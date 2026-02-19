@@ -3,15 +3,22 @@ const { maybeSummarizeConversation } = require('../memory/summarize');
 const { runChatWithTools } = require('../openai/runChatWithTools');
 const { redactForStorage } = require('../privacy/redact');
 
-function buildPriceFallbackReply({ brand, message }) {
+function buildHairTPFallbackReply({ brand, message }) {
   const normalizedBrand = typeof brand === 'string' ? brand.trim().toLowerCase() : '';
   if (normalizedBrand !== 'hair-tp-clinic') return '';
 
-  const q = String(message ?? '').toLowerCase();
-  const isPriceIntent = /(pris|priser|kostnad|kostar|kosta|kr|sek|graft|dhi)/i.test(q);
-  if (!isPriceIntent) return '';
+  const q = String(message ?? '').toLowerCase().trim();
+  if (!q) return '';
 
-  const normalizedQuery = q.replace(/(\d)\s+(\d{3})/g, '$1$2');
+  const normalizedQuery = q.replace(/(\d)\s+(\d{3})/g, '$1$2').replace(/\s+/g, ' ');
+
+  function hasAny(regexes) {
+    return regexes.some((re) => re.test(normalizedQuery));
+  }
+
+  function joinLines(lines) {
+    return lines.join('\n');
+  }
 
   const FUE = {
     1000: '42 000 kr/behandling',
@@ -45,32 +52,178 @@ function buildPriceFallbackReply({ brand, message }) {
     laggTillOmrade: '1 500 kr/område',
   };
 
+  const contactReply = joinLines([
+    'Kontaktuppgifter till Hair TP Clinic:',
+    'Adress: Vasaplatsen 2, 411 34 Göteborg',
+    'Telefon: 031 88 11 66',
+    'E-post: contact@hairtpclinic.com',
+  ]);
+
+  const priceOverviewReply = joinLines([
+    'Prislista hårtransplantation:',
+    `FUE 1000/1500/2000/2500/3000/3500/4000 grafts: ${FUE[1000]}, ${FUE[1500]}, ${FUE[2000]}, ${FUE[2500]}, ${FUE[3000]}, ${FUE[3500]}, ${FUE[4000]}`,
+    `DHI 1000/1500/2000/2500/3000 grafts: ${DHI[1000]}, ${DHI[1500]}, ${DHI[2000]}, ${DHI[2500]}, ${DHI[3000]}`,
+    '',
+    'PRP-priser:',
+    `- Hår Standard: ${PRP.standard}`,
+    `- Hår XL: ${PRP.xl}`,
+    `- Hår Mini: ${PRP.mini}`,
+    `- Efter hårtransplantation: ${PRP.efterHartransplantation}`,
+    `- Skägg / Ansikte / Hals / Dekolletage / Händer: ${PRP.skagg}`,
+    `- Microneedling/Dermapen + PRP för huden: ${PRP.microneedlingDermapenMedPrp}`,
+    `- Lägg till ett område: ${PRP.laggTillOmrade}`,
+    '',
+    'Antal grafts avgörs vid konsultation.',
+  ]);
+
+  if (/^priser?$/.test(normalizedQuery)) {
+    return priceOverviewReply;
+  }
+
+  if (/^behandling(ar)?$/.test(normalizedQuery)) {
+    return joinLines([
+      'Vi erbjuder:',
+      '- Hårtransplantation (FUE och DHI)',
+      '- PRP för hår (för män och kvinnor)',
+      '- PRP för hud',
+      '- Microneedling / Dermapen',
+      '- Hårtransplantation för skägg, ögonbryn och ärr',
+    ]);
+  }
+
+  if (/^efterv[aå]rd$/.test(normalizedQuery)) {
+    return joinLines([
+      'Eftervård ingår som en viktig del av behandlingsprocessen.',
+      'Du får vägledning om eftervård efter hårtransplantation från kliniken.',
+      'Kliniken har även information om: före behandlingen (konsultation), behandlingsdagen och eftervård.',
+    ]);
+  }
+
+  if (/^boka( konsultation| tid)?$/.test(normalizedQuery)) {
+    return joinLines([
+      'Du kan boka direkt via knappen "Boka tid" i chatten.',
+      'Det går att boka både fysisk konsultation och online-konsultation.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /kontaktuppgift/,
+      /kontakt/,
+      /kontakta/,
+    ])
+  ) {
+    return contactReply;
+  }
+
+  if (
+    hasAny([
+      /adress/,
+      /address/,
+      /var ligger/,
+      /vart ligger/,
+      /var finns/,
+      /hitta till/,
+      /location/,
+    ])
+  ) {
+    return 'Hair TP Clinic ligger på Vasaplatsen 2, 411 34 Göteborg.';
+  }
+
+  if (
+    hasAny([
+      /telefon/,
+      /tel/,
+      /nummer/,
+      /ring/,
+      /call/,
+    ])
+  ) {
+    return 'Du når Hair TP Clinic på telefon 031 88 11 66.';
+  }
+
+  if (hasAny([/e-post/, /epost/, /email/, /mail/])) {
+    return 'E-post till Hair TP Clinic: contact@hairtpclinic.com.';
+  }
+
+  if (
+    hasAny([
+      /öppettid/,
+      /oppettid/,
+      /öppet/,
+      /oppet/,
+      /öppnar/,
+      /oppnar/,
+      /stänger/,
+      /stanger/,
+      /tider/,
+      /opening hours/,
+      /open/,
+    ])
+  ) {
+    return 'Öppettider enligt hemsidans uppgifter: alla dagar 09:00-17:00.';
+  }
+
+  if (
+    hasAny([
+      /sedan när/,
+      /när startade/,
+      /hur länge/,
+      /vilket år/,
+      /sedan 2014/,
+    ])
+  ) {
+    return 'Hair TP Clinic uppger att de har arbetat med hårtransplantation och PRP-behandlingar sedan 2014.';
+  }
+
+  if (
+    hasAny([
+      /boka/,
+      /bokar/,
+      /bokning/,
+      /online[- ]?konsultation/,
+      /fysisk konsultation/,
+      /boka tid/,
+    ])
+  ) {
+    return joinLines([
+      'Du kan boka direkt via knappen "Boka tid" i chatten.',
+      'Det går att boka både fysisk konsultation och online-konsultation.',
+      'Om du vill kan jag guida dig till rätt typ av konsultation.',
+    ]);
+  }
+
   const graftMatch = normalizedQuery.match(/\b(1000|1500|2000|2500|3000|3500|4000)\b/);
   const graftCount = graftMatch ? Number.parseInt(graftMatch[1], 10) : null;
   const wantsDHI = /\bdhi\b/.test(normalizedQuery);
   const wantsFUE = /\bfue\b/.test(normalizedQuery);
+  const wantsPRP = /\bprp\b|\bplasma\b/.test(normalizedQuery);
+  const wantsMicroneedling = /\bmicroneedling\b|\bdermapen\b/.test(normalizedQuery);
+  const hasPriceWord = hasAny([
+    /\bpris\b/,
+    /\bpriser\b/,
+    /\bkostnad\b/,
+    /\bkostar\b/,
+    /\bkosta\b/,
+    /\bkr\b/,
+    /\bsek\b/,
+  ]);
+  const hasGraftKeyword = /\bgrafts?\b/.test(normalizedQuery);
+  const hasPriceCount = graftCount && (hasGraftKeyword || wantsDHI || wantsFUE);
+  const isPriceIntent = hasPriceWord || Boolean(hasPriceCount);
 
-  function withFooter(lines) {
-    return [
-      ...lines,
-      '',
-      'Källa: https://hairtpclinic.se/hartransplantation-pris/',
-      'Boka konsultation: https://hairtpclinic.se/boka/',
-    ].join('\n');
-  }
-
-  if (/(prp|plasma)/i.test(q)) {
+  if (isPriceIntent && wantsPRP) {
     if (/(mini)/i.test(q)) {
-      return withFooter([`PRP Hår Mini: ${PRP.mini}.`]);
+      return `PRP Hår Mini: ${PRP.mini}.`;
     }
     if (/(xl)/i.test(q)) {
-      return withFooter([`PRP Hår XL: ${PRP.xl}.`]);
+      return `PRP Hår XL: ${PRP.xl}.`;
     }
     if (/(standard)/i.test(q)) {
-      return withFooter([`PRP Hår Standard: ${PRP.standard}.`]);
+      return `PRP Hår Standard: ${PRP.standard}.`;
     }
 
-    return withFooter([
+    return joinLines([
       'PRP-priser:',
       `- Hår Standard: ${PRP.standard}`,
       `- Hår XL: ${PRP.xl}`,
@@ -82,37 +235,37 @@ function buildPriceFallbackReply({ brand, message }) {
     ]);
   }
 
-  if (/(microneedling|dermapen)/i.test(q)) {
-    return withFooter([
+  if (isPriceIntent && wantsMicroneedling) {
+    return joinLines([
       `Microneedling/Dermapen + PRP för huden: ${PRP.microneedlingDermapenMedPrp}.`,
       `Lägg till ett område: ${PRP.laggTillOmrade}.`,
     ]);
   }
 
-  if (graftCount && wantsDHI && DHI[graftCount]) {
-    return withFooter([
+  if (isPriceIntent && graftCount && wantsDHI && DHI[graftCount]) {
+    return joinLines([
       `Priset för ${graftCount} grafts med DHI är ${DHI[graftCount]}.`,
       'Antal grafts avgörs vid konsultation.',
     ]);
   }
 
-  if (graftCount && wantsFUE && FUE[graftCount]) {
-    return withFooter([
+  if (isPriceIntent && graftCount && wantsFUE && FUE[graftCount]) {
+    return joinLines([
       `Priset för ${graftCount} grafts med FUE är ${FUE[graftCount]}.`,
       'Antal grafts avgörs vid konsultation.',
     ]);
   }
 
-  if (graftCount && !wantsDHI && !wantsFUE) {
+  if (isPriceIntent && graftCount && !wantsDHI && !wantsFUE) {
     const lines = [`Pris för ${graftCount} grafts:`];
     if (FUE[graftCount]) lines.push(`- FUE: ${FUE[graftCount]}`);
     if (DHI[graftCount]) lines.push(`- DHI: ${DHI[graftCount]}`);
     lines.push('Antal grafts avgörs vid konsultation.');
-    return withFooter(lines);
+    return joinLines(lines);
   }
 
-  if (wantsDHI) {
-    return withFooter([
+  if (isPriceIntent && wantsDHI) {
+    return joinLines([
       'Prislista DHI:',
       `- 1000 grafts: ${DHI[1000]}`,
       `- 1500 grafts: ${DHI[1500]}`,
@@ -123,8 +276,8 @@ function buildPriceFallbackReply({ brand, message }) {
     ]);
   }
 
-  if (wantsFUE) {
-    return withFooter([
+  if (isPriceIntent && wantsFUE) {
+    return joinLines([
       'Prislista FUE:',
       `- 1000 grafts: ${FUE[1000]}`,
       `- 1500 grafts: ${FUE[1500]}`,
@@ -137,12 +290,189 @@ function buildPriceFallbackReply({ brand, message }) {
     ]);
   }
 
-  return withFooter([
-    'Prislista hårtransplantation:',
-    `- FUE 1000/1500/2000/2500/3000/3500/4000 grafts: ${FUE[1000]}, ${FUE[1500]}, ${FUE[2000]}, ${FUE[2500]}, ${FUE[3000]}, ${FUE[3500]}, ${FUE[4000]}`,
-    `- DHI 1000/1500/2000/2500/3000 grafts: ${DHI[1000]}, ${DHI[1500]}, ${DHI[2000]}, ${DHI[2500]}, ${DHI[3000]}`,
-    'Antal grafts avgörs vid konsultation.',
-  ]);
+  if (isPriceIntent) {
+    return priceOverviewReply;
+  }
+
+  if (
+    hasAny([
+      /vad är en graft/,
+      /vad betyder graft/,
+      /grafts?/,
+    ])
+  ) {
+    return joinLines([
+      'En graft är en transplanterad hårsäcksenhet.',
+      'Hur många grafts som behövs avgörs vid konsultation utifrån område och önskat resultat.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /fue.*dhi/,
+      /dhi.*fue/,
+      /skillnad.*dhi/,
+      /skillnad.*fue/,
+      /vilken metod/,
+      /dhi[- ]?metod/,
+      /vad är dhi/,
+      /vad innebär dhi/,
+      /vad är fue/,
+      /vad innebär fue/,
+    ])
+  ) {
+    return joinLines([
+      'Hair TP Clinic arbetar med både FUE och DHI.',
+      'Vilken metod som passar dig bäst avgörs vid konsultation utifrån hår, område och mål.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /vad erbjuder ni/,
+      /erbjuder ni/,
+      /vilka behandlingar/,
+      /behandling(ar)?/,
+      /tjänster/,
+      /vad kan ni hjälpa/,
+    ])
+  ) {
+    return joinLines([
+      'Hair TP Clinic erbjuder:',
+      '- Hårtransplantation (för män och kvinnor, inklusive DHI-metoden)',
+      '- PRP-behandling för hår',
+      '- PRP-behandling för hud',
+      '- Microneedling / Dermapen',
+      '- Hårtransplantation av skägg, ögonbryn och ärr',
+    ]);
+  }
+
+  if (hasAny([/skägg/, /skagg/, /ögonbryn/, /ogonbryn/, /ärr/, /arr/])) {
+    return 'Hair TP Clinic erbjuder även transplantation för skägg, ögonbryn och ärr.';
+  }
+
+  if (
+    hasAny([
+      /hårtransplantation/,
+      /hartransplantation/,
+      /transplantation/,
+    ])
+  ) {
+    return joinLines([
+      'Hair TP Clinic erbjuder hårtransplantation med fokus på naturligt resultat.',
+      'Kliniken arbetar med både FUE och DHI samt behandlingar för män och kvinnor.',
+      'Antal grafts och upplägg bestäms vid konsultation.',
+    ]);
+  }
+
+  if (hasAny([/\bprp\b/, /plasma/])) {
+    return joinLines([
+      'PRP-behandling används för att stimulera hårtillväxt och stödja hårsäckarnas vitalitet.',
+      'Kliniken erbjuder PRP för hår (män och kvinnor) samt PRP för hud.',
+    ]);
+  }
+
+  if (hasAny([/microneedling/, /dermapen/])) {
+    return joinLines([
+      'Microneedling / Dermapen används för att förbättra hudstruktur och hudkvalitet.',
+      'Behandlingen används bland annat vid fina linjer, ärr, porer och ojämn hudton.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /för män/,
+      /for man/,
+      /för kvinnor/,
+      /for kvinnor/,
+      /män/,
+      /manligt/,
+      /kvinn/,
+    ])
+  ) {
+    return 'Kliniken erbjuder behandlingar för både män och kvinnor, inklusive hårtransplantation och PRP.';
+  }
+
+  if (
+    hasAny([
+      /före behandlingen/,
+      /fore behandlingen/,
+      /inför behandlingen/,
+      /infor behandlingen/,
+      /innan behandlingen/,
+      /konsultation före/,
+      /forbered/,
+      /förbered/,
+    ])
+  ) {
+    return joinLines([
+      'Inför behandling börjar processen med konsultation.',
+      'Där går ni igenom mål, förutsättningar och plan för behandlingen.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /dagen för/,
+      /behandlingsdagen/,
+      /operationsdagen/,
+      /dagen för din hårtransplantation/,
+    ])
+  ) {
+    return joinLines([
+      'Kliniken har en tydlig genomgång för behandlingsdagen.',
+      'Du får information steg för steg inför och under dagen i samband med konsultationen.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /efterv[aå]rd/,
+      /efter behandlingen/,
+      /återhämtning/,
+      /aterhamtning/,
+      /recovery/,
+    ])
+  ) {
+    return joinLines([
+      'Eftervård är en viktig del av behandlingen.',
+      'Kliniken går igenom eftervård efter hårtransplantation så att du vet exakt hur du ska sköta området.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /håravfall/,
+      /haravfall/,
+      /tappar hår/,
+      /tappar har/,
+      /alopecia/,
+    ])
+  ) {
+    return joinLines([
+      'Hair TP Clinic arbetar med flera typer av håravfallsrelaterade behandlingar.',
+      'För rätt upplägg behöver du en konsultation där orsaker och mål gås igenom.',
+    ]);
+  }
+
+  if (
+    hasAny([
+      /delbetal/,
+      /avbetal/,
+      /finans/,
+      /betalplan/,
+      /klarna/,
+    ])
+  ) {
+    return joinLines([
+      'Jag har ingen bekräftad information om delbetalning i underlaget just nu.',
+      'För korrekt besked, kontakta kliniken direkt:',
+      'Telefon: 031 88 11 66',
+      'E-post: contact@hairtpclinic.com',
+    ]);
+  }
+
+  return '';
 }
 
 function createChatHandler({
@@ -211,8 +541,8 @@ function createChatHandler({
         ? await knowledgeRetriever.search(message)
         : [];
 
-      const fallbackPriceReply = buildPriceFallbackReply({ brand, message });
-      if (fallbackPriceReply) {
+      const fallbackReply = buildHairTPFallbackReply({ brand, message });
+      if (fallbackReply) {
         await memoryStore.appendMessage(
           conversationId,
           'user',
@@ -221,9 +551,9 @@ function createChatHandler({
         await memoryStore.appendMessage(
           conversationId,
           'assistant',
-          redactForStorage(fallbackPriceReply)
+          redactForStorage(fallbackReply)
         );
-        return res.json({ reply: fallbackPriceReply, conversationId });
+        return res.json({ reply: fallbackReply, conversationId });
       }
 
       const messages = await buildClinicMessages({
