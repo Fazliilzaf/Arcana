@@ -11,33 +11,138 @@ function buildPriceFallbackReply({ brand, message }) {
   const isPriceIntent = /(pris|priser|kostnad|kostar|kosta|kr|sek|graft|dhi)/i.test(q);
   if (!isPriceIntent) return '';
 
-  if (/(prp|plasma)/i.test(q)) {
+  const normalizedQuery = q.replace(/(\d)\s+(\d{3})/g, '$1$2');
+
+  const FUE = {
+    1000: '42 000 kr/behandling',
+    1500: '46 000 kr/behandling',
+    2000: '50 000 kr/behandling',
+    2500: '54 000 kr/behandling',
+    3000: '58 000 kr/behandling',
+    3500: '62 000 kr/behandling',
+    4000: '66 000 kr/behandling',
+  };
+
+  const DHI = {
+    1000: '52 000 kr/behandling',
+    1500: '56 000 kr/behandling',
+    2000: '60 000 kr/behandling',
+    2500: '64 000 kr/behandling',
+    3000: '68 000 kr/behandling',
+  };
+
+  const PRP = {
+    standard: '4 300 kr/behandling',
+    xl: '4 800 kr/behandling',
+    mini: '2 500 kr/behandling',
+    efterHartransplantation: '2 500 kr/behandling',
+    skagg: '4 300 kr/behandling',
+    ansikte: '4 300 kr/behandling',
+    hals: '4 300 kr/behandling',
+    dekolletage: '4 300 kr/behandling',
+    hander: '4 300 kr/behandling',
+    microneedlingDermapenMedPrp: '5 800 kr/behandling',
+    laggTillOmrade: '1 500 kr/område',
+  };
+
+  const graftMatch = normalizedQuery.match(/\b(1000|1500|2000|2500|3000|3500|4000)\b/);
+  const graftCount = graftMatch ? Number.parseInt(graftMatch[1], 10) : null;
+  const wantsDHI = /\bdhi\b/.test(normalizedQuery);
+  const wantsFUE = /\bfue\b/.test(normalizedQuery);
+
+  function withFooter(lines) {
     return [
-      'Aktuell information om PRP hittar du här:',
-      '- https://hairtpclinic.se/prp-behandling/',
+      ...lines,
       '',
-      'För exakt pris utifrån dina förutsättningar rekommenderar vi konsultation:',
-      '- https://hairtpclinic.se/boka/',
+      'Källa: https://hairtpclinic.se/hartransplantation-pris/',
+      'Boka konsultation: https://hairtpclinic.se/boka/',
     ].join('\n');
+  }
+
+  if (/(prp|plasma)/i.test(q)) {
+    if (/(mini)/i.test(q)) {
+      return withFooter([`PRP Hår Mini: ${PRP.mini}.`]);
+    }
+    if (/(xl)/i.test(q)) {
+      return withFooter([`PRP Hår XL: ${PRP.xl}.`]);
+    }
+    if (/(standard)/i.test(q)) {
+      return withFooter([`PRP Hår Standard: ${PRP.standard}.`]);
+    }
+
+    return withFooter([
+      'PRP-priser:',
+      `- Hår Standard: ${PRP.standard}`,
+      `- Hår XL: ${PRP.xl}`,
+      `- Hår Mini: ${PRP.mini}`,
+      `- Efter hårtransplantation: ${PRP.efterHartransplantation}`,
+      `- Skägg / Ansikte / Hals / Dekolletage / Händer: ${PRP.skagg}`,
+      `- Microneedling/Dermapen + PRP för huden: ${PRP.microneedlingDermapenMedPrp}`,
+      `- Lägg till ett område: ${PRP.laggTillOmrade}`,
+    ]);
   }
 
   if (/(microneedling|dermapen)/i.test(q)) {
-    return [
-      'Aktuell information om Microneedling / Dermapen hittar du här:',
-      '- https://hairtpclinic.se/microneedling-dermapen/',
-      '',
-      'För exakt pris utifrån dina förutsättningar rekommenderar vi konsultation:',
-      '- https://hairtpclinic.se/boka/',
-    ].join('\n');
+    return withFooter([
+      `Microneedling/Dermapen + PRP för huden: ${PRP.microneedlingDermapenMedPrp}.`,
+      `Lägg till ett område: ${PRP.laggTillOmrade}.`,
+    ]);
   }
 
-  return [
-    'Aktuell prisinformation för hårtransplantation hittar du här:',
-    '- https://hairtpclinic.se/hartransplantation-pris/',
-    '',
-    'För exakt pris (t.ex. vid DHI eller antal grafts) rekommenderar vi konsultation:',
-    '- https://hairtpclinic.se/boka/',
-  ].join('\n');
+  if (graftCount && wantsDHI && DHI[graftCount]) {
+    return withFooter([
+      `Priset för ${graftCount} grafts med DHI är ${DHI[graftCount]}.`,
+      'Antal grafts avgörs vid konsultation.',
+    ]);
+  }
+
+  if (graftCount && wantsFUE && FUE[graftCount]) {
+    return withFooter([
+      `Priset för ${graftCount} grafts med FUE är ${FUE[graftCount]}.`,
+      'Antal grafts avgörs vid konsultation.',
+    ]);
+  }
+
+  if (graftCount && !wantsDHI && !wantsFUE) {
+    const lines = [`Pris för ${graftCount} grafts:`];
+    if (FUE[graftCount]) lines.push(`- FUE: ${FUE[graftCount]}`);
+    if (DHI[graftCount]) lines.push(`- DHI: ${DHI[graftCount]}`);
+    lines.push('Antal grafts avgörs vid konsultation.');
+    return withFooter(lines);
+  }
+
+  if (wantsDHI) {
+    return withFooter([
+      'Prislista DHI:',
+      `- 1000 grafts: ${DHI[1000]}`,
+      `- 1500 grafts: ${DHI[1500]}`,
+      `- 2000 grafts: ${DHI[2000]}`,
+      `- 2500 grafts: ${DHI[2500]}`,
+      `- 3000 grafts: ${DHI[3000]}`,
+      'Antal grafts avgörs vid konsultation.',
+    ]);
+  }
+
+  if (wantsFUE) {
+    return withFooter([
+      'Prislista FUE:',
+      `- 1000 grafts: ${FUE[1000]}`,
+      `- 1500 grafts: ${FUE[1500]}`,
+      `- 2000 grafts: ${FUE[2000]}`,
+      `- 2500 grafts: ${FUE[2500]}`,
+      `- 3000 grafts: ${FUE[3000]}`,
+      `- 3500 grafts: ${FUE[3500]}`,
+      `- 4000 grafts: ${FUE[4000]}`,
+      'Antal grafts avgörs vid konsultation.',
+    ]);
+  }
+
+  return withFooter([
+    'Prislista hårtransplantation:',
+    `- FUE 1000/1500/2000/2500/3000/3500/4000 grafts: ${FUE[1000]}, ${FUE[1500]}, ${FUE[2000]}, ${FUE[2500]}, ${FUE[3000]}, ${FUE[3500]}, ${FUE[4000]}`,
+    `- DHI 1000/1500/2000/2500/3000 grafts: ${DHI[1000]}, ${DHI[1500]}, ${DHI[2000]}, ${DHI[2500]}, ${DHI[3000]}`,
+    'Antal grafts avgörs vid konsultation.',
+  ]);
 }
 
 function createChatHandler({
