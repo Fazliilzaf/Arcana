@@ -3,6 +3,43 @@ const { maybeSummarizeConversation } = require('../memory/summarize');
 const { runChatWithTools } = require('../openai/runChatWithTools');
 const { redactForStorage } = require('../privacy/redact');
 
+function buildPriceFallbackReply({ brand, message }) {
+  const normalizedBrand = typeof brand === 'string' ? brand.trim().toLowerCase() : '';
+  if (normalizedBrand !== 'hair-tp-clinic') return '';
+
+  const q = String(message ?? '').toLowerCase();
+  const isPriceIntent = /(pris|priser|kostnad|kostar|kosta|kr|sek|graft|dhi)/i.test(q);
+  if (!isPriceIntent) return '';
+
+  if (/(prp|plasma)/i.test(q)) {
+    return [
+      'Aktuell information om PRP hittar du här:',
+      '- https://hairtpclinic.se/prp-behandling/',
+      '',
+      'För exakt pris utifrån dina förutsättningar rekommenderar vi konsultation:',
+      '- https://hairtpclinic.se/boka/',
+    ].join('\n');
+  }
+
+  if (/(microneedling|dermapen)/i.test(q)) {
+    return [
+      'Aktuell information om Microneedling / Dermapen hittar du här:',
+      '- https://hairtpclinic.se/microneedling-dermapen/',
+      '',
+      'För exakt pris utifrån dina förutsättningar rekommenderar vi konsultation:',
+      '- https://hairtpclinic.se/boka/',
+    ].join('\n');
+  }
+
+  return [
+    'Aktuell prisinformation för hårtransplantation hittar du här:',
+    '- https://hairtpclinic.se/hartransplantation-pris/',
+    '',
+    'För exakt pris (t.ex. vid DHI eller antal grafts) rekommenderar vi konsultation:',
+    '- https://hairtpclinic.se/boka/',
+  ].join('\n');
+}
+
 function createChatHandler({
   openai,
   model,
@@ -68,6 +105,21 @@ function createChatHandler({
       const knowledge = knowledgeRetriever
         ? await knowledgeRetriever.search(message)
         : [];
+
+      const fallbackPriceReply = buildPriceFallbackReply({ brand, message });
+      if (fallbackPriceReply) {
+        await memoryStore.appendMessage(
+          conversationId,
+          'user',
+          redactForStorage(message)
+        );
+        await memoryStore.appendMessage(
+          conversationId,
+          'assistant',
+          redactForStorage(fallbackPriceReply)
+        );
+        return res.json({ reply: fallbackPriceReply, conversationId });
+      }
 
       const messages = await buildClinicMessages({
         brand,
