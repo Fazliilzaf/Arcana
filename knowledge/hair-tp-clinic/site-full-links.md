@@ -1,0 +1,64 @@
+# Hair TP Clinic - länkar från sidan
+
+Källa: https://hairtpclinic.se/
+Källa fil: public/hairtpclinic.txt
+
+- (utan länktext): https://hairtpclinic.se
+- (utan länktext): https://www.facebook.com/hairtpclinic/
+- (utan länktext): https://www.instagram.com/hairtpclinic/
+- Boka konsultation: https://hairtpclinic.se/boka/
+- Boka Online: https://hairtpclinic.se/boka/
+- Hårtransplantation: https://hairtpclinic.se/hartransplantation/
+- Om hårtransplantation: https://hairtpclinic.se/hartransplantation/
+- För män: https://hairtpclinic.se/hartransplantation/hartransplantation-for-man/
+- För kvinnor: https://hairtpclinic.se/hartransplantation/hartransplantation-for-kvinnor/
+- DHI-metoden: https://hairtpclinic.se/hartransplantation/dhi-metoden/
+- Skägg: https://hairtpclinic.se/hartransplantation/skaggtransplantation/
+- Ögonbryn: https://hairtpclinic.se/hartransplantation/ogonbryn/
+- Ärr: https://hairtpclinic.se/hartransplantation/arr/
+- Före behandlingen – Konsultation: https://hairtpclinic.se/hartransplantation/fore-behandlingen-konsultation/
+- Dagen för din hårtransplantation: https://hairtpclinic.se/hartransplantation/dagen-for-din-hartransplantation/
+- Genomgång av eftervård av en hårtransplantation: https://hairtpclinic.se/hartransplantation/genomgang-av-eftervard/
+- Priser: https://hairtpclinic.se/hartransplantation-pris/
+- Kundberättelser: https://hairtpclinic.se/kundberattelser/
+- PRP-behandling: https://hairtpclinic.se/prp-behandling/
+- För män: https://hairtpclinic.se/prp-behandling/prp-behandling-man/
+- För kvinnor: https://hairtpclinic.se/prp-behandling/prp-behandling-kvinnor/
+- PRP – hår: https://hairtpclinic.se/prp-behandling/prp-har/
+- PRP – hud: https://hairtpclinic.se/prp-behandling/prp-hud/
+- Information: https://hairtpclinic.se/prp-behandling/
+- Om PRP-behandling: https://hairtpclinic.se/prp-behandling/
+- Workshop PRP: https://hairtpclinic.se/workshop-prp-injektioner/
+- Microneedling: https://hairtpclinic.se/microneedling-dermapen/
+- Typer av håravfall: https://hairtpclinic.se/haravfall/
+- Håravfall Män: https://hairtpclinic.se/haravfall/manligt-haravfall/
+- Håravfall Kvinnor: https://hairtpclinic.se/haravfall/kvinnligt-haravfall/
+- Information, tips & fakta: https://hairtpclinic.se/artiklar/
+- Artiklar: https://hairtpclinic.se/artiklar/
+- Kontakta oss: https://hairtpclinic.se/kontakta-oss/
+- Om oss: https://hairtpclinic.se/?page_id=148
+- Jobba hos oss: https://hairtpclinic.se/jobba-hos-oss/
+- Tryggt och säkert: https://hairtpclinic.se/patientsakerhet/
+- Patientsäkerhet: https://hairtpclinic.se/patientsakerhet/
+- Läs mer här: https://hairtpclinic.se/microneedling-dermapen/
+- Fysisk konsultation: https://hairtpclinic.se/boka/
+- Online konsultation: https://hairtpclinic.se/boka/
+- Övriga frågor: https://hairtpclinic.se/ovriga-fragor/
+- PRP för män: https://hairtpclinic.se/prp-behandling/prp-behandling-man/
+- PRP för kvinnor: https://hairtpclinic.se/prp-behandling/prp-behandling-kvinnor/
+- February 2, 2023 --> Vad är bra mat mot håravfall? Som du kanske redan vet kan håravfall bero på många orsaker. Även om det väldigt ofta är...: https://hairtpclinic.se/vad-ar-bra-mat-mot-haravfall/
+- January 25, 2023 --> De 5 vanligaste orsakerna till håravfall Det finns flera typer av håravfallsproblem som kan påverka människor. Här kommer vi att...: https://hairtpclinic.se/de-5-vanligaste-orsakerna-till-haravfall/
+- January 17, 2023 --> Håravfall i skägget – vad kan man göra? Alopecia barbae, eller skägghåravfall, är en sjukdom som gör det svårt att växa ansiktshår....: https://hairtpclinic.se/haravfall-i-skagget-vad-kan-man-gora/
+- Till artiklarna: https://hairtpclinic.se/artiklar/
+- ✨ Nytt år, nytt hår? Här ser du resultatet av nog: https://www.instagram.com/p/DTvVulpDbc0/
+- Vi är djupt tacksamma. För förtroendet. För fina s: https://www.instagram.com/p/DTifrBvkvwd/
+- Vill du också ge dig själv en lyxig och hårig julk: https://www.instagram.com/p/DS7DWO1j9Bz/
+- 💭 Många undrar: “Kommer donationsområdet se konsti: https://www.instagram.com/reel/DS4jQJQFQqB/
+- Träning efter en hårtransplantation? 👇 Unna kropp: https://www.instagram.com/p/DR5Pwf4kr1t/
+- Från att ständigt gömma sig i keps – till att stol: https://www.instagram.com/p/DRu43ZVk4cN/
+- Har du hört ordet graft men undrat vad det egentli: https://www.instagram.com/p/DRc3Riek2kN/
+- En ny tät frisyr kommer lastad! 🚚 Från första kon: https://www.instagram.com/p/DREzgCFjy8w/
+- Online-konsultation: https://hairtpclinic.se/boka/
+- .a { fill: #fff; }: https://www.facebook.com/hairtpclinic/
+- .a { fill: #fff; }: https://www.instagram.com/hairtpclinic/
+- Integritetspolicy: https://hairtpclinic.se/integritetspolicy/
