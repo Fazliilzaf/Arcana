@@ -8,32 +8,76 @@ const STOP_WORDS = new Set(
     'och',
     'att',
     'det',
+    'de',
+    'den',
+    'detta',
+    'dessa',
     'som',
     'är',
+    'var',
+    'vart',
+    'varifrån',
+    'när',
+    'hur',
+    'varför',
+    'vad',
+    'vem',
+    'vems',
+    'vilken',
+    'vilket',
+    'vilka',
+    'vars',
+    'finns',
+    'har',
+    'ha',
+    'hade',
+    'får',
+    'kan',
+    'kunde',
+    'ska',
+    'skall',
+    'vill',
     'på',
     'i',
     'en',
     'ett',
+    'denna',
     'för',
+    'från',
+    'hos',
     'med',
     'till',
     'av',
-    'de',
     'du',
     'vi',
     'ni',
+    'er',
+    'era',
+    'ert',
+    'dig',
+    'dina',
+    'din',
     'jag',
+    'mig',
+    'min',
+    'mitt',
+    'mina',
     'man',
     'om',
-    'har',
-    'kan',
-    'ska',
     'inte',
     'eller',
     'så',
     'då',
     'the',
     'and',
+    'what',
+    'where',
+    'when',
+    'who',
+    'why',
+    'how',
+    'which',
+    'whose',
     'or',
     'to',
     'of',
@@ -61,10 +105,50 @@ function normalizeText(text) {
 function extractTerms(query) {
   const normalized = normalizeText(query);
   if (!normalized) return [];
-  const terms = normalized
-    .split(' ')
-    .map((t) => t.trim())
-    .filter(Boolean)
+
+  function expandTermVariants(term) {
+    const variants = new Set([term]);
+    const t = String(term || '').trim();
+    if (!t) return variants;
+
+    // Simple Swedish inflection normalization for better lexical recall.
+    const rules = [
+      { suffix: 'erna', minLen: 7 },
+      { suffix: 'orna', minLen: 7 },
+      { suffix: 'arna', minLen: 7 },
+      { suffix: 'ande', minLen: 7 },
+      { suffix: 'heten', minLen: 8 },
+      { suffix: 'ning', minLen: 7 },
+      { suffix: 'en', minLen: 5 },
+      { suffix: 'et', minLen: 5 },
+      { suffix: 'ar', minLen: 5 },
+      { suffix: 'or', minLen: 5 },
+      { suffix: 'er', minLen: 5 },
+      { suffix: 'na', minLen: 5 },
+      { suffix: 's', minLen: 4 },
+      { suffix: 'n', minLen: 6 },
+    ];
+
+    for (const rule of rules) {
+      if (t.length < rule.minLen) continue;
+      if (!t.endsWith(rule.suffix)) continue;
+      const base = t.slice(0, -rule.suffix.length).trim();
+      if (base.length >= 2) variants.add(base);
+    }
+
+    return variants;
+  }
+
+  const expanded = [];
+  for (const raw of normalized.split(' ')) {
+    const token = raw.trim();
+    if (!token) continue;
+    for (const variant of expandTermVariants(token)) {
+      expanded.push(variant);
+    }
+  }
+
+  const terms = expanded
     .filter((t) => t.length >= 2)
     .filter((t) => !STOP_WORDS.has(t));
   return Array.from(new Set(terms));
