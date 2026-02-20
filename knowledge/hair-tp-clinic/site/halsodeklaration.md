@@ -1,0 +1,223 @@
+# halsodeklaration
+
+Källa: https://hairtpclinic.se/halsodeklaration/
+
+Hälsodeklaration - Hair TP Clinic
+
+ -->
+
+ Boka konsultation
+
+ Boka Online
+
+ Hårtransplantation
+
+ Hårtransplantation
+
+ Om hårtransplantation
+
+ För män
+
+ För kvinnor
+
+ DHI-metoden
+
+ Andra områden
+
+ Skägg
+
+ Ögonbryn
+
+ Ärr
+
+ Information
+
+ Före behandlingen – Konsultation
+
+ Dagen för din hårtransplantation
+
+ Genomgång av eftervård av en hårtransplantation
+
+ Övrigt
+
+ Priser
+
+ Kundberättelser
+
+ PRP
+
+ PRP-behandling
+
+ För män
+
+ För kvinnor
+
+ Behandlingsområden
+
+ PRP – hår
+
+ PRP – hud
+
+ Information
+
+ Om PRP-behandling
+
+ Kundberättelser
+
+ Övrigt
+
+ Priser
+
+ Workshop PRP
+
+ Microneedling
+
+ Om håravfall
+
+ Typer av håravfall
+
+ Håravfall Män
+
+ Håravfall Kvinnor
+
+ Information, tips & fakta
+
+ Artiklar
+
+ Priser
+
+ Kontakt
+
+ Kontakta oss
+
+ Kontakta oss
+
+ Om oss
+
+ Jobba hos oss
+
+ Jobba hos oss
+
+ Tryggt och säkert
+
+ Patientsäkerhet
+
+ Boka konsultation
+
+ Hälsodeklaration
+
+ Personuppgifter
+
+ Röker du?
+ Ja Nej
+
+ Har du eller har du haft någon hjärt- & kärlsjukdom?
+ Ja Nej
+
+ Om ja, ange nedan:
+
+ Har du högt blodtryck?
+ Ja Nej Vet ej
+
+ Har du några övriga sjukdomar?
+ Ja Nej
+
+ Om ja, ange nedan:
+
+ Tar du några läkemedel?
+ Ja Nej
+
+ Om ja, ange läkemedlets namn, styrka och dos nedan:
+
+ Är du allergisk mot något läkemedel?
+ Ja Nej
+
+ Om ja, ange nedan:
+
+ Har du någon blodsmitta?
+ Ja Nej
+
+ Om ja, ange nedan:
+
+ Har du några specifika önskemål?
+
+ Hur kom du i kontakt med Hair TP Clinic?
+
+ Datum:
+
+ Jag godkänner att mina uppgifter sparas i Hair TP Clinics system. Jag ger även mitt godkännande till att ta emot utskick på mail från oss på Hair TP Clinic. Läs villkor
+
+ Skicka
+
+ Lämna detta fält tomt.
+
+ &times;
+ Boka konsultation
+
+ Boka konsultation
+ -->
+
+ Följ oss på Instagram
+
+ ✨ Nytt år, nytt hår?
+
+Här ser du resultatet av nog
+
+ Vi är djupt tacksamma.
+För förtroendet. För fina s
+
+ Vill du också ge dig själv en lyxig och hårig julk
+
+ 💭 Många undrar: “Kommer donationsområdet se konsti
+
+ Träning efter en hårtransplantation? 👇
+
+Unna kropp
+
+ Från att ständigt gömma sig i keps – till att stol
+
+ Har du hört ordet graft men undrat vad det egentli
+
+ En ny tät frisyr kommer lastad! 🚚
+
+Från första kon
+
+ Boka online-konsultation
+
+ Online-konsultation
+
+ Boka fysisk konsultation
+
+ Fysisk konsultation
+
+ Har du övriga frågor?
+
+ Övriga frågor
+
+ Skicka
+
+ Jag godkänner att mina personuppgifter behandlas i syfte att kontakta mig. Läs villkor
+
+ Lämna detta fält tomt.
+
+ -->
+
+ Besök oss:
+
+ Vasaplatsen 2, 411 34 Göteborg
+
+ Skicka e-post:
+
+ contact@hairtpclinic.com
+
+ Ring oss:
+
+ 031 88 11 66
+
+ Följ oss:
+
+ Copyright &copy; 2026 | Webbplatskarta | Hair TP Clinic | Alla rättigheter reserverade
+
+ Integritetspolicy
+
+ Boka konsultation

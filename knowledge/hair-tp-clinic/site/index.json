@@ -1,0 +1,1189 @@
+{
+  "base": "https://hairtpclinic.se",
+  "written": [
+    {
+      "url": "https://hairtpclinic.se/",
+      "file": "knowledge/hair-tp-clinic/site/index.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-content/themes/woonderland/library/assets/favicon/site.webmanifest",
+      "file": "knowledge/hair-tp-clinic/site/wp-content/themes/woonderland/library/assets/favicon/site-webmanifest.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/",
+      "file": "knowledge/hair-tp-clinic/site/wp-json.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/5",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/5.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/boka/",
+      "file": "knowledge/hair-tp-clinic/site/boka.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/hartransplantation-for-man/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/hartransplantation-for-man.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/hartransplantation-for-kvinnor/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/hartransplantation-for-kvinnor.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/dhi-metoden/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/dhi-metoden.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/skaggtransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/skaggtransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/ogonbryn/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/ogonbryn.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/arr/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/arr.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/fore-behandlingen-konsultation/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/fore-behandlingen-konsultation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/dagen-for-din-hartransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/dagen-for-din-hartransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/genomgang-av-eftervard/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/genomgang-av-eftervard.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-pris/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-pris.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandling/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandling.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandling/prp-behandling-man/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandling/prp-behandling-man.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandling/prp-behandling-kvinnor/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandling/prp-behandling-kvinnor.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandling/prp-har/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandling/prp-har.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandling/prp-hud/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandling/prp-hud.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/workshop-prp-injektioner/",
+      "file": "knowledge/hair-tp-clinic/site/workshop-prp-injektioner.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/microneedling-dermapen/",
+      "file": "knowledge/hair-tp-clinic/site/microneedling-dermapen.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall/manligt-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall/manligt-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall/kvinnligt-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall/kvinnligt-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/artiklar/",
+      "file": "knowledge/hair-tp-clinic/site/artiklar.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kontakta-oss/",
+      "file": "knowledge/hair-tp-clinic/site/kontakta-oss.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/jobba-hos-oss/",
+      "file": "knowledge/hair-tp-clinic/site/jobba-hos-oss.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/patientsakerhet/",
+      "file": "knowledge/hair-tp-clinic/site/patientsakerhet.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/ovriga-fragor/",
+      "file": "knowledge/hair-tp-clinic/site/ovriga-fragor.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vad-ar-bra-mat-mot-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/vad-ar-bra-mat-mot-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/de-5-vanligaste-orsakerna-till-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/de-5-vanligaste-orsakerna-till-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall-i-skagget-vad-kan-man-gora/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall-i-skagget-vad-kan-man-gora.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/integritetspolicy/",
+      "file": "knowledge/hair-tp-clinic/site/integritetspolicy.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/sitemap/",
+      "file": "knowledge/hair-tp-clinic/site/sitemap.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fboka%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fboka%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/595",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/595.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/153",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/153.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/behandlingar/hartransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/behandlingar/hartransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall/haravfall-kvinnor/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall/haravfall-kvinnor.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall/haravfall-man/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall/haravfall-man.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/skagg/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/skagg.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/carl-deman/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/carl-deman.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/jonas-fagerstrom/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/jonas-fagerstrom.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fhartransplantation-for-man%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fhartransplantation-for-man%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1268",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1268.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/behandlingar/prp-injektioner/",
+      "file": "knowledge/hair-tp-clinic/site/behandlingar/prp-injektioner.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fhartransplantation-for-kvinnor%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fhartransplantation-for-kvinnor%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1282",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1282.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fdhi-metoden%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fdhi-metoden%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/2392",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/2392.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-dhi-metoden-processen/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-dhi-metoden-processen.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fskaggtransplantation%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fskaggtransplantation%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/633",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/633.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fogonbryn%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fogonbryn%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/705",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/705.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Farr%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Farr%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/773",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/773.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Ffore-behandlingen-konsultation%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Ffore-behandlingen-konsultation%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/358",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/358.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fdagen-for-din-hartransplantation%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fdagen-for-din-hartransplantation%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/364",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/364.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fgenomgang-av-eftervard%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation%2Fgenomgang-av-eftervard%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/370",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/370.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-pris%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-pris%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/498",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/498.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/feed/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/lucas-simonsson/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/lucas-simonsson.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/146",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/146.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-behandling-man%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-behandling-man%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1232",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1232.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-behandling-kvinnor%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-behandling-kvinnor%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1235",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1235.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-har%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-har%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/317",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/317.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-hud%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fprp-behandling%2Fprp-hud%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/406",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/406.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fworkshop-prp-injektioner%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fworkshop-prp-injektioner%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1461",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1461.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fmicroneedling-dermapen%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fmicroneedling-dermapen%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/157",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/157.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/prp-behandlingar/prp-behandling/",
+      "file": "knowledge/hair-tp-clinic/site/prp-behandlingar/prp-behandling.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/615",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/615.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2Fmanligt-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2Fmanligt-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/155",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/155.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2Fkvinnligt-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall%2Fkvinnligt-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/421",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/421.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/fungerar-verkligen-inpackningar-mot-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/fungerar-verkligen-inpackningar-mot-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas/",
+      "file": "knowledge/hair-tp-clinic/site/vilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vilka-ar-de-olika-typerna-av-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/vilka-ar-de-olika-typerna-av-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/svar-pa-dina-harfragor-hur-man-stoppar-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/svar-pa-dina-harfragor-hur-man-stoppar-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/tillskott-av-biotin-for-battre-har-fungerar-det/",
+      "file": "knowledge/hair-tp-clinic/site/tillskott-av-biotin-for-battre-har-fungerar-det.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/undercut-en-trendig-frisyr-for-att-dolja-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/undercut-en-trendig-frisyr-for-att-dolja-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/fungerar-koffeinschampo-mot-haravfall/",
+      "file": "knowledge/hair-tp-clinic/site/fungerar-koffeinschampo-mot-haravfall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkontakta-oss%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkontakta-oss%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/151",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/151.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fjobba-hos-oss%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fjobba-hos-oss%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1478",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1478.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fpatientsakerhet%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fpatientsakerhet%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1529",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1529.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fovriga-fragor%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fovriga-fragor%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/2183",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/2183.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vad-ar-bra-mat-mot-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/vad-ar-bra-mat-mot-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvad-ar-bra-mat-mot-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvad-ar-bra-mat-mot-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1319",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1319.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/de-5-vanligaste-orsakerna-till-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/de-5-vanligaste-orsakerna-till-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fde-5-vanligaste-orsakerna-till-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fde-5-vanligaste-orsakerna-till-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1316",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1316.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/haravfall-i-skagget-vad-kan-man-gora/feed/",
+      "file": "knowledge/hair-tp-clinic/site/haravfall-i-skagget-vad-kan-man-gora/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall-i-skagget-vad-kan-man-gora%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fharavfall-i-skagget-vad-kan-man-gora%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1314",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1314.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fintegritetspolicy%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fintegritetspolicy%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/3",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/3.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fsitemap%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fsitemap%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/2721",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/2721.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/screen/",
+      "file": "knowledge/hair-tp-clinic/site/screen.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-karlstad-2/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-karlstad-2.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-boras-v1-2/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-boras-v1-2.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-skelleftea/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-skelleftea.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-karlskrona/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-karlskrona.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-upplands-vasby/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-upplands-vasby.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-varberg/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-varberg.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-solna/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-solna.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-kungsbacka/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-kungsbacka.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-lulea/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-lulea.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-marsta/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-marsta.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-ostersund/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-ostersund.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-uddevalla/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-uddevalla.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-vasteras/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-vasteras.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-angelholm/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-angelholm.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-vanersborg/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-vanersborg.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-skovde/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-skovde.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-akersberga/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-akersberga.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-falun/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-falun.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-borlange/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-borlange.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-trollhattan/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-trollhattan.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-halmstad/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-halmstad.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-vaxjo/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-vaxjo.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-taby/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-taby.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-sodertalje/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-sodertalje.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-sundsvall/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-sundsvall.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-boras/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-boras.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-umea/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-umea.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-jonkoping/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-jonkoping.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-norrkoping/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-norrkoping.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-helsingborg/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-helsingborg.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-linkoping/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-linkoping.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-stockholm/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-stockholm.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-malmo/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-malmo.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-uppsala/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-uppsala.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation-karlstad/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation-karlstad.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hartransplantation/fue-metoden/",
+      "file": "knowledge/hair-tp-clinic/site/hartransplantation/fue-metoden.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal-prp/",
+      "file": "knowledge/hair-tp-clinic/site/journal-prp.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal-tp-2/",
+      "file": "knowledge/hair-tp-clinic/site/journal-tp-2.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal/",
+      "file": "knowledge/hair-tp-clinic/site/journal.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal-estetiska-injektioner/",
+      "file": "knowledge/hair-tp-clinic/site/journal-estetiska-injektioner.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/tp-medicinsk-journal/",
+      "file": "knowledge/hair-tp-clinic/site/tp-medicinsk-journal.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal-efterbehandling/",
+      "file": "knowledge/hair-tp-clinic/site/journal-efterbehandling.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/tack/",
+      "file": "knowledge/hair-tp-clinic/site/tack.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/direktbokning-videokons-hd/",
+      "file": "knowledge/hair-tp-clinic/site/direktbokning-videokons-hd.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kompletterande-halsodeklaration/",
+      "file": "knowledge/hair-tp-clinic/site/kompletterande-halsodeklaration.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/healthdeclaration/",
+      "file": "knowledge/hair-tp-clinic/site/healthdeclaration.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/halsodeklaration/",
+      "file": "knowledge/hair-tp-clinic/site/halsodeklaration.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/friskforsakran-hartransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/friskforsakran-hartransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/behandlingsavtal-hartransplantation/",
+      "file": "knowledge/hair-tp-clinic/site/behandlingsavtal-hartransplantation.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/hair-transplant-medication-timing/",
+      "file": "knowledge/hair-tp-clinic/site/hair-transplant-medication-timing.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/carl-deman/feed/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/carl-deman/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Fcarl-deman%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Fcarl-deman%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/jonas-fagerstrom/feed/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/jonas-fagerstrom/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Fjonas-fagerstrom%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Fjonas-fagerstrom%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-dhi-metoden-processen%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-dhi-metoden-processen%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/2420",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/2420.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-content/uploads/2021/11/IMG_1274.mp4",
+      "file": "knowledge/hair-tp-clinic/site/wp-content/uploads/2021/11/IMG_1274-mp4.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/kundberattelser/lucas-simonsson/feed/",
+      "file": "knowledge/hair-tp-clinic/site/kundberattelser/lucas-simonsson/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Flucas-simonsson%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fkundberattelser%2Flucas-simonsson%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/fungerar-verkligen-inpackningar-mot-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/fungerar-verkligen-inpackningar-mot-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ffungerar-verkligen-inpackningar-mot-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ffungerar-verkligen-inpackningar-mot-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1311",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1311.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas/feed/",
+      "file": "knowledge/hair-tp-clinic/site/vilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvilka-ar-de-olika-orsakerna-till-haravfall-och-hur-kan-de-behandlas%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1308",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1308.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/vilka-ar-de-olika-typerna-av-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/vilka-ar-de-olika-typerna-av-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvilka-ar-de-olika-typerna-av-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fvilka-ar-de-olika-typerna-av-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/1305",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/1305.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/svar-pa-dina-harfragor-hur-man-stoppar-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/svar-pa-dina-harfragor-hur-man-stoppar-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fsvar-pa-dina-harfragor-hur-man-stoppar-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fsvar-pa-dina-harfragor-hur-man-stoppar-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/757",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/757.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/tillskott-av-biotin-for-battre-har-fungerar-det/feed/",
+      "file": "knowledge/hair-tp-clinic/site/tillskott-av-biotin-for-battre-har-fungerar-det/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ftillskott-av-biotin-for-battre-har-fungerar-det%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ftillskott-av-biotin-for-battre-har-fungerar-det%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/755",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/755.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/undercut-en-trendig-frisyr-for-att-dolja-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/undercut-en-trendig-frisyr-for-att-dolja-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fundercut-en-trendig-frisyr-for-att-dolja-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fundercut-en-trendig-frisyr-for-att-dolja-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/753",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/753.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/fungerar-koffeinschampo-mot-haravfall/feed/",
+      "file": "knowledge/hair-tp-clinic/site/fungerar-koffeinschampo-mot-haravfall/feed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ffungerar-koffeinschampo-mot-haravfall%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Ffungerar-koffeinschampo-mot-haravfall%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/posts/745",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/posts/745.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fscreen%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fscreen%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/4565",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/4565.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/journal-tp/",
+      "file": "knowledge/hair-tp-clinic/site/journal-tp.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-karlstad-2%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-karlstad-2%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1599",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1599.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-boras-v1-2%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-boras-v1-2%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1839",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1839.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-skelleftea%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-skelleftea%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1724",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1724.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-karlskrona%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-karlskrona%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1728",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1728.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-upplands-vasby%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-upplands-vasby%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1731",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1731.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-varberg%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-varberg%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1739",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1739.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-solna%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-solna%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1740",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1740.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-kungsbacka%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-kungsbacka%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1741",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1741.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-lulea%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-lulea%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1742",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1742.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-marsta%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-marsta%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1743",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1743.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-ostersund%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-ostersund%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1744",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1744.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-uddevalla%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-uddevalla%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1762",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1762.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-vasteras%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-vasteras%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1766",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1766.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-angelholm%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-angelholm%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1767",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1767.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-vanersborg%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-vanersborg%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/wp/v2/pages/1768",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/wp/v2/pages/1768.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-skovde%2F",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    },
+    {
+      "url": "https://hairtpclinic.se/wp-json/oembed/1.0/embed?url=https%3A%2F%2Fhairtpclinic.se%2Fhartransplantation-skovde%2F&",
+      "file": "knowledge/hair-tp-clinic/site/wp-json/oembed/1-0/embed.md"
+    }
+  ]
+}
