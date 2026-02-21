@@ -109,6 +109,7 @@ const config = {
   defaultTenantId: asNonEmptyString(process.env.ARCANA_DEFAULT_TENANT, brand),
   bootstrapOwnerEmail: asNonEmptyString(process.env.ARCANA_OWNER_EMAIL),
   bootstrapOwnerPassword: asNonEmptyString(process.env.ARCANA_OWNER_PASSWORD),
+  bootstrapOwnerResetPassword: asBool(process.env.ARCANA_BOOTSTRAP_RESET_OWNER_PASSWORD, false),
 
   templateStorePath: asNonEmptyString(
     process.env.TEMPLATE_STORE_PATH,

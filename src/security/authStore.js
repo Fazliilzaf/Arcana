@@ -675,7 +675,7 @@ async function createAuthStore({
     return filtered.slice(0, clampedLimit);
   }
 
-  async function bootstrapOwner({ tenantId, email, password }) {
+  async function bootstrapOwner({ tenantId, email, password, forcePasswordReset = false }) {
     const normalizedTenantId = normalizeTenantId(tenantId);
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedTenantId || !normalizedEmail || typeof password !== 'string' || !password.trim()) {
@@ -684,10 +684,16 @@ async function createAuthStore({
 
     let rawUser = findRawUserByEmail(normalizedEmail);
     let createdUser = false;
+    let passwordReset = false;
     if (!rawUser) {
       const created = await createUser({ email: normalizedEmail, password, mfaRequired: true });
       rawUser = state.users[created.id];
       createdUser = true;
+      passwordReset = true;
+    } else if (forcePasswordReset) {
+      await setUserPassword(rawUser.id, password);
+      rawUser = state.users[rawUser.id] || rawUser;
+      passwordReset = true;
     }
 
     const membership = await ensureMembership({
@@ -704,12 +710,13 @@ async function createAuthStore({
       outcome: 'success',
       targetType: 'membership',
       targetId: membership.id,
-      metadata: { createdUser },
+      metadata: { createdUser, passwordReset, forcePasswordReset: Boolean(forcePasswordReset) },
     });
 
     return {
       bootstrapped: true,
       createdUser,
+      passwordReset,
       user: toSafeUser(rawUser),
       membership,
     };

@@ -39,6 +39,12 @@ ARCANA_OWNER_PASSWORD=byt-till-starkt-losenord
 
 Vid uppstart bootstrapas första OWNER automatiskt om ovan variabler finns.
 
+Om prod-inloggning fastnar på gammalt lösenord:
+1) Sätt i Render env: `ARCANA_BOOTSTRAP_RESET_OWNER_PASSWORD=true`
+2) Deploy
+3) Verifiera login med `ARCANA_OWNER_EMAIL` / `ARCANA_OWNER_PASSWORD`
+4) Sätt tillbaka `ARCANA_BOOTSTRAP_RESET_OWNER_PASSWORD=false` och deploy igen
+
 ### 3) Viktiga endpoints (Foundation)
 - `GET /healthz` (liveness)
 - `GET /readyz` (readiness)

@@ -86,10 +86,12 @@ app.get('/readyz', (req, res) => {
       tenantId: config.defaultTenantId,
       email: config.bootstrapOwnerEmail,
       password: config.bootstrapOwnerPassword,
+      forcePasswordReset: config.bootstrapOwnerResetPassword,
     });
     if (bootstrap.bootstrapped) {
+      const resetMarker = bootstrap.passwordReset ? ' password synced' : '';
       console.log(
-        `Auth bootstrap klart för tenant "${config.defaultTenantId}" (${config.bootstrapOwnerEmail})`
+        `Auth bootstrap klart för tenant "${config.defaultTenantId}" (${config.bootstrapOwnerEmail})${resetMarker}`
       );
     }
   } else {
