@@ -1,0 +1,96 @@
+# Inbound-intents från mail (anonymiserad)
+
+Genererad: 2026-02-21T07:42:44.975Z
+
+## Topic-fördelning
+- **övrigt** _(x244)_
+- **bokning** _(x161)_
+- **pris** _(x59)_
+- **behandling** _(x51)_
+- **eftervård** _(x1)_
+
+## Vanliga patientfrågor (från inbox)
+- Granska följande meddelanden: _(x5)_
+- Fungerade inte knappen? Testa denna l�nk ist�llet: _(x4)_
+- Det är väldigt viktigt för oss att du kände dig omhändertagen och att alla dina frågor besvarades under konsultationen. Jag undrar nu hur du ser på tanken på en eventuell hårtransplantation, efter att ha haft tid att fu… _(x4)_
+- Hair TP Clinic - Curatiio _(x3)_
+- Jag har en sista uppföljning bokad digitalt den 6 mars kl 12:00 som jag tyvärr behöver boka om pga resa. Finns det någon ledig tid nästa vecka (senast 26/2) istället? _(x2)_
+- Inloggning från ny enhet _(x2)_
+- Jag har en tid hos läkare o behöver komma senare. Har ni runt 13 eller senare? _(x2)_
+- Torsdag 12/2 kl 10.00 skulle det funka? _(x2)_
+- Jag har bara en fråga gällande laser, jag brukar köra med picolaser i ansiktet (Hollywood peel) är de något jag bör undvika innan min bryntransplantation? :) eller är de nå andra behandlingar jag bör undvika? _(x2)_
+- Vad är nästa steg? Önskar ni att jag kommer in på en ytterligare konsultation för att stämma av form och detaljer lite närmare? Annars skulle jag gärna vilja boka en tid runt den 28 februari (efter kl. 15.00) alternativ… _(x2)_
+- Hej! Jag tänkte bara höra om ni mot förmodan hunnit kikat över bilderna något? Mvh Johannes _(x2)_
+- Finns det tid för en PRP-behandling då? _(x2)_
+- - Vad har personen/rna som utf�r ingreppen hos er f�r titel, �r de l�kare eller tekniker? _(x2)_
+- Vad sägs om 08:30? _(x2)_
+- mejlet konstigt ut? Läs det på webben istället _(x2)_
+- iPhone’umdan gönderildi _(x2)_
+- Tack för återkopplingen. Jag fick en ledig lucka idag kl 16:30 skulle det funka för dig? _(x2)_
+- Vill du inte få den här typen av email? _(x2)_
+- Har du/ni tid redan idag, alternativt imorgon (lördag) eller i starten av nästa vecka? _(x1)_
+- Jag undrar om ni s�ljer Finesterid i sprayform som man spruta eller droppar p� huvudet? _(x1)_
+- Jag förstår och uppskattar eran förklaring och vi kan absolut boka in en konsultation men då gärna via samtal/facetime då jag bor i Gävle kommun om de är möjligt? Mvh _(x1)_
+- Hur går vi vidare? _(x1)_
+- Jag är nyfiken hur det blir? ☺️ _(x1)_
+- Har ni någon tid i slutet på nästa vecka? _(x1)_
+- �r det l�mpligt att jag b�rjar anv�nda en dermaroller och Minoxidil som komplement, eller b�r jag v�nta tills mitt �terbes�k den 26 juni? Jag vill s�kerst�lla att jag g�r allt p� r�tt s�tt f�r att optimera resultatet. _(x1)_
+- Hur ser det ut med tider för din kollega då? Just den 6e kan jag inte _(x1)_
+- Har ni inte fått denna avbokning? _(x1)_
+- Hej TP-gänget! Jag har bokat in en Prp behandling 18/3, men skulle vilja flytta den till 19/3 är det möjligt, gärna samma tid. MVH Jonnie _(x1)_
+- Vad har ni för tillgängliga tider i Juli? _(x1)_
+- Påverkas detta av ingreppet och läkeprocess och kan det misslyckas pga denna åkomma eller hur påverkar detta en ev transplantation för lyckat resultat? _(x1)_
+- Jag har en bokad tid hos er imorgon. Tyvärr har familjen åkt på en magsjuka här hemma. Har ni några tider nästa vecka? _(x1)_
+- Det kom dock aldrig någon bekräftelse på bokningen, kan ni kontrollera om det finns något sådant datum bokat till mig? _(x1)_
+- Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? _(x1)_
+- > Kan du klockan 13:30 ? :) _(x1)_
+- Kan ni hjälpa mig med detta? _(x1)_
+- Jag jobbar på industri och har lite mer fysiskt ansträngande arbete. Hur länge behöver jag stanna hemma från jobbet efter transplantationen? _(x1)_
+- > processen skulle se ut innan vi bokar? :) _(x1)_
+- Hur vidare känslig är den sortens ingrepp just PRP? Om vi säger den t.ex. andra PRP behandling som är 4v in, behöver men avvakta jobb/fyskiska ansträngningar då med för det efterkommande PRP-behandlingarna när man endas… _(x1)_
+- Klart intresserad, hur fort kan ni? _(x1)_
+- Är det en PRP dirket när man gör första ingreppet och sedan resten vid senare datum eller hur funkade just den processen? _(x1)_
+- Det är jag absolut villig till men de beror också på hur stor prisskillnad det skulle resultera i vill säga? Mvh _(x1)_
+- vissa delar? _(x1)_
+- Är det ett problem? Jag ser nu att det tydligt står att man ska undvika båda två i minst 48h innan.. _(x1)_
+- Jag skulle vilja boka min fj�rde uppf�ljande prp behandling efter min h�rtransplantation. N�r har ni n�sta lediga tid? _(x1)_
+- riskerar jag inte att få en glipa/tunnt mellan det nya och gamla? _(x1)_
+- Då ordnar jag en uppföljning med Egzona. När kan du?skriv datum och tid så bokar jag gärna in dig _(x1)_
+- Tack för ett trevligt besök igår. Jag tänkte bara kolla hur det blev med tiden imorgon för att fylla på luggen - gick det att lösa eller ska vi kika på en tid längre fram? Jag kommer gärna imorgon om det finns möjlighet… _(x1)_
+- > > Hur tycker ni det ser ut? _(x1)_
+- Funkar l�rdag den 21e Februari p� f�rmiddagen? _(x1)_
+- Jag jobbar som truckförare inom industrin. Hur många dagar behöver jag stanna hemma från jobbet efter operation? Det är tillåtet att bära keps och mössa på min arbetsplats som eventuellt skydd för graftsen, kan jag anvä… _(x1)_
+- Det �r v�ldigt viktigt f�r oss att du k�nde dig omh�ndertagen och att alla dina fr�gor besvarades under konsultationen. Jag undrar nu hur du ser p� tanken p� en eventuell h�rtransplantation, efter att ha haft tid att fu… _(x1)_
+- Skulle ni kunna avboka tiden och boka in det med mina privata uppgifter ist�llet? _(x1)_
+- Har lite svårt att få tid en kvällstid framöver. Har ni ngn tid på en förmiddag eller eftermiddag framöver? _(x1)_
+- Om jag skulle bestämma mig för att göra detta hos er, när finns det i så fall tillgänglighet? Skulle det t.ex. passa 30/3, 31/3, eller 1/4? _(x1)_
+- Jag gjorde lite research p� PRP och det verkar som att jag har st�rre chans att h�lla vikarna i schack med minoxidil? Vad tror du om det? _(x1)_
+- > veckan som skulle funka för dig? _(x1)_
+- Just imorgon kväll kan jag dessvärre inte, har ni ngn tid på torsdag? _(x1)_
+- Vilka datum vecka 14 kan ni erbjuda? 🙂 _(x1)_
+- Hej! Har du något förslag på tider snarast efter 16/3 ? _(x1)_
+- Nu är det så att jag har fått lite förhinder under perioden min operation ska vara och undrar om den går att förflytta till den 28:e mars istället? _(x1)_
+- Jag gjorde hårtransplantation hos er 10:e jan och allt har gått bra med läkning osv. Vill bara kolla av att det är normalt att tappa typ allt hår o att de ser så kalt ut nu efter 4 veckor? _(x1)_
+- hej Lite tajt just den datumen _(x1)_
+- Finns det ngn tid i veckan? _(x1)_
+- Jag skulle behöva boka om min tid. Hur ser det ut för er om två veckor vid samma tid? _(x1)_
+- Utför ni behandlingen/ operationen i Jönköping? _(x1)_
+- Hur kan vi hjälpa dig? _(x1)_
+- Could you please reschedule the appointment for next week? _(x1)_
+- Tack detsamma. Vad är nästa steg? _(x1)_
+- Ska vi boka in en uppföljning i april så är det gjort? _(x1)_
+- Skrivelse för kännedom och information om när beslutet kommer till motpart _(x1)_
+- Har godk�nt avtalen inf�r m�ndagens behandling men hittar inget d�r jag ska betala in. Har ni skickat detta tro? :-) _(x1)_
+- Hur ser det ut veckorna 16-18? Jag bör kunna vilken måndag eller onsdag som _(x1)_
+- Den 15e mars kl 10 eller 11? _(x1)_
+- Jag bokar av den, vill du att vi bokar in en ny tid? _(x1)_
+- Fel datum! Önskade ju den 16e mars ändrar du till det? _(x1)_
+- Fortfarande 2500 kr om man gjort transplantation hos er? _(x1)_
+- Andrea har slutat har du kollat skr�pposten? Jag ber Egzona skicka bilderna n�r hon �r �ter p� kliniken i morgon torsdag _(x1)_
+- Jag hade kontakt med Andrea i mitten av januari om att f� tillg�ng till bilderna jag tog med Fazli (med h�rlinjen markerad). Sista jag h�rde var att dem var p�v�g men det har g�tt ett tag och nu verkar inte mejladressen… _(x1)_
+- Jag vaknade idag med en kraftig förkylning från ingenstans och har ett inbokat PRP tillfälle, bör jag komma idag eller är det bättre att boka om och hålla sig hemma? _(x1)_
+- Bäst och mest önskvärt vore måndag 23/3, alternativt hade onsdag 25/3 kunnat vara bra. Skulle något av dessa kunna gå bra? _(x1)_
+
+## Rekommendation
+- Dessa frågor kan användas som intent-bibliotek för Patient Agent.
+- För tonalitet och svarsmönster behövs även export från Sent/Skickat.

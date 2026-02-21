@@ -1,0 +1,999 @@
+{
+  "generatedAt": "2026-02-21T07:42:44.975Z",
+  "brand": "hair-tp-clinic",
+  "count": 62,
+  "seeds": [
+    {
+      "seedId": "ed63f24487004560",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 001",
+      "draftTitle": "Mail seed bokning 001 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Magnus! :) Hoppas att du mår gott. Vi kan självklart hjälpa dig den 16 Februari klockan 08:00",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Magnus! :) Hoppas att du mår gott. Vi kan självklart hjälpa dig den 16 Februari klockan 08:00\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_offert_behandling_fr=c3=a5n_hair_tp_clinic?=",
+        "inboundId": "bf3bb57a765827ed",
+        "outboundId": "6fb522f319cc65cf"
+      }
+    },
+    {
+      "seedId": "98225e8fa92aecd2",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 002",
+      "draftTitle": "Mail seed bokning 002 (BOOKING)",
+      "trigger": "> veckan som skulle funka för dig?",
+      "answerSnippet": "Hej, Tack för din fina återkoppling! Jag vill bekräfta att din tid är inbokad torsdagen den 12 mars kl. 08:00.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej, Tack för din fina återkoppling! Jag vill bekräfta att din tid är inbokad torsdagen den 12 mars kl. 08:00.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_offert_behandling_fr=c3=a5n_hair_tp_clinic?=",
+        "inboundId": "84f8a85fe88fb86b",
+        "outboundId": "a265502ab282724f"
+      }
+    },
+    {
+      "seedId": "4d53c72df5d5d319",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 003",
+      "draftTitle": "Mail seed bokning 003 (BOOKING)",
+      "trigger": "Om jag skulle bestämma mig för att göra detta hos er, när finns det i så fall tillgänglighet? Skulle det t.ex. passa 30/3, 31/3, eller 1/4?",
+      "answerSnippet": "Hej, Tack för din fina återkoppling! Jag vill bekräfta att din tid är inbokad torsdagen den 12 mars kl. 08:00.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej, Tack för din fina återkoppling! Jag vill bekräfta att din tid är inbokad torsdagen den 12 mars kl. 08:00.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_offert_behandling_fr=c3=a5n_hair_tp_clinic?=",
+        "inboundId": "39ecf9ca5d565b58",
+        "outboundId": "a265502ab282724f"
+      }
+    },
+    {
+      "seedId": "882e3bd1e11006b8",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 004",
+      "draftTitle": "Mail seed bokning 004 (BOOKING)",
+      "trigger": "Hej! Jag tänkte bara höra om ni mot förmodan hunnit kikat över bilderna något? Mvh Johannes",
+      "answerSnippet": "Hej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iepvagfubmvzietvbnrha3rmb3jtdwzdphi=?=",
+        "inboundId": "7761632a4a414545",
+        "outboundId": "471432081e3e6dfe"
+      }
+    },
+    {
+      "seedId": "371d8b8e22174a2a",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 005",
+      "draftTitle": "Mail seed bokning 005 (BOOKING)",
+      "trigger": "Hej! Jag tänkte bara höra om ni mot förmodan hunnit kikat över bilderna något? Mvh Johannes",
+      "answerSnippet": "Hej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iepvagfubmvzietvbnrha3rmb3jtdwzdphi=?=",
+        "inboundId": "25bd9772b3bd4fa0",
+        "outboundId": "471432081e3e6dfe"
+      }
+    },
+    {
+      "seedId": "b826693c813dc378",
+      "templateCategory": "BOOKING",
+      "topic": "pris",
+      "templateName": "Mail seed pris 006",
+      "draftTitle": "Mail seed pris 006 (BOOKING)",
+      "trigger": "Det är jag absolut villig till men de beror också på hur stor prisskillnad det skulle resultera i vill säga? Mvh",
+      "answerSnippet": "Hej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Johannes! Skulle vi kunna sätta upp en digital konsultation för att gå igenom hur jag tänker kring upplägget gällande samarbetet? Allt gott\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iepvagfubmvzietvbnrha3rmb3jtdwzdphi=?=",
+        "inboundId": "a65209e38f892aff",
+        "outboundId": "471432081e3e6dfe"
+      }
+    },
+    {
+      "seedId": "6a78b941f2c222f3",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 007",
+      "draftTitle": "Mail seed behandling 007 (CONSULTATION)",
+      "trigger": "Klart intresserad, hur fort kan ni?",
+      "answerSnippet": "Hej igen Robert. Va kul! Skulle du kunna komma in till kliniken för genomgång om hur den processen skulle se ut innan vi bokar? :) Allt gott",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej igen Robert. Va kul! Skulle du kunna komma in till kliniken för genomgång om hur den processen skulle se ut innan vi bokar? :) Allt gott\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iejdpxigdha=?=",
+        "inboundId": "d4d4d795f8f193ab",
+        "outboundId": "d4a2dd0ac2f57f9e"
+      }
+    },
+    {
+      "seedId": "639215ba15d1e502",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 008",
+      "draftTitle": "Mail seed behandling 008 (CONSULTATION)",
+      "trigger": "> processen skulle se ut innan vi bokar? :)",
+      "answerSnippet": "Hej hej! Skulle du kunna komma i morgon? Allt gott",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej hej! Skulle du kunna komma i morgon? Allt gott\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iejdpxigdha=?=",
+        "inboundId": "8e186c3aaab073c4",
+        "outboundId": "bda2dab71ab4687a"
+      }
+    },
+    {
+      "seedId": "ad65f7434a27a6ee",
+      "templateCategory": "CONSULTATION",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 009",
+      "draftTitle": "Mail seed bokning 009 (CONSULTATION)",
+      "trigger": "Ja, tid?",
+      "answerSnippet": "Kan du klockan 13:30 ? :) Bästa hälsningar, Egzona Krasniqi",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nKan du klockan 13:30 ? :) Bästa hälsningar, Egzona Krasniqi\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iejdpxigdha=?=",
+        "inboundId": "f38a1545f935bd96",
+        "outboundId": "711d0d4c2aba8fa9"
+      }
+    },
+    {
+      "seedId": "5097c6cd403c489e",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 010",
+      "draftTitle": "Mail seed bokning 010 (BOOKING)",
+      "trigger": "Vad har ni för tillgängliga tider i Juli?",
+      "answerSnippet": "Hej Victor Hoppas att du mår strålande. Vi kan erbjuda tider under vecka 28 och 29 under juli månad.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Victor Hoppas att du mår strålande. Vi kan erbjuda tider under vecka 28 och 29 under juli månad.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "hej",
+        "inboundId": "f56b6aba6e2725a8",
+        "outboundId": "78017e36f0315f50"
+      }
+    },
+    {
+      "seedId": "88acc3606579924e",
+      "templateCategory": "CONSULTATION",
+      "topic": "övrigt",
+      "templateName": "Mail seed övrigt 011",
+      "draftTitle": "Mail seed övrigt 011 (CONSULTATION)",
+      "trigger": "Jag hade kontakt med Andrea i mitten av januari om att f� tillg�ng till bilderna jag tog med Fazli (med h�rlinjen markerad). Sista jag h�rde var att dem var p�v�g men det har g�tt ett tag och nu verkar inte mejladressen…",
+      "answerSnippet": "Hej! Bästa hälsningar, Egzona Krasniqi",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Bästa hälsningar, Egzona Krasniqi\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "bilder",
+        "inboundId": "a63510359a658fa5",
+        "outboundId": "aa6afca15eb4e4cd"
+      }
+    },
+    {
+      "seedId": "2fdd90386bae2b22",
+      "templateCategory": "CONSULTATION",
+      "topic": "övrigt",
+      "templateName": "Mail seed övrigt 012",
+      "draftTitle": "Mail seed övrigt 012 (CONSULTATION)",
+      "trigger": "Andrea har slutat har du kollat skr�pposten? Jag ber Egzona skicka bilderna n�r hon �r �ter p� kliniken i morgon torsdag",
+      "answerSnippet": "Hej! Bästa hälsningar, Egzona Krasniqi",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Bästa hälsningar, Egzona Krasniqi\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "bilder",
+        "inboundId": "5633ea4f85ed97b8",
+        "outboundId": "aa6afca15eb4e4cd"
+      }
+    },
+    {
+      "seedId": "af7b0f15a4eb5c44",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 013",
+      "draftTitle": "Mail seed bokning 013 (BOOKING)",
+      "trigger": "Försäljningschef/Sales manager [facebook icon] <https://www.facebook.com/profile.php?id=100088166455489> [linkedin icon] <https://www.instagram.com/soderbergbil/> [twitter icon] <https://www.blocket.se/butik/soderberg-b…",
+      "answerSnippet": "Hej, Tack för ditt meddelande. Vi hoppas att allt gick bra på BVC. Det är ingen fara – vi tar självklart ingen avgift denna gång.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej, Tack för ditt meddelande. Vi hoppas att allt gick bra på BVC. Det är ingen fara – vi tar självklart ingen avgift denna gång.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "prp standard",
+        "inboundId": "43d1c9a00e44131a",
+        "outboundId": "25f50a2d377ace16"
+      }
+    },
+    {
+      "seedId": "fbb7ea885d41820d",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 014",
+      "draftTitle": "Mail seed bokning 014 (BOOKING)",
+      "trigger": "Tack detsamma. Vad är nästa steg?",
+      "answerSnippet": "Hej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6ie9mzmvydcbizwhhbmrsaw5nigzyw6vuiehhaxigvfagq2xpbmlj?=",
+        "inboundId": "0de8e4ff380dc269",
+        "outboundId": "1deb92963bdbff87"
+      }
+    },
+    {
+      "seedId": "5f0a63538c60c6f8",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 015",
+      "draftTitle": "Mail seed bokning 015 (BOOKING)",
+      "trigger": "Finns det ngn tid i veckan?",
+      "answerSnippet": "Hej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6ie9mzmvydcbizwhhbmrsaw5nigzyw6vuiehhaxigvfagq2xpbmlj?=",
+        "inboundId": "3a10fb25a1ef2d05",
+        "outboundId": "1deb92963bdbff87"
+      }
+    },
+    {
+      "seedId": "e4ad8a7efed07c95",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 016",
+      "draftTitle": "Mail seed bokning 016 (BOOKING)",
+      "trigger": "Vilka datum vecka 14 kan ni erbjuda? 🙂",
+      "answerSnippet": "Hej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Vi skulle kunna hjälpa dig nu på onsdag klockan 18:00. Återkom om det skulle passa dig så ser jag fram emot att ha dig på kliniken . Trevlig kväll\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6ie9mzmvydcbizwhhbmrsaw5nigzyw6vuiehhaxigvfagq2xpbmlj?=",
+        "inboundId": "54f4c7115cc42997",
+        "outboundId": "1deb92963bdbff87"
+      }
+    },
+    {
+      "seedId": "6950dfe072b94756",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 017",
+      "draftTitle": "Mail seed bokning 017 (BOOKING)",
+      "trigger": "Vad är nästa steg? Önskar ni att jag kommer in på en ytterligare konsultation för att stämma av form och detaljer lite närmare? Annars skulle jag gärna vilja boka en tid runt den 28 februari (efter kl. 15.00) alternativ…",
+      "answerSnippet": "Hej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iefuz8olzw5kzsbizwhhbmrsaw5nihddpsbiywlyifrqiensaw5pyw==?=",
+        "inboundId": "3d6f6a1e8ea17ced",
+        "outboundId": "97b3b6df399fb188"
+      }
+    },
+    {
+      "seedId": "74260a43940ad957",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 018",
+      "draftTitle": "Mail seed bokning 018 (BOOKING)",
+      "trigger": "Det är väldigt viktigt för oss att du kände dig omhändertagen och att alla dina frågor besvarades under konsultationen. Jag undrar nu hur du ser på tanken på en eventuell hårtransplantation, efter att ha haft tid att fu…",
+      "answerSnippet": "Hej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iefuz8olzw5kzsbizwhhbmrsaw5nihddpsbiywlyifrqiensaw5pyw==?=",
+        "inboundId": "90870fe8232df1bf",
+        "outboundId": "97b3b6df399fb188"
+      }
+    },
+    {
+      "seedId": "b64a8c54afb6835a",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 019",
+      "draftTitle": "Mail seed bokning 019 (BOOKING)",
+      "trigger": "Jag jobbar på industri och har lite mer fysiskt ansträngande arbete. Hur länge behöver jag stanna hemma från jobbet efter transplantationen?",
+      "answerSnippet": "Hej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Joakim, 😊 Tack igen för ditt förtroende, det betyder mycket. Jag har nu bokat in dig den 3 april och ser verkligen fram emot att få hjälpa dig.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?b?umu6iefuz8olzw5kzsbizwhhbmrsaw5nihddpsbiywlyifrqiensaw5pyw==?=",
+        "inboundId": "6d94add75082516b",
+        "outboundId": "97b3b6df399fb188"
+      }
+    },
+    {
+      "seedId": "9e6925d0e6c7e6df",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 020",
+      "draftTitle": "Mail seed bokning 020 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "193c83606a33fba2",
+        "outboundId": "5096c9af0eaa6bc4"
+      }
+    },
+    {
+      "seedId": "a95ff648fe26ce28",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 021",
+      "draftTitle": "Mail seed bokning 021 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "576af7ca23b5aa15",
+        "outboundId": "5096c9af0eaa6bc4"
+      }
+    },
+    {
+      "seedId": "adce705c03c56795",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 022",
+      "draftTitle": "Mail seed bokning 022 (BOOKING)",
+      "trigger": "Kan man boka in en konsultation hos dig?",
+      "answerSnippet": "Hej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Alex Hoppas allt är bra med dig. Svaret du kommer att få av mig är den samma du har fått av min kollega Egzona.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "4cf03f0490c1dd13",
+        "outboundId": "5096c9af0eaa6bc4"
+      }
+    },
+    {
+      "seedId": "86a8b25aacc5335c",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 023",
+      "draftTitle": "Mail seed bokning 023 (BOOKING)",
+      "trigger": "Har du kvar bilderna vi tog hos dig? Hittar inte bilderna vi ritade upp nämligen.",
+      "answerSnippet": "Hej Alex :) Här kommer dina bilder som togs under din konsultation. ￼￼￼￼",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Alex :) Här kommer dina bilder som togs under din konsultation. ￼￼￼￼\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "9ebd0ba42084544a",
+        "outboundId": "f0e81cea609704f5"
+      }
+    },
+    {
+      "seedId": "0e5553e27431f0eb",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 024",
+      "draftTitle": "Mail seed bokning 024 (BOOKING)",
+      "trigger": "Bäst och mest önskvärt vore måndag 23/3, alternativt hade onsdag 25/3 kunnat vara bra. Skulle något av dessa kunna gå bra?",
+      "answerSnippet": "Hej William, Tack för ditt mejl. Det låter som en klok plan, och det är helt förståeligt att du vill ta det i din egen takt. När tiden närmar sig är du varmt välkommen att höra av dig, så hjälper vi dig gärna med planering och nästa steg.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej William, Tack för ditt mejl. Det låter som en klok plan, och det är helt förståeligt att du vill ta det i din egen takt. När tiden närmar sig är du varmt välkommen att höra av dig, så hjälper vi dig gärna med planering och nästa steg.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "465f37fb96164e4f",
+        "outboundId": "ad9eea8e3582d3d0"
+      }
+    },
+    {
+      "seedId": "ba006e22a5b2edbd",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 025",
+      "draftTitle": "Mail seed bokning 025 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "c260f7249ed99075",
+        "outboundId": "1806e24a2f2ea982"
+      }
+    },
+    {
+      "seedId": "9ed9a88d132b6b65",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 026",
+      "draftTitle": "Mail seed bokning 026 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "b95306a5f5e1db65",
+        "outboundId": "1806e24a2f2ea982"
+      }
+    },
+    {
+      "seedId": "abaf7b2d00ed63fe",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 027",
+      "draftTitle": "Mail seed bokning 027 (BOOKING)",
+      "trigger": "Hur ser det ut veckorna 16-18? Jag bör kunna vilken måndag eller onsdag som",
+      "answerSnippet": "Hej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Daniel, Tack för ditt svar. Vi beklagar verkligen att vi inte kan matcha dina önskemål denna gång. Tyvärr har vi inga tillgängliga tider under veckorna 16–18.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "8af42b19f324e7db",
+        "outboundId": "1806e24a2f2ea982"
+      }
+    },
+    {
+      "seedId": "a8f2f723bdad1970",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 028",
+      "draftTitle": "Mail seed bokning 028 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej Daniel, Stort tack för ditt svar! Va kul att vi kunde hitta ett datum som passar oss båda. Vi har nu bokat in dig för din hårtransplantation onsdagen den 6 maj. Inom kort skickar vi även ut ett behandlingsavtal till dig där all praktisk information inför behandlingen finns samlad, så att du i lugn och ro kan läsa igenom allt.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Daniel, Stort tack för ditt svar! Va kul att vi kunde hitta ett datum som passar oss båda. Vi har nu bokat in dig för din hårtransplantation onsdagen den 6 maj. Inom kort skickar vi även ut ett behandlingsavtal till dig där all praktisk information inför behandlingen finns samlad, så att du i lugn och ro kan läsa igenom allt.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "a7a20a8c14c1ff4f",
+        "outboundId": "bd5d82ec5abce43d"
+      }
+    },
+    {
+      "seedId": "4395256b660ee8fd",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 029",
+      "draftTitle": "Mail seed bokning 029 (BOOKING)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Bästa Ronja, Stort tack för ditt fina mejl – och tack själv för en så trevlig konsultation. Det betyder verkligen mycket att höra att du känner dig supernöjd, det gör oss så glada 🤍 Vi har nu bokat in din ögonbrynstransplantation den 10 mars kl. 14:00 och ser verkligen fram emot att ta hand om dig då.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nBästa Ronja, Stort tack för ditt fina mejl – och tack själv för en så trevlig konsultation. Det betyder verkligen mycket att höra att du känner dig supernöjd, det gör oss så glada 🤍 Vi har nu bokat in din ögonbrynstransplantation den 10 mars kl. 14:00 och ser verkligen fram emot att ta hand om dig då.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "01671f6f88fd524f",
+        "outboundId": "ed35943eba6e2cda"
+      }
+    },
+    {
+      "seedId": "5a00b2d0a14e90c4",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 030",
+      "draftTitle": "Mail seed bokning 030 (BOOKING)",
+      "trigger": "Är det en PRP dirket när man gör första ingreppet och sedan resten vid senare datum eller hur funkade just den processen?",
+      "answerSnippet": "Hej Levi, Vad roligt att höra att du känner dig taggad att ta nästa steg 😊 Den första PRP-behandlingen görs samma dag som själva hårtransplantationen. De resterande tre PRP-behandlingarna görs med cirka fyra veckors intervall. Uppföljningarna som sker månad 4, 8 och 12 kan vi ta digitalt om du önskar. PRP-behandlingarna kan vid behov även göras med något större intervall.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Levi, Vad roligt att höra att du känner dig taggad att ta nästa steg 😊 Den första PRP-behandlingen görs samma dag som själva hårtransplantationen. De resterande tre PRP-behandlingarna görs med cirka fyra veckors intervall. Uppföljningarna som sker månad 4, 8 och 12 kan vi ta digitalt om du önskar. PRP-behandlingarna kan vid behov även göras med något större intervall.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_ang=c3=a5ende_behandling_p=c3=a5_hair_tp_clinic?=",
+        "inboundId": "a2c18dc018e8b327",
+        "outboundId": "e7e0cfa2a8280dff"
+      }
+    },
+    {
+      "seedId": "f5d217f74fc8969c",
+      "templateCategory": "LEAD",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 031",
+      "draftTitle": "Mail seed behandling 031 (LEAD)",
+      "trigger": "riskerar jag inte att få en glipa/tunnt mellan det nya och gamla?",
+      "answerSnippet": "Hej! Du kan återkomma till mig här. Bästa hälsningar,",
+      "instruction": "Skapa en LEAD-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Du kan återkomma till mig här. Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "kontakt",
+        "inboundId": "d6ad29585246879d",
+        "outboundId": "91573b1c477d1aeb"
+      }
+    },
+    {
+      "seedId": "9dde3aa10150a5af",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 032",
+      "draftTitle": "Mail seed bokning 032 (BOOKING)",
+      "trigger": "vissa delar?",
+      "answerSnippet": "Hej Jim, Tack för att du uppmärksammade detta, och jag ber om ursäkt för misstaget med datumet. Jag har nu ändrat i avtalet så att startdatumet är den 1 april enligt vår överenskommelse. PRP-behandlingen omfattar hela området uppe på hjässan (hela övre delen av hårbotten), inte bara en begränsad del.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Jim, Tack för att du uppmärksammade detta, och jag ber om ursäkt för misstaget med datumet. Jag har nu ändrat i avtalet så att startdatumet är den 1 april enligt vår överenskommelse. PRP-behandlingen omfattar hela området uppe på hjässan (hela övre delen av hårbotten), inte bara en begränsad del.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "kontakt",
+        "inboundId": "bd63917d29966be9",
+        "outboundId": "7509ce98ecbc4879"
+      }
+    },
+    {
+      "seedId": "ba77b320e5f9142d",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 033",
+      "draftTitle": "Mail seed bokning 033 (BOOKING)",
+      "trigger": "Jag gjorde lite research p� PRP och det verkar som att jag har st�rre chans att h�lla vikarna i schack med minoxidil? Vad tror du om det?",
+      "answerSnippet": "Hej, Stort tack f�r dina fina ord - det betyder verkligen mycket att du upplevde konsultationen som seri�s och hj�lpsam. Det �r klokt att du tar dig tid att fundera och l�sa p� innan du best�mmer dig.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej, Stort tack f�r dina fina ord - det betyder verkligen mycket att du upplevde konsultationen som seri�s och hj�lpsam. Det �r klokt att du tar dig tid att fundera och l�sa p� innan du best�mmer dig.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?iso-8859-1?q?re:_ang=e5ende_behandling_p=e5_hair_tp_clinic?=",
+        "inboundId": "975fdd71e5189716",
+        "outboundId": "de7b3ae722560b90"
+      }
+    },
+    {
+      "seedId": "f16985c1b9f2ec03",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 034",
+      "draftTitle": "Mail seed bokning 034 (BOOKING)",
+      "trigger": "Det �r v�ldigt viktigt f�r oss att du k�nde dig omh�ndertagen och att alla dina fr�gor besvarades under konsultationen. Jag undrar nu hur du ser p� tanken p� en eventuell h�rtransplantation, efter att ha haft tid att fu…",
+      "answerSnippet": "Hej, Stort tack f�r dina fina ord - det betyder verkligen mycket att du upplevde konsultationen som seri�s och hj�lpsam. Det �r klokt att du tar dig tid att fundera och l�sa p� innan du best�mmer dig.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej, Stort tack f�r dina fina ord - det betyder verkligen mycket att du upplevde konsultationen som seri�s och hj�lpsam. Det �r klokt att du tar dig tid att fundera och l�sa p� innan du best�mmer dig.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?iso-8859-1?q?re:_ang=e5ende_behandling_p=e5_hair_tp_clinic?=",
+        "inboundId": "0096a6504524b8e0",
+        "outboundId": "de7b3ae722560b90"
+      }
+    },
+    {
+      "seedId": "c7354bd914e054f0",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 035",
+      "draftTitle": "Mail seed bokning 035 (BOOKING)",
+      "trigger": "Du får inte ofta e-post från [email].",
+      "answerSnippet": "Hej Rawad, Tack för ditt meddelande 😊 Det går bra att ta ytterligare en PRP-behandling efter hårtransplantationen.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Rawad, Tack för ditt meddelande 😊 Det går bra att ta ytterligare en PRP-behandling efter hårtransplantationen.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "spruta",
+        "inboundId": "ed6d1d0833db95f6",
+        "outboundId": "a04bf88e9daaaccf"
+      }
+    },
+    {
+      "seedId": "f74e37eda72a7039",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 036",
+      "draftTitle": "Mail seed behandling 036 (CONSULTATION)",
+      "trigger": "Saturday after noon would be great. May be 15?",
+      "answerSnippet": "Hello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_vincent_francis_kontaktformul=c3=a4r?=",
+        "inboundId": "50e14ba0f6019047",
+        "outboundId": "c3cf1dd206bc615d"
+      }
+    },
+    {
+      "seedId": "95ecfc03efa289e6",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 037",
+      "draftTitle": "Mail seed behandling 037 (CONSULTATION)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_vincent_francis_kontaktformul=c3=a4r?=",
+        "inboundId": "518f4b5dd6cde8fd",
+        "outboundId": "c3cf1dd206bc615d"
+      }
+    },
+    {
+      "seedId": "18deaa8c143c4921",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 038",
+      "draftTitle": "Mail seed behandling 038 (CONSULTATION)",
+      "trigger": "Could you please reschedule the appointment for next week?",
+      "answerSnippet": "Hello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHello, Thank you for letting us know, and we’re sorry to hear that you’re not feeling well. We completely understand. That is no problem at all — we can reschedule your appointment for next week. Please let us know which day and time would suit you best, and we will do our best to accommodate you.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_vincent_francis_kontaktformul=c3=a4r?=",
+        "inboundId": "cf5be0042773026f",
+        "outboundId": "c3cf1dd206bc615d"
+      }
+    },
+    {
+      "seedId": "42e7a299e51a9ea1",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 039",
+      "draftTitle": "Mail seed bokning 039 (BOOKING)",
+      "trigger": "[Du får inte e-post ofta från [email]. Läs om varför det här är viktigt på https://aka.ms/LearnAboutSenderIdentification ]",
+      "answerSnippet": "Hej Adrian! Hoppas att du mår fint. Tiden är avbokad - återkom gärna när du vill boka in en ny tid eller om du har frågor.",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Adrian! Hoppas att du mår fint. Tiden är avbokad - återkom gärna när du vill boka in en ny tid eller om du har frågor.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "avbokning behandling",
+        "inboundId": "f6cb29df54b61ef1",
+        "outboundId": "937f2cfdd27d38a7"
+      }
+    },
+    {
+      "seedId": "96eca63476280ef0",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 040",
+      "draftTitle": "Mail seed bokning 040 (BOOKING)",
+      "trigger": "Fortfarande 2500 kr om man gjort transplantation hos er?",
+      "answerSnippet": "Hej C B�sta h�lsningar, [image]",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej C B�sta h�lsningar, [image]\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "prp",
+        "inboundId": "4c62441971df6765",
+        "outboundId": "5f42a847db8731cb"
+      }
+    },
+    {
+      "seedId": "ae38d723ff268efc",
+      "templateCategory": "BOOKING",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 041",
+      "draftTitle": "Mail seed bokning 041 (BOOKING)",
+      "trigger": "Vasaplatsen 2, 411 34 Göteborg<https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Tack f�r din �terkoppling! Hoppas att du m�r gott. N�r skulle vi kunna s�tta upp en digital uppf�ljning? ??",
+      "instruction": "Skapa en BOOKING-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nTack f�r din �terkoppling! Hoppas att du m�r gott. N�r skulle vi kunna s�tta upp en digital uppf�ljning? ??\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "prp avbokning",
+        "inboundId": "212ac23387c5a6ce",
+        "outboundId": "c85605ee8270d142"
+      }
+    },
+    {
+      "seedId": "ad4d070aab114da0",
+      "templateCategory": "CONSULTATION",
+      "topic": "övrigt",
+      "templateName": "Mail seed övrigt 042",
+      "draftTitle": "Mail seed övrigt 042 (CONSULTATION)",
+      "trigger": "Hej!",
+      "answerSnippet": "Hej Tobias Hoppas att du mår bra och att det går bra för dig med återhämtningen. Vi kan absolut lösa detta - när du kommer på din PRP-behandling i mars så kan vi prata om det eftersom jag inte kan mejla över känslig information utan måste träffa dig på plats.",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Tobias Hoppas att du mår bra och att det går bra för dig med återhämtningen. Vi kan absolut lösa detta - när du kommer på din PRP-behandling i mars så kan vi prata om det eftersom jag inte kan mejla över känslig information utan måste träffa dig på plats.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "operationsrapport",
+        "inboundId": "bd56e4d6e5e90126",
+        "outboundId": "4eaa1edb998fd662"
+      }
+    },
+    {
+      "seedId": "4fe698c4754edd5c",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 043",
+      "draftTitle": "Mail seed behandling 043 (CONSULTATION)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej! Vad härligt att höra att återhämtningen går så bra – det gläder oss verkligen. Och absolut, det är klokt att tänka långsiktigt och ha framtida planering i åtanke, precis som du beskriver. Tack snälla för dina fina ord, det betyder mycket för oss! Vi ser fram emot att ses i mars och följa din resa vidare.",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Vad härligt att höra att återhämtningen går så bra – det gläder oss verkligen. Och absolut, det är klokt att tänka långsiktigt och ha framtida planering i åtanke, precis som du beskriver. Tack snälla för dina fina ord, det betyder mycket för oss! Vi ser fram emot att ses i mars och följa din resa vidare.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "operationsrapport",
+        "inboundId": "cfa54a4b19efd38e",
+        "outboundId": "d75caf6d28966f42"
+      }
+    },
+    {
+      "seedId": "406529979bc615c7",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 044",
+      "draftTitle": "Mail seed behandling 044 (CONSULTATION)",
+      "trigger": "Du får inte ofta e-post från [email]. Läs om varför det här är viktigt<https://aka.ms/LearnAboutSenderIdentification>",
+      "answerSnippet": "Hej! Jag ber min kollega kolla upp det med en gång för dig. Det ska vara löst egentligen. Kontaktar dig så fort jag vet mer. Bästa hälsningar,",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej! Jag ber min kollega kolla upp det med en gång för dig. Det ska vara löst egentligen. Kontaktar dig så fort jag vet mer. Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "behandling avbruten",
+        "inboundId": "acb4b0a1117ac3c1",
+        "outboundId": "5df192eb5031ca6d"
+      }
+    },
+    {
+      "seedId": "ba776f17a5480e5f",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 045",
+      "draftTitle": "Mail seed behandling 045 (CONSULTATION)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Hej vännen Pratade precis med dem. Dem ringer dig under dagen idag och bekräftar att betalningen är klar. Pengarna hade ”fastnat påvägen” sa dem till mig men nu har dem löst problemet hos sig. Jag får be om ursäkt till dig verkligen - men detta var deras dåliga service. Ta hand om dig",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej vännen Pratade precis med dem. Dem ringer dig under dagen idag och bekräftar att betalningen är klar. Pengarna hade ”fastnat påvägen” sa dem till mig men nu har dem löst problemet hos sig. Jag får be om ursäkt till dig verkligen - men detta var deras dåliga service. Ta hand om dig\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "behandling avbruten",
+        "inboundId": "45b62579a6d4fe0d",
+        "outboundId": "cfaa78fc23830ca2"
+      }
+    },
+    {
+      "seedId": "1e943935dfaafa65",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 046",
+      "draftTitle": "Mail seed behandling 046 (CONSULTATION)",
+      "trigger": "> <https://www.google.com/maps/search/Vasaplatsen+2,+411+34+G%C3%B6teborg?entry=gmail&source=g>",
+      "answerSnippet": "Självklart - tack för ditt fina tålamod. 🌷 Bästa hälsningar, [image]",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nSjälvklart - tack för ditt fina tålamod. 🌷 Bästa hälsningar, [image]\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "behandling avbruten",
+        "inboundId": "9766ed1d221d921d",
+        "outboundId": "66850f4d3000ea5d"
+      }
+    },
+    {
+      "seedId": "b4a5354022e90744",
+      "templateCategory": "CONSULTATION",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 047",
+      "draftTitle": "Mail seed bokning 047 (CONSULTATION)",
+      "trigger": "Hej, märkte att det inte blev något samtal igår. Har du tid för ett samtal idag?",
+      "answerSnippet": "Hej Felix Sorry dykt upp massa jobb. Yes jag kna idag vid 17:15 funkar det för dig ? Bästa hälsningar,",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix Sorry dykt upp massa jobb. Yes jag kna idag vid 17:15 funkar det för dig ? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "samtal",
+        "inboundId": "0e0f28ca9b00a2b0",
+        "outboundId": "c70dcb6f178a741c"
+      }
+    },
+    {
+      "seedId": "c190471b1383d203",
+      "templateCategory": "INTERNAL",
+      "topic": "pris",
+      "templateName": "Mail seed pris 048",
+      "draftTitle": "Mail seed pris 048 (INTERNAL)",
+      "trigger": "onlinemötet imorgon efter klockan 10 eller på torsdag förmiddag?",
+      "answerSnippet": "Hej Nathaniel Hur ser det ut imorgon kl 10:45 ? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Nathaniel Hur ser det ut imorgon kl 10:45 ? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_arbetsans=c3=b6kan_nathaniel_pellikka_erlandsson?=",
+        "inboundId": "4671cc5168c835bd",
+        "outboundId": "5652be9fe11531de"
+      }
+    },
+    {
+      "seedId": "137bbe00886ae932",
+      "templateCategory": "INTERNAL",
+      "topic": "pris",
+      "templateName": "Mail seed pris 049",
+      "draftTitle": "Mail seed pris 049 (INTERNAL)",
+      "trigger": "> Hur ser det ut imorgon kl 10:45 ?",
+      "answerSnippet": "Hej Nathaniel, Tack för vårt senaste möte online och för ett väldigt trevligt samtal. Det gav en bra bild av dig och din bakgrund. Jag skulle gärna vilja bjuda in dig till kliniken för att ses på plats. Tanken är att ta en kaffe tillsammans, visa arbetsplatsen och gå lite djupare i vilka vi är som klinik, var vi står idag, vart vi är på väg och hur rollen som digital marknadsförare kan se ut i praktiken hos oss.",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Nathaniel, Tack för vårt senaste möte online och för ett väldigt trevligt samtal. Det gav en bra bild av dig och din bakgrund. Jag skulle gärna vilja bjuda in dig till kliniken för att ses på plats. Tanken är att ta en kaffe tillsammans, visa arbetsplatsen och gå lite djupare i vilka vi är som klinik, var vi står idag, vart vi är på väg och hur rollen som digital marknadsförare kan se ut i praktiken hos oss.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_arbetsans=c3=b6kan_nathaniel_pellikka_erlandsson?=",
+        "inboundId": "e1852e4a8acaaf85",
+        "outboundId": "834e2dfb2ea766e2"
+      }
+    },
+    {
+      "seedId": "67b55198cfe949fb",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 050",
+      "draftTitle": "Mail seed behandling 050 (INTERNAL)",
+      "trigger": "����O�Wc���\u0001ۮ��}�\u0004\u001f:\b^C\u0000\u000e��\u001d�\u000b�=\u0000ev?_x0\u001d��Q\u0014D�¢{^�ߓʗ�{\u001b�٥r\u0016���",
+      "answerSnippet": "Hej Felix Tack för återkopplingen. Jag fick en ledig lucka idag kl 16:30 skulle det funka för dig? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix Tack för återkopplingen. Jag fick en ledig lucka idag kl 16:30 skulle det funka för dig? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "67287a2c6eb1f4e5",
+        "outboundId": "3f10a25c9c5ab036"
+      }
+    },
+    {
+      "seedId": "5a3c5c2c500a75ed",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 051",
+      "draftTitle": "Mail seed behandling 051 (INTERNAL)",
+      "trigger": "Tack för återkopplingen. Jag fick en ledig lucka idag kl 16:30 skulle det funka för dig?",
+      "answerSnippet": "Hej Felix Sorry för sen återkopplingen. Hoppad du fortfarande kan. Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix Sorry för sen återkopplingen. Hoppad du fortfarande kan. Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "004ac1ef30abd5a4",
+        "outboundId": "12a7c7aa1225af6d"
+      }
+    },
+    {
+      "seedId": "6d40f54497906d33",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 052",
+      "draftTitle": "Mail seed behandling 052 (INTERNAL)",
+      "trigger": "tiden?",
+      "answerSnippet": "Hej Torbjörn Tack för återkopplingen. Jag skulle kunna på måndag kl 10:00 suckar det för dig? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Torbjörn Tack för återkopplingen. Jag skulle kunna på måndag kl 10:00 suckar det för dig? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "90a85d8402226c21",
+        "outboundId": "8059c0a498fdc513"
+      }
+    },
+    {
+      "seedId": "7b03a75506e91e95",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 053",
+      "draftTitle": "Mail seed behandling 053 (INTERNAL)",
+      "trigger": "Trevligt att ni vill ta ett m�te. Hur ser det ut att ta ett m�te p� m�ndag? Det funkar f�r mig mer eller mindre hela dagen.",
+      "answerSnippet": "Hej Torbjörn Tack för återkopplingen. Jag skulle kunna på måndag kl 10:00 suckar det för dig? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Torbjörn Tack för återkopplingen. Jag skulle kunna på måndag kl 10:00 suckar det för dig? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "020f6c105c537668",
+        "outboundId": "8059c0a498fdc513"
+      }
+    },
+    {
+      "seedId": "823462852886d71d",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 054",
+      "draftTitle": "Mail seed behandling 054 (INTERNAL)",
+      "trigger": "> Kl 11 har jag ledigt funkar det för dig då ?",
+      "answerSnippet": "Hej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "b32a3d0f1d9576e0",
+        "outboundId": "810e04f946e4f9b9"
+      }
+    },
+    {
+      "seedId": "1a9d8d1df6b9c578",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 055",
+      "draftTitle": "Mail seed behandling 055 (INTERNAL)",
+      "trigger": "Tack f�r �terkopplingen. Jag skulle kunna p� m�ndag kl 10:00 suckar det f�r dig?",
+      "answerSnippet": "Hej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "2d6b450781dd7abb",
+        "outboundId": "810e04f946e4f9b9"
+      }
+    },
+    {
+      "seedId": "85becff2896c98ee",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 056",
+      "draftTitle": "Mail seed behandling 056 (INTERNAL)",
+      "trigger": "Jag t�nkte st�mma av om vi skulle ha ett onlinem�te nu kl 10? Jag har inte f�tt n�gon l�nk, men sitter beredd att ha ett m�te.",
+      "answerSnippet": "Hej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix, Tack för vårt senaste möte online och för ett bra samtal. Jag skulle gärna vilja bjuda in dig till för att ses på plats. Tanken är att ta en kaffe tillsammans, visa hur vi arbetar i vardagen och gå mer på djupet i vilka vi är som klinik, var vi står idag och hur vi ser på tillväxt och marknadsföring framåt.\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "9fb713899efd8da7",
+        "outboundId": "810e04f946e4f9b9"
+      }
+    },
+    {
+      "seedId": "366ff46e6a7275a5",
+      "templateCategory": "INTERNAL",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 057",
+      "draftTitle": "Mail seed bokning 057 (INTERNAL)",
+      "trigger": "Tack för återkopplingen. Jag fick en ledig lucka idag kl 16:30 skulle det funka för dig?",
+      "answerSnippet": "Hej Felix Jag skulle kunna välkomna dig kl 17:30 imorgon skulle det funka? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Felix Jag skulle kunna välkomna dig kl 17:30 imorgon skulle det funka? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "42daf39dd960e436",
+        "outboundId": "ad357b5af6a787a9"
+      }
+    },
+    {
+      "seedId": "8ece050668ecbb67",
+      "templateCategory": "INTERNAL",
+      "topic": "bokning",
+      "templateName": "Mail seed bokning 058",
+      "draftTitle": "Mail seed bokning 058 (INTERNAL)",
+      "trigger": "Jag skulle kunna välkomna dig kl 17:30 imorgon skulle det funka?",
+      "answerSnippet": "Underbart då är du välkommen då. Bästa hälsningar, [image]",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nUnderbart då är du välkommen då. Bästa hälsningar, [image]\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "some",
+        "inboundId": "56cf20f0dcfa035f",
+        "outboundId": "16dc71c90436f40f"
+      }
+    },
+    {
+      "seedId": "08f5baa7e441ae1a",
+      "templateCategory": "CONSULTATION",
+      "topic": "övrigt",
+      "templateName": "Mail seed övrigt 059",
+      "draftTitle": "Mail seed övrigt 059 (CONSULTATION)",
+      "trigger": "����O�Wc���\u0001ۮ��p5�a\u0002�\u001d6\u0013n��MC\u000b�E\u0000ev?_x0\u001d��Q\u0014D�¢{^�ߓʗ�{\u001b�٥r\u0016���",
+      "answerSnippet": "Hej. Felix va kul det ska bli att se :) Självklart, här kommer en skriftlig beskrivning av arbetsprovet så att förväntningarna är tydliga. Uppgift:",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej. Felix va kul det ska bli att se :) Självklart, här kommer en skriftlig beskrivning av arbetsprovet så att förväntningarna är tydliga. Uppgift:\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "arbetsprov",
+        "inboundId": "5ea8220652259d95",
+        "outboundId": "993e04dfed04c8e6"
+      }
+    },
+    {
+      "seedId": "2d7bb1f00b3a1316",
+      "templateCategory": "CONSULTATION",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 060",
+      "draftTitle": "Mail seed behandling 060 (CONSULTATION)",
+      "trigger": "> Hej Vännen tack för återkopplingen. Om man skulle räkna dessa timmar i kostnader vad blir det då?",
+      "answerSnippet": "Jag mailar den vidare med en gång och kollar vännen. Bästa hälsningar, Fazli Krasniqi",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nJag mailar den vidare med en gång och kollar vännen. Bästa hälsningar, Fazli Krasniqi\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_g=c3=a4llande_curatiio?=",
+        "inboundId": "458000370b7ea8d2",
+        "outboundId": "346390f381c3a5c6"
+      }
+    },
+    {
+      "seedId": "45531bafb9a5cdeb",
+      "templateCategory": "INTERNAL",
+      "topic": "behandling",
+      "templateName": "Mail seed behandling 061",
+      "draftTitle": "Mail seed behandling 061 (INTERNAL)",
+      "trigger": "Under morgondagen 21/01 kan jag egentligen när som under dagen, funkar det för er eller blir det för tätt inpå?",
+      "answerSnippet": "Hej Måns Hur ser det ut för dig imorgon kl 11:30? Bästa hälsningar,",
+      "instruction": "Skapa en INTERNAL-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nHej Måns Hur ser det ut för dig imorgon kl 11:30? Bästa hälsningar,\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "=?utf-8?q?re=3a_digital_marknadsf=c3=b6rare?=",
+        "inboundId": "57033558cb234c4c",
+        "outboundId": "29bd2ed11dc200a9"
+      }
+    },
+    {
+      "seedId": "753442099c2b41cb",
+      "templateCategory": "CONSULTATION",
+      "topic": "övrigt",
+      "templateName": "Mail seed övrigt 062",
+      "draftTitle": "Mail seed övrigt 062 (CONSULTATION)",
+      "trigger": "varför och återkomma till mig?",
+      "answerSnippet": "Kan du föröka nu ? Bästa hälsningar, Fazli Krasniqi",
+      "instruction": "Skapa en CONSULTATION-mall i varm och tydlig ton baserat på trigger och svarssnutt.",
+      "draftContent": "Hej {{first_name}},\n\nKan du föröka nu ? Bästa hälsningar, Fazli Krasniqi\n\nOm du vill går vi gärna igenom nästa steg tillsammans.\nVid medicinska frågor gör klinikteamet alltid en individuell bedömning.\n\nMed vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}",
+      "source": {
+        "threadKey": "betalningsmedel google",
+        "inboundId": "fe483396902596d8",
+        "outboundId": "c5b80e8b989894d6"
+      }
+    }
+  ]
+}

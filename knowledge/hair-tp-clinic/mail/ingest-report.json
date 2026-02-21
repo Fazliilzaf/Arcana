@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-02-21T07:42:44.975Z",
+  "brand": "hair-tp-clinic",
+  "inputPath": "/Users/fazlikrasniqi/Desktop/Arcana/mail-exports",
+  "outputPath": "./knowledge/hair-tp-clinic/mail",
+  "counts": {
+    "scannedFiles": 8,
+    "supportedFiles": 4,
+    "unsupportedOlm": 0,
+    "messagesParsed": 981,
+    "messagesUsed": 939,
+    "threads": 463,
+    "inbound": 516,
+    "outbound": 420,
+    "internal": 0,
+    "unknown": 3,
+    "qaPairs": 62,
+    "templateSeeds": 62,
+    "inboundQuestionPatterns": 80
+  },
+  "clinicDomains": [
+    "hairtpclinic.se",
+    "hairtpclinic.com"
+  ]
+}
