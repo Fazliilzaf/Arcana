@@ -5,11 +5,116 @@
   const AUDIT_FILTERS_KEY = 'ARCANA_ADMIN_AUDIT_FILTERS';
   const TEMPLATE_LIST_FILTERS_KEY = 'ARCANA_ADMIN_TEMPLATE_LIST_FILTERS';
   const LIST_SCROLL_STATE_KEY = 'ARCANA_ADMIN_LIST_SCROLL_STATE';
+  const LANGUAGE_KEY = 'ARCANA_ADMIN_LANGUAGE';
   const TOAST_AUTO_DISMISS_MS = 6000;
-  const BRAND_PRIMARY_COLORS = Object.freeze(['#1A73E8', '#2B7FFF', '#2563EB', '#3B82F6']);
-  const BRAND_ACCENT_COLORS = Object.freeze(['#A855F7', '#9333EA', '#8B5CF6', '#C084FC']);
-  const DEFAULT_BRAND_PRIMARY_COLOR = '#1A73E8';
-  const DEFAULT_BRAND_ACCENT_COLOR = '#A855F7';
+  const BRAND_PRIMARY_COLORS = Object.freeze(['#cabaae', '#d7c9be', '#bfaea1', '#a58f82']);
+  const BRAND_ACCENT_COLORS = Object.freeze(['#2f2c2a', '#3a3633', '#4b4541', '#6a625d']);
+  const DEFAULT_BRAND_PRIMARY_COLOR = '#cabaae';
+  const DEFAULT_BRAND_ACCENT_COLOR = '#2f2c2a';
+  const SUPPORTED_LANGUAGES = Object.freeze(['sv', 'en']);
+  const TRANSLATIONS = Object.freeze({
+    sv: {
+      brand_title: 'Major Arcana',
+      label_language: 'Språk',
+      language_sv: 'Svenska',
+      language_en: 'English',
+      session_not_logged: 'Inte inloggad',
+      session_tenant: 'Klinik',
+      session_role: 'Roll',
+      tenant_option: 'Klinik',
+      switch_tenant: 'Byt klinik',
+      refresh: 'Uppdatera',
+      logout: 'Logga ut',
+      login_title: 'Logga in',
+      label_email: 'E-post',
+      label_tenant_optional: 'Klinik (valfri)',
+      label_password: 'Lösenord',
+      label_multi_tenant: 'Flera kliniker hittades. Välj klinik:',
+      continue: 'Fortsätt',
+      nav_overview: 'Översikt',
+      nav_templates: 'Mallar',
+      nav_reviews: 'Granskningar',
+      nav_incidents: 'Incidenter',
+      nav_audit: 'Revision',
+      nav_team: 'Team',
+      nav_settings: 'Inställningar',
+      nav_ops: 'Drift',
+      kpi_templates: 'Mallar',
+      kpi_owner_coverage: 'Ägaråtgärdstäckning',
+      open_queue: 'Öppna kö',
+      see_incidents: 'Se incidenter',
+      overview_insights: 'Översiktsinsikter',
+      latest_activity: 'Senaste aktivitet',
+      risk_trends: 'Risktrender (7 dagar)',
+      quick_actions: 'Snabbåtgärder',
+      quick_create_template: 'Skapa mall',
+      quick_generate_draft: 'Skapa utkast med AI',
+      quick_review_flagged: 'Granska flaggade utkast',
+      notifications: 'Notifieringar',
+      tenant_config: 'Klinikinställningar',
+      save_config: 'Spara inställningar',
+      template_categories: 'Mallkategorier',
+      risk_levels: 'Risknivåer',
+      my_tenants: 'Mina kliniker',
+      refresh_tenants: 'Uppdatera kliniklista',
+      onboard_tenant: 'Lägg till ny klinik',
+      onboard_tenant_btn: 'Lägg till klinik',
+    },
+    en: {
+      brand_title: 'Major Arcana',
+      label_language: 'Language',
+      language_sv: 'Swedish',
+      language_en: 'English',
+      session_not_logged: 'Not signed in',
+      session_tenant: 'Clinic',
+      session_role: 'Role',
+      tenant_option: 'Clinic',
+      switch_tenant: 'Switch clinic',
+      refresh: 'Refresh',
+      logout: 'Sign out',
+      login_title: 'Sign in',
+      label_email: 'Email',
+      label_tenant_optional: 'Clinic (optional)',
+      label_password: 'Password',
+      label_multi_tenant: 'Multiple clinics found. Select clinic:',
+      continue: 'Continue',
+      nav_overview: 'Overview',
+      nav_templates: 'Templates',
+      nav_reviews: 'Reviews',
+      nav_incidents: 'Incidents',
+      nav_audit: 'Audit',
+      nav_team: 'Team',
+      nav_settings: 'Settings',
+      nav_ops: 'Operations',
+      kpi_templates: 'Templates',
+      kpi_owner_coverage: 'Owner action coverage',
+      open_queue: 'Open queue',
+      see_incidents: 'View incidents',
+      overview_insights: 'Overview insights',
+      latest_activity: 'Latest activity',
+      risk_trends: 'Risk trends (7 days)',
+      quick_actions: 'Quick actions',
+      quick_create_template: 'Create template',
+      quick_generate_draft: 'Generate draft with AI',
+      quick_review_flagged: 'Review flagged drafts',
+      notifications: 'Notifications',
+      tenant_config: 'Clinic settings',
+      save_config: 'Save settings',
+      template_categories: 'Template categories',
+      risk_levels: 'Risk levels',
+      my_tenants: 'My clinics',
+      refresh_tenants: 'Refresh clinic list',
+      onboard_tenant: 'Add new clinic',
+      onboard_tenant_btn: 'Add clinic',
+    },
+  });
+
+  function loadLanguage() {
+    const raw = String(localStorage.getItem(LANGUAGE_KEY) || 'sv')
+      .trim()
+      .toLowerCase();
+    return SUPPORTED_LANGUAGES.includes(raw) ? raw : 'sv';
+  }
 
   function parseStorageJson(key, fallback) {
     try {
@@ -91,6 +196,7 @@
 
   const state = {
     token: localStorage.getItem(TOKEN_KEY) || '',
+    language: loadLanguage(),
     role: '',
     tenantId: '',
     pendingLoginTicket: '',
@@ -132,6 +238,7 @@
     lastToastKey: '',
     lastToastAt: 0,
     toastSequence: 0,
+    activeSectionGroup: 'overviewSection',
   };
 
   const els = {
@@ -158,6 +265,7 @@
     appModalCloseBtn: document.getElementById('appModalCloseBtn'),
     toastViewport: document.getElementById('toastViewport'),
     sessionMeta: document.getElementById('sessionMeta'),
+    languageSelect: document.getElementById('languageSelect'),
     tenantSwitchSelect: document.getElementById('tenantSwitchSelect'),
     switchTenantBtn: document.getElementById('switchTenantBtn'),
     refreshBtn: document.getElementById('refreshBtn'),
@@ -186,6 +294,7 @@
     reviewsIncidentsSection: document.getElementById('reviewsIncidentsSection'),
     auditSection: document.getElementById('auditSection'),
     teamSection: document.getElementById('teamSection'),
+    opsSection: document.getElementById('opsSection'),
     settingsSection: document.getElementById('settingsSection'),
     overviewSection: document.getElementById('overviewSection'),
     categoryBadges: document.getElementById('categoryBadges'),
@@ -407,6 +516,117 @@
     el.textContent = String(value ?? '');
   }
 
+  function t(key, fallback = '') {
+    const lang = SUPPORTED_LANGUAGES.includes(state.language) ? state.language : 'sv';
+    const scoped = TRANSLATIONS[lang] || TRANSLATIONS.sv || {};
+    const base = TRANSLATIONS.sv || {};
+    if (Object.prototype.hasOwnProperty.call(scoped, key)) return scoped[key];
+    if (Object.prototype.hasOwnProperty.call(base, key)) return base[key];
+    return String(fallback || key || '');
+  }
+
+  function applyLanguage() {
+    document.documentElement.lang = state.language === 'en' ? 'en' : 'sv';
+    if (els.languageSelect && els.languageSelect.value !== state.language) {
+      els.languageSelect.value = state.language;
+    }
+    document.querySelectorAll('[data-i18n]').forEach((element) => {
+      const key = String(element.getAttribute('data-i18n') || '').trim();
+      if (!key) return;
+      const fallback = element.dataset.i18nFallback || element.textContent || '';
+      element.textContent = t(key, fallback);
+    });
+    setSessionMeta();
+    renderTenantSwitchOptions();
+  }
+
+  function setLanguage(nextLanguage) {
+    const normalized = String(nextLanguage || '')
+      .trim()
+      .toLowerCase();
+    state.language = SUPPORTED_LANGUAGES.includes(normalized) ? normalized : 'sv';
+    localStorage.setItem(LANGUAGE_KEY, state.language);
+    applyLanguage();
+  }
+
+  function isEnglishLanguage() {
+    return state.language === 'en';
+  }
+
+  function formatRoleLabel(roleRaw) {
+    const role = String(roleRaw || '').trim().toUpperCase();
+    if (role === 'OWNER') return isEnglishLanguage() ? 'OWNER' : 'ÄGARE';
+    if (role === 'STAFF') return isEnglishLanguage() ? 'STAFF' : 'MEDARBETARE';
+    return roleRaw || '-';
+  }
+
+  function formatStatusLabel(statusRaw) {
+    const status = String(statusRaw || '').trim().toLowerCase();
+    const map = {
+      active: isEnglishLanguage() ? 'Active' : 'Aktiv',
+      disabled: isEnglishLanguage() ? 'Disabled' : 'Inaktiv',
+      revoked: isEnglishLanguage() ? 'Revoked' : 'Återkallad',
+      open: isEnglishLanguage() ? 'Open' : 'Öppen',
+      closed: isEnglishLanguage() ? 'Closed' : 'Stängd',
+      pending: isEnglishLanguage() ? 'Pending' : 'Väntar',
+      success: isEnglishLanguage() ? 'Success' : 'Lyckad',
+      error: isEnglishLanguage() ? 'Error' : 'Fel',
+      draft: isEnglishLanguage() ? 'Draft' : 'Utkast',
+      archived: isEnglishLanguage() ? 'Archived' : 'Arkiverad',
+    };
+    if (Object.prototype.hasOwnProperty.call(map, status)) return map[status];
+    return statusRaw || '-';
+  }
+
+  function formatDecisionLabel(decisionRaw) {
+    const decision = String(decisionRaw || '').trim().toLowerCase();
+    const map = {
+      allow: isEnglishLanguage() ? 'Allowed' : 'Tillåten',
+      review_required: isEnglishLanguage() ? 'Needs review' : 'Kräver granskning',
+      blocked: isEnglishLanguage() ? 'Blocked' : 'Blockerad',
+    };
+    if (Object.prototype.hasOwnProperty.call(map, decision)) return map[decision];
+    return decisionRaw || '-';
+  }
+
+  function formatOwnerDecisionLabel(valueRaw) {
+    const value = String(valueRaw || '').trim().toLowerCase();
+    const map = {
+      pending: isEnglishLanguage() ? 'Pending' : 'Väntar',
+      approved_exception: isEnglishLanguage() ? 'Approved exception' : 'Godkänd avvikelse',
+      false_positive: isEnglishLanguage() ? 'False positive' : 'Falskt positiv',
+      revision_requested: isEnglishLanguage() ? 'Revision requested' : 'Revidering begärd',
+      escalated: isEnglishLanguage() ? 'Escalated' : 'Eskalerad',
+    };
+    if (Object.prototype.hasOwnProperty.call(map, value)) return map[value];
+    return valueRaw || '-';
+  }
+
+  function formatOwnerActionLabel(actionRaw) {
+    const action = String(actionRaw || '').trim().toLowerCase();
+    const map = {
+      request_revision: isEnglishLanguage() ? 'Request revision' : 'Begär revidering',
+      approve_exception: isEnglishLanguage() ? 'Approve exception' : 'Godkänn avvikelse',
+      mark_false_positive: isEnglishLanguage() ? 'Mark false positive' : 'Markera falskt positiv',
+      escalate: isEnglishLanguage() ? 'Escalate' : 'Eskalera',
+    };
+    if (Object.prototype.hasOwnProperty.call(map, action)) return map[action];
+    return actionRaw || '-';
+  }
+
+  function formatTemplateStateLabel(stateRaw) {
+    const value = String(stateRaw || '').trim().toLowerCase();
+    const map = {
+      draft: isEnglishLanguage() ? 'Draft' : 'Utkast',
+      active: isEnglishLanguage() ? 'Active' : 'Aktiv',
+      archived: isEnglishLanguage() ? 'Archived' : 'Arkiverad',
+      review_required: isEnglishLanguage() ? 'Needs review' : 'Kräver granskning',
+      blocked: isEnglishLanguage() ? 'Blocked' : 'Blockerad',
+    };
+    if (Object.prototype.hasOwnProperty.call(map, value)) return map[value];
+    return stateRaw || '-';
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -490,7 +710,7 @@
       els.templateFilterSelect.innerHTML = '';
       const allOption = document.createElement('option');
       allOption.value = '';
-      allOption.textContent = 'Alla';
+      allOption.textContent = isEnglishLanguage() ? 'All' : 'Alla';
       els.templateFilterSelect.appendChild(allOption);
       for (const category of categories) {
         const option = document.createElement('option');
@@ -509,7 +729,7 @@
       els.riskCategoryFilter.innerHTML = '';
       const allOption = document.createElement('option');
       allOption.value = '';
-      allOption.textContent = 'Alla';
+      allOption.textContent = isEnglishLanguage() ? 'All' : 'Alla';
       els.riskCategoryFilter.appendChild(allOption);
       for (const category of categories) {
         const option = document.createElement('option');
@@ -527,7 +747,7 @@
     if (!els.templateCategoryChips) return;
     const selected = String(state.templateListFilters?.category || '').trim();
     const options = [
-      { value: '', label: 'Alla' },
+      { value: '', label: isEnglishLanguage() ? 'All' : 'Alla' },
       ...categories.map((category) => ({ value: category, label: category })),
     ];
 
@@ -763,7 +983,7 @@
     if (!raw) return 'Okänt fel.';
 
     if (action === 'activate' && /owner/i.test(raw)) {
-      return `${raw} Gå till Reviews/Incidents och sätt owner action först.`;
+      return `${raw} Gå till Granskningar/Incidenter och sätt ägaråtgärd först.`;
     }
     if (action === 'activate' && /risk\/policy/i.test(raw)) {
       return `${raw} Kör Evaluate och hantera riskbeslut innan activation.`;
@@ -1301,7 +1521,7 @@
         els.tonePreviewLogo.classList.remove('hidden');
       } else {
         els.tonePreviewLogo.removeAttribute('src');
-        els.tonePreviewLogo.alt = 'Brand logo preview';
+        els.tonePreviewLogo.alt = 'Förhandsvisning av logga';
         els.tonePreviewLogo.classList.add('hidden');
       }
     }
@@ -1352,9 +1572,9 @@
     return [
       `Hej ${safeEmail},`,
       '',
-      'Du är nu inbjuden till Arcana Executive OS.',
+      'Du är nu inbjuden till Major Arcana.',
       `Inloggning: ${window.location.origin}/admin.html`,
-      `Tenant: ${safeTenant || '-'}`,
+      `Klinik: ${safeTenant || '-'}`,
       `E-post: ${safeEmail}`,
       `Temporärt lösenord: ${safePassword}`,
       '',
@@ -1366,7 +1586,7 @@
     const content = String(message || '').trim();
     state.lastInviteMessage = content;
     if (els.staffInvitePreview) {
-      els.staffInvitePreview.textContent = content || 'Ingen invite-text ännu.';
+      els.staffInvitePreview.textContent = content || 'Ingen inbjudningstext ännu.';
     }
     if (els.copyInviteMessageBtn) {
       els.copyInviteMessageBtn.disabled = !content;
@@ -1385,7 +1605,7 @@
     const selected = getStaffMemberByMembershipId(state.selectedStaffMembershipId);
     if (!selected) {
       state.selectedStaffMembershipId = '';
-      if (els.selectedStaffMeta) els.selectedStaffMeta.textContent = 'Ingen staff vald.';
+      if (els.selectedStaffMeta) els.selectedStaffMeta.textContent = 'Ingen medarbetare vald.';
       if (els.selectedStaffDetails) {
         els.selectedStaffDetails.textContent =
           'Välj en rad i tabellen för att se detaljer och nästa steg.';
@@ -1401,8 +1621,10 @@
     }
 
     const email = String(selected?.user?.email || '-');
-    const role = String(selected?.membership?.role || '-');
-    const status = String(selected?.membership?.status || '-');
+    const roleRaw = String(selected?.membership?.role || '-');
+    const statusRaw = String(selected?.membership?.status || '-');
+    const role = formatRoleLabel(roleRaw);
+    const status = formatStatusLabel(statusRaw);
     const createdAt = formatDateTime(selected?.membership?.createdAt || selected?.user?.createdAt);
     const updatedAt = formatDateTime(selected?.membership?.updatedAt || selected?.user?.updatedAt);
     const membershipId = String(selected?.membership?.id || '-');
@@ -1421,13 +1643,19 @@
     if (els.selectedStaffDetails) {
       els.selectedStaffDetails.textContent = [
         `email: ${email}`,
-        `role: ${role}`,
+        `roll: ${role}`,
         `status: ${status}`,
         `membershipId: ${membershipId}`,
         `userId: ${userId}`,
         `createdAt: ${createdAt}`,
         `updatedAt: ${updatedAt}`,
-        isCurrentMembership ? 'session: current' : 'session: other',
+        isCurrentMembership
+          ? isEnglishLanguage()
+            ? 'session: current'
+            : 'session: aktuell'
+          : isEnglishLanguage()
+          ? 'session: other'
+          : 'session: annan',
       ].join('\n');
     }
     const canReset = isOwner() && role !== 'OWNER';
@@ -1440,11 +1668,11 @@
       if (isOwner()) {
         if (role === 'STAFF') {
           nextRole = 'OWNER';
-          label = 'Promote OWNER';
+          label = isEnglishLanguage() ? 'Promote OWNER' : 'Befordra till ÄGARE';
           enabled = true;
         } else if (role === 'OWNER') {
           nextRole = 'STAFF';
-          label = 'Demote STAFF';
+          label = isEnglishLanguage() ? 'Demote STAFF' : 'Sänk till MEDARBETARE';
           enabled = activeOwnerCount > 1 && !isCurrentMembership;
         }
       }
@@ -1520,6 +1748,12 @@
   function setAuthVisible(isLoggedIn) {
     els.loginPanel.classList.toggle('hidden', isLoggedIn);
     els.dashboardPanel.classList.toggle('hidden', !isLoggedIn);
+    if (isLoggedIn) {
+      setActiveSectionGroup(state.activeSectionGroup || 'overviewSection', {
+        targetId: resolveDefaultTargetForGroup(state.activeSectionGroup || 'overviewSection'),
+        scroll: false,
+      });
+    }
     if (!isLoggedIn) {
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       if (els.tenantSelectionSelect) els.tenantSelectionSelect.innerHTML = '';
@@ -1530,10 +1764,13 @@
   function setSessionMeta() {
     if (!els.sessionMeta) return;
     if (!state.token || !state.tenantId || !state.role) {
-      els.sessionMeta.textContent = 'Inte inloggad';
+      els.sessionMeta.textContent = t('session_not_logged', 'Inte inloggad');
       return;
     }
-    els.sessionMeta.textContent = `Tenant: ${state.tenantId} • Roll: ${state.role}`;
+    els.sessionMeta.textContent = `${t('session_tenant', 'Klinik')}: ${state.tenantId} • ${t(
+      'session_role',
+      'Roll'
+    )}: ${formatRoleLabel(state.role)}`;
   }
 
   function renderTenantSwitchOptions() {
@@ -1545,7 +1782,7 @@
     if (!memberships.length) {
       const option = document.createElement('option');
       option.value = '';
-      option.textContent = 'Tenant';
+      option.textContent = t('tenant_option', 'Klinik');
       els.tenantSwitchSelect.appendChild(option);
       return;
     }
@@ -1553,7 +1790,7 @@
     for (const membership of memberships) {
       const tenantId = membership?.tenantId || membership?.membership?.tenantId || '';
       if (!tenantId) continue;
-      const role = membership?.role || membership?.membership?.role || 'okänd';
+      const role = formatRoleLabel(membership?.role || membership?.membership?.role || 'okänd');
       const assistantName = membership?.config?.assistantName || '';
       const option = document.createElement('option');
       option.value = tenantId;
@@ -1574,7 +1811,7 @@
       if (!tenant?.tenantId) continue;
       const option = document.createElement('option');
       option.value = tenant.tenantId;
-      option.textContent = `${tenant.tenantId} (${tenant.role || 'okänd'})`;
+      option.textContent = `${tenant.tenantId} (${formatRoleLabel(tenant.role || 'okänd')})`;
       els.tenantSelectionSelect.appendChild(option);
     }
     const hasOptions = els.tenantSelectionSelect.options.length > 0;
@@ -1873,7 +2110,9 @@
     const tone = percent >= 90 ? 'ok' : percent >= 60 ? 'warn' : 'bad';
     setKpiMeta(
       els.ownerCoverageMeta,
-      `${handled}/${total} owner-hanterade • pending: ${pending}`,
+      isEnglishLanguage()
+        ? `${handled}/${total} owner handled • pending: ${pending}`
+        : `${handled}/${total} ägarhanterade • väntar: ${pending}`,
       tone
     );
   }
@@ -1902,7 +2141,9 @@
       else buckets.ok += 1;
     }
 
-    const text = `Breach:${buckets.breached} • Kritisk:${buckets.critical} • Varning:${buckets.warn}`;
+    const text = isEnglishLanguage()
+      ? `Breach:${buckets.breached} • Critical:${buckets.critical} • Warning:${buckets.warn}`
+      : `Brist:${buckets.breached} • Kritisk:${buckets.critical} • Varning:${buckets.warn}`;
     const tone = buckets.breached > 0 ? 'bad' : buckets.critical > 0 || buckets.warn > 0 ? 'warn' : 'ok';
     setKpiMeta(els.slaIndicatorMeta, text, tone);
   }
@@ -2007,35 +2248,51 @@
     if (highCriticalOpen > 0) {
       notifications.push({
         tone: 'bad',
-        title: `${highCriticalOpen} high/critical incidents öppna`,
-        detail: 'Prioritera incidenthantering och owner action.',
+        title: isEnglishLanguage()
+          ? `${highCriticalOpen} high/critical incidents open`
+          : `${highCriticalOpen} höga/kritiska incidenter öppna`,
+        detail: isEnglishLanguage()
+          ? 'Prioritize incident handling and owner actions.'
+          : 'Prioritera incidenthantering och ägaråtgärder.',
       });
     }
     if (l3Count > 0) {
       notifications.push({
         tone: 'warn',
-        title: `${l3Count} reviews väntar`,
-        detail: 'L3-utvärderingar behöver manuell granskning.',
+        title: isEnglishLanguage() ? `${l3Count} reviews pending` : `${l3Count} granskningar väntar`,
+        detail: isEnglishLanguage()
+          ? 'L3 evaluations need manual review.'
+          : 'L3-utvärderingar behöver manuell granskning.',
       });
     }
     if (pendingOwner > 0) {
       notifications.push({
         tone: 'warn',
-        title: `${pendingOwner} owner decisions pending`,
-        detail: 'Hantera pending-rader för bättre coverage.',
+        title: isEnglishLanguage()
+          ? `${pendingOwner} owner decisions pending`
+          : `${pendingOwner} ägarbeslut väntar`,
+        detail: isEnglishLanguage()
+          ? 'Handle pending rows to improve coverage.'
+          : 'Hantera väntande rader för bättre täckning.',
       });
     }
     if (totalTemplates > 0 && activeTemplates < totalTemplates) {
       notifications.push({
         tone: 'warn',
-        title: `${totalTemplates - activeTemplates} mallar utan aktiv version`,
-        detail: `Aktiva: ${activeTemplates}/${totalTemplates}.`,
+        title: isEnglishLanguage()
+          ? `${totalTemplates - activeTemplates} templates without active version`
+          : `${totalTemplates - activeTemplates} mallar utan aktiv version`,
+        detail: isEnglishLanguage()
+          ? `Active: ${activeTemplates}/${totalTemplates}.`
+          : `Aktiva: ${activeTemplates}/${totalTemplates}.`,
       });
     } else if (totalTemplates > 0) {
       notifications.push({
         tone: 'ok',
-        title: 'Alla mallar är aktiva',
-        detail: `${activeTemplates}/${totalTemplates} mallar har aktiv version.`,
+        title: isEnglishLanguage() ? 'All templates are active' : 'Alla mallar är aktiva',
+        detail: isEnglishLanguage()
+          ? `${activeTemplates}/${totalTemplates} templates have active version.`
+          : `${activeTemplates}/${totalTemplates} mallar har aktiv version.`,
       });
     }
 
@@ -2043,7 +2300,9 @@
     if (latestEvent) {
       notifications.push({
         tone: 'ok',
-        title: `Senaste audit: ${toActionLabel(latestEvent.action)}`,
+        title: `${isEnglishLanguage() ? 'Latest audit' : 'Senaste revision'}: ${toActionLabel(
+          latestEvent.action
+        )}`,
         detail: `${formatDateTime(latestEvent.ts)} • ${latestEvent.actorUserId || '-'}`,
       });
     }
@@ -2100,12 +2359,14 @@
     }
 
     const rows = [
-      `Total: ${stats.total}`,
-      `Pending: ${stats.pending}`,
-      `Revision requested: ${stats.revisionRequested}`,
-      `Escalated: ${stats.escalated}`,
-      `High/Critical open: ${stats.highCriticalOpen}`,
-      `Valda rader: ${state.selectedRiskIds.length}`,
+      `${isEnglishLanguage() ? 'Total' : 'Totalt'}: ${stats.total}`,
+      `${isEnglishLanguage() ? 'Pending' : 'Väntar'}: ${stats.pending}`,
+      `${isEnglishLanguage() ? 'Revision requested' : 'Revidering begärd'}: ${
+        stats.revisionRequested
+      }`,
+      `${isEnglishLanguage() ? 'Escalated' : 'Eskalerade'}: ${stats.escalated}`,
+      `${isEnglishLanguage() ? 'High/Critical open' : 'Hög/Kritisk öppna'}: ${stats.highCriticalOpen}`,
+      `${isEnglishLanguage() ? 'Selected rows' : 'Valda rader'}: ${state.selectedRiskIds.length}`,
     ];
     els.riskQueueSummary.innerHTML = rows.map((row) => `<span class="chip">${escapeHtml(row)}</span>`).join('');
   }
@@ -2121,6 +2382,7 @@
         .querySelectorAll('button[data-owner-action]')
         .forEach((btn) => {
           const action = String(btn.getAttribute('data-owner-action') || '').trim();
+          btn.textContent = formatOwnerActionLabel(action);
           btn.disabled = !canEdit;
           btn.classList.toggle('active', canEdit && action === selectedAction);
           if (currentEvaluation?.id) {
@@ -2146,9 +2408,13 @@
       if (currentEvaluation?.evaluatedAt) {
         events.push({
           ts: currentEvaluation.evaluatedAt,
-          title: `Risk evaluated (L${currentEvaluation.riskLevel || '-'})`,
-          detail: `Decision: ${currentEvaluation.decision || '-'} • Owner: ${
-            currentEvaluation.ownerDecision || 'pending'
+          title: `${isEnglishLanguage() ? 'Risk evaluated' : 'Risk utvärderad'} (L${
+            currentEvaluation.riskLevel || '-'
+          })`,
+          detail: `${isEnglishLanguage() ? 'Decision' : 'Beslut'}: ${formatDecisionLabel(
+            currentEvaluation.decision || '-'
+          )} • ${isEnglishLanguage() ? 'Owner' : 'Ägare'}: ${
+            formatOwnerDecisionLabel(currentEvaluation.ownerDecision || 'pending')
           }`,
         });
       }
@@ -2158,17 +2424,23 @@
       for (const action of ownerActions) {
         events.push({
           ts: action?.createdAt || currentEvaluation?.updatedAt || currentEvaluation?.evaluatedAt,
-          title: `Owner action: ${action?.action || '-'}`,
+          title: `${isEnglishLanguage() ? 'Owner action' : 'Ägaråtgärd'}: ${formatOwnerActionLabel(
+            action?.action || '-'
+          )}`,
           detail: `${action?.note ? `Notering: ${action.note}` : 'Ingen notering'}${
-            action?.actorUserId ? ` • actor: ${action.actorUserId}` : ''
+            action?.actorUserId
+              ? ` • ${isEnglishLanguage() ? 'actor' : 'aktör'}: ${action.actorUserId}`
+              : ''
           }`,
         });
       }
       if (!events.length && currentEvaluation?.updatedAt) {
         events.push({
           ts: currentEvaluation.updatedAt,
-          title: 'Senaste uppdatering',
-          detail: 'Ingen extra historik tillgänglig.',
+          title: isEnglishLanguage() ? 'Latest update' : 'Senaste uppdatering',
+          detail: isEnglishLanguage()
+            ? 'No additional history available.'
+            : 'Ingen extra historik tillgänglig.',
         });
       }
       events.sort((a, b) => {
@@ -2178,7 +2450,9 @@
       });
 
       if (!events.length) {
-        els.riskDetailTimeline.innerHTML = '<li class="muted mini">Ingen timeline ännu.</li>';
+        els.riskDetailTimeline.innerHTML = `<li class="muted mini">${
+          isEnglishLanguage() ? 'No timeline yet.' : 'Ingen tidslinje ännu.'
+        }</li>`;
         return;
       }
       els.riskDetailTimeline.innerHTML = events
@@ -2202,7 +2476,9 @@
         els.riskDetailSla.textContent = 'Ingen incident-SLA.';
       }
       if (els.riskDetailTimeline) {
-        els.riskDetailTimeline.innerHTML = '<li class="muted mini">Ingen timeline ännu.</li>';
+        els.riskDetailTimeline.innerHTML = `<li class="muted mini">${
+          isEnglishLanguage() ? 'No timeline yet.' : 'Ingen tidslinje ännu.'
+        }</li>`;
       }
       els.riskDetailBlock.textContent = 'Ingen detaljerad riskdata ännu.';
       setQuickActionsState(null);
@@ -2226,16 +2502,24 @@
       els.riskDetailSummary.innerHTML = `
         <div class="seg">
           <span class="chip">Risk L${escapeHtml(evaluation.riskLevel || '-')}</span>
-          <span class="chip">${escapeHtml(evaluation.decision || '-')}</span>
-          <span class="chip">Owner: ${escapeHtml(evaluation.ownerDecision || 'pending')}</span>
-          <span class="chip">Actions: ${escapeHtml(ownerActions.length)}</span>
+          <span class="chip">${escapeHtml(formatDecisionLabel(evaluation.decision || '-'))}</span>
+          <span class="chip">${isEnglishLanguage() ? 'Owner' : 'Ägare'}: ${escapeHtml(
+            formatOwnerDecisionLabel(evaluation.ownerDecision || 'pending')
+          )}</span>
+          <span class="chip">${isEnglishLanguage() ? 'Actions' : 'Åtgärder'}: ${escapeHtml(
+            ownerActions.length
+          )}</span>
         </div>
-        <div class="mini" style="margin-top:8px"><strong>Reason codes:</strong> ${
+        <div class="mini" style="margin-top:8px"><strong>${
+          isEnglishLanguage() ? 'Reason codes' : 'Orsakskoder'
+        }:</strong> ${
           reasonCodes.length
             ? escapeHtml(reasonCodes.join(', '))
             : '<span class="muted">-</span>'
         }</div>
-        <div class="mini" style="margin-top:4px"><strong>Policy:</strong> ${escapeHtml(policySummary)}</div>
+        <div class="mini" style="margin-top:4px"><strong>${
+          isEnglishLanguage() ? 'Policy' : 'Policy'
+        }:</strong> ${escapeHtml(policySummary)}</div>
       `;
     }
     if (els.riskDetailSla) {
@@ -2256,8 +2540,8 @@
     els.riskDetailBlock.textContent = JSON.stringify(
       {
         riskLevel: evaluation.riskLevel,
-        decision: evaluation.decision,
-        ownerDecision: evaluation.ownerDecision || 'pending',
+        decision: formatDecisionLabel(evaluation.decision),
+        ownerDecision: formatOwnerDecisionLabel(evaluation.ownerDecision || 'pending'),
         scores: {
           riskScore: evaluation.riskScore,
           semanticScore: evaluation.semanticScore,
@@ -2350,9 +2634,13 @@
     const isOpen = ownerDecision === 'pending' || ownerDecision === 'revision_requested';
     if (!isOpen) {
       return {
-        label: 'Closed',
+        label: isEnglishLanguage() ? 'Closed' : 'Stängd',
         className: 'sla-ok',
-        detail: `Stängd med ownerDecision=${ownerDecision}. Mål: ${formatDurationCompact(targetMs)}.`,
+        detail: `${
+          isEnglishLanguage() ? 'Closed with ownerDecision' : 'Stängd med ägarbeslut'
+        }=${formatOwnerDecisionLabel(ownerDecision)}. ${
+          isEnglishLanguage() ? 'Target' : 'Mål'
+        }: ${formatDurationCompact(targetMs)}.`,
       };
     }
 
@@ -2360,9 +2648,13 @@
     const remainingMs = targetMs - elapsedMs;
     if (remainingMs <= 0) {
       return {
-        label: `Breached ${formatDurationCompact(Math.abs(remainingMs))}`,
+        label: `${
+          isEnglishLanguage() ? 'Breached' : 'Överskriden'
+        } ${formatDurationCompact(Math.abs(remainingMs))}`,
         className: 'sla-breached',
-        detail: `SLA överskriden. Mål: ${formatDurationCompact(targetMs)}.`,
+        detail: `${isEnglishLanguage() ? 'SLA breached' : 'SLA överskriden'}. ${
+          isEnglishLanguage() ? 'Target' : 'Mål'
+        }: ${formatDurationCompact(targetMs)}.`,
       };
     }
 
@@ -2466,13 +2758,13 @@
             return;
           }
           try {
-            setStatus(els.riskActionStatus, `Sparar owner action (${action})...`);
+            setStatus(els.riskActionStatus, `Sparar ägaråtgärd (${formatOwnerActionLabel(action)})...`);
             await applyOwnerAction(evaluationId, action, noteDialog.value || '');
             setStatus(els.riskActionStatus, `Owner action sparad: ${action}.`);
             await loadDashboard();
             await loadRiskEvaluationDetail(evaluationId);
           } catch (error) {
-            setStatus(els.riskActionStatus, error.message || 'Kunde inte spara owner action.', true);
+            setStatus(els.riskActionStatus, error.message || 'Kunde inte spara ägaråtgärd.', true);
           }
         });
       });
@@ -2500,8 +2792,8 @@
     renderRiskQueueSummary(state.riskEvaluations);
 
     if (!displayEvaluations.length) {
-      renderRiskEmptyRow(els.riskReviewsTableBody, 12, 'Inga reviews (L3) för valt filter.');
-      renderRiskEmptyRow(els.riskIncidentsTableBody, 11, 'Inga incidents (L4-L5) för valt filter.');
+      renderRiskEmptyRow(els.riskReviewsTableBody, 12, 'Inga granskningar (L3) för valt filter.');
+      renderRiskEmptyRow(els.riskIncidentsTableBody, 11, 'Inga incidenter (L4-L5) för valt filter.');
       syncSelectAllCheckbox(els.riskSelectAllReviews, []);
       syncSelectAllCheckbox(els.riskSelectAllIncidents, []);
       renderRiskDetail(null);
@@ -2546,8 +2838,8 @@
         <td><span class="chip">${escapeHtml(categoryLabel)}</span></td>
         <td class="mini">${escapeHtml(updatedAtLabel)}<br/><span class="muted">${escapeHtml(ageLabel)}</span></td>
         <td><span class="badge"><span class="dot ${dotClassForRiskLevel(riskLevel)}"></span>L${riskLevel}</span></td>
-        <td>${escapeHtml(evaluation.decision || '-')}</td>
-        <td>${escapeHtml(evaluation.ownerDecision || 'pending')}</td>
+        <td>${escapeHtml(formatDecisionLabel(evaluation.decision || '-'))}</td>
+        <td>${escapeHtml(formatOwnerDecisionLabel(evaluation.ownerDecision || 'pending'))}</td>
         <td class="mini">
           risk: <strong>${riskScore}</strong><br/>
           sem: ${semanticScore}<br/>
@@ -2562,14 +2854,16 @@
             <select data-eid="${escapeHtml(evaluation.id || '')}" class="ownerActionSelect">
               <option value="request_revision" ${
                 selectedAction === 'request_revision' ? 'selected' : ''
-              }>request_revision</option>
+              }>${escapeHtml(formatOwnerActionLabel('request_revision'))}</option>
               <option value="approve_exception" ${
                 selectedAction === 'approve_exception' ? 'selected' : ''
-              }>approve_exception</option>
+              }>${escapeHtml(formatOwnerActionLabel('approve_exception'))}</option>
               <option value="mark_false_positive" ${
                 selectedAction === 'mark_false_positive' ? 'selected' : ''
-              }>mark_false_positive</option>
-              <option value="escalate" ${selectedAction === 'escalate' ? 'selected' : ''}>escalate</option>
+              }>${escapeHtml(formatOwnerActionLabel('mark_false_positive'))}</option>
+              <option value="escalate" ${selectedAction === 'escalate' ? 'selected' : ''}>${escapeHtml(
+                formatOwnerActionLabel('escalate')
+              )}</option>
             </select>
             <button class="btn small ownerActionBtn" data-eid="${escapeHtml(evaluation.id || '')}">Spara</button>
             <button class="btn small riskOpenBtn" data-eid="${escapeHtml(evaluation.id || '')}">Visa</button>
@@ -2607,22 +2901,24 @@
         <td><span class="chip">${escapeHtml(categoryLabel)}</span></td>
         <td class="mini">${escapeHtml(updatedAtLabel)}<br/><span class="muted">${escapeHtml(ageLabel)}</span></td>
         <td><span class="badge"><span class="dot ${dotClassForRiskLevel(riskLevel)}"></span>L${riskLevel}</span></td>
-        <td>${escapeHtml(evaluation.decision || '-')}</td>
-        <td>${escapeHtml(evaluation.ownerDecision || 'pending')}</td>
+        <td>${escapeHtml(formatDecisionLabel(evaluation.decision || '-'))}</td>
+        <td>${escapeHtml(formatOwnerDecisionLabel(evaluation.ownerDecision || 'pending'))}</td>
         <td class="mini" title="${escapeHtml(reasonCodes.join(', '))}">${escapeHtml(reasonCodesShort || '-')}${reasonCodes.length > 3 ? ' ...' : ''}<br/><span class="muted">${reasonCodes.length} st</span></td>
         <td>
           <div class="actions">
             <select data-eid="${escapeHtml(evaluation.id || '')}" class="ownerActionSelect">
               <option value="request_revision" ${
                 selectedAction === 'request_revision' ? 'selected' : ''
-              }>request_revision</option>
+              }>${escapeHtml(formatOwnerActionLabel('request_revision'))}</option>
               <option value="approve_exception" ${
                 selectedAction === 'approve_exception' ? 'selected' : ''
-              }>approve_exception</option>
+              }>${escapeHtml(formatOwnerActionLabel('approve_exception'))}</option>
               <option value="mark_false_positive" ${
                 selectedAction === 'mark_false_positive' ? 'selected' : ''
-              }>mark_false_positive</option>
-              <option value="escalate" ${selectedAction === 'escalate' ? 'selected' : ''}>escalate</option>
+              }>${escapeHtml(formatOwnerActionLabel('mark_false_positive'))}</option>
+              <option value="escalate" ${selectedAction === 'escalate' ? 'selected' : ''}>${escapeHtml(
+                formatOwnerActionLabel('escalate')
+              )}</option>
             </select>
             <button class="btn small ownerActionBtn" data-eid="${escapeHtml(evaluation.id || '')}">Spara</button>
             <button class="btn small riskOpenBtn" data-eid="${escapeHtml(evaluation.id || '')}">Visa</button>
@@ -2637,10 +2933,10 @@
     }
 
     if (!reviews.length) {
-      renderRiskEmptyRow(els.riskReviewsTableBody, 12, 'Inga reviews (L3) för valt filter.');
+      renderRiskEmptyRow(els.riskReviewsTableBody, 12, 'Inga granskningar (L3) för valt filter.');
     }
     if (!incidents.length) {
-      renderRiskEmptyRow(els.riskIncidentsTableBody, 11, 'Inga incidents (L4-L5) för valt filter.');
+      renderRiskEmptyRow(els.riskIncidentsTableBody, 11, 'Inga incidenter (L4-L5) för valt filter.');
     }
 
     bindRiskRowInteractions(reviews, incidents);
@@ -2767,19 +3063,66 @@
   async function openReviewsQueue() {
     applyRiskFilterPreset('pending');
     await loadDashboard();
-    scrollToSection(els.reviewsQueueSection || els.reviewsIncidentsSection);
+    setActiveSectionGroup('reviewsIncidentsSection', {
+      targetId: els.reviewsQueueSection?.id || els.reviewsIncidentsSection?.id || '',
+      scroll: true,
+    });
   }
 
   async function openIncidentsQueue() {
     applyRiskFilterPreset('high_critical');
     await loadDashboard();
-    scrollToSection(els.incidentsQueueSection || els.reviewsIncidentsSection);
+    setActiveSectionGroup('reviewsIncidentsSection', {
+      targetId: els.incidentsQueueSection?.id || els.reviewsIncidentsSection?.id || '',
+      scroll: true,
+    });
+  }
+
+  function resolveSectionGroupTarget(targetId) {
+    const normalized = String(targetId || '').trim();
+    if (!normalized) return 'overviewSection';
+    if (normalized === 'reviewsQueueSection' || normalized === 'incidentsQueueSection') {
+      return 'reviewsIncidentsSection';
+    }
+    const targetEl = document.getElementById(normalized);
+    const group = String(targetEl?.getAttribute('data-section-group') || '').trim();
+    return group || normalized;
+  }
+
+  function resolveDefaultTargetForGroup(groupId) {
+    const normalized = String(groupId || '').trim();
+    if (!normalized) return 'overviewSection';
+    if (normalized === 'reviewsIncidentsSection') {
+      return resolveSectionNavTarget(normalized);
+    }
+    return normalized;
+  }
+
+  function setActiveSectionGroup(nextGroupId, options = {}) {
+    const groupId = resolveSectionGroupTarget(nextGroupId);
+    state.activeSectionGroup = groupId;
+    document.querySelectorAll('[data-section-group]').forEach((section) => {
+      const currentGroup = String(section.getAttribute('data-section-group') || '').trim();
+      section.classList.toggle('hidden', currentGroup !== groupId);
+    });
+
+    const targetId = String(options.targetId || resolveDefaultTargetForGroup(groupId)).trim();
+    if (targetId) setActiveSectionNav(targetId);
+
+    if (options.scroll) {
+      const focusEl =
+        (targetId && document.getElementById(targetId)) ||
+        document.querySelector(`[data-section-group="${groupId}"]`);
+      focusEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   function scrollToSection(sectionEl) {
     if (!sectionEl) return;
-    setActiveSectionNav(sectionEl.id);
-    sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSectionGroup(sectionEl.id, {
+      targetId: sectionEl.id,
+      scroll: true,
+    });
   }
 
   function resolveSectionNavTarget(targetId) {
@@ -2803,32 +3146,6 @@
     });
   }
 
-  function syncSectionNavFromViewport() {
-    if (!els.sectionNav) return;
-    const candidates = [
-      els.overviewSection,
-      els.templateLifecycleSection,
-      els.reviewsQueueSection,
-      els.incidentsQueueSection,
-      els.reviewsIncidentsSection,
-      els.auditSection,
-      els.teamSection,
-      els.settingsSection,
-    ].filter(Boolean);
-    if (!candidates.length) return;
-    let best = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    for (const section of candidates) {
-      const rect = section.getBoundingClientRect();
-      const distance = Math.abs(rect.top - 140);
-      if (distance < bestDistance) {
-        best = section;
-        bestDistance = distance;
-      }
-    }
-    if (best?.id) setActiveSectionNav(best.id);
-  }
-
   async function applyBulkOwnerAction() {
     try {
       if (!isOwner()) throw new Error('Endast OWNER kan köra bulk action.');
@@ -2836,12 +3153,15 @@
       if (!selectedIds.length) throw new Error('Markera minst en riskutvärdering först.');
 
       const action = String(els.riskBulkAction?.value || '').trim().toLowerCase();
-      if (!action) throw new Error('Välj owner action.');
+      if (!action) throw new Error('Välj ägaråtgärd.');
+      const actionLabel = formatOwnerActionLabel(action);
 
       const note = String(els.riskBulkNote?.value || '').trim();
       const confirmResult = await openAppModal({
-        title: 'Bulk owner action',
-        message: `Applicera "${action}" på ${selectedIds.length} valda riskutvärderingar?`,
+        title: isEnglishLanguage() ? 'Bulk owner action' : 'Massuppdatera ägaråtgärd',
+        message: isEnglishLanguage()
+          ? `Apply "${actionLabel}" to ${selectedIds.length} selected risk evaluations?`
+          : `Applicera "${actionLabel}" på ${selectedIds.length} valda riskutvärderingar?`,
         confirmLabel: 'Applicera',
         cancelLabel: 'Avbryt',
         confirmTone: 'danger',
@@ -2851,7 +3171,7 @@
         return;
       }
 
-      setStatus(els.riskActionStatus, `Applicerar ${action} på ${selectedIds.length} rader...`);
+      setStatus(els.riskActionStatus, `Applicerar ${actionLabel} på ${selectedIds.length} rader...`);
       let success = 0;
       const failures = [];
       for (const evaluationId of selectedIds) {
@@ -2889,25 +3209,25 @@
 
   async function applyRiskDetailOwnerAction(button) {
     try {
-      if (!isOwner()) throw new Error('Endast OWNER kan sätta owner action.');
+      if (!isOwner()) throw new Error('Endast OWNER kan sätta ägaråtgärd.');
       const action = String(button?.getAttribute('data-owner-action') || '')
         .trim()
         .toLowerCase();
       const evaluationId =
         String(button?.getAttribute('data-eid') || '').trim() ||
         String(state.selectedRiskEvaluationId || '').trim();
-      if (!action) throw new Error('Saknar owner action.');
+      if (!action) throw new Error('Saknar ägaråtgärd.');
       if (!evaluationId) throw new Error('Välj en riskutvärdering först.');
 
       const note = String(els.riskDetailNoteInput?.value || '').trim();
-      setStatus(els.riskActionStatus, `Sparar owner action (${action})...`);
+      setStatus(els.riskActionStatus, `Sparar ägaråtgärd (${formatOwnerActionLabel(action)})...`);
       await applyOwnerAction(evaluationId, action, note);
-      setStatus(els.riskActionStatus, `Owner action sparad: ${action}.`);
+      setStatus(els.riskActionStatus, `Ägaråtgärd sparad: ${formatOwnerActionLabel(action)}.`);
       if (els.riskDetailNoteInput) els.riskDetailNoteInput.value = '';
       await loadDashboard();
       await loadRiskEvaluationDetail(evaluationId);
     } catch (error) {
-      setStatus(els.riskActionStatus, error.message || 'Kunde inte spara owner action.', true);
+      setStatus(els.riskActionStatus, error.message || 'Kunde inte spara ägaråtgärd.', true);
     }
   }
 
@@ -3263,10 +3583,10 @@
 
     els.auditSummary.innerHTML = '';
     const badges = [
-      { label: 'Loaded', value: state.auditEvents.length, dot: 'ok' },
-      { label: 'Visible', value: visibleEvents.length, dot: 'info' },
-      { label: 'Success', value: success, dot: 'ok' },
-      { label: 'Error', value: error, dot: error > 0 ? 'bad' : 'ok' },
+      { label: isEnglishLanguage() ? 'Loaded' : 'Laddade', value: state.auditEvents.length, dot: 'ok' },
+      { label: isEnglishLanguage() ? 'Visible' : 'Visade', value: visibleEvents.length, dot: 'info' },
+      { label: isEnglishLanguage() ? 'Success' : 'Lyckade', value: success, dot: 'ok' },
+      { label: isEnglishLanguage() ? 'Errors' : 'Fel', value: error, dot: error > 0 ? 'bad' : 'ok' },
       { label: 'L4-L5', value: highCritical, dot: highCritical > 0 ? 'bad' : 'ok' },
     ];
 
@@ -3309,7 +3629,7 @@
         <div class="audit-timeline-item-title">
           ${severityClass ? `<span class="dot ${severityClass}"></span>` : ''}
           <span>${escapeHtml(event?.action || '-')}</span>
-          <span class="mini muted">${escapeHtml(event?.outcome || '-')}</span>
+          <span class="mini muted">${escapeHtml(formatStatusLabel(event?.outcome || '-'))}</span>
         </div>
         <div class="mini muted">${escapeHtml(formatEventTime(event?.ts))}</div>
         <div class="mini code">${escapeHtml(event?.targetType || '-')}:${escapeHtml(event?.targetId || '-')}</div>
@@ -3373,10 +3693,12 @@
 
     for (const item of filteredMembers) {
       const email = item?.user?.email || '-';
-      const role = item?.membership?.role || '-';
-      const status = item?.membership?.status || '-';
+      const roleRaw = item?.membership?.role || '-';
+      const statusRaw = item?.membership?.status || '-';
+      const role = formatRoleLabel(roleRaw);
+      const status = formatStatusLabel(statusRaw);
       const membershipId = item?.membership?.id || '';
-      const isOwnerMembership = role === 'OWNER';
+      const isOwnerMembership = String(roleRaw).toUpperCase() === 'OWNER';
       const isCurrentMembership = Boolean(
         membershipId && currentMembershipId && membershipId === currentMembershipId
       );
@@ -3387,13 +3709,27 @@
       );
       const actionControls = isOwnerMembership
         ? canDemoteOwner
-          ? `<button class="btn small staffRoleBtn" data-mid="${membershipId}" data-role="STAFF">Demote STAFF</button>`
-          : '<span class="mini muted">immutable</span>'
+          ? `<button class="btn small staffRoleBtn" data-mid="${membershipId}" data-role="STAFF">${
+              isEnglishLanguage() ? 'Demote STAFF' : 'Sänk till MEDARBETARE'
+            }</button>`
+          : `<span class="mini muted">${isEnglishLanguage() ? 'Locked' : 'Låst'}</span>`
         : `<button class="btn small staffToggleBtn" data-mid="${membershipId}" data-next="${
-            status === 'active' ? 'disabled' : 'active'
-          }">${status === 'active' ? 'Disable' : 'Enable'}</button>
-           <button class="btn small staffRoleBtn" data-mid="${membershipId}" data-role="OWNER">Promote OWNER</button>
-           <button class="btn small staffResetPwdBtn" data-mid="${membershipId}">Reset lösenord</button>`;
+            statusRaw === 'active' ? 'disabled' : 'active'
+          }">${
+            statusRaw === 'active'
+              ? isEnglishLanguage()
+                ? 'Disable'
+                : 'Inaktivera'
+              : isEnglishLanguage()
+              ? 'Enable'
+              : 'Aktivera'
+          }</button>
+           <button class="btn small staffRoleBtn" data-mid="${membershipId}" data-role="OWNER">${
+             isEnglishLanguage() ? 'Promote OWNER' : 'Befordra till ÄGARE'
+           }</button>
+           <button class="btn small staffResetPwdBtn" data-mid="${membershipId}">${
+             isEnglishLanguage() ? 'Reset password' : 'Återställ lösenord'
+           }</button>`;
 
       const tr = document.createElement('tr');
       if (isSelected) tr.classList.add('staff-row-active');
@@ -3404,7 +3740,9 @@
         <td class="mini">${updatedAt}</td>
         <td>
           <div class="seg">
-            <button class="btn small staffSelectBtn" data-mid="${membershipId}">Profil</button>
+            <button class="btn small staffSelectBtn" data-mid="${membershipId}">${
+              isEnglishLanguage() ? 'Profile' : 'Profil'
+            }</button>
             ${actionControls}
           </div>
         </td>
@@ -3426,16 +3764,19 @@
         const nextStatus = btn.getAttribute('data-next');
         if (!membershipId || !nextStatus) return;
         try {
-          setStatus(els.staffStatus, 'Uppdaterar staff-status...');
+          setStatus(els.staffStatus, 'Uppdaterar medarbetarstatus...');
           await api(`/users/staff/${membershipId}`, {
             method: 'PATCH',
             body: { status: nextStatus },
           });
-          setStatus(els.staffStatus, `Staff-status uppdaterad till ${nextStatus}.`);
+          setStatus(
+            els.staffStatus,
+            `${isEnglishLanguage() ? 'Member status updated to' : 'Medarbetarstatus uppdaterad till'} ${formatStatusLabel(nextStatus)}.`
+          );
           await loadStaffMembers();
           await loadDashboard();
         } catch (error) {
-          setStatus(els.staffStatus, error.message || 'Kunde inte uppdatera staff-status.', true);
+          setStatus(els.staffStatus, error.message || 'Kunde inte uppdatera medarbetarstatus.', true);
         }
       });
     });
@@ -3477,24 +3818,27 @@
       const session = entry?.session || entry || {};
       const sessionId = session?.id || '';
       const isCurrent = currentSessionId && sessionId === currentSessionId;
-      const status = session?.revokedAt ? 'revoked' : 'active';
+      const statusRaw = session?.revokedAt ? 'revoked' : 'active';
+      const status = formatStatusLabel(statusRaw);
       const userEmail = entry?.user?.email || '-';
-      const role = entry?.membership?.role || session?.role || '-';
+      const role = formatRoleLabel(entry?.membership?.role || session?.role || '-');
       const lastSeen = session?.lastSeenAt || session?.createdAt || '-';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="code">${escapeHtml(sessionId || '-')} ${isCurrent ? '<span class="chip">current</span>' : ''}</td>
+        <td class="code">${escapeHtml(sessionId || '-')} ${
+          isCurrent ? `<span class="chip">${isEnglishLanguage() ? 'current' : 'aktuell'}</span>` : ''
+        }</td>
         <td>${escapeHtml(userEmail)}</td>
         <td>${escapeHtml(role)}</td>
         <td class="mini">${escapeHtml(lastSeen)}</td>
         <td>${escapeHtml(status)}</td>
         <td>
           ${
-            status === 'active'
+            statusRaw === 'active'
               ? `<button class="btn small revokeSessionBtn" data-session-id="${escapeHtml(sessionId)}" ${
-                  isCurrent ? 'title="Aktuell session"' : ''
-                }>${isCurrent ? 'Logga ut denna' : 'Avsluta'}</button>`
+                  isCurrent ? `title="${isEnglishLanguage() ? 'Current session' : 'Aktuell session'}"` : ''
+                }>${isCurrent ? (isEnglishLanguage() ? 'Sign out this' : 'Logga ut denna') : isEnglishLanguage() ? 'Revoke' : 'Avsluta'}</button>`
               : '<span class="mini muted">-</span>'
           }
         </td>
@@ -4000,20 +4344,42 @@
             Välj för bulk
           </label>
           <div class="meta">
-            <span class="chip">locale: ${escapeHtml(template.locale || '-')}</span>
-            <span class="chip">channel: ${escapeHtml(template.channel || '-')}</span>
-            <span class="chip">${template.currentActiveVersionId ? 'active' : 'utan aktiv version'}</span>
-            <span class="chip">${escapeHtml(template.status || 'active')}</span>
+            <span class="chip">${
+              isEnglishLanguage() ? 'Locale' : 'Språk'
+            }: ${escapeHtml(template.locale || '-')}</span>
+            <span class="chip">${
+              isEnglishLanguage() ? 'Channel' : 'Kanal'
+            }: ${escapeHtml(template.channel || '-')}</span>
+            <span class="chip">${
+              template.currentActiveVersionId
+                ? isEnglishLanguage()
+                  ? 'Active version'
+                  : 'Aktiv version'
+                : isEnglishLanguage()
+                ? 'No active version'
+                : 'Utan aktiv version'
+            }</span>
+            <span class="chip">${escapeHtml(formatTemplateStateLabel(template.status || 'active'))}</span>
             ${
               riskSnapshot
                 ? `<span class="badge"><span class="dot ${riskSnapshot.dotClass}"></span>L${riskSnapshot.riskLevel} • ${escapeHtml(riskSnapshot.decision)}</span>`
-                : '<span class="chip muted">risk: -</span>'
+                : `<span class="chip muted">${isEnglishLanguage() ? 'Risk' : 'Risk'}: -</span>`
             }
           </div>
           <div class="mini muted">Uppdaterad: ${escapeHtml(formatDateTime(template.updatedAt, true))}</div>
           <div class="footer">
-            <button class="btn small templateSelectBtn" data-tid="${escapeHtml(template.id)}">${selected ? 'Vald' : 'Öppna'}</button>
-            <button class="btn small templateNewDraftBtn" data-tid="${escapeHtml(template.id)}">Ny draft</button>
+            <button class="btn small templateSelectBtn" data-tid="${escapeHtml(template.id)}">${
+              selected
+                ? isEnglishLanguage()
+                  ? 'Selected'
+                  : 'Vald'
+                : isEnglishLanguage()
+                ? 'Open'
+                : 'Öppna'
+            }</button>
+            <button class="btn small templateNewDraftBtn" data-tid="${escapeHtml(template.id)}">${
+              isEnglishLanguage() ? 'New draft' : 'Ny draft'
+            }</button>
           </div>
         `;
         els.templateCardList.appendChild(card);
@@ -4058,11 +4424,21 @@
         <td class="template-select-col"><input type="checkbox" class="templateSelectChk" data-tid="${escapeHtml(template.id)}" ${checked ? 'checked' : ''} /></td>
         <td>${escapeHtml(template.name)}</td>
         <td>${escapeHtml(template.category)}</td>
-        <td>${escapeHtml(template.status || 'active')}</td>
-        <td class="code">${template.currentActiveVersionId ? 'yes' : '-'}</td>
+        <td>${escapeHtml(formatTemplateStateLabel(template.status || 'active'))}</td>
+        <td class="code">${
+          template.currentActiveVersionId ? (isEnglishLanguage() ? 'yes' : 'ja') : '-'
+        }</td>
         <td>${riskSnapshot ? `<span class="badge"><span class="dot ${riskSnapshot.dotClass}"></span>L${riskSnapshot.riskLevel}</span>` : '<span class="muted mini">-</span>'}</td>
         <td class="mini">${escapeHtml(formatDateTime(template.updatedAt, true))}</td>
-        <td><button class="btn small templateSelectBtn" data-tid="${escapeHtml(template.id)}">${selected ? 'Vald' : 'Välj'}</button></td>
+        <td><button class="btn small templateSelectBtn" data-tid="${escapeHtml(template.id)}">${
+          selected
+            ? isEnglishLanguage()
+              ? 'Selected'
+              : 'Vald'
+            : isEnglishLanguage()
+            ? 'Select'
+            : 'Välj'
+        }</button></td>
       `;
       if (els.templateTableBody) els.templateTableBody.appendChild(tr);
     }
@@ -4095,9 +4471,17 @@
       const selected = version.id === selectedId;
       tr.innerHTML = `
         <td>${version.versionNo}</td>
-        <td>${version.state}</td>
+        <td>${escapeHtml(formatTemplateStateLabel(version.state || 'draft'))}</td>
         <td>${riskLevel}</td>
-        <td><button class="btn small versionSelectBtn" data-vid="${version.id}">${selected ? 'Vald' : 'Öppna'}</button></td>
+        <td><button class="btn small versionSelectBtn" data-vid="${version.id}">${
+          selected
+            ? isEnglishLanguage()
+              ? 'Selected'
+              : 'Vald'
+            : isEnglishLanguage()
+            ? 'Open'
+            : 'Öppna'
+        }</button></td>
       `;
       els.versionTableBody.appendChild(tr);
     }
@@ -4118,7 +4502,11 @@
     state.selectedVersionId = version.id;
     setText(
       els.selectedVersionMeta,
-      `v${version.versionNo} · state=${version.state} · createdAt=${version.createdAt}`
+      `v${version.versionNo} · ${
+        isEnglishLanguage() ? 'status' : 'status'
+      }=${formatTemplateStateLabel(version.state || 'draft')} · ${
+        isEnglishLanguage() ? 'created' : 'skapad'
+      }=${version.createdAt}`
     );
     if (els.versionTitleInput) els.versionTitleInput.value = version.title || '';
     if (els.versionContentInput) els.versionContentInput.value = version.content || '';
@@ -4178,7 +4566,9 @@
     if (template) {
       setText(
         els.selectedTemplateMeta,
-        `${template.name} · ${template.category} · locale=${template.locale} · channel=${template.channel}`
+        `${template.name} · ${template.category} · ${
+          isEnglishLanguage() ? 'Locale' : 'Språk'
+        }=${template.locale} · ${isEnglishLanguage() ? 'Channel' : 'Kanal'}=${template.channel}`
       );
     } else {
       setText(els.selectedTemplateMeta, 'Ingen mall vald.');
@@ -4327,7 +4717,9 @@
       rememberVariableValidation(state.selectedVersionId, response?.variableValidation);
       setStatus(
         els.versionStatus,
-        `Riskutvärdering klar • L${response?.version?.risk?.riskLevel || '-'} (${response?.version?.risk?.decision || '-'})`
+        `Riskutvärdering klar • L${response?.version?.risk?.riskLevel || '-'} (${formatDecisionLabel(
+          response?.version?.risk?.decision || '-'
+        )})`
       );
       await refreshAll();
       await selectVersion(state.selectedVersionId);
@@ -4350,7 +4742,10 @@
         method: 'POST',
         body: {},
       });
-      setStatus(els.versionStatus, `Version aktiverad • state=${response?.version?.state || 'active'}.`);
+      setStatus(
+        els.versionStatus,
+        `Version aktiverad • status=${formatTemplateStateLabel(response?.version?.state || 'active')}.`
+      );
       await refreshAll();
       await selectVersion(state.selectedVersionId);
     } catch (error) {
@@ -4492,12 +4887,12 @@
         await copyText(inviteMessage);
         setStatus(
           els.staffStatus,
-          `Staff ${statusCode}: ${email}. Invite-text kopierad (${autoGenerated ? 'auto-lösenord' : 'manuellt lösenord'}).`
+          `Medarbetare ${statusCode}: ${email}. Inbjudningstext kopierad (${autoGenerated ? 'auto-lösenord' : 'manuellt lösenord'}).`
         );
       } catch {
         setStatus(
           els.staffStatus,
-          `Staff ${statusCode}: ${email}. Invite-text klar i panelen.`
+          `Medarbetare ${statusCode}: ${email}. Inbjudningstext klar i panelen.`
         );
       }
     } catch (error) {
@@ -4510,7 +4905,7 @@
     if (!looksLikeEmail(email)) throw new Error('Saknar giltig e-post för vald användare.');
 
     const modal = await openAppModal({
-      title: 'Kopiera invite-text',
+      title: 'Kopiera inbjudningstext',
       message: `Ange temporärt lösenord för ${email}.`,
       inputMode: 'text',
       inputType: 'password',
@@ -4525,7 +4920,7 @@
     const password = String(modal.value || '').trim();
     const strength = getPasswordStrength(password);
     if (strength.level === 'weak') {
-      throw new Error('Lösenordet är för svagt för invite-texten.');
+      throw new Error('Lösenordet är för svagt för inbjudningstexten.');
     }
 
     const inviteMessage = buildStaffInviteMessage({
@@ -4552,14 +4947,14 @@
         .toLowerCase();
       const password = String(els.staffPasswordInput?.value || '').trim();
       if (!looksLikeEmail(email) || !password) {
-        throw new Error('Skapa först en invite-text eller fyll i e-post + lösenord.');
+        throw new Error('Skapa först en inbjudningstext eller fyll i e-post + lösenord.');
       }
       const inviteMessage = buildStaffInviteMessage({ email, password, tenantId: state.tenantId });
       setStaffInvitePreview(inviteMessage);
       await copyText(inviteMessage);
       setStatus(els.staffStatus, 'Invite-text kopierad.');
     } catch (error) {
-      setStatus(els.staffStatus, error.message || 'Kunde inte kopiera invite-text.', true);
+      setStatus(els.staffStatus, error.message || 'Kunde inte kopiera inbjudningstext.', true);
     }
   }
 
@@ -4573,7 +4968,7 @@
       if (role === 'OWNER') throw new Error('OWNER-lösenord hanteras via profilpanelen.');
 
       const modal = await openAppModal({
-        title: 'Reset staff-lösenord',
+        title: 'Återställ medarbetarlösenord',
         message: `Ange nytt temporärt lösenord för ${email}.`,
         inputMode: 'text',
         inputType: 'password',
@@ -4803,7 +5198,7 @@
             .filter(Boolean)
         : undefined;
 
-      setStatus(els.riskLabStatus, 'Kör risk preview...');
+      setStatus(els.riskLabStatus, 'Kör riskförhandsgranskning...');
       const response = await api('/risk/preview', {
         method: 'POST',
         body: {
@@ -4822,7 +5217,7 @@
       );
       await loadDashboard();
     } catch (error) {
-      setStatus(els.riskLabStatus, error.message || 'Kunde inte köra risk preview.', true);
+      setStatus(els.riskLabStatus, error.message || 'Kunde inte köra riskförhandsgranskning.', true);
     }
   }
 
@@ -4987,10 +5382,10 @@
       return `${index + 1}. ${item?.templateName || '-'} [${item?.category || '-'}] • unknownVars=${unknown} • missingRequired=${missing}`;
     });
     const lines = [
-      `Seed preview: selected=${response?.selected ?? 0}`,
+      `Seed-förhandsvisning: valda=${response?.selected ?? 0}`,
       `Tenant: ${response?.tenantId || '-'}`,
       '',
-      ...(rows.length ? rows : ['(inga preview-rader)']),
+      ...(rows.length ? rows : ['(inga förhandsrader)']),
     ];
     els.mailInsightsResult.textContent = lines.join('\n');
   }
@@ -5016,7 +5411,7 @@
       const payload = getMailSeedApplyPayload({ forceDryRun: dryRun });
       setStatus(
         els.mailInsightsStatus,
-        dryRun ? 'Kör seed preview...' : 'Skapar drafts från seeds...'
+        dryRun ? 'Kör seed-förhandsvisning...' : 'Skapar utkast från seeds...'
       );
 
       const response = await api('/mail/template-seeds/apply', {
@@ -5158,7 +5553,7 @@
       return;
     }
     try {
-      setStatus(els.opsStatus, 'Kör prune preview...');
+      setStatus(els.opsStatus, 'Kör förhandsvisning av rensning...');
       const response = await api('/ops/state/backups/prune', {
         method: 'POST',
         body: { dryRun: true },
@@ -5168,10 +5563,10 @@
       }
       setStatus(
         els.opsStatus,
-        `Prune preview klar: ${response?.deletedCount ?? 0} filer skulle tas bort.`
+        `Förhandsvisning klar: ${response?.deletedCount ?? 0} filer skulle tas bort.`
       );
     } catch (error) {
-      setStatus(els.opsStatus, error.message || 'Kunde inte köra prune preview.', true);
+      setStatus(els.opsStatus, error.message || 'Kunde inte köra förhandsvisning av rensning.', true);
     }
   }
 
@@ -5217,7 +5612,7 @@
     try {
       const fileName = getRestoreFileName();
       if (!fileName) throw new Error('Ange backupfil att förhandsgranska.');
-      setStatus(els.opsStatus, `Läser restore preview för ${fileName}...`);
+      setStatus(els.opsStatus, `Läser förhandsvisning av återställning för ${fileName}...`);
       const response = await api('/ops/state/restore', {
         method: 'POST',
         body: {
@@ -5231,9 +5626,9 @@
       const restoreCount = Array.isArray(response?.preview?.stores)
         ? response.preview.stores.filter((store) => store?.willRestore).length
         : 0;
-      setStatus(els.opsStatus, `Restore preview klart: ${restoreCount} stores kan återställas.`);
+      setStatus(els.opsStatus, `Förhandsvisning klar: ${restoreCount} stores kan återställas.`);
     } catch (error) {
-      setStatus(els.opsStatus, error.message || 'Kunde inte köra restore preview.', true);
+      setStatus(els.opsStatus, error.message || 'Kunde inte köra förhandsvisning av återställning.', true);
     }
   }
 
@@ -5672,7 +6067,7 @@
     if (els.staffSearchInput) els.staffSearchInput.value = '';
     if (els.staffStatusFilter) els.staffStatusFilter.value = '';
     setStatus(els.tenantOnboardStatus, '');
-    if (els.riskLabResult) els.riskLabResult.textContent = 'Ingen preview körd ännu.';
+    if (els.riskLabResult) els.riskLabResult.textContent = 'Ingen förhandsgranskning körd ännu.';
     if (els.orchestratorResult) els.orchestratorResult.textContent = 'Ingen körning ännu.';
     if (els.calibrationResult) els.calibrationResult.textContent = 'Inget kalibreringsförslag ännu.';
     if (els.pilotReportResult) els.pilotReportResult.textContent = 'Ingen rapport körd ännu.';
@@ -5734,7 +6129,7 @@
     }
     if (els.tenantCatalog) els.tenantCatalog.textContent = 'Ingen data ännu.';
     if (els.staffInvitePreview) {
-      els.staffInvitePreview.textContent = 'Ingen invite-text ännu.';
+      els.staffInvitePreview.textContent = 'Ingen inbjudningstext ännu.';
     }
     if (els.staffEmailInput) els.staffEmailInput.value = '';
     if (els.staffPasswordInput) els.staffPasswordInput.value = '';
@@ -5795,6 +6190,15 @@
     });
   });
   els.onboardTenantBtn?.addEventListener('click', onboardTenant);
+  els.languageSelect?.addEventListener('change', (event) => {
+    const nextLanguage = String(event?.target?.value || '').trim().toLowerCase();
+    setLanguage(nextLanguage);
+    if (state.token) {
+      refreshAll().catch((error) => {
+        setStatus(els.loginStatus, error.message || 'Kunde inte uppdatera språkvy.', true);
+      });
+    }
+  });
   els.sectionNav?.addEventListener('click', (event) => {
     const button = event.target.closest('.sectionNavBtn');
     if (!button) return;
@@ -5804,14 +6208,6 @@
     if (!targetEl) return;
     event.preventDefault();
     scrollToSection(targetEl);
-  });
-  let sectionNavScrollRaf = 0;
-  window.addEventListener('scroll', () => {
-    if (sectionNavScrollRaf) return;
-    sectionNavScrollRaf = window.requestAnimationFrame(() => {
-      sectionNavScrollRaf = 0;
-      syncSectionNavFromViewport();
-    });
   });
 
   els.createTemplateBtn?.addEventListener('click', createTemplate);
@@ -5931,7 +6327,7 @@
   els.resetSelectedStaffPasswordBtn?.addEventListener('click', () => {
     const membershipId = String(state.selectedStaffMembershipId || '').trim();
     if (!membershipId) {
-      setStatus(els.staffStatus, 'Välj en staff-rad först.');
+      setStatus(els.staffStatus, 'Välj en medarbetarrad först.');
       return;
     }
     resetStaffPasswordFlow(membershipId);
@@ -5940,7 +6336,7 @@
     const membershipId = String(state.selectedStaffMembershipId || '').trim();
     const nextRole = String(els.selectedStaffRoleBtn?.dataset?.role || '').trim().toUpperCase();
     if (!membershipId || !nextRole) {
-      setStatus(els.staffStatus, 'Välj en giltig staff-rad först.');
+      setStatus(els.staffStatus, 'Välj en giltig medarbetarrad först.');
       return;
     }
     updateStaffRole(membershipId, nextRole);
@@ -5948,11 +6344,11 @@
   els.copySelectedStaffInviteBtn?.addEventListener('click', () => {
     const member = getStaffMemberByMembershipId(state.selectedStaffMembershipId);
     if (!member) {
-      setStatus(els.staffStatus, 'Välj en staff-rad först.');
+      setStatus(els.staffStatus, 'Välj en medarbetarrad först.');
       return;
     }
     copyInviteForMember(member).catch((error) => {
-      setStatus(els.staffStatus, error.message || 'Kunde inte kopiera invite-text.', true);
+      setStatus(els.staffStatus, error.message || 'Kunde inte kopiera inbjudningstext.', true);
     });
   });
   els.changeOwnPasswordBtn?.addEventListener('click', () => {
@@ -6174,7 +6570,11 @@
   syncAuditFilterInputs();
   syncTemplateFilterInputs();
   bindScrollableListPersistence();
-  syncSectionNavFromViewport();
+  applyLanguage();
+  setActiveSectionGroup(state.activeSectionGroup || 'overviewSection', {
+    targetId: resolveDefaultTargetForGroup(state.activeSectionGroup || 'overviewSection'),
+    scroll: false,
+  });
   renderTonePreview();
   renderTeamSummary([]);
 

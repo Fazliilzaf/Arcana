@@ -3,27 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Arcana Admin</title>
+  <title>Major Arcana · Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #121419;
-      --panel: #1a1e26;
-      --panel-soft: #202632;
-      --text: #e8edf5;
-      --muted: #9aa6bb;
-      --line: #2b3342;
+      --bg: #303030;
+      --panel: rgba(48, 48, 48, 0.72);
+      --panel-soft: rgba(18, 15, 14, 0.58);
+      --text: #f6f1ee;
+      --muted: rgba(246, 241, 238, 0.72);
+      --line: rgba(246, 241, 238, 0.14);
       --accent: #cabaae;
-      --accent-text: #1f2430;
+      --accent-2: #d7c9be;
+      --accent-text: #2f2c2a;
       --ok: #50c878;
       --warn: #f2b84b;
       --bad: #e46b6b;
+      --shadow-3d: 0 14px 28px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: radial-gradient(circle at 20% 0%, #1e2430 0%, var(--bg) 55%);
+      background:
+        radial-gradient(900px 500px at 15% -10%, rgba(202, 186, 174, 0.18) 0%, transparent 60%),
+        radial-gradient(900px 500px at 95% 0%, rgba(255, 255, 255, 0.04) 0%, transparent 60%),
+        var(--bg);
       color: var(--text);
-      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: "Jost", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .container { width: min(1200px, 94vw); margin: 24px auto 64px; }
     .row { display: grid; gap: 14px; }
@@ -35,14 +43,22 @@
       .row.cols-4, .row.cols-6, .row.cols-3, .row.cols-2 { grid-template-columns: 1fr; }
     }
     .panel {
-      background: linear-gradient(160deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+      background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.01));
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      box-shadow: var(--shadow-3d);
+      backdrop-filter: blur(10px) saturate(130%);
+      -webkit-backdrop-filter: blur(10px) saturate(130%);
     }
     h1, h2, h3 { margin: 0 0 8px; }
-    h1 { font-size: 24px; }
+    h1 {
+      font-size: 32px;
+      font-family: "Cormorant Garamond", Georgia, serif;
+      font-weight: 600;
+      letter-spacing: .01em;
+      margin: 0;
+    }
     h2 { font-size: 18px; color: var(--text); }
     h3 { font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
     .muted { color: var(--muted); }
@@ -69,21 +85,59 @@
       margin-bottom: 14px;
       flex-wrap: wrap;
     }
+    .brand-stack {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .admin-brand-mark {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      object-fit: cover;
+      background: rgba(10, 10, 10, 0.4);
+    }
+    .lang-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lang-wrap label {
+      margin: 0;
+      font-size: 12px;
+    }
+    .lang-wrap select {
+      width: auto;
+      min-width: 120px;
+      padding: 8px 10px;
+    }
     .btn {
       border: 1px solid var(--line);
-      background: #171c24;
+      background: rgba(18, 15, 14, 0.48);
       color: var(--text);
       border-radius: 10px;
       padding: 9px 13px;
       font-size: 14px;
       cursor: pointer;
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px) saturate(120%);
+      -webkit-backdrop-filter: blur(8px) saturate(120%);
     }
-    .btn:hover { border-color: #3c475c; }
+    .btn:hover {
+      border-color: rgba(246, 241, 238, 0.28);
+      background: rgba(18, 15, 14, 0.62);
+    }
     .btn.primary {
       background: var(--accent);
-      color: #272018;
+      color: var(--accent-text);
       border-color: var(--accent);
       font-weight: 600;
+    }
+    .btn.primary:hover {
+      background: var(--accent-2);
+      border-color: var(--accent-2);
     }
     .btn.active {
       border-color: var(--accent);
@@ -106,6 +160,9 @@
       border-radius: 10px;
       padding: 10px 11px;
       font-size: 14px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(6px) saturate(120%);
+      -webkit-backdrop-filter: blur(6px) saturate(120%);
     }
     input[type="checkbox"] {
       width: auto;
@@ -629,6 +686,15 @@
       padding: 10px;
       backdrop-filter: blur(6px);
     }
+    .section-nav .btn.active {
+      color: var(--accent-text);
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 12px 22px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    }
+    [data-section-group].hidden {
+      display: none !important;
+    }
     .section-nav .btn {
       padding: 6px 10px;
       font-size: 12px;
@@ -856,19 +922,20 @@
       align-items: center;
       justify-content: center;
       border-radius: 999px;
-      border: 1px solid transparent;
+      border: 1px solid rgba(202, 186, 174, 0.82);
       padding: 6px 11px;
       font-size: 12px;
       font-weight: 600;
       letter-spacing: .01em;
       text-transform: none;
-      background: #1A73E8;
-      color: #fff;
+      background: var(--accent);
+      color: var(--accent-text);
+      box-shadow: 0 9px 18px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255,255,255,0.36);
     }
     .preview-cta.secondary {
-      background: transparent;
-      border-color: #A855F7;
-      color: #C8A7FF;
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(202, 186, 174, 0.48);
+      color: var(--text);
       margin-left: 8px;
     }
     .setting-preview .preview-meta {
@@ -994,66 +1061,74 @@
 <body>
   <div class="container">
     <div class="header">
-      <div>
-        <h1>Arcana Executive OS — Owner Panel</h1>
-        <div class="muted">Pilot 0.1 (Auth + Templates + Risk + Audit)</div>
+      <div class="brand-stack">
+        <img src="/assets/major-arcana-mark.svg" class="admin-brand-mark" alt="Major Arcana logotyp" />
+        <h1 data-i18n="brand_title">Major Arcana</h1>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
-        <div id="sessionMeta" class="muted">Inte inloggad</div>
-        <div class="seg">
-          <select id="tenantSwitchSelect" style="min-width:180px">
-            <option value="">Tenant</option>
+        <div class="lang-wrap">
+          <label for="languageSelect" class="mini muted" data-i18n="label_language">Språk</label>
+          <select id="languageSelect">
+            <option value="sv" data-i18n="language_sv">Svenska</option>
+            <option value="en" data-i18n="language_en">English</option>
           </select>
-          <button id="switchTenantBtn" class="btn">Byt tenant</button>
-          <button id="refreshBtn" class="btn">Uppdatera</button>
-          <button id="logoutBtn" class="btn danger">Logga ut</button>
+        </div>
+        <div id="sessionMeta" class="muted" data-i18n="session_not_logged">Inte inloggad</div>
+        <div class="seg">
+          <select id="tenantSwitchSelect" style="min-width:180px" data-i18n-default-option="tenant_option">
+            <option value="" data-i18n="tenant_option">Klinik</option>
+          </select>
+          <button id="switchTenantBtn" class="btn" data-i18n="switch_tenant">Byt klinik</button>
+          <button id="refreshBtn" class="btn" data-i18n="refresh">Uppdatera</button>
+          <button id="logoutBtn" class="btn danger" data-i18n="logout">Logga ut</button>
         </div>
       </div>
     </div>
 
     <section id="loginPanel" class="panel">
-      <h2>Logga in</h2>
+      <h2 data-i18n="login_title">Logga in</h2>
       <div class="grid" style="margin-top:10px">
         <div>
-          <label for="emailInput">E-post</label>
+          <label for="emailInput" data-i18n="label_email">E-post</label>
           <input id="emailInput" type="email" value="owner@hairtpclinic.se" />
         </div>
         <div>
-          <label for="tenantInput">Tenant (valfri)</label>
+          <label for="tenantInput" data-i18n="label_tenant_optional">Klinik (valfri)</label>
           <input id="tenantInput" type="text" value="hair-tp-clinic" />
         </div>
         <div>
-          <label for="passwordInput">Lösenord</label>
+          <label for="passwordInput" data-i18n="label_password">Lösenord</label>
           <input id="passwordInput" type="password" />
         </div>
       </div>
       <div style="margin-top:12px">
-        <button id="loginBtn" class="btn primary">Logga in</button>
+        <button id="loginBtn" class="btn primary" data-i18n="login_title">Logga in</button>
       </div>
       <div id="loginStatus" class="status-line"></div>
       <div id="tenantSelectionPanel" class="hidden" style="margin-top:10px">
-        <label for="tenantSelectionSelect">Flera tenants hittades. Välj tenant:</label>
+        <label for="tenantSelectionSelect" data-i18n="label_multi_tenant">Flera kliniker hittades. Välj klinik:</label>
         <div class="seg">
           <select id="tenantSelectionSelect" style="min-width:220px"></select>
-          <button id="completeTenantSelectionBtn" class="btn primary">Fortsätt</button>
+          <button id="completeTenantSelectionBtn" class="btn primary" data-i18n="continue">Fortsätt</button>
         </div>
       </div>
     </section>
 
     <section id="dashboardPanel" class="hidden">
       <nav id="sectionNav" class="section-nav panel">
-        <button class="btn small sectionNavBtn active" data-target="overviewSection">Overview</button>
-        <button class="btn small sectionNavBtn" data-target="templateLifecycleSection">Templates</button>
-        <button class="btn small sectionNavBtn" data-target="reviewsQueueSection">Reviews</button>
-        <button class="btn small sectionNavBtn" data-target="incidentsQueueSection">Incidents</button>
-        <button class="btn small sectionNavBtn" data-target="auditSection">Audit</button>
-        <button class="btn small sectionNavBtn" data-target="teamSection">Team</button>
-        <button class="btn small sectionNavBtn" data-target="settingsSection">Settings</button>
+        <button class="btn small sectionNavBtn active" data-target="overviewSection" data-i18n="nav_overview">Översikt</button>
+        <button class="btn small sectionNavBtn" data-target="templateLifecycleSection" data-i18n="nav_templates">Mallar</button>
+        <button class="btn small sectionNavBtn" data-target="reviewsQueueSection" data-i18n="nav_reviews">Granskningar</button>
+        <button class="btn small sectionNavBtn" data-target="incidentsQueueSection" data-i18n="nav_incidents">Incidenter</button>
+        <button class="btn small sectionNavBtn" data-target="auditSection" data-i18n="nav_audit">Revision</button>
+        <button class="btn small sectionNavBtn" data-target="teamSection" data-i18n="nav_team">Team</button>
+        <button class="btn small sectionNavBtn" data-target="settingsSection" data-i18n="nav_settings">Inställningar</button>
+        <button class="btn small sectionNavBtn" data-target="opsSection" data-i18n="nav_ops">Drift</button>
       </nav>
 
-      <div id="overviewSection" class="row cols-6" style="margin-bottom:14px">
+      <div id="overviewSection" data-section-group="overviewSection" class="row cols-6" style="margin-bottom:14px">
         <article class="panel">
-          <h3>Templates</h3>
+          <h3 data-i18n="kpi_templates">Mallar</h3>
           <div id="templatesTotal" class="value">0</div>
         </article>
         <article class="panel">
@@ -1064,16 +1139,16 @@
           <h3>Riskutvärderingar</h3>
           <div id="riskTotal" class="value">0</div>
           <div class="kpi-meta">Öppna review-kön för L3-utkast.</div>
-          <button id="openReviewsQueueBtn" class="btn small" style="margin-top:8px">Öppna kö</button>
+          <button id="openReviewsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="open_queue">Öppna kö</button>
         </article>
         <article class="panel">
           <h3>High/Critical öppna</h3>
           <div id="riskOpen" class="value">0</div>
           <div class="kpi-meta">Prioritera incidents med SLA.</div>
-          <button id="openIncidentsQueueBtn" class="btn small" style="margin-top:8px">Se incidents</button>
+          <button id="openIncidentsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="see_incidents">Se incidenter</button>
         </article>
         <article class="panel">
-          <h3>Owner action coverage</h3>
+          <h3 data-i18n="kpi_owner_coverage">Ägaråtgärdstäckning</h3>
           <div id="ownerCoverageValue" class="value">0%</div>
           <div id="ownerCoverageMeta" class="kpi-meta">Ingen riskhistorik ännu.</div>
         </article>
@@ -1084,18 +1159,18 @@
         </article>
       </div>
 
-      <div class="overview-layout">
+      <div class="overview-layout" data-section-group="overviewSection">
         <section class="panel">
-          <h2>Overview Insights</h2>
+          <h2 data-i18n="overview_insights">Översiktsinsikter</h2>
           <div class="overview-grid" style="margin-top:10px">
             <article class="overview-card">
-              <h3>Latest Activity</h3>
+              <h3 data-i18n="latest_activity">Senaste aktivitet</h3>
               <ul id="latestActivityList" class="list">
                 <li class="muted mini">Ingen aktivitet ännu.</li>
               </ul>
             </article>
             <article class="overview-card">
-              <h3>Risk Trends (7 dagar)</h3>
+              <h3 data-i18n="risk_trends">Risktrender (7 dagar)</h3>
               <div id="riskTrendBars" class="risk-trend-list">
                 <div class="mini muted">Ingen riskhistorik ännu.</div>
               </div>
@@ -1105,59 +1180,59 @@
         </section>
 
         <aside class="panel">
-          <h2>Quick Actions</h2>
+          <h2 data-i18n="quick_actions">Snabbåtgärder</h2>
           <div class="quick-actions">
-            <button id="quickCreateTemplateBtn" class="btn primary">Create Template</button>
-            <button id="quickGenerateDraftBtn" class="btn">Generate Draft with AI</button>
-            <button id="quickReviewFlaggedBtn" class="btn">Review Flagged Drafts</button>
+            <button id="quickCreateTemplateBtn" class="btn primary" data-i18n="quick_create_template">Skapa mall</button>
+            <button id="quickGenerateDraftBtn" class="btn" data-i18n="quick_generate_draft">Skapa utkast med AI</button>
+            <button id="quickReviewFlaggedBtn" class="btn" data-i18n="quick_review_flagged">Granska flaggade utkast</button>
           </div>
-          <h3 style="margin-top:16px">Notifications</h3>
+          <h3 style="margin-top:16px" data-i18n="notifications">Notifieringar</h3>
           <ul id="overviewNotificationsList" class="notification-list">
             <li class="notification-item"><div class="notification-detail">Inga notifieringar ännu.</div></li>
           </ul>
         </aside>
       </div>
 
-      <div id="settingsSection" class="row cols-2">
+      <div id="settingsSection" data-section-group="settingsSection" class="row cols-2">
         <section class="panel">
-          <h2>Tenant Config</h2>
+          <h2 data-i18n="tenant_config">Klinikinställningar</h2>
           <div class="grid" style="margin-top:10px">
             <div>
-              <label for="assistantName">assistantName</label>
+              <label for="assistantName">Assistentnamn (`assistantName`)</label>
               <input id="assistantName" type="text" />
             </div>
             <div>
-              <label for="toneStyle">toneStyle</label>
+              <label for="toneStyle">Tonstil (`toneStyle`)</label>
               <input id="toneStyle" type="text" />
             </div>
             <div>
-              <label for="brandProfile">brandProfile</label>
+              <label for="brandProfile">Varumärkesprofil (`brandProfile`)</label>
               <input id="brandProfile" type="text" />
             </div>
             <div>
-              <label for="brandLogoUrl">brandLogoUrl (http(s):// eller /path)</label>
+              <label for="brandLogoUrl">Logga URL (`brandLogoUrl`, http(s):// eller /path)</label>
               <input id="brandLogoUrl" type="text" placeholder="https://..." />
             </div>
             <div>
-              <label for="brandPrimaryColor">brandPrimaryColor (palett)</label>
+              <label for="brandPrimaryColor">Primär färg (`brandPrimaryColor`)</label>
               <select id="brandPrimaryColor">
-                <option value="#1A73E8">#1A73E8</option>
-                <option value="#2B7FFF">#2B7FFF</option>
-                <option value="#2563EB">#2563EB</option>
-                <option value="#3B82F6">#3B82F6</option>
+                <option value="#cabaae">#cabaae</option>
+                <option value="#d7c9be">#d7c9be</option>
+                <option value="#bfaea1">#bfaea1</option>
+                <option value="#a58f82">#a58f82</option>
               </select>
             </div>
             <div>
-              <label for="brandAccentColor">brandAccentColor (palett)</label>
+              <label for="brandAccentColor">Accentfärg (`brandAccentColor`)</label>
               <select id="brandAccentColor">
-                <option value="#A855F7">#A855F7</option>
-                <option value="#9333EA">#9333EA</option>
-                <option value="#8B5CF6">#8B5CF6</option>
-                <option value="#C084FC">#C084FC</option>
+                <option value="#2f2c2a">#2f2c2a</option>
+                <option value="#3a3633">#3a3633</option>
+                <option value="#4b4541">#4b4541</option>
+                <option value="#6a625d">#6a625d</option>
               </select>
             </div>
             <div>
-              <label for="riskModifier">riskSensitivityModifier (-10 → 10)</label>
+              <label for="riskModifier">Riskkänslighet (`riskSensitivityModifier`, -10 → 10)</label>
               <div class="inline-range">
                 <input id="riskModifier" type="number" step="0.1" min="-10" max="10" />
                 <input id="riskModifierRange" type="range" step="0.5" min="-10" max="10" />
@@ -1165,35 +1240,35 @@
               </div>
             </div>
             <div style="grid-column:1 / -1">
-              <label>Tone presets</label>
+              <label>Tonförval</label>
               <div id="tonePresetButtons" class="seg tone-presets">
-                <button type="button" class="btn small tonePresetBtn" data-tone="professional-warm">Professional Warm</button>
-                <button type="button" class="btn small tonePresetBtn" data-tone="concise-executive">Concise Executive</button>
-                <button type="button" class="btn small tonePresetBtn" data-tone="empathetic-clinical">Empathetic Clinical</button>
-                <button type="button" class="btn small tonePresetBtn" data-tone="luxury-premium">Luxury Premium</button>
+                <button type="button" class="btn small tonePresetBtn" data-tone="professional-warm">Professionell & varm</button>
+                <button type="button" class="btn small tonePresetBtn" data-tone="concise-executive">Koncis & tydlig</button>
+                <button type="button" class="btn small tonePresetBtn" data-tone="empathetic-clinical">Empatisk & klinisk</button>
+                <button type="button" class="btn small tonePresetBtn" data-tone="luxury-premium">Premium & exklusiv</button>
               </div>
             </div>
             <div style="grid-column:1 / -1">
-              <label for="templateEmailSignature">templateSignaturesByChannel.email</label>
+              <label for="templateEmailSignature">E-postsignatur (`templateSignaturesByChannel.email`)</label>
               <textarea id="templateEmailSignature" style="min-height:90px" placeholder="Med vänlig hälsning,\n{{clinic_name}}\n{{clinic_phone}}"></textarea>
             </div>
             <div style="grid-column:1 / -1">
-              <label for="templateAllowlistOverrides">templateVariableAllowlistByCategory (JSON)</label>
+              <label for="templateAllowlistOverrides">Tillåtna variabler per kategori (`templateVariableAllowlistByCategory`, JSON)</label>
               <textarea id="templateAllowlistOverrides" style="min-height:90px" placeholder='{"CONSULTATION":["patient_name"]}'></textarea>
             </div>
             <div style="grid-column:1 / -1">
-              <label for="templateRequiredOverrides">templateRequiredVariablesByCategory (JSON)</label>
+              <label for="templateRequiredOverrides">Obligatoriska variabler per kategori (`templateRequiredVariablesByCategory`, JSON)</label>
               <textarea id="templateRequiredOverrides" style="min-height:90px" placeholder='{"CONSULTATION":["patient_name"]}'></textarea>
             </div>
             <div style="grid-column:1 / -1">
-              <label>Preview</label>
+              <label>Förhandsvisning</label>
               <div id="tonePreviewCard" class="setting-preview">
                 <div class="preview-brand-row">
-                  <img id="tonePreviewLogo" class="preview-logo hidden" alt="Brand logo preview" />
+                  <img id="tonePreviewLogo" class="preview-logo hidden" alt="Förhandsvisning av logga" />
                   <div class="preview-swatches">
                     <div class="preview-swatch">
                       <span id="tonePreviewPrimaryDot" class="preview-swatch-dot"></span>
-                      Primary
+                      Primär
                     </div>
                     <div class="preview-swatch">
                       <span id="tonePreviewAccentDot" class="preview-swatch-dot"></span>
@@ -1202,7 +1277,7 @@
                   </div>
                 </div>
                 <div id="tonePreviewMeta" class="preview-meta">Ingen preview ännu.</div>
-                <div id="tonePreviewText">Välj tone och assistantName för att se exempeltext.</div>
+                <div id="tonePreviewText">Välj tonstil och assistentnamn för att se exempeltext.</div>
                 <div>
                   <span id="tonePreviewPrimaryBtn" class="preview-cta">Primär CTA</span>
                   <span id="tonePreviewAccentBtn" class="preview-cta secondary">Sekundär CTA</span>
@@ -1211,70 +1286,70 @@
             </div>
           </div>
           <div style="margin-top:12px">
-            <button id="saveTenantConfigBtn" class="btn primary">Spara config</button>
+            <button id="saveTenantConfigBtn" class="btn primary" data-i18n="save_config">Spara inställningar</button>
           </div>
           <div id="tenantConfigStatus" class="status-line"></div>
         </section>
 
         <section class="panel">
-          <h2>Template Categories</h2>
+          <h2 data-i18n="template_categories">Mallkategorier</h2>
           <div id="categoryBadges"></div>
-          <h2 style="margin-top:16px">Risknivåer</h2>
+          <h2 style="margin-top:16px" data-i18n="risk_levels">Risknivåer</h2>
           <div id="riskBadges"></div>
         </section>
       </div>
 
-      <div class="row cols-2" style="margin-top:14px">
+      <div class="row cols-2" data-section-group="settingsSection" style="margin-top:14px">
         <section class="panel">
-          <h2>Mina tenants</h2>
+          <h2 data-i18n="my_tenants">Mina kliniker</h2>
           <div style="margin-top:8px" class="seg">
-            <button id="refreshTenantsBtn" class="btn">Uppdatera tenant-lista</button>
+            <button id="refreshTenantsBtn" class="btn" data-i18n="refresh_tenants">Uppdatera kliniklista</button>
           </div>
           <div id="tenantCatalog" class="code-block" style="margin-top:10px">Ingen data ännu.</div>
         </section>
 
         <section class="panel">
-          <h2>Onboard ny tenant</h2>
+          <h2 data-i18n="onboard_tenant">Lägg till ny klinik</h2>
           <div class="grid" style="margin-top:10px">
             <div>
-              <label for="onboardTenantId">tenantId (slug)</label>
+              <label for="onboardTenantId">klinikId (slug)</label>
               <input id="onboardTenantId" type="text" placeholder="curatiio" />
             </div>
             <div>
-              <label for="onboardOwnerEmail">ownerEmail (valfri)</label>
+              <label for="onboardOwnerEmail">Ägarens e-post (`ownerEmail`, valfri)</label>
               <input id="onboardOwnerEmail" type="email" placeholder="owner@clinic.se" />
             </div>
             <div>
-              <label for="onboardOwnerPassword">ownerPassword (valfri)</label>
-              <input id="onboardOwnerPassword" type="password" placeholder="krävs om ownerEmail är annan user" />
+              <label for="onboardOwnerPassword">Ägarens lösenord (`ownerPassword`, valfri)</label>
+              <input id="onboardOwnerPassword" type="password" placeholder="Krävs om ownerEmail är en annan användare" />
             </div>
             <div>
-              <label for="onboardAssistantName">assistantName</label>
+              <label for="onboardAssistantName">Assistentnamn (`assistantName`)</label>
               <input id="onboardAssistantName" type="text" placeholder="Arcana" />
             </div>
             <div>
-              <label for="onboardToneStyle">toneStyle</label>
+              <label for="onboardToneStyle">Tonstil (`toneStyle`)</label>
               <input id="onboardToneStyle" type="text" placeholder="professional-warm" />
             </div>
             <div>
-              <label for="onboardBrandProfile">brandProfile</label>
+              <label for="onboardBrandProfile">Varumärkesprofil (`brandProfile`)</label>
               <input id="onboardBrandProfile" type="text" placeholder="Curatiio" />
             </div>
             <div>
-              <label for="onboardRiskModifier">riskSensitivityModifier (-10 → 10)</label>
+              <label for="onboardRiskModifier">Riskkänslighet (`riskSensitivityModifier`, -10 → 10)</label>
               <input id="onboardRiskModifier" type="number" step="0.1" min="-10" max="10" placeholder="0" />
             </div>
           </div>
           <div style="margin-top:12px">
-            <button id="onboardTenantBtn" class="btn primary">Onboard tenant</button>
+            <button id="onboardTenantBtn" class="btn primary" data-i18n="onboard_tenant_btn">Lägg till klinik</button>
           </div>
           <div id="tenantOnboardStatus" class="status-line"></div>
         </section>
       </div>
 
-      <div class="row cols-2" style="margin-top:14px">
+      <div id="teamSectionGroup" class="row cols-2" data-section-group="teamSection" style="margin-top:14px">
         <section id="teamSection" class="panel">
-          <h2>Staff Management</h2>
+          <h2>Teamhantering</h2>
           <div id="teamSummary" class="team-summary">
             <article class="team-summary-item">
               <div class="label">Totalt</div>
@@ -1285,17 +1360,17 @@
               <div id="teamSummaryActive" class="value">0</div>
             </article>
             <article class="team-summary-item">
-              <div class="label">Disabled</div>
+              <div class="label">Inaktiva</div>
               <div id="teamSummaryDisabled" class="value">0</div>
             </article>
             <article class="team-summary-item">
-              <div class="label">Owners</div>
+              <div class="label">Ägare</div>
               <div id="teamSummaryOwners" class="value">0</div>
             </article>
           </div>
           <div class="team-profile-grid">
             <article class="team-profile-card">
-              <h3>Bjud in / skapa Staff</h3>
+              <h3>Bjud in / skapa medarbetare</h3>
               <div class="grid" style="margin-top:6px">
                 <div>
                   <label for="staffEmailInput">E-post</label>
@@ -1307,12 +1382,12 @@
                 </div>
               </div>
               <div style="margin-top:10px" class="seg">
-                <button id="createStaffBtn" class="btn primary">Skapa/Uppdatera staff</button>
+                <button id="createStaffBtn" class="btn primary">Skapa/Uppdatera medarbetare</button>
                 <button id="generateStaffPasswordBtn" class="btn">Generera lösenord</button>
-                <button id="copyInviteMessageBtn" class="btn">Kopiera invite-text</button>
+                <button id="copyInviteMessageBtn" class="btn">Kopiera inbjudningstext</button>
               </div>
               <div id="staffStatus" class="status-line"></div>
-              <div id="staffInvitePreview" class="code-block" style="margin-top:8px">Ingen invite-text ännu.</div>
+              <div id="staffInvitePreview" class="code-block" style="margin-top:8px">Ingen inbjudningstext ännu.</div>
             </article>
             <article class="team-profile-card">
               <h3>Min profil & säkerhet</h3>
@@ -1369,16 +1444,16 @@
               <select id="staffStatusFilter">
                 <option value="">Alla</option>
                 <option value="active">Aktiva</option>
-                <option value="disabled">Disabled</option>
-                <option value="owner">Owners</option>
+                <option value="disabled">Inaktiva</option>
+                <option value="owner">Ägare</option>
               </select>
             </div>
             <div>
-              <label class="mini">Bulk actions</label>
+              <label class="mini">Massåtgärder</label>
               <div class="seg">
                 <button id="refreshStaffBtn" class="btn small">Uppdatera lista</button>
-                <button id="staffEnableFilteredBtn" class="btn small">Enable filtrerade</button>
-                <button id="staffDisableFilteredBtn" class="btn small">Disable filtrerade</button>
+                <button id="staffEnableFilteredBtn" class="btn small">Aktivera filtrerade</button>
+                <button id="staffDisableFilteredBtn" class="btn small">Inaktivera filtrerade</button>
               </div>
             </div>
           </div>
@@ -1398,21 +1473,21 @@
           </div>
           <div class="team-profile-card" style="margin-top:10px">
             <h3>Vald användarprofil</h3>
-            <div id="selectedStaffMeta" class="mini muted">Ingen staff vald.</div>
+            <div id="selectedStaffMeta" class="mini muted">Ingen medarbetare vald.</div>
             <div id="selectedStaffDetails" class="code-block" style="margin-top:8px">Välj en rad i tabellen för att se detaljer och nästa steg.</div>
             <div class="invite-preview-actions">
-              <button id="resetSelectedStaffPasswordBtn" class="btn small">Reset lösenord</button>
+              <button id="resetSelectedStaffPasswordBtn" class="btn small">Återställ lösenord</button>
               <button id="selectedStaffRoleBtn" class="btn small">Ändra roll</button>
-              <button id="copySelectedStaffInviteBtn" class="btn small">Kopiera invite-text</button>
+              <button id="copySelectedStaffInviteBtn" class="btn small">Kopiera inbjudningstext</button>
             </div>
           </div>
           <h2 style="margin-top:18px">Aktiva sessioner</h2>
           <div class="seg" style="margin-top:8px">
             <label class="mini" for="sessionsScopeSelect" style="margin:0;display:flex;align-items:center;gap:8px">
-              Scope:
+              Omfång:
               <select id="sessionsScopeSelect" style="width:auto;min-width:130px">
-                <option value="me">me</option>
-                <option value="tenant">tenant</option>
+                <option value="me">Min användare</option>
+                <option value="tenant">Hela kliniken</option>
               </select>
             </label>
             <label class="mini" for="sessionsIncludeRevoked" style="margin:0;display:flex;align-items:center;gap:6px">
@@ -1429,7 +1504,7 @@
                   <th>Session</th>
                   <th>Användare</th>
                   <th>Roll</th>
-                  <th>Last seen</th>
+                  <th>Senast aktiv</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -1440,7 +1515,7 @@
         </section>
 
         <section class="panel">
-          <h2>Risk Lab (Preview)</h2>
+          <h2>Risklabb (förhandsvisning)</h2>
           <div class="grid" style="margin-top:10px">
             <div>
               <label for="riskLabCategory">Kategori</label>
@@ -1453,10 +1528,10 @@
               </select>
             </div>
             <div>
-              <label for="riskLabScope">Scope</label>
+              <label for="riskLabScope">Omfång</label>
               <select id="riskLabScope">
-                <option value="output">output</option>
-                <option value="input">input</option>
+                <option value="output">Utdata</option>
+                <option value="input">Indata</option>
               </select>
             </div>
             <div style="grid-column:1 / -1">
@@ -1469,46 +1544,46 @@
             </div>
           </div>
           <div class="seg" style="margin-top:10px">
-            <button id="runRiskPreviewBtn" class="btn primary">Kör preview</button>
+            <button id="runRiskPreviewBtn" class="btn primary">Kör förhandsgranskning</button>
           </div>
           <div id="riskLabStatus" class="status-line"></div>
-          <div id="riskLabResult" class="code-block" style="margin-top:8px">Ingen preview körd ännu.</div>
+          <div id="riskLabResult" class="code-block" style="margin-top:8px">Ingen förhandsgranskning körd ännu.</div>
         </section>
       </div>
 
-      <div class="row cols-3" style="margin-top:14px">
+      <div id="opsSection" class="row cols-3" data-section-group="opsSection" style="margin-top:14px">
         <section class="panel">
-          <h2>Arcana Orchestrator</h2>
+          <h2>Arcana-orkestrering</h2>
           <div style="margin-top:10px">
             <label for="orchestratorPromptInput">Intern uppgift</label>
             <textarea id="orchestratorPromptInput" style="min-height:120px" placeholder="Ex: Granska high/critical och föreslå owner actions för idag."></textarea>
           </div>
           <div class="seg" style="margin-top:10px">
-            <button id="runOrchestratorBtn" class="btn primary">Kör orchestrator</button>
+            <button id="runOrchestratorBtn" class="btn primary">Kör orkestrering</button>
           </div>
           <div id="orchestratorStatus" class="status-line"></div>
           <div id="orchestratorResult" class="code-block" style="margin-top:8px">Ingen körning ännu.</div>
         </section>
 
         <section class="panel">
-          <h2>Risk Calibration</h2>
+          <h2>Riskkalibrering</h2>
           <div class="seg" style="margin-top:10px">
             <button id="fetchCalibrationSuggestionBtn" class="btn">Hämta förslag</button>
             <button id="applyCalibrationSuggestionBtn" class="btn primary">Applicera förslag</button>
           </div>
           <div style="margin-top:10px">
             <label for="calibrationNoteInput">Notering (valfritt)</label>
-            <input id="calibrationNoteInput" type="text" placeholder="Owner note för audit logg" />
+            <input id="calibrationNoteInput" type="text" placeholder="Ägarens notering för revisionsloggen" />
           </div>
           <div id="calibrationStatus" class="status-line"></div>
           <div id="calibrationResult" class="code-block" style="margin-top:8px">Inget kalibreringsförslag ännu.</div>
         </section>
 
         <section class="panel">
-          <h2>Pilot Report</h2>
+          <h2>Pilotrapport</h2>
           <div class="seg" style="margin-top:10px">
             <label class="mini" for="reportDaysInput" style="margin:0;display:flex;align-items:center;gap:8px">
-              Days:
+              Dagar:
               <input id="reportDaysInput" type="number" value="14" min="1" max="90" style="width:96px" />
             </label>
             <button id="runPilotReportBtn" class="btn primary">Generera rapport</button>
@@ -1518,11 +1593,11 @@
         </section>
 
         <section class="panel">
-          <h2>Mail Insights</h2>
+          <h2>Mailinsikter</h2>
           <div class="seg" style="margin-top:10px">
             <button id="refreshMailInsightsBtn" class="btn">Ladda mail-insikter</button>
-            <button id="previewMailSeedsBtn" class="btn">Preview seeds → drafts</button>
-            <button id="applyMailSeedsBtn" class="btn primary">Skapa drafts från seeds</button>
+            <button id="previewMailSeedsBtn" class="btn">Förhandsvisa seeds → utkast</button>
+            <button id="applyMailSeedsBtn" class="btn primary">Skapa utkast från seeds</button>
           </div>
           <div class="grid" style="margin-top:10px">
             <div>
@@ -1553,21 +1628,21 @@
         </section>
 
         <section class="panel">
-          <h2>Monitor Status</h2>
+          <h2>Driftstatus</h2>
           <div class="seg" style="margin-top:10px">
             <button id="refreshMonitorBtn" class="btn">Uppdatera monitor</button>
           </div>
           <div id="monitorPanelStatus" class="status-line"></div>
-          <div id="monitorResult" class="code-block" style="margin-top:8px">Ingen monitor-data ännu.</div>
+          <div id="monitorResult" class="code-block" style="margin-top:8px">Ingen driftdata ännu.</div>
         </section>
 
         <section class="panel">
-          <h2>Ops Backup</h2>
+          <h2>Driftbackup</h2>
           <div class="seg" style="margin-top:10px">
             <button id="loadStateManifestBtn" class="btn">Läs state manifest</button>
             <button id="createStateBackupBtn" class="btn primary">Skapa backup</button>
-            <button id="listStateBackupsBtn" class="btn">Lista backups</button>
-            <button id="previewPruneBackupsBtn" class="btn">Preview prune</button>
+            <button id="listStateBackupsBtn" class="btn">Lista säkerhetskopior</button>
+            <button id="previewPruneBackupsBtn" class="btn">Förhandsvisa rensning</button>
             <button id="runPruneBackupsBtn" class="btn danger">Kör prune</button>
           </div>
           <div style="margin-top:10px">
@@ -1575,19 +1650,19 @@
             <input id="restoreBackupFileInput" type="text" placeholder="arcana-state-YYYYMMDD-HHMMSS.json" />
           </div>
           <div class="seg" style="margin-top:10px">
-            <button id="previewStateRestoreBtn" class="btn">Restore preview</button>
+            <button id="previewStateRestoreBtn" class="btn">Förhandsvisa återställning</button>
             <button id="runStateRestoreBtn" class="btn danger">Kör restore</button>
           </div>
           <div class="muted" style="margin-top:8px">
             Restore kräver bekräftelse med exakt text: <code>RESTORE &lt;filnamn&gt;</code>
           </div>
           <div id="opsStatus" class="status-line"></div>
-          <div id="opsResult" class="code-block" style="margin-top:8px">Ingen ops-data ännu.</div>
+          <div id="opsResult" class="code-block" style="margin-top:8px">Ingen driftsdata ännu.</div>
         </section>
       </div>
 
-      <section id="templateLifecycleSection" class="panel" style="margin-top:14px">
-        <h2>Template Lifecycle</h2>
+      <section id="templateLifecycleSection" data-section-group="templateLifecycleSection" class="panel" style="margin-top:14px">
+        <h2>Mallflöde</h2>
         <div class="grid" style="margin-top:10px">
           <div>
             <label for="templateNameInput">Ny mall: namn</label>
@@ -1604,11 +1679,11 @@
             </select>
           </div>
           <div>
-            <label for="templateChannelInput">Channel</label>
+            <label for="templateChannelInput">Kanal</label>
             <input id="templateChannelInput" type="text" value="email" />
           </div>
           <div>
-            <label for="templateLocaleInput">Locale</label>
+            <label for="templateLocaleInput">Språk-kod</label>
             <input id="templateLocaleInput" type="text" value="sv-SE" />
           </div>
         </div>
@@ -1618,7 +1693,7 @@
         <div class="grid" style="margin-top:10px">
           <div>
             <label for="templateSearchInput">Sök mall</label>
-            <input id="templateSearchInput" type="text" placeholder="Namn, kategori, locale, channel..." />
+            <input id="templateSearchInput" type="text" placeholder="Namn, kategori, språk-kod, kanal..." />
           </div>
           <div>
             <label for="templateFilterSelect">Kategori</label>
@@ -1660,9 +1735,9 @@
         </div>
         <div class="seg template-bulk-toolbar" style="margin-top:8px">
           <label class="mini muted" for="templateBulkAction" style="display:flex;align-items:center;gap:8px">
-            Bulk:
+            Massåtgärd:
             <select id="templateBulkAction" style="width:auto;min-width:220px">
-              <option value="evaluate_latest">Evaluate senaste version</option>
+              <option value="evaluate_latest">Utvärdera senaste version</option>
               <option value="clone_latest">Klona senaste version</option>
               <option value="archive_active">Arkivera aktiv version (OWNER)</option>
             </select>
@@ -1675,7 +1750,7 @@
 
         <div class="row cols-2" style="margin-top:10px">
           <div>
-            <h3>Templates</h3>
+            <h3>Mallar</h3>
             <div id="templateCardList" class="template-card-grid hidden"></div>
             <div id="templateTableWrap" style="overflow:auto">
               <table>
@@ -1705,7 +1780,7 @@
                 <thead>
                   <tr>
                     <th>v#</th>
-                    <th>State</th>
+                    <th>Tillstånd</th>
                     <th>Risk</th>
                     <th></th>
                   </tr>
@@ -1717,7 +1792,7 @@
         </div>
 
         <div style="margin-top:14px">
-          <h3>Version Editor</h3>
+          <h3>Versionsredigerare</h3>
           <div id="selectedVersionMeta" class="mini muted" style="margin-bottom:8px">Ingen version vald.</div>
           <div class="grid">
             <div>
@@ -1725,7 +1800,7 @@
               <input id="versionTitleInput" type="text" />
             </div>
             <div>
-              <label for="draftInstructionInput">AI instruction (för nytt utkast)</label>
+              <label for="draftInstructionInput">AI-instruktion (för nytt utkast)</label>
               <input id="draftInstructionInput" type="text" placeholder="Skriv vad mallen ska innehålla..." />
             </div>
             <div style="grid-column:1 / -1">
@@ -1738,7 +1813,7 @@
               <h4>Variabler</h4>
               <div id="templateVariableMeta" class="mini muted">Laddar variabelpolicy…</div>
               <div id="templateRequiredVariables" class="template-variable-cloud"></div>
-              <div class="mini muted" style="margin-top:10px">Insert token i innehåll:</div>
+              <div class="mini muted" style="margin-top:10px">Lägg in variabeltoken i innehållet:</div>
               <div id="templateVariablePicker" class="template-variable-cloud"></div>
             </article>
             <article class="template-editor-card">
@@ -1751,21 +1826,21 @@
             </article>
           </div>
           <div class="seg" style="margin-top:10px">
-            <button id="generateDraftBtn" class="btn">Generera draft (AI)</button>
+            <button id="generateDraftBtn" class="btn">Generera utkast (AI)</button>
             <button id="saveDraftBtn" class="btn">Spara draft</button>
-            <button id="evaluateBtn" class="btn">Evaluate</button>
-            <button id="activateBtn" class="btn primary">Activate</button>
-            <button id="archiveBtn" class="btn">Archive</button>
-            <button id="cloneBtn" class="btn">Clone</button>
+            <button id="evaluateBtn" class="btn">Utvärdera</button>
+            <button id="activateBtn" class="btn primary">Aktivera</button>
+            <button id="archiveBtn" class="btn">Arkivera</button>
+            <button id="cloneBtn" class="btn">Klona</button>
           </div>
           <div id="versionStatus" class="status-line"></div>
           <div id="versionRiskBlock" class="code-block" style="margin-top:8px"></div>
         </div>
       </section>
 
-      <section id="reviewsIncidentsSection" class="panel" style="margin-top:14px">
-        <h2>Reviews & Incidents</h2>
-        <div class="muted" style="margin-bottom:10px">Reviews = L3 • Incidents = L4-L5 med SLA (L4: 4h, L5: 30m)</div>
+      <section id="reviewsIncidentsSection" data-section-group="reviewsIncidentsSection" class="panel" style="margin-top:14px">
+        <h2>Granskningar & incidenter</h2>
+        <div class="muted" style="margin-bottom:10px">Granskningar = L3 • Incidenter = L4–L5 med SLA (L4: 4h, L5: 30m)</div>
         <div id="riskQueueSummary" class="seg" style="margin-bottom:10px"></div>
         <div class="seg" style="margin-bottom:10px">
           <label class="mini" for="riskMinFilter" style="margin:0;display:flex;align-items:center;gap:8px">
@@ -1789,35 +1864,35 @@
             </select>
           </label>
           <label class="mini" for="riskDecisionFilter" style="margin:0;display:flex;align-items:center;gap:8px">
-            Decision:
+            Beslut:
             <select id="riskDecisionFilter" style="width:auto;min-width:190px">
               <option value="">Alla</option>
-              <option value="allow">allow</option>
-              <option value="review_required">review_required</option>
-              <option value="blocked">blocked</option>
+              <option value="allow">Tillåten</option>
+              <option value="review_required">Kräver granskning</option>
+              <option value="blocked">Blockerad</option>
             </select>
           </label>
           <label class="mini" for="riskOwnerDecisionFilter" style="margin:0;display:flex;align-items:center;gap:8px">
-            Owner decision:
+            Ägarbeslut:
             <select id="riskOwnerDecisionFilter" style="width:auto;min-width:180px">
               <option value="">Alla</option>
-              <option value="pending">pending</option>
-              <option value="approved_exception">approved_exception</option>
-              <option value="false_positive">false_positive</option>
-              <option value="revision_requested">revision_requested</option>
-              <option value="escalated">escalated</option>
+              <option value="pending">Väntar</option>
+              <option value="approved_exception">Godkänd avvikelse</option>
+              <option value="false_positive">Falskt positiv</option>
+              <option value="revision_requested">Revidering begärd</option>
+              <option value="escalated">Eskalering</option>
             </select>
           </label>
           <label class="mini" for="riskStateFilter" style="margin:0;display:flex;align-items:center;gap:8px">
             Status:
             <select id="riskStateFilter" style="width:auto;min-width:140px">
               <option value="">Alla</option>
-              <option value="open">open</option>
-              <option value="closed">closed</option>
+              <option value="open">Öppen</option>
+              <option value="closed">Stängd</option>
             </select>
           </label>
           <label class="mini" for="riskCategoryFilter" style="margin:0;display:flex;align-items:center;gap:8px">
-            Category:
+            Kategori:
             <select id="riskCategoryFilter" style="width:auto;min-width:180px">
               <option value="">Alla</option>
             </select>
@@ -1834,26 +1909,26 @@
             </select>
           </label>
           <label class="mini" for="riskReasonFilter" style="margin:0;display:flex;align-items:center;gap:8px">
-            Reason code:
+            Orsakskod:
             <input id="riskReasonFilter" type="text" placeholder="Ex. policy_" style="min-width:180px;max-width:260px" />
           </label>
           <label class="mini" for="riskSearchFilter" style="margin:0;display:flex;align-items:center;gap:8px">
             Sök:
-            <input id="riskSearchFilter" type="text" placeholder="evaluation/template/reason" style="min-width:220px;max-width:320px" />
+            <input id="riskSearchFilter" type="text" placeholder="utvärdering/mall/orsak" style="min-width:220px;max-width:320px" />
           </label>
           <button id="applyRiskFilterBtn" class="btn small">Applicera filter</button>
           <button id="riskShowPendingBtn" class="btn small">Endast pending</button>
-          <button id="riskShowHighCriticalBtn" class="btn small">High/Critical</button>
+          <button id="riskShowHighCriticalBtn" class="btn small">Hög/Kritisk</button>
           <button id="riskClearFiltersBtn" class="btn small">Rensa filter</button>
         </div>
         <div class="seg" style="margin-bottom:10px">
           <label class="mini" for="riskBulkAction" style="margin:0;display:flex;align-items:center;gap:8px">
-            Bulk action:
+            Massåtgärd:
             <select id="riskBulkAction" style="width:auto;min-width:220px">
-              <option value="request_revision">request_revision</option>
-              <option value="approve_exception">approve_exception</option>
-              <option value="mark_false_positive">mark_false_positive</option>
-              <option value="escalate">escalate</option>
+              <option value="request_revision">Begär revidering</option>
+              <option value="approve_exception">Godkänn avvikelse</option>
+              <option value="mark_false_positive">Markera falskt positiv</option>
+              <option value="escalate">Eskalera</option>
             </select>
           </label>
           <input id="riskBulkNote" type="text" placeholder="Notering för bulk action (valfritt)" style="min-width:280px;max-width:420px" />
@@ -1862,25 +1937,25 @@
         <div id="riskActionStatus" class="status-line"></div>
         <div class="grid" style="margin-top:8px">
           <div id="reviewsQueueSection">
-            <h3>Reviews (L3) <span id="riskReviewsCount" class="mini muted"></span></h3>
+            <h3>Granskningar (L3) <span id="riskReviewsCount" class="mini muted"></span></h3>
             <div id="riskReviewsWrap" style="overflow:auto">
               <table>
                 <thead>
                   <tr>
                     <th>
-                      <input id="riskSelectAllReviews" type="checkbox" title="Välj alla reviews" />
+                      <input id="riskSelectAllReviews" type="checkbox" title="Välj alla granskningar" />
                     </th>
-                    <th>Evaluation</th>
-                    <th>Template</th>
-                    <th>Category</th>
+                    <th>Utvärdering</th>
+                    <th>Mall</th>
+                    <th>Kategori</th>
                     <th>Tid</th>
                     <th>Risk</th>
-                    <th>Decision</th>
-                    <th>Owner</th>
-                    <th>AI/Rule</th>
+                    <th>Beslut</th>
+                    <th>Ägare</th>
+                    <th>AI/Regel</th>
                     <th>Policy</th>
-                    <th>Reason</th>
-                    <th>Action</th>
+                    <th>Orsak</th>
+                    <th>Åtgärd</th>
                   </tr>
                 </thead>
                 <tbody id="riskReviewsTableBody"></tbody>
@@ -1888,24 +1963,24 @@
             </div>
           </div>
           <div id="incidentsQueueSection">
-            <h3>Incidents (L4-L5) <span id="riskIncidentsCount" class="mini muted"></span></h3>
+            <h3>Incidenter (L4-L5) <span id="riskIncidentsCount" class="mini muted"></span></h3>
             <div id="riskIncidentsWrap" style="overflow:auto">
               <table>
                 <thead>
                   <tr>
                     <th>
-                      <input id="riskSelectAllIncidents" type="checkbox" title="Välj alla incidents" />
+                      <input id="riskSelectAllIncidents" type="checkbox" title="Välj alla incidenter" />
                     </th>
                     <th>SLA</th>
-                    <th>Evaluation</th>
-                    <th>Template</th>
-                    <th>Category</th>
+                    <th>Utvärdering</th>
+                    <th>Mall</th>
+                    <th>Kategori</th>
                     <th>Tid</th>
                     <th>Risk</th>
-                    <th>Decision</th>
-                    <th>Owner</th>
-                    <th>Reason</th>
-                    <th>Action</th>
+                    <th>Beslut</th>
+                    <th>Ägare</th>
+                    <th>Orsak</th>
+                    <th>Åtgärd</th>
                   </tr>
                 </thead>
                 <tbody id="riskIncidentsTableBody"></tbody>
@@ -1922,65 +1997,65 @@
               <div id="riskDetailSummary" class="mini muted">Ingen detaljerad riskdata ännu.</div>
               <div id="riskDetailSla" class="mini muted" style="margin-top:8px">Ingen incident-SLA.</div>
               <div id="riskDetailQuickActions" class="risk-detail-actions">
-                <input id="riskDetailNoteInput" type="text" placeholder="Notering för owner action (valfritt)" />
-                <button class="btn small" data-owner-action="request_revision">request_revision</button>
-                <button class="btn small" data-owner-action="approve_exception">approve_exception</button>
-                <button class="btn small" data-owner-action="mark_false_positive">mark_false_positive</button>
-                <button class="btn small" data-owner-action="escalate">escalate</button>
+                <input id="riskDetailNoteInput" type="text" placeholder="Notering för ägaråtgärd (valfritt)" />
+                <button class="btn small" data-owner-action="request_revision">Begär revidering</button>
+                <button class="btn small" data-owner-action="approve_exception">Godkänn avvikelse</button>
+                <button class="btn small" data-owner-action="mark_false_positive">Markera falskt positiv</button>
+                <button class="btn small" data-owner-action="escalate">Eskalera</button>
               </div>
             </article>
             <article class="risk-detail-card">
-              <h4>Incident timeline</h4>
+              <h4>Incidenttidslinje</h4>
               <ul id="riskDetailTimeline" class="risk-timeline">
-                <li class="muted mini">Ingen timeline ännu.</li>
+                <li class="muted mini">Ingen tidslinje ännu.</li>
               </ul>
             </article>
           </div>
           <details style="margin-top:10px">
-            <summary class="mini muted" style="cursor:pointer">Raw JSON</summary>
+            <summary class="mini muted" style="cursor:pointer">Rå JSON</summary>
             <div id="riskDetailBlock" class="code-block" style="margin-top:8px">Ingen detaljerad riskdata ännu.</div>
           </details>
         </div>
       </section>
 
-      <section id="auditSection" class="panel" style="margin-top:14px">
-        <h2>Audit Explorer</h2>
-        <div class="muted" style="margin-bottom:10px">Filtrera på actor/action/datum/risk och öppna detaljer per händelse.</div>
+      <section id="auditSection" data-section-group="auditSection" class="panel" style="margin-top:14px">
+        <h2>Revisionslogg</h2>
+        <div class="muted" style="margin-bottom:10px">Filtrera på användare/åtgärd/datum/risk och öppna detaljer per händelse.</div>
         <div class="grid" style="margin-top:10px">
           <div>
-            <label for="auditSearchInput">Sök (correlation/id/template/user)</label>
-            <input id="auditSearchInput" type="text" placeholder="Sök i action, target, actor, metadata..." />
+            <label for="auditSearchInput">Sök (korrelation/id/mall/användare)</label>
+            <input id="auditSearchInput" type="text" placeholder="Sök i åtgärd, mål, användare, metadata..." />
           </div>
           <div>
-            <label for="auditActionFilter">Action</label>
+            <label for="auditActionFilter">Åtgärd</label>
             <select id="auditActionFilter">
               <option value="">Alla</option>
             </select>
           </div>
           <div>
-            <label for="auditActorFilter">Actor userId (valfri)</label>
+            <label for="auditActorFilter">Användar-id (valfritt)</label>
             <input id="auditActorFilter" type="text" placeholder="Ex. 60035ab8..." />
           </div>
           <div>
-            <label for="auditTargetTypeFilter">Target type</label>
+            <label for="auditTargetTypeFilter">Måltyp</label>
             <select id="auditTargetTypeFilter">
               <option value="">Alla</option>
             </select>
           </div>
           <div>
-            <label for="auditOutcomeFilter">Outcome</label>
+            <label for="auditOutcomeFilter">Utfall</label>
             <select id="auditOutcomeFilter">
               <option value="">Alla</option>
-              <option value="success">success</option>
-              <option value="error">error</option>
+              <option value="success">Lyckad</option>
+              <option value="error">Fel</option>
             </select>
           </div>
           <div>
-            <label for="auditSeverityFilter">Risk severity</label>
+            <label for="auditSeverityFilter">Risknivå</label>
             <select id="auditSeverityFilter">
               <option value="">Alla</option>
-              <option value="low">L1-L2 (low)</option>
-              <option value="moderate">L3 (review)</option>
+              <option value="low">L1-L2 (låg)</option>
+              <option value="moderate">L3 (granskning)</option>
               <option value="high_critical">L4-L5 (incident)</option>
               <option value="none">Ingen risknivå</option>
             </select>
@@ -1997,7 +2072,7 @@
             </select>
           </div>
           <div>
-            <label for="auditLimitFilter">API limit</label>
+            <label for="auditLimitFilter">API-gräns</label>
             <select id="auditLimitFilter">
               <option value="100">100</option>
               <option value="200" selected>200</option>
@@ -2007,26 +2082,26 @@
           </div>
         </div>
         <div class="seg" style="margin-top:10px">
-          <button id="applyAuditFilterBtn" class="btn small">Applicera audit-filter</button>
-          <button id="clearAuditFilterBtn" class="btn small">Rensa audit-filter</button>
+          <button id="applyAuditFilterBtn" class="btn small">Applicera filter</button>
+          <button id="clearAuditFilterBtn" class="btn small">Rensa filter</button>
         </div>
         <div id="auditSummary" class="audit-summary"></div>
         <div class="audit-layout">
           <ul id="auditTimeline" class="audit-timeline">
-            <li class="audit-timeline-item muted mini">Ingen audit-data ännu.</li>
+            <li class="audit-timeline-item muted mini">Ingen revisionsdata ännu.</li>
           </ul>
           <div class="audit-detail">
-            <div id="auditDetailMeta" class="mini muted">Ingen audit-händelse vald.</div>
+            <div id="auditDetailMeta" class="mini muted">Ingen revisionshändelse vald.</div>
             <ul id="auditDetailFacts" class="audit-facts">
               <li>Välj en händelse i listan för detaljer.</li>
             </ul>
-            <div id="auditDetailDiffMeta" class="mini muted" style="margin-top:10px">Ingen diff-data ännu.</div>
+            <div id="auditDetailDiffMeta" class="mini muted" style="margin-top:10px">Ingen ändringsdata ännu.</div>
             <div id="auditDetailDiff" class="audit-diff">
-              <div class="audit-diff-row muted mini">Välj en händelse för att se before/after.</div>
+              <div class="audit-diff-row muted mini">Välj en händelse för att se före/efter.</div>
             </div>
             <details style="margin-top:10px">
-              <summary class="mini muted" style="cursor:pointer">Raw JSON</summary>
-              <div id="auditDetailRaw" class="code-block" style="margin-top:8px">Ingen audit-händelse vald.</div>
+              <summary class="mini muted" style="cursor:pointer">Rå JSON</summary>
+              <div id="auditDetailRaw" class="code-block" style="margin-top:8px">Ingen revisionshändelse vald.</div>
             </details>
           </div>
         </div>
