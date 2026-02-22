@@ -29,6 +29,10 @@ function countBy(items, getKey) {
   return result;
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function requiresOwnerAction(evaluation) {
   const decision = String(evaluation?.decision || 'allow').toLowerCase();
   return decision === 'review_required' || decision === 'blocked';
@@ -48,13 +52,20 @@ function createReportsRouter({
       const sinceDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
       const tenantId = req.auth.tenantId;
 
-      const [templates, evaluations, riskSummary, members, auditEvents] = await Promise.all([
+      const [templatesRaw, evaluationsRaw, riskSummaryRaw, membersRaw, auditEventsRaw] = await Promise.all([
         templateStore.listTemplates({ tenantId, includeVersions: true }),
         templateStore.listEvaluations({ tenantId, minRiskLevel: 1, limit: 500 }),
         templateStore.summarizeRisk({ tenantId, minRiskLevel: 1 }),
         authStore.listTenantMembers(tenantId),
         authStore.listAuditEvents({ tenantId, limit: 500 }),
       ]);
+
+      const templates = asArray(templatesRaw);
+      const evaluations = asArray(evaluationsRaw);
+      const members = asArray(membersRaw);
+      const auditEvents = asArray(auditEventsRaw);
+      const riskSummary =
+        riskSummaryRaw && typeof riskSummaryRaw === 'object' ? riskSummaryRaw : {};
 
       const windowEvaluations = evaluations.filter((item) => isSince(item.evaluatedAt, sinceDate));
       const windowAuditEvents = auditEvents.filter((item) => isSince(item.ts, sinceDate));
