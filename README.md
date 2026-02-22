@@ -335,6 +335,9 @@ Snabbare via npm:
 - Preview: `npm run mail:seeds:preview`
 - Skapa drafts: `npm run mail:seeds:apply`
 - Skapa + aktivera auto i batch (alla `allow`; review/block skippas): `npm run mail:seeds:apply-activate`
+  - Scriptet säkerställer nu också risk-evaluation per version (nya + befintliga seeds) så `reports/pilot` får `evaluationsTotal` > 0.
+  - Stäng av evaluations-pass vid behov: `node ./scripts/apply-activate-mail-seeds.js --all --no-ensure-evaluations`
+  - Hoppa över evaluation för redan existerande templates: `node ./scripts/apply-activate-mail-seeds.js --all --skip-existing-evaluations`
 - Paginering manuellt: `bash ./scripts/apply-mail-seeds.sh --apply --limit 20 --offset 20`
 - Med filter: `bash ./scripts/apply-mail-seeds.sh --apply --limit 12 --category CONSULTATION --name-prefix "Mail seed HTPC"`
 - Duplicering stoppas som default (`skipExisting=true`). För att tillåta dubbletter:

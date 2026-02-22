@@ -76,6 +76,69 @@ async function findLatestEvaluationId({ baseUrl, token, templateId, versionId })
   return String(first?.id || '');
 }
 
+async function getTemplateVersionToEvaluate({ baseUrl, token, templateId }) {
+  const payload = await httpJson(`${baseUrl}/api/v1/templates/${templateId}/versions`, {
+    method: 'GET',
+    token,
+  });
+  const versions = Array.isArray(payload?.versions) ? payload.versions : [];
+  if (!versions.length) return '';
+  const active = versions.find((item) => String(item?.state || '').toLowerCase() === 'active');
+  return String((active || versions[0])?.id || '');
+}
+
+async function ensureEvaluationForVersion({ baseUrl, token, templateId, versionId }) {
+  if (!templateId || !versionId) {
+    return { evaluationId: '', created: false, decision: 'allow', riskLevel: 1 };
+  }
+
+  const existingEvaluationId = await findLatestEvaluationId({
+    baseUrl,
+    token,
+    templateId,
+    versionId,
+  });
+  if (existingEvaluationId) {
+    const payload = await httpJson(
+      `${baseUrl}/api/v1/risk/evaluations?templateId=${encodeURIComponent(
+        templateId
+      )}&templateVersionId=${encodeURIComponent(versionId)}&limit=1`,
+      {
+        method: 'GET',
+        token,
+      }
+    );
+    const first = Array.isArray(payload?.evaluations) ? payload.evaluations[0] : null;
+    return {
+      evaluationId: existingEvaluationId,
+      created: false,
+      decision: String(first?.decision || 'allow'),
+      riskLevel: Number(first?.riskLevel || 1),
+    };
+  }
+
+  const evaluationResult = await httpJson(
+    `${baseUrl}/api/v1/templates/${templateId}/versions/${versionId}/evaluate`,
+    {
+      method: 'POST',
+      token,
+      body: {},
+    }
+  );
+  const evaluationId = await findLatestEvaluationId({
+    baseUrl,
+    token,
+    templateId,
+    versionId,
+  });
+  return {
+    evaluationId,
+    created: true,
+    decision: String(evaluationResult?.version?.risk?.decision || 'allow'),
+    riskLevel: Number(evaluationResult?.version?.risk?.riskLevel || 1),
+  };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const baseUrl = String(process.env.BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
@@ -92,6 +155,8 @@ async function main() {
   const skipExisting = hasFlag(args, '--skip-existing') || !allowDuplicates;
   const overrideReview = hasFlag(args, '--override-review');
   const ownerAction = getArgValue(args, '--owner-action', 'approve_exception');
+  const ensureEvaluations = !hasFlag(args, '--no-ensure-evaluations');
+  const evaluateExisting = !hasFlag(args, '--skip-existing-evaluations');
 
   console.log('== Mail seeds: apply + activate ==');
   console.log(`BASE_URL: ${baseUrl}`);
@@ -101,6 +166,10 @@ async function main() {
   console.log(`ALL: ${applyAll ? 'yes' : 'no'}`);
   console.log(`SKIP_EXISTING: ${skipExisting ? 'yes' : 'no'}`);
   console.log(`OVERRIDE_REVIEW: ${overrideReview ? 'yes' : 'no'}`);
+  console.log(`ENSURE_EVALUATIONS: ${ensureEvaluations ? 'yes' : 'no'}`);
+  console.log(
+    `EVALUATE_EXISTING: ${ensureEvaluations && evaluateExisting ? 'yes' : 'no'}`
+  );
 
   const token = await login({ baseUrl, email, password, tenantId });
   console.log(`✅ Login OK (token längd: ${token.length})`);
@@ -110,6 +179,9 @@ async function main() {
     activated: [],
     skipped: [],
     failed: [],
+    evaluationsCreated: 0,
+    evaluationsExisting: 0,
+    evaluationsFailed: [],
   };
   let offset = offsetStart;
   let batch = 0;
@@ -151,13 +223,38 @@ async function main() {
     for (const item of createdTemplates) {
       const templateId = String(item?.templateId || '');
       const versionId = String(item?.versionId || '');
-      const decision = String(item?.decision || 'allow');
-      const riskLevel = Number(item?.riskLevel || 1);
-      const label = `${item?.templateName || templateId} (L${riskLevel}, ${decision})`;
+      let decision = String(item?.decision || 'allow');
+      let riskLevel = Number(item?.riskLevel || 1);
+      const labelBase = item?.templateName || templateId;
+      let label = `${labelBase} (L${riskLevel}, ${decision})`;
 
       if (!templateId || !versionId) {
         summary.failed.push({ label, reason: 'saknar template/version-id' });
         continue;
+      }
+
+      let evaluationId = '';
+      if (ensureEvaluations) {
+        try {
+          const ensured = await ensureEvaluationForVersion({
+            baseUrl,
+            token,
+            templateId,
+            versionId,
+          });
+          evaluationId = ensured.evaluationId;
+          decision = ensured.decision;
+          riskLevel = ensured.riskLevel;
+          label = `${labelBase} (L${riskLevel}, ${decision})`;
+          if (ensured.created) summary.evaluationsCreated += 1;
+          else summary.evaluationsExisting += 1;
+        } catch (error) {
+          summary.evaluationsFailed.push({
+            label: `${labelBase} (${versionId})`,
+            reason: error?.message || 'kunde inte evaluera version',
+          });
+          continue;
+        }
       }
 
       if (decision !== 'allow' && !overrideReview) {
@@ -170,12 +267,14 @@ async function main() {
 
       try {
         if (decision !== 'allow' && overrideReview) {
-          const evaluationId = await findLatestEvaluationId({
-            baseUrl,
-            token,
-            templateId,
-            versionId,
-          });
+          if (!evaluationId) {
+            evaluationId = await findLatestEvaluationId({
+              baseUrl,
+              token,
+              templateId,
+              versionId,
+            });
+          }
           if (!evaluationId) {
             throw new Error('kunde inte hitta risk evaluation för owner-action');
           }
@@ -202,6 +301,43 @@ async function main() {
       }
     }
 
+    if (ensureEvaluations && evaluateExisting && skippedTemplates.length) {
+      for (const skippedItem of skippedTemplates) {
+        const templateId = String(skippedItem?.templateId || '');
+        const templateName = String(
+          skippedItem?.templateName || skippedItem?.templateId || 'existing-template'
+        );
+        if (!templateId) continue;
+        try {
+          const versionId = await getTemplateVersionToEvaluate({
+            baseUrl,
+            token,
+            templateId,
+          });
+          if (!versionId) {
+            summary.evaluationsFailed.push({
+              label: `${templateName} (${templateId})`,
+              reason: 'kunde inte hitta version att evaluera',
+            });
+            continue;
+          }
+          const ensured = await ensureEvaluationForVersion({
+            baseUrl,
+            token,
+            templateId,
+            versionId,
+          });
+          if (ensured.created) summary.evaluationsCreated += 1;
+          else summary.evaluationsExisting += 1;
+        } catch (error) {
+          summary.evaluationsFailed.push({
+            label: `${templateName} (${templateId})`,
+            reason: error?.message || 'kunde inte evaluera befintlig template',
+          });
+        }
+      }
+    }
+
     const nextOffset = offset + selected;
     const reachedEnd = selected <= 0 || nextOffset >= totalAvailable;
     if (!applyAll || reachedEnd) break;
@@ -210,6 +346,11 @@ async function main() {
 
   console.log(`✅ Total apply: ${summary.created}`);
   console.log(`✅ Activation klart: ${summary.activated.length} aktiverade`);
+  if (ensureEvaluations) {
+    console.log(
+      `✅ Evaluations: created=${summary.evaluationsCreated}, existing=${summary.evaluationsExisting}, failed=${summary.evaluationsFailed.length}`
+    );
+  }
   if (summary.skipped.length) {
     console.log(`ℹ️ Skippade (${summary.skipped.length}):`);
     for (const row of summary.skipped.slice(0, 20)) {
@@ -219,6 +360,12 @@ async function main() {
   if (summary.failed.length) {
     console.log(`⚠️ Misslyckade (${summary.failed.length}):`);
     for (const row of summary.failed.slice(0, 20)) {
+      console.log(`- ${row.label}: ${row.reason}`);
+    }
+  }
+  if (summary.evaluationsFailed.length) {
+    console.log(`⚠️ Evaluation-fel (${summary.evaluationsFailed.length}):`);
+    for (const row of summary.evaluationsFailed.slice(0, 20)) {
       console.log(`- ${row.label}: ${row.reason}`);
     }
   }
