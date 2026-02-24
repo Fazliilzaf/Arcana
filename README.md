@@ -167,6 +167,7 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `GET /api/v1/monitor/metrics` (OWNER/STAFF)
 - `GET /api/v1/monitor/slo` (OWNER/STAFF, availability + incident response + restore recency)
 - `GET /api/v1/monitor/readiness` (OWNER/STAFF, Go/No-Go score + blocker-matris)
+  - inkluderar deterministiska no-go checks för output risk/policy-gate, policy-floor bypass och L5 manual intervention
 - `GET /api/v1/ops/state/manifest` (OWNER)
 - `GET /api/v1/ops/state/backups` (OWNER)
 - `POST /api/v1/ops/state/backup` (OWNER)
