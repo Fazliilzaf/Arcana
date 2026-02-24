@@ -213,6 +213,7 @@
     role: '',
     tenantId: '',
     pendingLoginTicket: '',
+    pendingMfaTicket: '',
     availableTenants: [],
     templates: [],
     versions: [],
@@ -263,6 +264,16 @@
     tenantSelectionPanel: document.getElementById('tenantSelectionPanel'),
     tenantSelectionSelect: document.getElementById('tenantSelectionSelect'),
     completeTenantSelectionBtn: document.getElementById('completeTenantSelectionBtn'),
+    mfaPanel: document.getElementById('mfaPanel'),
+    mfaSetupHint: document.getElementById('mfaSetupHint'),
+    mfaSetupSecretWrap: document.getElementById('mfaSetupSecretWrap'),
+    mfaSetupSecret: document.getElementById('mfaSetupSecret'),
+    mfaSetupOtpAuthWrap: document.getElementById('mfaSetupOtpAuthWrap'),
+    mfaSetupOtpAuth: document.getElementById('mfaSetupOtpAuth'),
+    mfaRecoveryCodesWrap: document.getElementById('mfaRecoveryCodesWrap'),
+    mfaRecoveryCodes: document.getElementById('mfaRecoveryCodes'),
+    mfaCodeInput: document.getElementById('mfaCodeInput'),
+    mfaVerifyBtn: document.getElementById('mfaVerifyBtn'),
     loginBtn: document.getElementById('loginBtn'),
     loginStatus: document.getElementById('loginStatus'),
     appModalBackdrop: document.getElementById('appModalBackdrop'),
@@ -1904,6 +1915,10 @@
     els.loginPanel.classList.toggle('hidden', isLoggedIn);
     els.dashboardPanel.classList.toggle('hidden', !isLoggedIn);
     if (isLoggedIn) {
+      if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
+      if (els.tenantSelectionSelect) els.tenantSelectionSelect.innerHTML = '';
+      state.pendingLoginTicket = '';
+      clearPendingMfa();
       setActiveSectionGroup(state.activeSectionGroup || 'overviewSection', {
         targetId: resolveDefaultTargetForGroup(state.activeSectionGroup || 'overviewSection'),
         scroll: false,
@@ -1913,6 +1928,7 @@
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       if (els.tenantSelectionSelect) els.tenantSelectionSelect.innerHTML = '';
       state.pendingLoginTicket = '';
+      clearPendingMfa();
     }
   }
 
@@ -1971,6 +1987,45 @@
     }
     const hasOptions = els.tenantSelectionSelect.options.length > 0;
     els.tenantSelectionPanel.classList.toggle('hidden', !hasOptions);
+  }
+
+  function clearPendingMfa() {
+    state.pendingMfaTicket = '';
+    if (els.mfaPanel) els.mfaPanel.classList.add('hidden');
+    if (els.mfaSetupHint) els.mfaSetupHint.classList.add('hidden');
+    if (els.mfaSetupSecretWrap) els.mfaSetupSecretWrap.classList.add('hidden');
+    if (els.mfaSetupOtpAuthWrap) els.mfaSetupOtpAuthWrap.classList.add('hidden');
+    if (els.mfaRecoveryCodesWrap) els.mfaRecoveryCodesWrap.classList.add('hidden');
+    if (els.mfaSetupSecret) els.mfaSetupSecret.textContent = '';
+    if (els.mfaSetupOtpAuth) els.mfaSetupOtpAuth.textContent = '';
+    if (els.mfaRecoveryCodes) els.mfaRecoveryCodes.textContent = '';
+    if (els.mfaCodeInput) els.mfaCodeInput.value = '';
+  }
+
+  function renderPendingMfa(payload = {}) {
+    if (!els.mfaPanel) return;
+    const mfaTicket = String(payload?.mfaTicket || '').trim();
+    if (!mfaTicket) {
+      clearPendingMfa();
+      return;
+    }
+
+    state.pendingMfaTicket = mfaTicket;
+    const setupRequired = Boolean(payload?.mfa?.setupRequired);
+    const setupSecret = String(payload?.mfa?.secret || '').trim();
+    const setupOtpAuth = String(payload?.mfa?.otpauthUrl || '').trim();
+    const recoveryCodes = Array.isArray(payload?.mfa?.recoveryCodes) ? payload.mfa.recoveryCodes : [];
+
+    if (els.mfaPanel) els.mfaPanel.classList.remove('hidden');
+    if (els.mfaSetupHint) els.mfaSetupHint.classList.toggle('hidden', !setupRequired);
+    if (els.mfaSetupSecretWrap) els.mfaSetupSecretWrap.classList.toggle('hidden', !setupSecret);
+    if (els.mfaSetupSecret) els.mfaSetupSecret.textContent = setupSecret;
+    if (els.mfaSetupOtpAuthWrap) els.mfaSetupOtpAuthWrap.classList.toggle('hidden', !setupOtpAuth);
+    if (els.mfaSetupOtpAuth) els.mfaSetupOtpAuth.textContent = setupOtpAuth;
+    if (els.mfaRecoveryCodesWrap) els.mfaRecoveryCodesWrap.classList.toggle('hidden', !recoveryCodes.length);
+    if (els.mfaRecoveryCodes) {
+      els.mfaRecoveryCodes.textContent = recoveryCodes.join('\n');
+    }
   }
 
   function isOwner() {
@@ -6504,6 +6559,7 @@
       setStatus(els.loginStatus, 'Loggar in...');
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       state.pendingLoginTicket = '';
+      clearPendingMfa();
       const response = await api('/auth/login', {
         method: 'POST',
         auth: false,
@@ -6513,6 +6569,16 @@
           tenantId: (els.tenantInput.value || '').trim(),
         },
       });
+
+      if (response?.requiresMfa) {
+        renderPendingMfa(response);
+        if (!state.pendingMfaTicket) {
+          throw new Error('mfaTicket saknas för MFA-verifiering.');
+        }
+        setStatus(els.loginStatus, 'MFA krävs. Ange kod för att fortsätta.');
+        updateLifecyclePermissions();
+        return;
+      }
 
       if (response?.requiresTenantSelection) {
         state.pendingLoginTicket = response.loginTicket || '';
@@ -6539,6 +6605,51 @@
     }
   }
 
+  async function verifyMfa() {
+    try {
+      const mfaTicket = String(state.pendingMfaTicket || '').trim();
+      const code = String(els.mfaCodeInput?.value || '').trim();
+      if (!mfaTicket || !code) {
+        throw new Error('Ange MFA-kod först.');
+      }
+      setStatus(els.loginStatus, 'Verifierar MFA...');
+      const response = await api('/auth/mfa/verify', {
+        method: 'POST',
+        auth: false,
+        body: {
+          mfaTicket,
+          code,
+          tenantId: (els.tenantInput.value || '').trim(),
+        },
+      });
+
+      if (response?.requiresTenantSelection) {
+        state.pendingLoginTicket = response.loginTicket || '';
+        clearPendingMfa();
+        renderPendingTenantSelection(response.tenants || []);
+        if (!state.pendingLoginTicket) {
+          throw new Error('loginTicket saknas för tenant-val.');
+        }
+        setStatus(els.loginStatus, 'Välj tenant för att slutföra inloggning.');
+        updateLifecyclePermissions();
+        return;
+      }
+
+      applyAuthContext({
+        token: response.token,
+        membership: response?.membership || null,
+        memberships: response?.memberships || (response?.membership ? [response.membership] : []),
+      });
+
+      clearPendingMfa();
+      setStatus(els.loginStatus, 'Inloggad.');
+      setAuthVisible(true);
+      await refreshAll();
+    } catch (error) {
+      setStatus(els.loginStatus, error.message || 'MFA-verifiering misslyckades.', true);
+    }
+  }
+
   async function completeTenantSelection() {
     try {
       const loginTicket = String(state.pendingLoginTicket || '').trim();
@@ -6558,6 +6669,7 @@
         memberships: response?.memberships || (response?.membership ? [response.membership] : []),
       });
       state.pendingLoginTicket = '';
+      clearPendingMfa();
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       setStatus(els.loginStatus, 'Inloggad.');
       setAuthVisible(true);
@@ -6863,6 +6975,12 @@
   }
 
   els.loginBtn?.addEventListener('click', handleLogin);
+  els.mfaVerifyBtn?.addEventListener('click', verifyMfa);
+  els.mfaCodeInput?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    verifyMfa();
+  });
   els.completeTenantSelectionBtn?.addEventListener('click', completeTenantSelection);
   els.switchTenantBtn?.addEventListener('click', switchTenant);
   els.refreshBtn?.addEventListener('click', () => refreshAll().catch((error) => alert(error.message || 'Kunde inte uppdatera.')));
