@@ -241,7 +241,9 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 5) Spara pilotrapport automatiskt (utan att skapa otrackade filer i repo-root):
 - `npm run report:pilot`
 - Filen sparas i `data/reports/` (git-ignorerad), t.ex. `data/reports/Pilot_Baseline_14d_YYYYMMDD-HHMMSS.json`.
+- Rapportfilen inkluderar `readinessSnapshot` med Go/No-Go, no-go triggers och prioriterad remediation-lista.
 - För publik miljö: `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run report:pilot`
+- Om OWNER kräver MFA: sätt `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>`.
 - Valfritt: `npm run report:pilot -- --days 30`
 
 Tips:

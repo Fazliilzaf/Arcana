@@ -446,6 +446,8 @@
     refreshMonitorBtn: document.getElementById('refreshMonitorBtn'),
     monitorPanelStatus: document.getElementById('monitorPanelStatus'),
     monitorResult: document.getElementById('monitorResult'),
+    monitorRemediationSummary: document.getElementById('monitorRemediationSummary'),
+    monitorRemediationResult: document.getElementById('monitorRemediationResult'),
     loadStateManifestBtn: document.getElementById('loadStateManifestBtn'),
     createStateBackupBtn: document.getElementById('createStateBackupBtn'),
     listStateBackupsBtn: document.getElementById('listStateBackupsBtn'),
@@ -6045,21 +6047,109 @@
     }
   }
 
+  function remediationPriorityRank(priorityRaw) {
+    const priority = String(priorityRaw || '')
+      .trim()
+      .toUpperCase();
+    if (priority === 'P0') return 0;
+    if (priority === 'P1') return 1;
+    if (priority === 'P2') return 2;
+    if (priority === 'P3') return 3;
+    return 9;
+  }
+
+  function renderMonitorRemediation(readiness) {
+    const remediation = readiness?.remediation || null;
+    const summary = remediation?.summary || {};
+    const byPriority = summary?.byPriority || {};
+    const total = Number(summary?.total || 0);
+    const p0 = Number(byPriority?.P0 || 0);
+    const p1 = Number(byPriority?.P1 || 0);
+    const p2 = Number(byPriority?.P2 || 0);
+    const p3 = Number(byPriority?.P3 || 0);
+    const potentialGain = Number(summary?.potentialScoreGain || 0);
+
+    if (els.monitorRemediationSummary) {
+      els.monitorRemediationSummary.textContent = `Actions=${total} (P0=${p0}, P1=${p1}, P2=${p2}, P3=${p3}) | potentialGain=${potentialGain}`;
+    }
+
+    if (!els.monitorRemediationResult) return;
+
+    const actionList = Array.isArray(remediation?.actions) ? remediation.actions : [];
+    const nextActions = actionList
+      .slice()
+      .sort((a, b) => {
+        const byPriorityOrder =
+          remediationPriorityRank(a?.priority) - remediationPriorityRank(b?.priority);
+        if (byPriorityOrder !== 0) return byPriorityOrder;
+        const byRequired = Number(Boolean(b?.required)) - Number(Boolean(a?.required));
+        if (byRequired !== 0) return byRequired;
+        return String(a?.id || '').localeCompare(String(b?.id || ''));
+      })
+      .slice(0, 8);
+
+    if (nextActions.length === 0) {
+      els.monitorRemediationResult.textContent = 'Inga remediation-actions just nu.';
+      return;
+    }
+
+    const lines = [
+      `Readiness: score=${readiness?.score ?? '-'} band=${readiness?.band || '-'} goAllowed=${readiness?.goNoGo?.allowed === true ? 'yes' : 'no'}`,
+      `Critical path (P0): ${p0}`,
+      '',
+      'Top actions:',
+    ];
+
+    nextActions.forEach((action, index) => {
+      const priority = String(action?.priority || '-').toUpperCase();
+      const owner = String(action?.owner || '-');
+      const title = String(action?.title || action?.relatedId || '-');
+      const targetState = String(action?.targetState || '-');
+      const impact = Number(action?.scoreImpactMax || 0);
+      lines.push(
+        `${index + 1}. [${priority}] ${title} | owner=${owner} | target=${targetState} | impact<=${impact}`
+      );
+      if (action?.playbook) {
+        lines.push(`   playbook: ${String(action.playbook)}`);
+      }
+    });
+
+    els.monitorRemediationResult.textContent = lines.join('\n');
+  }
+
   async function loadMonitorStatus() {
     try {
       setStatus(els.monitorPanelStatus, 'Laddar monitor-status...');
-      const response = await api('/monitor/status');
+      const [statusResponse, readinessResponse] = await Promise.all([
+        api('/monitor/status'),
+        api('/monitor/readiness'),
+      ]);
       if (els.monitorResult) {
-        els.monitorResult.textContent = JSON.stringify(response, null, 2);
+        els.monitorResult.textContent = JSON.stringify(
+          {
+            status: statusResponse,
+            readiness: readinessResponse,
+          },
+          null,
+          2
+        );
       }
-      const templatesTotal = response?.kpis?.templatesTotal ?? 0;
-      const evaluationsTotal = response?.kpis?.evaluationsTotal ?? 0;
-      const highCriticalOpen = response?.kpis?.highCriticalOpen ?? 0;
+      renderMonitorRemediation(readinessResponse);
+      const templatesTotal = statusResponse?.kpis?.templatesTotal ?? 0;
+      const evaluationsTotal = statusResponse?.kpis?.evaluationsTotal ?? 0;
+      const highCriticalOpen = statusResponse?.kpis?.highCriticalOpen ?? 0;
+      const band = readinessResponse?.band || '-';
+      const remediationTotal = Number(readinessResponse?.remediation?.summary?.total || 0);
+      const p0 = Number(readinessResponse?.remediation?.summary?.byPriority?.P0 || 0);
       setStatus(
         els.monitorPanelStatus,
-        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}`
+        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}, band=${band}, remediation=${remediationTotal}, P0=${p0}`
       );
     } catch (error) {
+      if (els.monitorRemediationSummary) els.monitorRemediationSummary.textContent = '';
+      if (els.monitorRemediationResult) {
+        els.monitorRemediationResult.textContent = 'Readiness-remediation kunde inte laddas.';
+      }
       setStatus(els.monitorPanelStatus, error.message || 'Kunde inte läsa monitor-status.', true);
     }
   }
@@ -6880,6 +6970,10 @@
     if (els.pilotReportResult) els.pilotReportResult.textContent = 'Ingen rapport körd ännu.';
     if (els.mailInsightsResult) els.mailInsightsResult.textContent = 'Ingen mail-data ännu.';
     if (els.monitorResult) els.monitorResult.textContent = 'Ingen monitor-data ännu.';
+    if (els.monitorRemediationSummary) els.monitorRemediationSummary.textContent = '';
+    if (els.monitorRemediationResult) {
+      els.monitorRemediationResult.textContent = 'Ingen readiness-remediation ännu.';
+    }
     if (els.opsResult) els.opsResult.textContent = 'Ingen ops-data ännu.';
     if (els.latestActivityList) {
       els.latestActivityList.innerHTML = '<li class="muted mini">Ingen aktivitet ännu.</li>';
