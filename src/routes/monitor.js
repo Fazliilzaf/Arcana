@@ -33,6 +33,13 @@ function mb(value) {
   return Number((Number(value || 0) / 1024 / 1024).toFixed(2));
 }
 
+function toAgeDaysSince(isoTs, nowMs = Date.now()) {
+  const ts = Date.parse(String(isoTs || ''));
+  if (!Number.isFinite(ts)) return null;
+  if (ts > nowMs) return 0;
+  return Number(((nowMs - ts) / (24 * 60 * 60 * 1000)).toFixed(2));
+}
+
 function createMonitorRouter({
   authStore,
   templateStore,
@@ -99,6 +106,19 @@ function createMonitorRouter({
           scheduler && typeof scheduler.getStatus === 'function'
             ? scheduler.getStatus()
             : null;
+        const schedulerJobs = Array.isArray(schedulerStatus?.jobs) ? schedulerStatus.jobs : [];
+        const restoreDrillJob =
+          schedulerJobs.find((item) => String(item?.id || '') === 'restore_drill_preview') || null;
+        const restoreDrillLastSuccessAt = toIso(restoreDrillJob?.lastSuccessAt);
+        const restoreDrillAgeDays = toAgeDaysSince(restoreDrillLastSuccessAt, now);
+        const restoreDrillMaxAgeDays = Math.max(
+          1,
+          Math.min(365, Number(config?.monitorRestoreDrillMaxAgeDays || 30))
+        );
+        const restoreDrillHealthy =
+          restoreDrillAgeDays !== null && restoreDrillAgeDays <= restoreDrillMaxAgeDays;
+        const restoreDrillNoGo =
+          !schedulerStatus?.enabled || !schedulerStatus?.started || !restoreDrillHealthy;
 
         await authStore.addAuditEvent({
           tenantId,
@@ -134,12 +154,26 @@ function createMonitorRouter({
                   jobsEnabled: Array.isArray(schedulerStatus.jobs)
                     ? schedulerStatus.jobs.filter((item) => item?.enabled).length
                     : 0,
+                  restoreDrill: {
+                    maxAgeDays: restoreDrillMaxAgeDays,
+                    lastSuccessAt: restoreDrillLastSuccessAt,
+                    ageDays: restoreDrillAgeDays,
+                    healthy: restoreDrillHealthy,
+                    noGo: restoreDrillNoGo,
+                  },
                 }
               : {
                   enabled: false,
                   started: false,
                   startedAt: null,
                   jobsEnabled: 0,
+                  restoreDrill: {
+                    maxAgeDays: restoreDrillMaxAgeDays,
+                    lastSuccessAt: null,
+                    ageDays: null,
+                    healthy: false,
+                    noGo: true,
+                  },
                 },
           },
           security: {
@@ -179,9 +213,20 @@ function createMonitorRouter({
             incidentsTotal: Number(incidentSummary?.totals?.incidents || 0),
             incidentsOpen: Number(incidentSummary?.totals?.openUnresolved || 0),
             incidentsBreachedOpen: Number(incidentSummary?.totals?.breachedOpen || 0),
+            restoreDrillAgeDays,
+            restoreDrillHealthy,
             staffActive: activeStaff,
             staffDisabled: disabledStaff,
             auditEvents24h: recentAuditCount,
+          },
+          gates: {
+            restoreDrill: {
+              maxAgeDays: restoreDrillMaxAgeDays,
+              lastSuccessAt: restoreDrillLastSuccessAt,
+              ageDays: restoreDrillAgeDays,
+              healthy: restoreDrillHealthy,
+              noGo: restoreDrillNoGo,
+            },
           },
           stores: {
             auth: authFile,

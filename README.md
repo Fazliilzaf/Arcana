@@ -91,6 +91,7 @@ ARCANA_SCHEDULER_INCIDENT_AUTO_ASSIGN_OWNER_LIMIT=100
 ARCANA_ALERT_WEBHOOK_URL=
 ARCANA_ALERT_WEBHOOK_SECRET=
 ARCANA_ALERT_WEBHOOK_TIMEOUT_MS=4000
+ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS=30
 ARCANA_SCHEDULER_STARTUP_DELAY_SEC=8
 ARCANA_SCHEDULER_JITTER_SEC=4
 ARCANA_SCHEDULER_RUN_ON_STARTUP=false
@@ -102,6 +103,7 @@ ARCANA_SCHEDULER_RUN_ON_STARTUP=false
 - Om `ARCANA_ALERT_WEBHOOK_URL` är satt skickas webhook-notifieringar för `incidents.auto_assign_owner` och `incidents.auto_escalate`.
 - Sätt `ARCANA_ALERT_WEBHOOK_SECRET` för HMAC-signatur (`x-arcana-signature: sha256=...`).
 - Status syns i `GET /api/v1/monitor/status` under `runtime.scheduler`.
+- `monitor/status` exponerar även `gates.restoreDrill` (`healthy`/`noGo`) baserat på senaste `restore_drill_preview` och max-age (`ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS`).
 
 `POST /api/v1/auth/change-password` har nu global invalidation som default:
 - revokerar alla user-sessioner (alla tenants) vid lösenordsbyte

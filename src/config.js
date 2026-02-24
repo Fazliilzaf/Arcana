@@ -190,6 +190,7 @@ const config = {
   schedulerStartupDelaySec: asInt(process.env.ARCANA_SCHEDULER_STARTUP_DELAY_SEC, 8),
   schedulerJitterSec: asInt(process.env.ARCANA_SCHEDULER_JITTER_SEC, 4),
   schedulerRunOnStartup: asBool(process.env.ARCANA_SCHEDULER_RUN_ON_STARTUP, false),
+  monitorRestoreDrillMaxAgeDays: asInt(process.env.ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS, 30),
 
   knowledgeDir: asNonEmptyString(
     process.env.KNOWLEDGE_DIR,
