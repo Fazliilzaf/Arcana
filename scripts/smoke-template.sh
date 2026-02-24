@@ -136,7 +136,19 @@ fi
 MONITOR_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/status" \
   -H "Authorization: Bearer $TOKEN")"
 MONITOR_TEMPLATES="$(printf '%s' "$MONITOR_RESPONSE" | json_get kpis.templatesTotal)"
-echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES})"
+MONITOR_RESTORE_DRILL_HEALTHY="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.restoreDrill.healthy 2>/dev/null || true)"
+MONITOR_RESTORE_DRILL_NOGO="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.restoreDrill.noGo 2>/dev/null || true)"
+if [[ "$MONITOR_RESTORE_DRILL_HEALTHY" != "true" && "$MONITOR_RESTORE_DRILL_HEALTHY" != "false" ]]; then
+  echo "❌ monitor/status saknar gates.restoreDrill.healthy"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_RESTORE_DRILL_NOGO" != "true" && "$MONITOR_RESTORE_DRILL_NOGO" != "false" ]]; then
+  echo "❌ monitor/status saknar gates.restoreDrill.noGo"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO})"
 
 if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
   OPS_MANIFEST_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/state/manifest" \
