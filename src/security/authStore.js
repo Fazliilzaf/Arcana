@@ -4,6 +4,7 @@ const path = require('node:path');
 
 const { hashPassword, verifyPassword } = require('./password');
 const { ROLE_OWNER, ROLE_STAFF, normalizeRole, isValidRole } = require('./roles');
+const { getRequestContext } = require('../observability/requestContext');
 
 function nowIso() {
   return new Date().toISOString();
@@ -17,6 +18,10 @@ function normalizeEmail(value) {
 function normalizeTenantId(value) {
   if (typeof value !== 'string') return '';
   return value.trim();
+}
+
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function safeObject(value) {
@@ -601,6 +606,11 @@ async function createAuthStore({
     const { seq: lastSeq, hash: lastHash } = getAuditTail();
     const nextSeq = lastSeq + 1;
     const metadataValue = metadata && typeof metadata === 'object' ? safeObject(metadata) : {};
+    const requestContext = getRequestContext();
+    const correlationId = normalizeText(requestContext?.correlationId || '');
+    if (correlationId && !normalizeText(metadataValue?.correlationId)) {
+      metadataValue.correlationId = correlationId;
+    }
     const event = {
       id: crypto.randomUUID(),
       ts: nowIso(),

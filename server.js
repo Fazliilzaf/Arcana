@@ -9,12 +9,14 @@ const {
   getKnowledgeDirForBrand,
 } = require('./src/brand/runtimeConfig');
 const { createCorsPolicy } = require('./src/security/corsPolicy');
+const { requestContextMiddleware } = require('./src/observability/requestContext');
 
 const app = express();
 if (config.trustProxy) app.set('trust proxy', 1);
 app.use(cors(createCorsPolicy(config)));
 app.use(express.json());
 app.use(express.static("public"));
+app.use(requestContextMiddleware({ headerName: 'x-correlation-id' }));
 
 const { openai } = require('./src/openai/client');
 const { createMemoryStore } = require('./src/memory/store');
