@@ -17,6 +17,8 @@ const READINESS_BANDS = Object.freeze({
   noGoMaxExclusive: 75,
   limitedBetaMaxExclusive: 85,
 });
+const OWNER_DECISIONS_ALLOW_ACTIVATION = new Set(['approved_exception', 'false_positive']);
+const DECISIONS_REQUIRING_OWNER_OVERRIDE = new Set(['review_required', 'blocked']);
 
 function toIso(value) {
   if (!value) return null;
@@ -263,6 +265,56 @@ function buildSchedulerFreshnessCheck(job) {
     },
     evidence: ageHours === null ? 'Saknar lyckad körning.' : '',
   });
+}
+
+function collectActiveTemplateVersions(templates = []) {
+  const activeVersions = [];
+
+  for (const template of Array.isArray(templates) ? templates : []) {
+    const versions = Array.isArray(template?.versions) ? template.versions : [];
+    const activeVersionId = normalizeText(template?.currentActiveVersionId);
+    let activeVersion = null;
+
+    if (activeVersionId) {
+      activeVersion =
+        versions.find((version) => normalizeText(version?.id) === activeVersionId) || null;
+    }
+    if (!activeVersion) {
+      activeVersion =
+        versions.find((version) => normalizeText(version?.state).toLowerCase() === 'active') || null;
+    }
+    if (!activeVersion) continue;
+
+    activeVersions.push({
+      templateId: normalizeText(template?.id),
+      templateName: normalizeText(template?.name) || null,
+      category: normalizeText(template?.category) || null,
+      versionId: normalizeText(activeVersion?.id),
+      versionNo: Number(activeVersion?.versionNo || 0),
+      risk: activeVersion?.risk || null,
+      activatedAt: toIso(activeVersion?.activatedAt),
+      updatedAt: toIso(activeVersion?.updatedAt),
+    });
+  }
+
+  return activeVersions;
+}
+
+function toNoGoDetails(items = [], limit = 10) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const safeLimit = Math.max(1, Math.min(50, Number(limit) || 10));
+  return items.slice(0, safeLimit);
+}
+
+function buildPolicyRuleFloorMap(policyRules = []) {
+  const map = new Map();
+  for (const rule of Array.isArray(policyRules) ? policyRules : []) {
+    const id = normalizeText(rule?.id);
+    if (!id) continue;
+    const floor = Math.max(1, Math.min(5, Number(rule?.floor || 1)));
+    map.set(id, floor);
+  }
+  return map;
 }
 
 function createMonitorRouter({
@@ -714,6 +766,7 @@ function createMonitorRouter({
           latestRestoreDrillAudit,
           tenantConfig,
           secretRotationStatus,
+          templatesWithVersions,
         ] = await Promise.all([
           authStore.listTenantMembers(tenantId),
           authStore.listAuditEvents({ tenantId, limit: 500 }),
@@ -736,6 +789,7 @@ function createMonitorRouter({
                 maxAgeDays: parseDays(config?.secretRotationMaxAgeDays, 90),
               })
             : Promise.resolve(null),
+          templateStore.listTemplates({ tenantId, includeVersions: true }),
         ]);
 
         const restoreDrillGate = buildRestoreDrillGate({
@@ -830,6 +884,103 @@ function createMonitorRouter({
         const riskDatasetCases = Number(riskPrecision?.dataset?.count || 0);
         const bandAccuracyPercent = Number(riskPrecision?.report?.totals?.bandAccuracyPercent || 0);
         const levelAccuracyPercent = Number(riskPrecision?.report?.totals?.levelAccuracyPercent || 0);
+        const activeTemplateVersions = collectActiveTemplateVersions(templatesWithVersions);
+        const policyRuleFloorMap = buildPolicyRuleFloorMap(policyRules);
+
+        const outputGateViolations = [];
+        const policyFloorBypassViolations = [];
+        const l5WithoutManualIntervention = [];
+
+        for (const activeVersion of activeTemplateVersions) {
+          const risk = activeVersion?.risk && typeof activeVersion.risk === 'object'
+            ? activeVersion.risk
+            : null;
+          const decision = normalizeText(risk?.decision).toLowerCase();
+          const ownerDecision = normalizeText(risk?.ownerDecision).toLowerCase();
+          const outputEvaluation =
+            risk?.output && typeof risk.output === 'object' ? risk.output : null;
+          const hasOutputEvaluation =
+            Boolean(outputEvaluation) &&
+            normalizeText(outputEvaluation?.scope).toLowerCase() === 'output';
+          const hasPolicyMetadata =
+            hasOutputEvaluation &&
+            Array.isArray(outputEvaluation?.policyHits) &&
+            Array.isArray(outputEvaluation?.policyAdjustments);
+          const requiresOwnerOverride = DECISIONS_REQUIRING_OWNER_OVERRIDE.has(decision);
+          const hasOwnerOverride = OWNER_DECISIONS_ALLOW_ACTIVATION.has(ownerDecision);
+          const riskLevel = Number(risk?.riskLevel || 0);
+
+          const gateIssues = [];
+          if (!risk) gateIssues.push('risk_missing');
+          if (!hasOutputEvaluation) gateIssues.push('output_evaluation_missing');
+          if (hasOutputEvaluation && !hasPolicyMetadata) gateIssues.push('policy_metadata_missing');
+          if (!decision) gateIssues.push('decision_missing');
+          if (requiresOwnerOverride && !hasOwnerOverride) gateIssues.push('owner_override_missing');
+
+          if (gateIssues.length > 0) {
+            outputGateViolations.push({
+              templateId: activeVersion.templateId,
+              templateName: activeVersion.templateName,
+              versionId: activeVersion.versionId,
+              versionNo: activeVersion.versionNo,
+              category: activeVersion.category,
+              riskLevel,
+              decision: decision || null,
+              ownerDecision: ownerDecision || null,
+              gateIssues,
+              activatedAt: activeVersion.activatedAt,
+            });
+          }
+
+          if (hasPolicyMetadata) {
+            const policyHits = Array.isArray(outputEvaluation.policyHits) ? outputEvaluation.policyHits : [];
+            for (const hit of policyHits) {
+              const policyHitId = normalizeText(hit?.id);
+              const floorFromHit = Number(hit?.floor || 0);
+              const floorFromRuleMap = Number(policyRuleFloorMap.get(policyHitId) || 0);
+              const floor =
+                floorFromHit > 0 ? floorFromHit : floorFromRuleMap > 0 ? floorFromRuleMap : 1;
+              if (riskLevel < floor) {
+                policyFloorBypassViolations.push({
+                  reason: 'floor_underflow',
+                  templateId: activeVersion.templateId,
+                  versionId: activeVersion.versionId,
+                  riskLevel,
+                  decision: decision || null,
+                  policyRuleId: policyHitId || null,
+                  policyFloor: floor,
+                  activatedAt: activeVersion.activatedAt,
+                });
+              }
+              if (decision === 'allow' && floor >= 4) {
+                policyFloorBypassViolations.push({
+                  reason: 'allow_despite_policy_floor',
+                  templateId: activeVersion.templateId,
+                  versionId: activeVersion.versionId,
+                  riskLevel,
+                  decision: decision || null,
+                  policyRuleId: policyHitId || null,
+                  policyFloor: floor,
+                  activatedAt: activeVersion.activatedAt,
+                });
+              }
+            }
+          }
+
+          if (riskLevel >= 5 && !hasOwnerOverride) {
+            l5WithoutManualIntervention.push({
+              templateId: activeVersion.templateId,
+              templateName: activeVersion.templateName,
+              versionId: activeVersion.versionId,
+              versionNo: activeVersion.versionNo,
+              category: activeVersion.category,
+              riskLevel,
+              decision: decision || null,
+              ownerDecision: ownerDecision || null,
+              activatedAt: activeVersion.activatedAt,
+            });
+          }
+        }
 
         const categoryA = evaluateCategory({
           id: 'A',
@@ -1171,31 +1322,57 @@ function createMonitorRouter({
         const score = Number((weightedScore / totalWeight).toFixed(2));
         const band = pickReadinessBand(score);
         const blockersAllGreen = categories.every((item) => item.status === 'green');
+        const outputGateNoGoTriggered = outputGateViolations.length > 0;
+        const policyFloorNoGoTriggered =
+          policyRules.length === 0 || policyFloorBypassViolations.length > 0;
+        const l5NoGoTriggered = l5WithoutManualIntervention.length > 0;
 
         const noGoTriggers = [
           {
             id: 'output_without_risk_policy_gate',
             label: 'Output kan lämna systemet utan output risk + policy gate',
-            status: 'unknown',
-            inferred: true,
-            evidence: 'Kräver aktivt bypass-test i release-gate.',
+            status: outputGateNoGoTriggered ? 'triggered' : 'clear',
+            inferred: false,
+            evidence: outputGateNoGoTriggered
+              ? `Hittade ${outputGateViolations.length} aktiva versioner med saknad output risk/policy gate.`
+              : `Kontrollerade ${activeTemplateVersions.length} aktiva versioner utan gate-avvikelser.`,
+            value: {
+              activeTemplateVersions: activeTemplateVersions.length,
+              violations: outputGateViolations.length,
+              details: toNoGoDetails(outputGateViolations, 12),
+            },
           },
           {
             id: 'policy_floor_bypass',
             label: 'Policy floor kan kringgås',
-            status: policyRules.length > 0 ? 'unknown' : 'triggered',
-            inferred: true,
+            status: policyFloorNoGoTriggered ? 'triggered' : 'clear',
+            inferred: false,
             evidence:
-              policyRules.length > 0
-                ? 'Policy floor-regler finns, men bypass-test krävs för verifiering.'
-                : 'Policy floor-regler saknas.',
+              policyRules.length === 0
+                ? 'Policy floor-regler saknas.'
+                : policyFloorBypassViolations.length > 0
+                  ? `Hittade ${policyFloorBypassViolations.length} policy floor-avvikelser i aktiva versioner.`
+                  : `Policy floor kontrollerad i ${activeTemplateVersions.length} aktiva versioner utan avvikelser.`,
+            value: {
+              policyRules: policyRules.length,
+              activeTemplateVersions: activeTemplateVersions.length,
+              violations: policyFloorBypassViolations.length,
+              details: toNoGoDetails(policyFloorBypassViolations, 12),
+            },
           },
           {
             id: 'l5_without_manual_intervention',
             label: 'L5 kan gå live utan manuell intervention',
-            status: 'unknown',
-            inferred: true,
-            evidence: 'Kräver explicit L5 activation-gate test.',
+            status: l5NoGoTriggered ? 'triggered' : 'clear',
+            inferred: false,
+            evidence: l5NoGoTriggered
+              ? `Hittade ${l5WithoutManualIntervention.length} aktiva L5-versioner utan owner override.`
+              : 'Inga aktiva L5-versioner saknar manuell owner intervention.',
+            value: {
+              activeTemplateVersions: activeTemplateVersions.length,
+              violations: l5WithoutManualIntervention.length,
+              details: toNoGoDetails(l5WithoutManualIntervention, 12),
+            },
           },
           {
             id: 'restore_drill_unverified_30d',
@@ -1295,6 +1472,22 @@ function createMonitorRouter({
               integrityOk: Boolean(auditIntegrity?.ok),
               issues: Number(auditIntegrity?.issues?.length || 0),
               latestTenantAccessCheckAt: toIso(latestTenantAccessCheck?.ts),
+            },
+            releaseGuards: {
+              activeTemplateVersions: activeTemplateVersions.length,
+              outputRiskPolicyGate: {
+                violations: outputGateViolations.length,
+                details: toNoGoDetails(outputGateViolations, 12),
+              },
+              policyFloorBypass: {
+                policyRules: policyRules.length,
+                violations: policyFloorBypassViolations.length,
+                details: toNoGoDetails(policyFloorBypassViolations, 12),
+              },
+              l5ManualIntervention: {
+                violations: l5WithoutManualIntervention.length,
+                details: toNoGoDetails(l5WithoutManualIntervention, 12),
+              },
             },
           },
         });

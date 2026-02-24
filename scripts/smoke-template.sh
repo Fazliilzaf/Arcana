@@ -348,12 +348,19 @@ READINESS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/readiness" \
 READINESS_SCORE="$(printf '%s' "$READINESS_RESPONSE" | json_get score 2>/dev/null || true)"
 READINESS_BAND="$(printf '%s' "$READINESS_RESPONSE" | json_get band 2>/dev/null || true)"
 READINESS_CATEGORIES_COUNT="$(printf '%s' "$READINESS_RESPONSE" | json_get categories | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
-if [[ -z "$READINESS_SCORE" || "$READINESS_SCORE" == "null" || "$READINESS_CATEGORIES_COUNT" -lt 4 ]]; then
+READINESS_NOGO_COUNT="$(printf '%s' "$READINESS_RESPONSE" | json_get noGoTriggers | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
+READINESS_NOGO_UNKNOWN="$(printf '%s' "$READINESS_RESPONSE" | json_get noGoTriggers | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const c=Array.isArray(d)?d.filter((item)=>String(item?.status||'').toLowerCase()==='unknown').length:0; process.stdout.write(String(c));")"
+if [[ -z "$READINESS_SCORE" || "$READINESS_SCORE" == "null" || "$READINESS_CATEGORIES_COUNT" -lt 4 || "$READINESS_NOGO_COUNT" -lt 6 ]]; then
   echo "❌ monitor/readiness saknar score eller kategorier"
   printf '%s\n' "$READINESS_RESPONSE"
   exit 1
 fi
-echo "✅ monitor/readiness OK (score: ${READINESS_SCORE}, band: ${READINESS_BAND}, categories: ${READINESS_CATEGORIES_COUNT})"
+if [[ "$READINESS_NOGO_UNKNOWN" -ne 0 ]]; then
+  echo "❌ monitor/readiness innehåller okända no-go-statusar (${READINESS_NOGO_UNKNOWN})"
+  printf '%s\n' "$READINESS_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/readiness OK (score: ${READINESS_SCORE}, band: ${READINESS_BAND}, categories: ${READINESS_CATEGORIES_COUNT}, noGo: ${READINESS_NOGO_COUNT})"
 
 if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
   OPS_MANIFEST_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/state/manifest" \
