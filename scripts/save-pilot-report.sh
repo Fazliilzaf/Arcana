@@ -10,6 +10,8 @@ PASSWORD="${ARCANA_OWNER_PASSWORD:-}"
 TENANT_ID="${ARCANA_DEFAULT_TENANT:-hair-tp-clinic}"
 DAYS="${ARCANA_PILOT_REPORT_DAYS:-14}"
 OUT_FILE="${ARCANA_PILOT_REPORT_OUT:-}"
+MFA_CODE="${ARCANA_OWNER_MFA_CODE:-}"
+MFA_SECRET="${ARCANA_OWNER_MFA_SECRET:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -37,9 +39,17 @@ while [[ $# -gt 0 ]]; do
       OUT_FILE="${2:-}"
       shift 2
       ;;
+    --mfa-code)
+      MFA_CODE="${2:-}"
+      shift 2
+      ;;
+    --mfa-secret)
+      MFA_SECRET="${2:-}"
+      shift 2
+      ;;
     *)
       echo "Okänd flagga: $1"
-      echo "Använd: [--base-url URL] [--email EMAIL] [--password PASSWORD] [--tenant TENANT] [--days 14] [--out FIL]"
+      echo "Använd: [--base-url URL] [--email EMAIL] [--password PASSWORD] [--tenant TENANT] [--days 14] [--out FIL] [--mfa-code 123456] [--mfa-secret BASE32]"
       exit 1
       ;;
   esac
@@ -97,6 +107,143 @@ else process.stdout.write(String(ref));
 " "$path"
 }
 
+read_mfa_secret_from_store() {
+  local email="$1"
+  local auth_store_path="${AUTH_STORE_PATH:-./data/auth.json}"
+  node -e "
+const fs = require('fs');
+const path = process.argv[1];
+const email = String(process.argv[2] || '').trim().toLowerCase();
+if (!email) process.exit(0);
+let raw = null;
+try {
+  raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch {
+  process.exit(0);
+}
+const users = raw && raw.users && typeof raw.users === 'object' ? Object.values(raw.users) : [];
+const user = users.find((item) => String(item?.email || '').trim().toLowerCase() === email) || null;
+const secret = String(user?.mfaSecret || '').trim();
+if (secret) process.stdout.write(secret);
+" "$auth_store_path" "$email"
+}
+
+generate_totp_code() {
+  local secret="$1"
+  node -e "
+const crypto = require('crypto');
+const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const secret = String(process.argv[1] || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+if (!secret) process.exit(1);
+let bits = 0;
+let value = 0;
+const bytes = [];
+for (const ch of secret) {
+  const idx = alphabet.indexOf(ch);
+  if (idx < 0) continue;
+  value = (value << 5) | idx;
+  bits += 5;
+  if (bits >= 8) {
+    bits -= 8;
+    bytes.push((value >>> bits) & 0xff);
+  }
+}
+const key = Buffer.from(bytes);
+if (!key.length) process.exit(1);
+const step = 30;
+const counter = Math.floor(Date.now() / 1000 / step);
+const msg = Buffer.alloc(8);
+msg.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+msg.writeUInt32BE(counter >>> 0, 4);
+const hmac = crypto.createHmac('sha1', key).update(msg).digest();
+const offset = hmac[hmac.length - 1] & 0x0f;
+const code = ((hmac.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, '0');
+process.stdout.write(code);
+" "$secret"
+}
+
+complete_login_with_optional_mfa() {
+  local login_response="$1"
+  local requested_tenant_id="$2"
+  local email="$3"
+  local mfa_code_override="$4"
+  local mfa_secret_override="$5"
+
+  local token=""
+  token="$(printf '%s' "$login_response" | json_get token 2>/dev/null || true)"
+  if [[ -n "$token" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local requires_mfa=""
+  requires_mfa="$(printf '%s' "$login_response" | json_get requiresMfa 2>/dev/null || true)"
+  if [[ "$requires_mfa" != "true" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_ticket=""
+  mfa_ticket="$(printf '%s' "$login_response" | json_get mfaTicket 2>/dev/null || true)"
+  if [[ -z "$mfa_ticket" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_code="$mfa_code_override"
+  if [[ -z "$mfa_code" ]]; then
+    local mfa_secret="$mfa_secret_override"
+    if [[ -z "$mfa_secret" ]]; then
+      mfa_secret="$(printf '%s' "$login_response" | json_get mfa.secret 2>/dev/null || true)"
+    fi
+    if [[ -z "$mfa_secret" ]]; then
+      mfa_secret="$(read_mfa_secret_from_store "$email" 2>/dev/null || true)"
+    fi
+    if [[ -n "$mfa_secret" ]]; then
+      mfa_code="$(generate_totp_code "$mfa_secret" 2>/dev/null || true)"
+    fi
+  fi
+
+  if [[ -z "$mfa_code" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_verify_response=""
+  mfa_verify_response="$(curl -sS -X POST "$BASE_URL/api/v1/auth/mfa/verify" \
+    -H "Content-Type: application/json" \
+    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$mfa_code\",\"tenantId\":\"$requested_tenant_id\"}")"
+
+  local mfa_token=""
+  mfa_token="$(printf '%s' "$mfa_verify_response" | json_get token 2>/dev/null || true)"
+  if [[ -n "$mfa_token" ]]; then
+    printf '%s' "$mfa_verify_response"
+    return 0
+  fi
+
+  local requires_tenant_selection=""
+  requires_tenant_selection="$(printf '%s' "$mfa_verify_response" | json_get requiresTenantSelection 2>/dev/null || true)"
+  if [[ "$requires_tenant_selection" == "true" ]]; then
+    local login_ticket=""
+    login_ticket="$(printf '%s' "$mfa_verify_response" | json_get loginTicket 2>/dev/null || true)"
+    local selected_tenant_id="$requested_tenant_id"
+    if [[ -z "$selected_tenant_id" ]]; then
+      selected_tenant_id="$(printf '%s' "$mfa_verify_response" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const t=(Array.isArray(d?.tenants)?d.tenants:[])[0]; process.stdout.write(String(t?.tenantId||''));" 2>/dev/null || true)"
+    fi
+    if [[ -n "$login_ticket" && -n "$selected_tenant_id" ]]; then
+      local tenant_select_response=""
+      tenant_select_response="$(curl -sS -X POST "$BASE_URL/api/v1/auth/select-tenant" \
+        -H "Content-Type: application/json" \
+        -d "{\"loginTicket\":\"$login_ticket\",\"tenantId\":\"$selected_tenant_id\"}")"
+      printf '%s' "$tenant_select_response"
+      return 0
+    fi
+  fi
+
+  printf '%s' "$mfa_verify_response"
+  return 0
+}
+
 if [[ -z "$EMAIL" ]]; then
   EMAIL="$(dotenv_get ARCANA_OWNER_EMAIL || true)"
 fi
@@ -137,29 +284,82 @@ LOGIN_PAYLOAD="$(node -e 'const [email,password,tenant]=process.argv.slice(1); p
 LOGIN_RESPONSE="$(curl -sS -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   --data-raw "$LOGIN_PAYLOAD")"
-TOKEN="$(printf '%s' "$LOGIN_RESPONSE" | json_get token || true)"
+LOGIN_RESPONSE_FINAL="$(complete_login_with_optional_mfa "$LOGIN_RESPONSE" "$TENANT_ID" "$EMAIL" "$MFA_CODE" "$MFA_SECRET")"
+TOKEN="$(printf '%s' "$LOGIN_RESPONSE_FINAL" | json_get token || true)"
 
 if [[ -z "$TOKEN" ]]; then
-  echo "❌ Login misslyckades."
-  printf '%s\n' "$LOGIN_RESPONSE"
+  echo "❌ Login misslyckades (kontrollera lösenord + MFA-kod/secret)."
+  printf '%s\n' "$LOGIN_RESPONSE_FINAL"
   exit 1
 fi
 
 REPORT_RESPONSE="$(curl -sS "$BASE_URL/api/v1/reports/pilot?days=$DAYS" \
   -H "Authorization: Bearer $TOKEN")"
+READINESS_RESPONSE="$(curl -sS "$BASE_URL/api/v1/monitor/readiness" \
+  -H "Authorization: Bearer $TOKEN")"
 
-TENANT_FROM_REPORT="$(printf '%s' "$REPORT_RESPONSE" | json_get tenantId || true)"
-if [[ -z "$TENANT_FROM_REPORT" ]]; then
-  echo "❌ Kunde inte hämta pilotrapport."
-  printf '%s\n' "$REPORT_RESPONSE"
+READINESS_SCORE="$(printf '%s' "$READINESS_RESPONSE" | json_get score || true)"
+if [[ -z "$READINESS_SCORE" ]]; then
+  echo "❌ Kunde inte hämta readiness-snapshot."
+  printf '%s\n' "$READINESS_RESPONSE"
   exit 1
 fi
 
-printf '%s\n' "$REPORT_RESPONSE" > "$OUT_FILE"
+REPORT_TMP="$(mktemp)"
+READINESS_TMP="$(mktemp)"
+cleanup_tmp() {
+  rm -f "$REPORT_TMP" "$READINESS_TMP"
+}
+trap cleanup_tmp EXIT
 
-TEMPLATES_TOTAL="$(printf '%s' "$REPORT_RESPONSE" | json_get kpis.templatesTotal || echo 0)"
-EVALUATIONS_TOTAL="$(printf '%s' "$REPORT_RESPONSE" | json_get kpis.evaluationsTotal || echo 0)"
-HIGH_CRITICAL_TOTAL="$(printf '%s' "$REPORT_RESPONSE" | json_get kpis.highCriticalTotal || echo 0)"
+printf '%s\n' "$REPORT_RESPONSE" > "$REPORT_TMP"
+printf '%s\n' "$READINESS_RESPONSE" > "$READINESS_TMP"
+
+COMBINED_REPORT="$(node -e "
+const fs = require('fs');
+const reportPath = process.argv[1];
+const readinessPath = process.argv[2];
+let report = {};
+let readiness = {};
+try {
+  report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+} catch {
+  process.exit(2);
+}
+try {
+  readiness = JSON.parse(fs.readFileSync(readinessPath, 'utf8'));
+} catch {
+  process.exit(3);
+}
+const remediation = readiness?.remediation && typeof readiness.remediation === 'object'
+  ? readiness.remediation
+  : null;
+report.readinessSnapshot = {
+  generatedAt: new Date().toISOString(),
+  score: Number(readiness?.score || 0),
+  band: readiness?.band || null,
+  goNoGo: readiness?.goNoGo || null,
+  noGoTriggers: Array.isArray(readiness?.noGoTriggers) ? readiness.noGoTriggers : [],
+  remediation,
+};
+process.stdout.write(JSON.stringify(report, null, 2));
+" "$REPORT_TMP" "$READINESS_TMP")"
+
+TENANT_FROM_REPORT="$(printf '%s' "$COMBINED_REPORT" | json_get tenantId || true)"
+if [[ -z "$TENANT_FROM_REPORT" ]]; then
+  echo "❌ Kunde inte hämta pilotrapport."
+  printf '%s\n' "$COMBINED_REPORT"
+  exit 1
+fi
+
+printf '%s\n' "$COMBINED_REPORT" > "$OUT_FILE"
+
+TEMPLATES_TOTAL="$(printf '%s' "$COMBINED_REPORT" | json_get kpis.templatesTotal || echo 0)"
+EVALUATIONS_TOTAL="$(printf '%s' "$COMBINED_REPORT" | json_get kpis.evaluationsTotal || echo 0)"
+HIGH_CRITICAL_TOTAL="$(printf '%s' "$COMBINED_REPORT" | json_get kpis.highCriticalTotal || echo 0)"
+READINESS_BAND="$(printf '%s' "$COMBINED_REPORT" | json_get readinessSnapshot.band || echo '-')"
+READINESS_REMEDIATION_TOTAL="$(printf '%s' "$COMBINED_REPORT" | json_get readinessSnapshot.remediation.summary.total || echo 0)"
 
 echo "✅ Pilotrapport sparad: $OUT_FILE"
 echo "   tenant=$TENANT_FROM_REPORT templates=$TEMPLATES_TOTAL evaluations=$EVALUATIONS_TOTAL highCritical=$HIGH_CRITICAL_TOTAL"
+echo "   readinessScore=$READINESS_SCORE readinessBand=$READINESS_BAND remediationActions=$READINESS_REMEDIATION_TOTAL"
