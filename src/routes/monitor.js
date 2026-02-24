@@ -253,6 +253,7 @@ function createMonitorRouter({
   templateStore,
   tenantConfigStore,
   secretRotationStore = null,
+  runtimeMetricsStore = null,
   config,
   scheduler = null,
   requireAuth,
@@ -320,6 +321,10 @@ function createMonitorRouter({
         ).length;
 
         const memoryUsage = process.memoryUsage();
+        const runtimeMetrics =
+          runtimeMetricsStore && typeof runtimeMetricsStore.getSnapshot === 'function'
+            ? runtimeMetricsStore.getSnapshot({ areaLimit: 8 })
+            : null;
         const activeTemplates = templates.filter((item) => item.currentActiveVersionId).length;
         const schedulerStatus =
           scheduler && typeof scheduler.getStatus === 'function'
@@ -365,6 +370,19 @@ function createMonitorRouter({
               heapUsed: mb(memoryUsage.heapUsed),
               external: mb(memoryUsage.external),
             },
+            metrics: runtimeMetrics
+              ? {
+                  p95Ms: Number(runtimeMetrics?.latency?.p95Ms || 0),
+                  p99Ms: Number(runtimeMetrics?.latency?.p99Ms || 0),
+                  sampledRequests: Number(runtimeMetrics?.totals?.sampledRequests || 0),
+                  slowRequests: Number(runtimeMetrics?.totals?.slowRequests || 0),
+                }
+              : {
+                  p95Ms: 0,
+                  p99Ms: 0,
+                  sampledRequests: 0,
+                  slowRequests: 0,
+                },
             scheduler: schedulerStatus
               ? {
                   enabled: Boolean(schedulerStatus.enabled),
@@ -441,6 +459,8 @@ function createMonitorRouter({
           kpis: {
             templatesTotal: templates.length,
             templatesActive: activeTemplates,
+            requestLatencyP95Ms: Number(runtimeMetrics?.latency?.p95Ms || 0),
+            requestLatencyP99Ms: Number(runtimeMetrics?.latency?.p99Ms || 0),
             evaluationsTotal: Number(summary?.totals?.evaluations || 0),
             highCriticalOpen: Number(summary?.totals?.highCriticalOpen || 0),
             incidentsTotal: Number(incidentSummary?.totals?.incidents || 0),
@@ -476,6 +496,47 @@ function createMonitorRouter({
         }
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte läsa monitor-status.' });
+      }
+    }
+  );
+
+  router.get(
+    '/monitor/metrics',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!runtimeMetricsStore || typeof runtimeMetricsStore.getSnapshot !== 'function') {
+        return res.status(503).json({ error: 'Runtime metrics är inte tillgängliga.' });
+      }
+      try {
+        const areaLimit = Math.max(
+          1,
+          Math.min(50, Number.parseInt(String(req.query?.areaLimit ?? ''), 10) || 12)
+        );
+        const snapshot = runtimeMetricsStore.getSnapshot({ areaLimit });
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'monitor.metrics.read',
+          outcome: 'success',
+          targetType: 'monitor_metrics',
+          targetId: req.auth.tenantId,
+          metadata: {
+            requests: Number(snapshot?.totals?.requests || 0),
+            sampledRequests: Number(snapshot?.totals?.sampledRequests || 0),
+            p95Ms: Number(snapshot?.latency?.p95Ms || 0),
+            areaLimit,
+          },
+        });
+
+        return res.json(snapshot);
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa monitor metrics.' });
       }
     }
   );

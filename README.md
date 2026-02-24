@@ -113,6 +113,8 @@ ARCANA_ALERT_WEBHOOK_TIMEOUT_MS=4000
 ARCANA_SECRET_ROTATION_STORE_PATH=./data/secret-rotation.json
 ARCANA_SECRET_ROTATION_MAX_AGE_DAYS=90
 ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS=30
+ARCANA_METRICS_MAX_SAMPLES=5000
+ARCANA_METRICS_SLOW_REQUEST_MS=1500
 ARCANA_SCHEDULER_STARTUP_DELAY_SEC=8
 ARCANA_SCHEDULER_JITTER_SEC=4
 ARCANA_SCHEDULER_RUN_ON_STARTUP=false
@@ -157,6 +159,7 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `POST /api/v1/users/staff` (OWNER)
 - `PATCH /api/v1/users/staff/:membershipId` (OWNER)
 - `GET /api/v1/monitor/status` (OWNER/STAFF)
+- `GET /api/v1/monitor/metrics` (OWNER/STAFF)
 - `GET /api/v1/monitor/readiness` (OWNER/STAFF, Go/No-Go score + blocker-matris)
 - `GET /api/v1/ops/state/manifest` (OWNER)
 - `GET /api/v1/ops/state/backups` (OWNER)
@@ -283,6 +286,7 @@ Owner action `action` (endast OWNER):
   - avsluta session (`POST /api/v1/auth/sessions/:sessionId/revoke`)
 - Monitor-panel i UI:
   - driftstatus, minne, datastores och tenant-KPI (`GET /api/v1/monitor/status`)
+  - latency/fel-metrics (`GET /api/v1/monitor/metrics`)
   - readiness/Go-No-Go matris (`GET /api/v1/monitor/readiness`)
 - Ops backup-panel i UI (OWNER):
   - state manifest (`GET /api/v1/ops/state/manifest`)
