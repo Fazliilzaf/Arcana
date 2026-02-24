@@ -330,6 +330,8 @@ Publika webbfalt kan styras via tenant-config med PATCH (OWNER):
 - Risk settings API:
   - `GET /api/v1/risk/settings`
   - `PATCH /api/v1/risk/settings` (OWNER)
+  - `GET /api/v1/risk/settings/versions` (OWNER/STAFF, query: `limit`)
+  - `POST /api/v1/risk/settings/rollback` (OWNER, body: `version`, valfri `note`)
 - Risk lab API:
   - `POST /api/v1/risk/preview` (OWNER/STAFF)
 - Risk calibration API:
@@ -338,6 +340,7 @@ Publika webbfalt kan styras via tenant-config med PATCH (OWNER):
 - Policy floor API:
   - `GET /api/v1/policy/floor` (OWNER/STAFF)
 - Tenantens `riskSensitivityModifier` appliceras nu i template-riskutvärdering (generate/update/evaluate).
+- Ändringar av `riskSensitivityModifier` versionshanteras per tenant och kan rollbackas till tidigare version.
 
 ## Risk precision benchmark (Gold Set + confusion matrix)
 - Versionerat gold set finns i:

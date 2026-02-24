@@ -28,6 +28,12 @@ function normalizeRiskModifier(value) {
   return Math.max(-10, Math.min(10, Number(num.toFixed(2))));
 }
 
+function parsePositiveInt(value) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 const TEMPLATE_SIGNATURE_CHANNELS = Object.freeze(['email', 'sms', 'internal']);
 const MAX_VARIABLES_PER_CATEGORY = 120;
 const MAX_SIGNATURE_LENGTH = 2000;
@@ -47,6 +53,8 @@ const BRAND_COLOR_PALETTE_ACCENT = Object.freeze([
 const DEFAULT_BRAND_PRIMARY_COLOR = '#1A73E8';
 const DEFAULT_BRAND_ACCENT_COLOR = '#A855F7';
 const MAX_BRAND_LOGO_URL_LENGTH = 500;
+const MAX_RISK_CHANGE_NOTE_LENGTH = 280;
+const MAX_RISK_THRESHOLD_HISTORY = 200;
 
 function emptyState() {
   return { tenants: {} };
@@ -244,8 +252,138 @@ function buildDefaultTemplateSignaturesByChannel() {
   return cloneSignatures({});
 }
 
+function normalizeRiskChangeSource(value, fallback = 'manual_update') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (!normalized) return fallback;
+  return normalized.slice(0, 80);
+}
+
+function normalizeRiskChangeNote(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return '';
+  if (normalized.length <= MAX_RISK_CHANGE_NOTE_LENGTH) return normalized;
+  return normalized.slice(0, MAX_RISK_CHANGE_NOTE_LENGTH);
+}
+
+function buildRiskThresholdHistoryEntry({
+  version,
+  riskSensitivityModifier = 0,
+  changedAt = nowIso(),
+  changedBy = null,
+  changeSource = 'manual_update',
+  note = '',
+  rollbackFromVersion = null,
+} = {}) {
+  return {
+    version: parsePositiveInt(version) || 1,
+    riskSensitivityModifier: normalizeRiskModifier(riskSensitivityModifier),
+    changedAt: normalizeText(changedAt) || nowIso(),
+    changedBy: normalizeText(changedBy) || null,
+    changeSource: normalizeRiskChangeSource(changeSource, 'manual_update'),
+    note: normalizeRiskChangeNote(note),
+    rollbackFromVersion: parsePositiveInt(rollbackFromVersion),
+  };
+}
+
+function cloneRiskThresholdHistory(value) {
+  return Array.isArray(value) ? value.map((item) => ({ ...item })) : [];
+}
+
+function normalizeRiskThresholdHistory(
+  value,
+  {
+    fallbackModifier = 0,
+    fallbackChangedAt = nowIso(),
+    fallbackChangedBy = null,
+    fallbackSource = 'seed',
+  } = {}
+) {
+  const source = Array.isArray(value) ? value : [];
+  const normalized = [];
+  const seenVersions = new Set();
+
+  for (const item of source) {
+    if (!item || typeof item !== 'object') continue;
+    const version = parsePositiveInt(item.version);
+    if (!version || seenVersions.has(version)) continue;
+    seenVersions.add(version);
+    normalized.push(
+      buildRiskThresholdHistoryEntry({
+        version,
+        riskSensitivityModifier: item.riskSensitivityModifier,
+        changedAt: item.changedAt,
+        changedBy: item.changedBy,
+        changeSource: item.changeSource || item.source || fallbackSource,
+        note: item.note,
+        rollbackFromVersion: item.rollbackFromVersion,
+      })
+    );
+  }
+
+  normalized.sort((a, b) => a.version - b.version);
+
+  if (!normalized.length) {
+    normalized.push(
+      buildRiskThresholdHistoryEntry({
+        version: 1,
+        riskSensitivityModifier: fallbackModifier,
+        changedAt: fallbackChangedAt,
+        changedBy: fallbackChangedBy,
+        changeSource: fallbackSource,
+      })
+    );
+  }
+
+  if (normalized.length > MAX_RISK_THRESHOLD_HISTORY) {
+    return normalized.slice(normalized.length - MAX_RISK_THRESHOLD_HISTORY);
+  }
+  return normalized;
+}
+
+function appendRiskThresholdHistoryEntry(
+  config,
+  {
+    riskSensitivityModifier,
+    actorUserId = null,
+    changeSource = 'manual_update',
+    note = '',
+    rollbackFromVersion = null,
+    changedAt = nowIso(),
+  } = {}
+) {
+  const baseHistory = normalizeRiskThresholdHistory(config?.riskThresholdHistory, {
+    fallbackModifier: normalizeRiskModifier(config?.riskSensitivityModifier),
+    fallbackChangedAt: normalizeText(config?.updatedAt) || changedAt,
+    fallbackChangedBy: config?.updatedBy || null,
+    fallbackSource: 'legacy_seed',
+  });
+  const latestVersion = parsePositiveInt(baseHistory[baseHistory.length - 1]?.version) || 0;
+  const explicitVersion = parsePositiveInt(config?.riskThresholdVersion) || 0;
+  const nextVersion = Math.max(latestVersion, explicitVersion) + 1;
+  const entry = buildRiskThresholdHistoryEntry({
+    version: nextVersion,
+    riskSensitivityModifier,
+    changedAt,
+    changedBy: actorUserId,
+    changeSource,
+    note,
+    rollbackFromVersion,
+  });
+
+  const nextHistory = [...baseHistory, entry];
+  config.riskThresholdHistory =
+    nextHistory.length > MAX_RISK_THRESHOLD_HISTORY
+      ? nextHistory.slice(nextHistory.length - MAX_RISK_THRESHOLD_HISTORY)
+      : nextHistory;
+  config.riskThresholdVersion = entry.version;
+  return entry;
+}
+
 function sanitizeTenantConfig(config) {
   if (!config) return null;
+  const riskThresholdHistory = cloneRiskThresholdHistory(config.riskThresholdHistory);
+  const latestRiskThresholdVersion =
+    parsePositiveInt(riskThresholdHistory[riskThresholdHistory.length - 1]?.version) || 1;
   return {
     tenantId: config.tenantId,
     assistantName: config.assistantName,
@@ -255,6 +393,9 @@ function sanitizeTenantConfig(config) {
     brandPrimaryColor: config.brandPrimaryColor || DEFAULT_BRAND_PRIMARY_COLOR,
     brandAccentColor: config.brandAccentColor || DEFAULT_BRAND_ACCENT_COLOR,
     riskSensitivityModifier: config.riskSensitivityModifier,
+    riskThresholdVersion:
+      parsePositiveInt(config.riskThresholdVersion) || latestRiskThresholdVersion,
+    riskThresholdHistory,
     templateVariableAllowlistByCategory: cloneCategoryMap(
       config.templateVariableAllowlistByCategory
     ),
@@ -274,6 +415,13 @@ function buildDefaultConfig({
   defaultBrand = '',
 }) {
   const ts = nowIso();
+  const initialRiskThreshold = buildRiskThresholdHistoryEntry({
+    version: 1,
+    riskSensitivityModifier: 0,
+    changedAt: ts,
+    changedBy: null,
+    changeSource: 'seed',
+  });
   return {
     tenantId,
     assistantName: 'Arcana',
@@ -283,6 +431,8 @@ function buildDefaultConfig({
     brandPrimaryColor: DEFAULT_BRAND_PRIMARY_COLOR,
     brandAccentColor: DEFAULT_BRAND_ACCENT_COLOR,
     riskSensitivityModifier: 0,
+    riskThresholdVersion: initialRiskThreshold.version,
+    riskThresholdHistory: [initialRiskThreshold],
     templateVariableAllowlistByCategory: buildDefaultTemplateVariableAllowlistByCategory(),
     templateRequiredVariablesByCategory: buildDefaultTemplateRequiredVariablesByCategory(),
     templateSignaturesByChannel: buildDefaultTemplateSignaturesByChannel(),
@@ -357,6 +507,38 @@ function hydrateTenantConfig(rawConfig, { tenantId, defaultBrand }) {
     updatedBy: source.updatedBy || null,
   };
 
+  let riskThresholdHistory = normalizeRiskThresholdHistory(source.riskThresholdHistory, {
+    fallbackModifier: hydrated.riskSensitivityModifier,
+    fallbackChangedAt: hydrated.updatedAt || hydrated.createdAt || nowIso(),
+    fallbackChangedBy: hydrated.updatedBy || null,
+    fallbackSource: 'legacy_seed',
+  });
+  const latestHistory = riskThresholdHistory[riskThresholdHistory.length - 1] || null;
+  if (
+    !latestHistory ||
+    normalizeRiskModifier(latestHistory.riskSensitivityModifier) !== hydrated.riskSensitivityModifier
+  ) {
+    const reconcileVersion = (parsePositiveInt(latestHistory?.version) || 0) + 1;
+    riskThresholdHistory.push(
+      buildRiskThresholdHistoryEntry({
+        version: reconcileVersion,
+        riskSensitivityModifier: hydrated.riskSensitivityModifier,
+        changedAt: hydrated.updatedAt,
+        changedBy: hydrated.updatedBy || null,
+        changeSource: 'legacy_reconcile',
+        note: 'Hydrated from legacy tenant config.',
+      })
+    );
+    if (riskThresholdHistory.length > MAX_RISK_THRESHOLD_HISTORY) {
+      riskThresholdHistory = riskThresholdHistory.slice(
+        riskThresholdHistory.length - MAX_RISK_THRESHOLD_HISTORY
+      );
+    }
+  }
+  hydrated.riskThresholdHistory = riskThresholdHistory;
+  hydrated.riskThresholdVersion =
+    parsePositiveInt(riskThresholdHistory[riskThresholdHistory.length - 1]?.version) || 1;
+
   validateRequiredVariablesAgainstAllowed({
     allowlistByCategory: hydrated.templateVariableAllowlistByCategory,
     requiredByCategory: hydrated.templateRequiredVariablesByCategory,
@@ -425,6 +607,7 @@ async function createTenantConfigStore({
     tenantId,
     patch = {},
     actorUserId = null,
+    riskChangeMeta = {},
   }) {
     const normalizedTenantId = normalizeTenantId(tenantId);
     if (!normalizedTenantId) throw new Error('tenantId saknas.');
@@ -434,6 +617,8 @@ async function createTenantConfigStore({
 
     const rawConfig = state.tenants[normalizedTenantId];
     let changed = false;
+    let riskModifierChanged = false;
+    let nextRiskModifier = normalizeRiskModifier(rawConfig.riskSensitivityModifier);
 
     if (Object.prototype.hasOwnProperty.call(patch, 'assistantName')) {
       const value = normalizeText(patch.assistantName);
@@ -503,6 +688,8 @@ async function createTenantConfigStore({
       const nextValue = normalizeRiskModifier(patch.riskSensitivityModifier);
       if (rawConfig.riskSensitivityModifier !== nextValue) {
         rawConfig.riskSensitivityModifier = nextValue;
+        nextRiskModifier = nextValue;
+        riskModifierChanged = true;
         changed = true;
       }
     }
@@ -566,7 +753,22 @@ async function createTenantConfigStore({
     });
 
     if (changed) {
-      rawConfig.updatedAt = nowIso();
+      const updateTs = nowIso();
+      const riskMeta =
+        riskChangeMeta && typeof riskChangeMeta === 'object' && !Array.isArray(riskChangeMeta)
+          ? riskChangeMeta
+          : {};
+      if (riskModifierChanged) {
+        appendRiskThresholdHistoryEntry(rawConfig, {
+          riskSensitivityModifier: nextRiskModifier,
+          actorUserId,
+          changeSource: normalizeRiskChangeSource(riskMeta.changeSource, 'manual_update'),
+          note: normalizeRiskChangeNote(riskMeta.note),
+          rollbackFromVersion: parsePositiveInt(riskMeta.rollbackFromVersion),
+          changedAt: updateTs,
+        });
+      }
+      rawConfig.updatedAt = updateTs;
       rawConfig.updatedBy = actorUserId || null;
       await save();
     }
@@ -574,11 +776,40 @@ async function createTenantConfigStore({
     return sanitizeTenantConfig(rawConfig);
   }
 
+  async function listRiskThresholdVersions({
+    tenantId,
+    limit = 20,
+  }) {
+    const config = await getTenantConfig(tenantId);
+    const parsedLimit = Number.parseInt(String(limit ?? ''), 10);
+    const boundedLimit = Number.isFinite(parsedLimit)
+      ? Math.max(1, Math.min(MAX_RISK_THRESHOLD_HISTORY, parsedLimit))
+      : 20;
+    const history = cloneRiskThresholdHistory(config?.riskThresholdHistory);
+    history.sort((a, b) => (Number(b?.version || 0) - Number(a?.version || 0)));
+    return history.slice(0, boundedLimit);
+  }
+
+  async function getRiskThresholdVersion({
+    tenantId,
+    version,
+  }) {
+    const targetVersion = parsePositiveInt(version);
+    if (!targetVersion) {
+      throw new Error('version måste vara ett positivt heltal.');
+    }
+    const config = await getTenantConfig(tenantId);
+    const history = Array.isArray(config?.riskThresholdHistory) ? config.riskThresholdHistory : [];
+    return history.find((item) => Number(item?.version || 0) === targetVersion) || null;
+  }
+
   return {
     filePath,
     findTenantConfig,
     getTenantConfig,
     updateTenantConfig,
+    listRiskThresholdVersions,
+    getRiskThresholdVersion,
   };
 }
 

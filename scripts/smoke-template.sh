@@ -390,7 +390,50 @@ echo "✅ templates/meta OK (kategorier: $CATEGORY_COUNT)"
 RISK_SETTINGS_RESPONSE="$(curl -s "$BASE_URL/api/v1/risk/settings" \
   -H "Authorization: Bearer $TOKEN")"
 RISK_MODIFIER="$(printf '%s' "$RISK_SETTINGS_RESPONSE" | json_get settings.riskSensitivityModifier)"
-echo "✅ risk/settings OK (modifier: ${RISK_MODIFIER})"
+RISK_VERSION_BEFORE="$(printf '%s' "$RISK_SETTINGS_RESPONSE" | json_get settings.riskThresholdVersion)"
+if [[ -z "$RISK_VERSION_BEFORE" || "$RISK_VERSION_BEFORE" == "null" ]]; then
+  echo "❌ risk/settings saknar riskThresholdVersion"
+  printf '%s\n' "$RISK_SETTINGS_RESPONSE"
+  exit 1
+fi
+echo "✅ risk/settings OK (modifier: ${RISK_MODIFIER}, version: ${RISK_VERSION_BEFORE})"
+
+RISK_VERSIONS_RESPONSE="$(curl -s "$BASE_URL/api/v1/risk/settings/versions?limit=5" \
+  -H "Authorization: Bearer $TOKEN")"
+RISK_VERSIONS_COUNT="$(printf '%s' "$RISK_VERSIONS_RESPONSE" | json_get count)"
+if [[ "${RISK_VERSIONS_COUNT}" -lt 1 ]]; then
+  echo "❌ risk/settings/versions returnerade inga versioner"
+  printf '%s\n' "$RISK_VERSIONS_RESPONSE"
+  exit 1
+fi
+echo "✅ risk/settings/versions OK (count: ${RISK_VERSIONS_COUNT})"
+
+RISK_TEMP_MODIFIER="$(node -e "const curr=Number(process.argv[1]); let next=Number.isFinite(curr)?curr+0.25:0.25; if(next>10) next=curr-0.25; if(next<-10) next=curr+0.25; if(Math.abs(next-curr)<0.001) next=curr>=0?curr-0.5:curr+0.5; if(next>10) next=10; if(next<-10) next=-10; process.stdout.write(String(Number(next.toFixed(2))));" "$RISK_MODIFIER")"
+RISK_PATCH_RESPONSE="$(curl -s -X PATCH "$BASE_URL/api/v1/risk/settings" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"riskSensitivityModifier\":${RISK_TEMP_MODIFIER},\"note\":\"Smoke temporary modifier change\"}")"
+RISK_PATCH_MODIFIER="$(printf '%s' "$RISK_PATCH_RESPONSE" | json_get settings.riskSensitivityModifier)"
+RISK_PATCH_VERSION="$(printf '%s' "$RISK_PATCH_RESPONSE" | json_get settings.riskThresholdVersion)"
+if ! node -e "const a=Number(process.argv[1]); const b=Number(process.argv[2]); process.exit(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=0.001?0:1);" "$RISK_PATCH_MODIFIER" "$RISK_TEMP_MODIFIER"; then
+  echo "❌ risk/settings patch modifier mismatch (expected: ${RISK_TEMP_MODIFIER}, got: ${RISK_PATCH_MODIFIER})"
+  printf '%s\n' "$RISK_PATCH_RESPONSE"
+  exit 1
+fi
+echo "✅ risk/settings patch OK (modifier: ${RISK_PATCH_MODIFIER}, version: ${RISK_PATCH_VERSION})"
+
+RISK_ROLLBACK_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/risk/settings/rollback" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"version\":${RISK_VERSION_BEFORE},\"note\":\"Smoke rollback to baseline\"}")"
+RISK_ROLLBACK_MODIFIER="$(printf '%s' "$RISK_ROLLBACK_RESPONSE" | json_get settings.riskSensitivityModifier)"
+RISK_ROLLBACK_VERSION="$(printf '%s' "$RISK_ROLLBACK_RESPONSE" | json_get settings.riskThresholdVersion)"
+if ! node -e "const a=Number(process.argv[1]); const b=Number(process.argv[2]); process.exit(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=0.001?0:1);" "$RISK_ROLLBACK_MODIFIER" "$RISK_MODIFIER"; then
+  echo "❌ risk/settings rollback gav fel modifier (expected: ${RISK_MODIFIER}, got: ${RISK_ROLLBACK_MODIFIER})"
+  printf '%s\n' "$RISK_ROLLBACK_RESPONSE"
+  exit 1
+fi
+echo "✅ risk/settings rollback OK (modifier: ${RISK_ROLLBACK_MODIFIER}, version: ${RISK_ROLLBACK_VERSION})"
 
 RISK_PRECISION_RESPONSE="$(curl -s "$BASE_URL/api/v1/risk/precision/report" \
   -H "Authorization: Bearer $TOKEN")"
