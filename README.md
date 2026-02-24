@@ -176,6 +176,8 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `GET /api/v1/ops/state/backups` (OWNER)
 - `POST /api/v1/ops/state/backup` (OWNER)
 - `POST /api/v1/ops/state/backups/prune` (OWNER, dry-run eller apply)
+- `GET /api/v1/ops/reports` (OWNER, scheduler-genererade pilotrapporter)
+- `POST /api/v1/ops/reports/prune` (OWNER, dry-run eller apply)
 - `POST /api/v1/ops/state/restore` (OWNER, dry-run + restore med confirmText)
 - `GET /api/v1/ops/scheduler/status` (OWNER)
 - `POST /api/v1/ops/scheduler/run` (OWNER, body: `{ "jobId": "alert_probe" }`)
@@ -308,6 +310,8 @@ Owner action `action` (endast OWNER):
   - skapa backup (`POST /api/v1/ops/state/backup`)
   - lista backups (`GET /api/v1/ops/state/backups`)
   - prune backups (`POST /api/v1/ops/state/backups/prune`)
+  - lista scheduler-rapporter (`GET /api/v1/ops/reports`)
+  - prune scheduler-rapporter (`POST /api/v1/ops/reports/prune`)
   - restore preview + restore (`POST /api/v1/ops/state/restore`)
  - Mail insights-panel i UI:
    - läser anonymiserad mail-kunskap per tenant
@@ -445,6 +449,8 @@ Tips vid route-fel (`Cannot GET ...`): stoppa alla gamla processer på port 3000
   - Lägg till `--yes` för icke-interaktiv restore.
 - API prune preview/run (OWNER):
   - `POST /api/v1/ops/state/backups/prune` med body `{ "dryRun": true }` eller `{ "dryRun": false }`
+- API report prune preview/run (OWNER):
+  - `POST /api/v1/ops/reports/prune` med body `{ "dryRun": true }` eller `{ "dryRun": false }`
 - API restore preview (OWNER):
   - `POST /api/v1/ops/state/restore` med body `{ "fileName": "arcana-state-YYYYMMDD-HHMMSS.json", "dryRun": true }`
 - API restore run (OWNER):
