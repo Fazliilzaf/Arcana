@@ -184,7 +184,14 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
   OPS_SCHED_RUN_ERROR="$(printf '%s' "$OPS_SCHED_RUN_RESPONSE" | json_get error 2>/dev/null || true)"
   if [[ "$OPS_SCHED_RUN_OK" == "true" ]]; then
     OPS_SCHED_RUN_JOB="$(printf '%s' "$OPS_SCHED_RUN_RESPONSE" | json_get jobId)"
-    echo "✅ ops/scheduler/run OK (job: ${OPS_SCHED_RUN_JOB})"
+    OPS_SCHED_AUTO_ASSIGNED="$(printf '%s' "$OPS_SCHED_RUN_RESPONSE" | json_get result.autoAssignedOwnerCount 2>/dev/null || true)"
+    OPS_SCHED_AUTO_ESCALATED="$(printf '%s' "$OPS_SCHED_RUN_RESPONSE" | json_get result.autoEscalatedCount 2>/dev/null || true)"
+    if [[ -z "$OPS_SCHED_AUTO_ASSIGNED" || -z "$OPS_SCHED_AUTO_ESCALATED" ]]; then
+      echo "❌ ops/scheduler/run saknar expected auto-assignment/escalation-fält"
+      printf '%s\n' "$OPS_SCHED_RUN_RESPONSE"
+      exit 1
+    fi
+    echo "✅ ops/scheduler/run OK (job: ${OPS_SCHED_RUN_JOB}, auto-assigned: ${OPS_SCHED_AUTO_ASSIGNED}, auto-escalated: ${OPS_SCHED_AUTO_ESCALATED})"
   elif [[ "$OPS_SCHED_RUN_ERROR" == "disabled_job" || "$OPS_SCHED_RUN_ERROR" == "job_running" ]]; then
     echo "ℹ️ ops/scheduler/run SKIP (${OPS_SCHED_RUN_ERROR})"
   else
