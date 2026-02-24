@@ -18,6 +18,12 @@ function normalizeRiskModifier(value) {
   return Math.max(-10, Math.min(10, Number(num.toFixed(2))));
 }
 
+function parsePositiveInt(value) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 const RISK_GOLD_SET_DEFAULT_PATH = path.join(process.cwd(), 'docs', 'risk', 'gold-set-v1.json');
 
 async function readTenantConfigSafe(tenantConfigStore, tenantId) {
@@ -25,6 +31,10 @@ async function readTenantConfigSafe(tenantConfigStore, tenantId) {
   return {
     tenantId,
     riskSensitivityModifier: normalizeRiskModifier(config?.riskSensitivityModifier ?? 0),
+    riskThresholdVersion: parsePositiveInt(config?.riskThresholdVersion) || 1,
+    riskThresholdHistoryCount: Array.isArray(config?.riskThresholdHistory)
+      ? config.riskThresholdHistory.length
+      : 0,
     templateVariableAllowlistByCategory:
       config?.templateVariableAllowlistByCategory || {},
     templateRequiredVariablesByCategory:
@@ -84,15 +94,22 @@ function createRiskRouter({
     try {
       const currentSettings = await readTenantConfigSafe(tenantConfigStore, req.auth.tenantId);
       const beforeModifier = normalizeRiskModifier(currentSettings?.riskSensitivityModifier);
+      const beforeVersion = parsePositiveInt(currentSettings?.riskThresholdVersion) || 1;
       const nextModifier = normalizeRiskModifier(req.body?.riskSensitivityModifier);
+      const note = normalizeText(req.body?.note || '');
       const updated = await tenantConfigStore.updateTenantConfig({
         tenantId: req.auth.tenantId,
         patch: {
           riskSensitivityModifier: nextModifier,
         },
         actorUserId: req.auth.userId,
+        riskChangeMeta: {
+          changeSource: 'manual_update',
+          note,
+        },
       });
       const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
+      const afterVersion = parsePositiveInt(updated?.riskThresholdVersion) || beforeVersion;
 
       await authStore.addAuditEvent({
         tenantId: req.auth.tenantId,
@@ -105,9 +122,11 @@ function createRiskRouter({
           riskSensitivityModifier: nextModifier,
           before: {
             riskSensitivityModifier: beforeModifier,
+            riskThresholdVersion: beforeVersion,
           },
           after: {
             riskSensitivityModifier: afterModifier,
+            riskThresholdVersion: afterVersion,
           },
           diff: [
             {
@@ -116,6 +135,7 @@ function createRiskRouter({
               after: afterModifier,
             },
           ],
+          note,
         },
       });
 
@@ -123,6 +143,10 @@ function createRiskRouter({
         settings: {
           tenantId: req.auth.tenantId,
           riskSensitivityModifier: afterModifier,
+          riskThresholdVersion: afterVersion,
+          riskThresholdHistoryCount: Array.isArray(updated?.riskThresholdHistory)
+            ? updated.riskThresholdHistory.length
+            : 0,
           allowedRange: {
             min: -10,
             max: 10,
@@ -137,6 +161,144 @@ function createRiskRouter({
       return res.status(500).json({ error: 'Kunde inte uppdatera riskinställningar.' });
     }
   });
+
+  router.get(
+    '/risk/settings/versions',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        const requestedLimit = Number.parseInt(String(req.query?.limit ?? ''), 10);
+        const limit = Number.isFinite(requestedLimit) ? requestedLimit : 20;
+        const [settings, versions] = await Promise.all([
+          readTenantConfigSafe(tenantConfigStore, req.auth.tenantId),
+          tenantConfigStore.listRiskThresholdVersions({
+            tenantId: req.auth.tenantId,
+            limit,
+          }),
+        ]);
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'risk.settings.versions.read',
+          outcome: 'success',
+          targetType: 'risk_settings_versions',
+          targetId: req.auth.tenantId,
+          metadata: {
+            currentVersion: settings.riskThresholdVersion,
+            count: versions.length,
+            requestedLimit: limit,
+          },
+        });
+
+        return res.json({
+          tenantId: req.auth.tenantId,
+          currentVersion: settings.riskThresholdVersion,
+          historyCount: settings.riskThresholdHistoryCount,
+          count: versions.length,
+          versions,
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa riskversionshistorik.' });
+      }
+    }
+  );
+
+  router.post(
+    '/risk/settings/rollback',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      try {
+        const targetVersion = parsePositiveInt(req.body?.version);
+        if (!targetVersion) {
+          return res.status(400).json({ error: 'version måste vara ett positivt heltal.' });
+        }
+        const note = normalizeText(req.body?.note || '');
+
+        const currentSettings = await readTenantConfigSafe(tenantConfigStore, req.auth.tenantId);
+        const beforeModifier = normalizeRiskModifier(currentSettings?.riskSensitivityModifier);
+        const beforeVersion = parsePositiveInt(currentSettings?.riskThresholdVersion) || 1;
+
+        const target = await tenantConfigStore.getRiskThresholdVersion({
+          tenantId: req.auth.tenantId,
+          version: targetVersion,
+        });
+        if (!target) {
+          return res.status(404).json({ error: 'Versionen hittades inte.' });
+        }
+
+        const targetModifier = normalizeRiskModifier(target?.riskSensitivityModifier);
+        const updated = await tenantConfigStore.updateTenantConfig({
+          tenantId: req.auth.tenantId,
+          patch: {
+            riskSensitivityModifier: targetModifier,
+          },
+          actorUserId: req.auth.userId,
+          riskChangeMeta: {
+            changeSource: 'rollback',
+            note,
+            rollbackFromVersion: targetVersion,
+          },
+        });
+        const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
+        const afterVersion = parsePositiveInt(updated?.riskThresholdVersion) || beforeVersion;
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'risk.settings.rollback',
+          outcome: 'success',
+          targetType: 'risk_settings',
+          targetId: req.auth.tenantId,
+          metadata: {
+            requestedVersion: targetVersion,
+            requestedModifier: targetModifier,
+            note,
+            before: {
+              riskSensitivityModifier: beforeModifier,
+              riskThresholdVersion: beforeVersion,
+            },
+            after: {
+              riskSensitivityModifier: afterModifier,
+              riskThresholdVersion: afterVersion,
+            },
+          },
+        });
+
+        return res.json({
+          settings: {
+            tenantId: req.auth.tenantId,
+            riskSensitivityModifier: afterModifier,
+            riskThresholdVersion: afterVersion,
+            riskThresholdHistoryCount: Array.isArray(updated?.riskThresholdHistory)
+              ? updated.riskThresholdHistory.length
+              : 0,
+            allowedRange: {
+              min: -10,
+              max: 10,
+            },
+          },
+          rollback: {
+            requestedVersion: targetVersion,
+            requestedModifier: targetModifier,
+            appliedVersion: afterVersion,
+          },
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte rollbacka riskinställning.' });
+      }
+    }
+  );
 
   router.post('/risk/preview', requireAuth, requireRole(ROLE_OWNER, ROLE_STAFF), async (req, res) => {
     try {
@@ -339,6 +501,7 @@ function createRiskRouter({
       try {
         const currentSettings = await readTenantConfigSafe(tenantConfigStore, req.auth.tenantId);
         const beforeModifier = normalizeRiskModifier(currentSettings?.riskSensitivityModifier);
+        const beforeVersion = parsePositiveInt(currentSettings?.riskThresholdVersion) || 1;
         const nextModifier = normalizeRiskModifier(req.body?.suggestedModifier);
         const note = normalizeText(req.body?.note || '');
 
@@ -348,8 +511,13 @@ function createRiskRouter({
             riskSensitivityModifier: nextModifier,
           },
           actorUserId: req.auth.userId,
+          riskChangeMeta: {
+            changeSource: 'calibration_apply',
+            note,
+          },
         });
         const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
+        const afterVersion = parsePositiveInt(updated?.riskThresholdVersion) || beforeVersion;
 
         await authStore.addAuditEvent({
           tenantId: req.auth.tenantId,
@@ -363,9 +531,11 @@ function createRiskRouter({
             note,
             before: {
               riskSensitivityModifier: beforeModifier,
+              riskThresholdVersion: beforeVersion,
             },
             after: {
               riskSensitivityModifier: afterModifier,
+              riskThresholdVersion: afterVersion,
             },
             diff: [
               {
@@ -381,6 +551,10 @@ function createRiskRouter({
           settings: {
             tenantId: req.auth.tenantId,
             riskSensitivityModifier: afterModifier,
+            riskThresholdVersion: afterVersion,
+            riskThresholdHistoryCount: Array.isArray(updated?.riskThresholdHistory)
+              ? updated.riskThresholdHistory.length
+              : 0,
           },
         });
       } catch (error) {
