@@ -181,6 +181,13 @@ READY_RESPONSE="$(curl -s "$BASE_URL/readyz")"
 READY_OK="$(printf '%s' "$READY_RESPONSE" | json_get ok)"
 echo "✅ readyz OK (ok: ${READY_OK})"
 
+CORRELATION_HEADER="$(curl -s -D - -o /dev/null "$BASE_URL/healthz" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-correlation-id"{print $2}' | tail -n 1)"
+if [[ -z "$CORRELATION_HEADER" ]]; then
+  echo "❌ x-correlation-id saknas i svarshuvud"
+  exit 1
+fi
+echo "✅ correlation-id header OK (${CORRELATION_HEADER})"
+
 LOGIN_RESPONSE_RAW="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"tenantId\":\"$TENANT_ID\"}")"
@@ -696,5 +703,16 @@ if [[ "$AUDIT_CHAIN_OK" != "true" ]]; then
   exit 1
 fi
 echo "✅ audit/integrity OK (issues: ${AUDIT_CHAIN_ISSUES})"
+
+AUDIT_EVENTS_RESPONSE="$(curl -s "$BASE_URL/api/v1/audit/events?limit=5" \
+  -H "Authorization: Bearer $TOKEN")"
+AUDIT_CORRELATION_ID="$(printf '%s' "$AUDIT_EVENTS_RESPONSE" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const id=d?.events?.[0]?.metadata?.correlationId||''; process.stdout.write(String(id));" 2>/dev/null || true)"
+if [[ -z "$AUDIT_CORRELATION_ID" ]]; then
+  echo "❌ audit/events saknar metadata.correlationId i senaste event"
+  printf '%s\n' "$AUDIT_EVENTS_RESPONSE"
+  exit 1
+fi
+echo "✅ audit/events correlation-id OK (${AUDIT_CORRELATION_ID})"
+
 echo
 echo "🎯 Smoke test klart."

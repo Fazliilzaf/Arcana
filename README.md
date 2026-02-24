@@ -140,6 +140,11 @@ Om prod-inloggning fastnar på gammalt lösenord:
 3) Verifiera login med `ARCANA_OWNER_EMAIL` / `ARCANA_OWNER_PASSWORD`
 4) Sätt tillbaka `ARCANA_BOOTSTRAP_RESET_OWNER_PASSWORD=false` och deploy igen
 
+### Correlation ID
+- Alla requests får/returnerar header `x-correlation-id`.
+- Om klienten skickar `x-correlation-id` återanvänds den, annars genereras en ny.
+- Audit-events inkluderar automatiskt `metadata.correlationId` för spårbarhet.
+
 ### 3) Viktiga endpoints (Foundation)
 - `GET /healthz` (liveness)
 - `GET /readyz` (readiness)
