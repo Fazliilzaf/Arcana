@@ -11,6 +11,10 @@ const {
   inspectBackupRestore,
   restoreFromBackup,
 } = require('../ops/stateBackup');
+const {
+  listSchedulerPilotReports,
+  pruneSchedulerPilotReports,
+} = require('../ops/pilotReports');
 
 function parseLimit(value, fallback = 20) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -262,6 +266,87 @@ function createOpsRouter({
       } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte läsa secret-rotation historik.' });
+      }
+    }
+  );
+
+  router.get(
+    '/ops/reports',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      try {
+        const limit = parseLimit(req.query?.limit, 20);
+        const reports = await listSchedulerPilotReports({
+          reportsDir: config.reportsDir,
+          limit,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.reports.read',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: 'scheduler_reports',
+          metadata: {
+            count: reports.length,
+            limit,
+          },
+        });
+
+        return res.json({
+          reportsDir: config.reportsDir,
+          retention: {
+            maxFiles: config.reportRetentionMaxFiles,
+            maxAgeDays: config.reportRetentionMaxAgeDays,
+          },
+          count: reports.length,
+          reports,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa scheduler-rapporter.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/reports/prune',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      try {
+        const dryRun = parseBoolean(req.body?.dryRun, true);
+        const result = await pruneSchedulerPilotReports({
+          reportsDir: config.reportsDir,
+          maxFiles: config.reportRetentionMaxFiles,
+          maxAgeDays: config.reportRetentionMaxAgeDays,
+          dryRun,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: dryRun ? 'ops.reports.prune.preview' : 'ops.reports.prune.run',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: 'scheduler_reports',
+          metadata: {
+            deletedCount: result.deletedCount,
+            scannedCount: result.scannedCount,
+            maxFiles: result.settings.maxFiles,
+            maxAgeDays: result.settings.maxAgeDays,
+          },
+        });
+
+        return res.json({
+          ok: true,
+          ...result,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte pruna scheduler-rapporter.' });
       }
     }
   );

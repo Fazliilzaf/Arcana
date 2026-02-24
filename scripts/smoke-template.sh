@@ -509,6 +509,34 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
     exit 1
   fi
 
+  OPS_REPORTS_LIST_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/reports?limit=20" \
+    -H "Authorization: Bearer $TOKEN")"
+  OPS_REPORTS_LIST_COUNT="$(printf '%s' "$OPS_REPORTS_LIST_RESPONSE" | json_get count 2>/dev/null || true)"
+  OPS_REPORTS_FIRST_FILE="$(printf '%s' "$OPS_REPORTS_LIST_RESPONSE" | json_get reports.0.fileName 2>/dev/null || true)"
+  if [[ -z "$OPS_REPORTS_LIST_COUNT" || -z "$OPS_REPORTS_FIRST_FILE" ]]; then
+    echo "❌ ops/reports saknar expected count/fileName-fält"
+    printf '%s\n' "$OPS_REPORTS_LIST_RESPONSE"
+    exit 1
+  fi
+  if [[ "$OPS_REPORTS_FIRST_FILE" != Pilot_Scheduler_* ]]; then
+    echo "❌ ops/reports returnerade oväntat filnamn: $OPS_REPORTS_FIRST_FILE"
+    printf '%s\n' "$OPS_REPORTS_LIST_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/reports OK (count: ${OPS_REPORTS_LIST_COUNT}, latest: ${OPS_REPORTS_FIRST_FILE})"
+
+  OPS_REPORTS_PRUNE_PREVIEW_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/reports/prune" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"dryRun":true}')"
+  OPS_REPORTS_PRUNE_PREVIEW_COUNT="$(printf '%s' "$OPS_REPORTS_PRUNE_PREVIEW_RESPONSE" | json_get deletedCount 2>/dev/null || true)"
+  if [[ -z "$OPS_REPORTS_PRUNE_PREVIEW_COUNT" ]]; then
+    echo "❌ ops/reports/prune preview saknar deletedCount"
+    printf '%s\n' "$OPS_REPORTS_PRUNE_PREVIEW_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/reports/prune preview OK (deleted: ${OPS_REPORTS_PRUNE_PREVIEW_COUNT})"
+
   OPS_SCHED_RESTORE_RUN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \

@@ -457,6 +457,9 @@
     listStateBackupsBtn: document.getElementById('listStateBackupsBtn'),
     previewPruneBackupsBtn: document.getElementById('previewPruneBackupsBtn'),
     runPruneBackupsBtn: document.getElementById('runPruneBackupsBtn'),
+    listSchedulerReportsBtn: document.getElementById('listSchedulerReportsBtn'),
+    previewPruneReportsBtn: document.getElementById('previewPruneReportsBtn'),
+    runPruneReportsBtn: document.getElementById('runPruneReportsBtn'),
     restoreBackupFileInput: document.getElementById('restoreBackupFileInput'),
     previewStateRestoreBtn: document.getElementById('previewStateRestoreBtn'),
     runStateRestoreBtn: document.getElementById('runStateRestoreBtn'),
@@ -2158,6 +2161,9 @@
     if (els.listStateBackupsBtn) els.listStateBackupsBtn.disabled = !owner;
     if (els.previewPruneBackupsBtn) els.previewPruneBackupsBtn.disabled = !owner;
     if (els.runPruneBackupsBtn) els.runPruneBackupsBtn.disabled = !owner;
+    if (els.listSchedulerReportsBtn) els.listSchedulerReportsBtn.disabled = !owner;
+    if (els.previewPruneReportsBtn) els.previewPruneReportsBtn.disabled = !owner;
+    if (els.runPruneReportsBtn) els.runPruneReportsBtn.disabled = !owner;
     if (els.previewStateRestoreBtn) els.previewStateRestoreBtn.disabled = !owner;
     if (els.runStateRestoreBtn) els.runStateRestoreBtn.disabled = !owner;
     if (els.restoreBackupFileInput) els.restoreBackupFileInput.disabled = !owner;
@@ -6355,6 +6361,80 @@
     }
   }
 
+  async function listSchedulerReports() {
+    if (!isOwner()) {
+      if (els.opsResult) els.opsResult.textContent = 'Endast OWNER.';
+      return;
+    }
+    try {
+      setStatus(els.opsStatus, 'Laddar scheduler-rapporter...');
+      const response = await api('/ops/reports?limit=20');
+      if (els.opsResult) {
+        els.opsResult.textContent = JSON.stringify(response, null, 2);
+      }
+      setStatus(els.opsStatus, `Scheduler-rapporter: ${response?.count ?? 0}`);
+    } catch (error) {
+      setStatus(els.opsStatus, error.message || 'Kunde inte läsa scheduler-rapporter.', true);
+    }
+  }
+
+  async function previewPruneSchedulerReports() {
+    if (!isOwner()) {
+      if (els.opsResult) els.opsResult.textContent = 'Endast OWNER.';
+      return;
+    }
+    try {
+      setStatus(els.opsStatus, 'Kör förhandsvisning av report-prune...');
+      const response = await api('/ops/reports/prune', {
+        method: 'POST',
+        body: { dryRun: true },
+      });
+      if (els.opsResult) {
+        els.opsResult.textContent = JSON.stringify(response, null, 2);
+      }
+      setStatus(
+        els.opsStatus,
+        `Report-prune preview klar: ${response?.deletedCount ?? 0} filer skulle tas bort.`
+      );
+    } catch (error) {
+      setStatus(els.opsStatus, error.message || 'Kunde inte köra report-prune preview.', true);
+    }
+  }
+
+  async function runPruneSchedulerReports() {
+    if (!isOwner()) {
+      if (els.opsResult) els.opsResult.textContent = 'Endast OWNER.';
+      return;
+    }
+    try {
+      const confirmResult = await openAppModal({
+        title: 'Prune scheduler reports',
+        message: 'Kör prune på scheduler-genererade pilotrapporter enligt retention-reglerna?',
+        confirmLabel: 'Kör prune',
+        cancelLabel: 'Avbryt',
+        confirmTone: 'danger',
+      });
+      if (!confirmResult.confirmed) {
+        setStatus(els.opsStatus, 'Report-prune avbruten.');
+        return;
+      }
+      setStatus(els.opsStatus, 'Kör report-prune...');
+      const response = await api('/ops/reports/prune', {
+        method: 'POST',
+        body: { dryRun: false },
+      });
+      if (els.opsResult) {
+        els.opsResult.textContent = JSON.stringify(response, null, 2);
+      }
+      setStatus(
+        els.opsStatus,
+        `Report-prune klar: ${response?.deletedCount ?? 0} filer borttagna.`
+      );
+    } catch (error) {
+      setStatus(els.opsStatus, error.message || 'Kunde inte köra report-prune.', true);
+    }
+  }
+
   async function previewStateRestore() {
     if (!isOwner()) {
       if (els.opsResult) els.opsResult.textContent = 'Endast OWNER.';
@@ -7402,6 +7482,9 @@
   els.listStateBackupsBtn?.addEventListener('click', listStateBackups);
   els.previewPruneBackupsBtn?.addEventListener('click', previewPruneBackups);
   els.runPruneBackupsBtn?.addEventListener('click', runPruneBackups);
+  els.listSchedulerReportsBtn?.addEventListener('click', listSchedulerReports);
+  els.previewPruneReportsBtn?.addEventListener('click', previewPruneSchedulerReports);
+  els.runPruneReportsBtn?.addEventListener('click', runPruneSchedulerReports);
   els.previewStateRestoreBtn?.addEventListener('click', previewStateRestore);
   els.runStateRestoreBtn?.addEventListener('click', runStateRestore);
   els.quickCreateTemplateBtn?.addEventListener('click', () => {
