@@ -309,6 +309,17 @@ if [[ -z "$MONITOR_RISK_LIMIT_MAX" || "$MONITOR_RISK_LIMIT_MAX" == "null" || -z 
 fi
 echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO})"
 
+MONITOR_METRICS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/metrics?areaLimit=6" \
+  -H "Authorization: Bearer $TOKEN")"
+MONITOR_METRICS_P95="$(printf '%s' "$MONITOR_METRICS_RESPONSE" | json_get latency.p95Ms 2>/dev/null || true)"
+MONITOR_METRICS_SAMPLED="$(printf '%s' "$MONITOR_METRICS_RESPONSE" | json_get totals.sampledRequests 2>/dev/null || true)"
+if [[ -z "$MONITOR_METRICS_P95" || "$MONITOR_METRICS_P95" == "null" || -z "$MONITOR_METRICS_SAMPLED" || "$MONITOR_METRICS_SAMPLED" == "null" ]]; then
+  echo "❌ monitor/metrics saknar latency/sampledRequests"
+  printf '%s\n' "$MONITOR_METRICS_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/metrics OK (p95Ms: ${MONITOR_METRICS_P95}, sampled: ${MONITOR_METRICS_SAMPLED})"
+
 READINESS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/readiness" \
   -H "Authorization: Bearer $TOKEN")"
 READINESS_SCORE="$(printf '%s' "$READINESS_RESPONSE" | json_get score 2>/dev/null || true)"

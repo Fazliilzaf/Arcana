@@ -41,12 +41,17 @@ const { createPublicClinicRouter } = require('./src/routes/publicClinic');
 const { createScheduler } = require('./src/ops/scheduler');
 const { createAlertNotifier } = require('./src/ops/alertNotifier');
 const { createSecretRotationStore } = require('./src/ops/secretRotationStore');
+const { createRuntimeMetricsStore } = require('./src/ops/runtimeMetrics');
 
 const runtimeState = {
   startedAt: new Date().toISOString(),
   ready: false,
   lastError: null,
 };
+const runtimeMetricsStore = createRuntimeMetricsStore({
+  maxSamples: config.metricsMaxSamples,
+  slowRequestMs: config.metricsSlowRequestMs,
+});
 
 app.get("/", (req, res) => {
   res.sendFile("index.html", { root: __dirname + "/public" });
@@ -78,6 +83,8 @@ app.get('/readyz', (req, res) => {
     ready: true,
   });
 });
+
+app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
 
 (async () => {
   const authStore = await createAuthStore({
@@ -433,6 +440,7 @@ app.get('/readyz', (req, res) => {
       tenantConfigStore,
       authStore,
       secretRotationStore,
+      runtimeMetricsStore,
       config,
       scheduler,
       requireAuth: auth.requireAuth,
