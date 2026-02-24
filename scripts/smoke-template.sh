@@ -32,6 +32,141 @@ if (typeof ref === 'object') {
 " "$path"
 }
 
+read_mfa_secret_from_store() {
+  local email="$1"
+  local auth_store_path="${AUTH_STORE_PATH:-./data/auth.json}"
+  node -e "
+const fs = require('fs');
+const path = process.argv[1];
+const email = String(process.argv[2] || '').trim().toLowerCase();
+if (!email) process.exit(0);
+let raw = null;
+try {
+  raw = JSON.parse(fs.readFileSync(path, 'utf8'));
+} catch {
+  process.exit(0);
+}
+const users = raw && raw.users && typeof raw.users === 'object' ? Object.values(raw.users) : [];
+const user = users.find((item) => String(item?.email || '').trim().toLowerCase() === email) || null;
+const secret = String(user?.mfaSecret || '').trim();
+if (secret) process.stdout.write(secret);
+" "$auth_store_path" "$email"
+}
+
+generate_totp_code() {
+  local secret="$1"
+  node -e "
+const crypto = require('crypto');
+const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const secret = String(process.argv[1] || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+if (!secret) process.exit(1);
+let bits = 0;
+let value = 0;
+const bytes = [];
+for (const ch of secret) {
+  const idx = alphabet.indexOf(ch);
+  if (idx < 0) continue;
+  value = (value << 5) | idx;
+  bits += 5;
+  if (bits >= 8) {
+    bytes.push((value >>> (bits - 8)) & 255);
+    bits -= 8;
+  }
+}
+const key = Buffer.from(bytes);
+const counter = Math.floor(Date.now() / 1000 / 30);
+const counterBuffer = Buffer.alloc(8);
+counterBuffer.writeBigUInt64BE(BigInt(counter));
+const hmac = crypto.createHmac('sha1', key).update(counterBuffer).digest();
+const offset = hmac[hmac.length - 1] & 0x0f;
+const binary =
+  ((hmac[offset] & 0x7f) << 24) |
+  ((hmac[offset + 1] & 0xff) << 16) |
+  ((hmac[offset + 2] & 0xff) << 8) |
+  (hmac[offset + 3] & 0xff);
+const otp = String(binary % 1000000).padStart(6, '0');
+process.stdout.write(otp);
+" "$secret"
+}
+
+complete_login_with_optional_mfa() {
+  local login_response="$1"
+  local requested_tenant_id="$2"
+  local email="$3"
+
+  local token=""
+  token="$(printf '%s' "$login_response" | json_get token 2>/dev/null || true)"
+  if [[ -n "$token" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local requires_mfa=""
+  requires_mfa="$(printf '%s' "$login_response" | json_get requiresMfa 2>/dev/null || true)"
+  if [[ "$requires_mfa" != "true" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_ticket=""
+  mfa_ticket="$(printf '%s' "$login_response" | json_get mfaTicket 2>/dev/null || true)"
+  if [[ -z "$mfa_ticket" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_secret=""
+  mfa_secret="$(printf '%s' "$login_response" | json_get mfa.secret 2>/dev/null || true)"
+  if [[ -z "$mfa_secret" ]]; then
+    mfa_secret="$(read_mfa_secret_from_store "$email" 2>/dev/null || true)"
+  fi
+  if [[ -z "$mfa_secret" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_code=""
+  mfa_code="$(generate_totp_code "$mfa_secret" 2>/dev/null || true)"
+  if [[ -z "$mfa_code" ]]; then
+    printf '%s' "$login_response"
+    return 0
+  fi
+
+  local mfa_verify_response=""
+  mfa_verify_response="$(curl -s -X POST "$BASE_URL/api/v1/auth/mfa/verify" \
+    -H "Content-Type: application/json" \
+    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$mfa_code\",\"tenantId\":\"$requested_tenant_id\"}")"
+
+  local mfa_token=""
+  mfa_token="$(printf '%s' "$mfa_verify_response" | json_get token 2>/dev/null || true)"
+  if [[ -n "$mfa_token" ]]; then
+    printf '%s' "$mfa_verify_response"
+    return 0
+  fi
+
+  local requires_tenant_selection=""
+  requires_tenant_selection="$(printf '%s' "$mfa_verify_response" | json_get requiresTenantSelection 2>/dev/null || true)"
+  if [[ "$requires_tenant_selection" == "true" ]]; then
+    local login_ticket=""
+    login_ticket="$(printf '%s' "$mfa_verify_response" | json_get loginTicket 2>/dev/null || true)"
+    local selected_tenant_id="$requested_tenant_id"
+    if [[ -z "$selected_tenant_id" ]]; then
+      selected_tenant_id="$(printf '%s' "$mfa_verify_response" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const t=(Array.isArray(d?.tenants)?d.tenants:[])[0]; process.stdout.write(String(t?.tenantId||''));" 2>/dev/null || true)"
+    fi
+    if [[ -n "$login_ticket" && -n "$selected_tenant_id" ]]; then
+      local tenant_select_response=""
+      tenant_select_response="$(curl -s -X POST "$BASE_URL/api/v1/auth/select-tenant" \
+        -H "Content-Type: application/json" \
+        -d "{\"loginTicket\":\"$login_ticket\",\"tenantId\":\"$selected_tenant_id\"}")"
+      printf '%s' "$tenant_select_response"
+      return 0
+    fi
+  fi
+
+  printf '%s' "$mfa_verify_response"
+  return 0
+}
+
 echo "== Arcana Template Smoke Test =="
 echo "BASE_URL:  $BASE_URL"
 echo "EMAIL:     $EMAIL"
@@ -46,9 +181,10 @@ READY_RESPONSE="$(curl -s "$BASE_URL/readyz")"
 READY_OK="$(printf '%s' "$READY_RESPONSE" | json_get ok)"
 echo "✅ readyz OK (ok: ${READY_OK})"
 
-LOGIN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
+LOGIN_RESPONSE_RAW="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"tenantId\":\"$TENANT_ID\"}")"
+LOGIN_RESPONSE="$(complete_login_with_optional_mfa "$LOGIN_RESPONSE_RAW" "$TENANT_ID" "$EMAIL")"
 
 TOKEN="$(printf '%s' "$LOGIN_RESPONSE" | json_get token)"
 if [[ -z "$TOKEN" ]]; then
@@ -77,10 +213,14 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
   SESSIONS_TENANT_COUNT="$(printf '%s' "$SESSIONS_TENANT_RESPONSE" | json_get count)"
   echo "✅ auth/sessions tenant OK (count: ${SESSIONS_TENANT_COUNT})"
 
-  SECOND_LOGIN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
+  SECOND_LOGIN_RESPONSE_RAW="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"tenantId\":\"$CURRENT_TENANT\"}")"
-  SECOND_TOKEN="$(printf '%s' "$SECOND_LOGIN_RESPONSE" | json_get token)"
+  SECOND_LOGIN_RESPONSE="$(complete_login_with_optional_mfa "$SECOND_LOGIN_RESPONSE_RAW" "$CURRENT_TENANT" "$EMAIL")"
+  SECOND_TOKEN="$(printf '%s' "$SECOND_LOGIN_RESPONSE" | json_get token 2>/dev/null || true)"
+  if [[ -z "$SECOND_TOKEN" ]]; then
+    echo "ℹ️ auth/sessions revoke SKIP (kunde inte skapa sekundär session med MFA)"
+  else
   SECOND_ME_RESPONSE="$(curl -s "$BASE_URL/api/v1/auth/me" \
     -H "Authorization: Bearer $SECOND_TOKEN")"
   SECOND_SESSION_ID="$(printf '%s' "$SECOND_ME_RESPONSE" | json_get session.id)"
@@ -104,6 +244,7 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
     TOKEN="$SECOND_TOKEN"
     CURRENT_SESSION_ID="$SECOND_SESSION_ID"
     echo "ℹ️ auth/sessions revoke SKIP (login rotation invalidated första sessionen)"
+  fi
   fi
 fi
 

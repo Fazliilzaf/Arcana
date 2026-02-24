@@ -75,6 +75,15 @@ function createAuthRouter({
     return revokedSessions;
   }
 
+  function toTenantOptions(memberships) {
+    return (Array.isArray(memberships) ? memberships : [])
+      .filter((membership) => membership?.tenantId)
+      .map((membership) => ({
+        tenantId: membership.tenantId,
+        role: membership.role,
+      }));
+  }
+
   router.post('/auth/login', applyLoginRateLimit, async (req, res) => {
     try {
       const email = normalizeEmail(req.body?.email);
@@ -123,7 +132,53 @@ function createAuthRouter({
         }
       } else if (memberships.length === 1) {
         selectedMembership = memberships[0];
-      } else {
+      }
+
+      const hasOwnerMembership = memberships.some(
+        (membership) => String(membership?.role || '').toUpperCase() === ROLE_OWNER
+      );
+      const requiresMfa = hasOwnerMembership || Boolean(user?.mfaRequired);
+
+      if (requiresMfa) {
+        const pendingMfa =
+          typeof authStore.createPendingMfaChallenge === 'function'
+            ? await authStore.createPendingMfaChallenge({
+                userId: user.id,
+                membershipIds: memberships.map((membership) => membership.id),
+                selectedMembershipId: selectedMembership?.id || '',
+                requestedTenantId: tenantId || '',
+              })
+            : null;
+        if (!pendingMfa?.ticket) {
+          return res.status(500).json({ error: 'MFA challenge kunde inte initieras.' });
+        }
+
+        await authStore.addAuditEvent({
+          actorUserId: user.id,
+          action: 'auth.login.pending_mfa',
+          outcome: 'success',
+          targetType: 'pending_mfa',
+          targetId: pendingMfa.ticket,
+          metadata: {
+            tenantRequested: tenantId || null,
+            setupRequired: Boolean(pendingMfa.setupRequired),
+            tenantCount: memberships.length,
+          },
+        });
+
+        return res.json({
+          requiresMfa: true,
+          mfaTicket: pendingMfa.ticket,
+          expiresAt: pendingMfa.expiresAt,
+          mfa: {
+            setupRequired: Boolean(pendingMfa.setupRequired),
+            ...(pendingMfa.setup || {}),
+          },
+          tenants: toTenantOptions(memberships),
+        });
+      }
+
+      if (!selectedMembership) {
         const pending = await authStore.createPendingLoginTicket({
           userId: user.id,
           membershipIds: memberships.map((membership) => membership.id),
@@ -141,10 +196,7 @@ function createAuthRouter({
           requiresTenantSelection: true,
           loginTicket: pending.ticket,
           expiresAt: pending.expiresAt,
-          tenants: memberships.map((membership) => ({
-            tenantId: membership.tenantId,
-            role: membership.role,
-          })),
+          tenants: toTenantOptions(memberships),
         });
       }
 
@@ -182,6 +234,171 @@ function createAuthRouter({
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Något gick fel vid inloggning.' });
+    }
+  });
+
+  router.post('/auth/mfa/verify', applySelectTenantRateLimit, async (req, res) => {
+    try {
+      const mfaTicket = typeof req.body?.mfaTicket === 'string' ? req.body.mfaTicket.trim() : '';
+      const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+      const tenantId = normalizeTenantId(req.body?.tenantId);
+
+      if (!mfaTicket || !code) {
+        return res.status(400).json({ error: 'mfaTicket och code krävs.' });
+      }
+
+      if (typeof authStore.verifyMfaChallenge !== 'function') {
+        return res.status(503).json({ error: 'MFA verifiering är inte tillgänglig.' });
+      }
+
+      const mfaResult = await authStore.verifyMfaChallenge({
+        ticket: mfaTicket,
+        code,
+      });
+      if (!mfaResult?.ok) {
+        const statusCode =
+          mfaResult?.error === 'invalid_ticket' || mfaResult?.error === 'expired_ticket' ? 400 : 401;
+        const errorMessage =
+          mfaResult?.error === 'too_many_attempts'
+            ? 'För många MFA-försök. Logga in igen.'
+            : mfaResult?.error === 'expired_ticket'
+            ? 'MFA-ticket har gått ut. Logga in igen.'
+            : mfaResult?.error === 'invalid_ticket'
+            ? 'MFA-ticket är ogiltig.'
+            : 'Fel MFA-kod.';
+
+        await authStore.addAuditEvent({
+          actorUserId: mfaResult?.userId || null,
+          action: 'auth.mfa.verify',
+          outcome: 'denied',
+          targetType: 'pending_mfa',
+          targetId: mfaTicket,
+          metadata: {
+            error: mfaResult?.error || 'invalid_code',
+          },
+        });
+
+        return res.status(statusCode).json({ error: errorMessage });
+      }
+
+      const user = await authStore.getUserById(mfaResult.userId);
+      if (!user) {
+        return res.status(404).json({ error: 'Användaren hittades inte.' });
+      }
+
+      const membershipsAll = await authStore.listMembershipsForUser(mfaResult.userId, {
+        includeDisabled: false,
+      });
+      const allowedMembershipIds = new Set(
+        Array.isArray(mfaResult.membershipIds) ? mfaResult.membershipIds : []
+      );
+      const memberships = membershipsAll.filter(
+        (membership) =>
+          allowedMembershipIds.size === 0 || allowedMembershipIds.has(String(membership?.id || ''))
+      );
+
+      if (memberships.length === 0) {
+        await authStore.addAuditEvent({
+          actorUserId: mfaResult.userId,
+          action: 'auth.mfa.verify',
+          outcome: 'denied',
+          targetType: 'pending_mfa',
+          targetId: mfaTicket,
+          metadata: { reason: 'no_memberships_after_mfa' },
+        });
+        return res.status(403).json({ error: 'Inga aktiva medlemskap hittades.' });
+      }
+
+      let selectedMembership = null;
+      const selectedMembershipId = String(mfaResult.selectedMembershipId || '').trim();
+      if (selectedMembershipId) {
+        selectedMembership =
+          memberships.find((membership) => String(membership?.id || '') === selectedMembershipId) ||
+          null;
+      }
+      if (!selectedMembership && tenantId) {
+        selectedMembership =
+          memberships.find((membership) => normalizeTenantId(membership?.tenantId) === tenantId) ||
+          null;
+      }
+      if (!selectedMembership && memberships.length === 1) {
+        selectedMembership = memberships[0];
+      }
+
+      await authStore.addAuditEvent({
+        actorUserId: mfaResult.userId,
+        action: 'auth.mfa.verify',
+        outcome: 'success',
+        targetType: 'pending_mfa',
+        targetId: mfaTicket,
+        metadata: {
+          usedRecoveryCode: Boolean(mfaResult.usedRecoveryCode),
+          setupCompleted: Boolean(mfaResult.setupCompleted),
+          recoveryCodesRemaining: Number(mfaResult.recoveryCodesRemaining || 0),
+        },
+      });
+
+      if (!selectedMembership) {
+        const pending = await authStore.createPendingLoginTicket({
+          userId: mfaResult.userId,
+          membershipIds: memberships.map((membership) => membership.id),
+        });
+
+        await authStore.addAuditEvent({
+          actorUserId: mfaResult.userId,
+          action: 'auth.mfa.verify.pending_tenant_selection',
+          outcome: 'success',
+          targetType: 'pending_login',
+          targetId: pending.ticket,
+        });
+
+        return res.json({
+          requiresTenantSelection: true,
+          loginTicket: pending.ticket,
+          expiresAt: pending.expiresAt,
+          tenants: toTenantOptions(memberships),
+        });
+      }
+
+      const created = await authStore.createSession({
+        userId: mfaResult.userId,
+        membershipId: selectedMembership.id,
+      });
+      const rotatedSessions = await rotateSessionsAfterLogin({
+        userId: mfaResult.userId,
+        tenantId: selectedMembership.tenantId,
+        currentSessionId: created.session.id,
+      });
+
+      await authStore.addAuditEvent({
+        tenantId: selectedMembership.tenantId,
+        actorUserId: mfaResult.userId,
+        action: 'auth.login',
+        outcome: 'success',
+        targetType: 'session',
+        targetId: created.session.id,
+        metadata: {
+          role: selectedMembership.role,
+          rotatedSessions,
+          rotationScope,
+          mfa: {
+            usedRecoveryCode: Boolean(mfaResult.usedRecoveryCode),
+            setupCompleted: Boolean(mfaResult.setupCompleted),
+            recoveryCodesRemaining: Number(mfaResult.recoveryCodesRemaining || 0),
+          },
+        },
+      });
+
+      return res.json({
+        token: created.token,
+        expiresAt: created.session.expiresAt,
+        user,
+        membership: selectedMembership,
+        permissions: getPermissionsForRole(selectedMembership.role),
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Något gick fel vid MFA-verifiering.' });
     }
   });
 

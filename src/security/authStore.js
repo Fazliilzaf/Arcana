@@ -31,6 +31,148 @@ function createSessionToken() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const MFA_TOTP_STEP_SEC = 30;
+const MFA_TOTP_DIGITS = 6;
+const MFA_TOTP_WINDOW = 1;
+const MFA_RECOVERY_CODE_COUNT = 10;
+const MFA_MAX_VERIFY_ATTEMPTS = 10;
+
+function normalizeMfaCode(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeRecoveryCode(value) {
+  return normalizeMfaCode(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+function safeEqualText(a, b) {
+  const aText = String(a || '');
+  const bText = String(b || '');
+  const aBuffer = Buffer.from(aText, 'utf8');
+  const bBuffer = Buffer.from(bText, 'utf8');
+  if (aBuffer.length !== bBuffer.length) return false;
+  return crypto.timingSafeEqual(aBuffer, bBuffer);
+}
+
+function hashRecoveryCode(normalizedCode) {
+  return crypto.createHash('sha256').update(String(normalizedCode || '')).digest('hex');
+}
+
+function encodeBase32(buffer) {
+  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (!bytes.length) return '';
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+function decodeBase32(value) {
+  const normalized = String(value || '')
+    .toUpperCase()
+    .replace(/=+$/g, '')
+    .replace(/[^A-Z2-7]/g, '');
+  if (!normalized) return Buffer.alloc(0);
+  let bits = 0;
+  let current = 0;
+  const out = [];
+  for (const ch of normalized) {
+    const index = BASE32_ALPHABET.indexOf(ch);
+    if (index < 0) continue;
+    current = (current << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((current >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+
+function generateMfaSecret() {
+  return encodeBase32(crypto.randomBytes(20));
+}
+
+function formatRecoveryCode(rawHex) {
+  const value = String(rawHex || '')
+    .toUpperCase()
+    .replace(/[^A-F0-9]/g, '')
+    .padEnd(16, '0')
+    .slice(0, 16);
+  return `${value.slice(0, 4)}-${value.slice(4, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}`;
+}
+
+function generateRecoveryCodes(count = MFA_RECOVERY_CODE_COUNT) {
+  const codes = [];
+  const hashes = [];
+  const total = Math.max(1, Math.min(50, Number(count) || MFA_RECOVERY_CODE_COUNT));
+  for (let index = 0; index < total; index += 1) {
+    const code = formatRecoveryCode(crypto.randomBytes(8).toString('hex'));
+    const normalized = normalizeRecoveryCode(code);
+    codes.push(code);
+    hashes.push(hashRecoveryCode(normalized));
+  }
+  return { codes, hashes };
+}
+
+function generateTotpToken(secret, counter) {
+  const normalizedSecret = String(secret || '').trim();
+  if (!normalizedSecret) return '';
+  const key = decodeBase32(normalizedSecret);
+  if (!key.length) return '';
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeBigUInt64BE(BigInt(Math.max(0, Number(counter) || 0)));
+  const hmac = crypto.createHmac('sha1', key).update(counterBuffer).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  const divisor = 10 ** MFA_TOTP_DIGITS;
+  const token = binary % divisor;
+  return String(token).padStart(MFA_TOTP_DIGITS, '0');
+}
+
+function verifyTotpCode(secret, code, { nowMs = Date.now(), window = MFA_TOTP_WINDOW } = {}) {
+  const normalizedCode = normalizeMfaCode(code);
+  if (!/^\d{6}$/.test(normalizedCode)) return false;
+  const baseCounter = Math.floor(Math.max(0, Number(nowMs) || Date.now()) / 1000 / MFA_TOTP_STEP_SEC);
+  const clampedWindow = Math.max(0, Math.min(3, Number(window) || MFA_TOTP_WINDOW));
+  for (let offset = -clampedWindow; offset <= clampedWindow; offset += 1) {
+    const candidate = generateTotpToken(secret, baseCounter + offset);
+    if (candidate && safeEqualText(candidate, normalizedCode)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildOtpAuthUrl({ secret, email, issuer = 'Arcana' }) {
+  const normalizedSecret = String(secret || '').trim();
+  const normalizedEmail = normalizeEmail(email);
+  const safeIssuer = normalizeMfaCode(issuer) || 'Arcana';
+  if (!normalizedSecret || !normalizedEmail) return '';
+  const label = encodeURIComponent(`${safeIssuer}:${normalizedEmail}`);
+  return `otpauth://totp/${label}?secret=${encodeURIComponent(
+    normalizedSecret
+  )}&issuer=${encodeURIComponent(safeIssuer)}&algorithm=SHA1&digits=${MFA_TOTP_DIGITS}&period=${MFA_TOTP_STEP_SEC}`;
+}
+
 const AUDIT_CHAIN_VERSION = 1;
 
 function isSha256Hex(value) {
@@ -111,6 +253,7 @@ function emptyState() {
     memberships: {},
     sessions: {},
     pendingLogins: {},
+    pendingMfaChallenges: {},
     auditEvents: [],
   };
 }
@@ -135,11 +278,17 @@ async function writeJsonAtomic(filePath, data) {
 
 function toSafeUser(user) {
   if (!user) return null;
+  const mfaSecret = typeof user.mfaSecret === 'string' ? user.mfaSecret.trim() : '';
+  const recoveryCodeHashes = Array.isArray(user.mfaRecoveryCodeHashes)
+    ? user.mfaRecoveryCodeHashes
+    : [];
   return {
     id: user.id,
     email: user.email,
     status: user.status,
     mfaRequired: Boolean(user.mfaRequired),
+    mfaConfigured: Boolean(mfaSecret),
+    mfaRecoveryCodesRemaining: recoveryCodeHashes.length,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -188,6 +337,7 @@ async function createAuthStore({
     memberships: safeObject(rawState.memberships),
     sessions: safeObject(rawState.sessions),
     pendingLogins: safeObject(rawState.pendingLogins),
+    pendingMfaChallenges: safeObject(rawState.pendingMfaChallenges),
     auditEvents: Array.isArray(rawState.auditEvents) ? rawState.auditEvents : [],
   };
 
@@ -348,6 +498,13 @@ async function createAuthStore({
       }
     }
 
+    for (const [ticket, challenge] of Object.entries(state.pendingMfaChallenges)) {
+      const expiresAt = Date.parse(challenge.expiresAt || '');
+      if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+        delete state.pendingMfaChallenges[ticket];
+      }
+    }
+
     if (!auditAppendOnly && auditMaxEntries > 0 && state.auditEvents.length > auditMaxEntries) {
       state.auditEvents = state.auditEvents.slice(-auditMaxEntries);
     }
@@ -485,6 +642,8 @@ async function createAuthStore({
       passwordHash: passwordDigest.hash,
       passwordSalt: passwordDigest.salt,
       mfaRequired: Boolean(mfaRequired),
+      mfaSecret: '',
+      mfaRecoveryCodeHashes: [],
       status: 'active',
       createdAt,
       updatedAt: createdAt,
@@ -605,6 +764,183 @@ async function createAuthStore({
     }
 
     return entry;
+  }
+
+  async function createPendingMfaChallenge({
+    userId,
+    membershipIds = [],
+    selectedMembershipId = '',
+    requestedTenantId = '',
+  }) {
+    const normalizedUserId = typeof userId === 'string' ? userId.trim() : '';
+    if (!normalizedUserId) {
+      throw new Error('userId saknas för MFA challenge.');
+    }
+    const user = state.users[normalizedUserId];
+    if (!user || user.status !== 'active') {
+      throw new Error('Användaren är inte aktiv.');
+    }
+
+    const uniqueMembershipIds = Array.isArray(membershipIds)
+      ? [...new Set(membershipIds.map((item) => String(item || '').trim()).filter(Boolean))]
+      : [];
+    const normalizedSelectedMembershipId =
+      typeof selectedMembershipId === 'string' ? selectedMembershipId.trim() : '';
+    const normalizedRequestedTenantId = normalizeTenantId(requestedTenantId);
+
+    const ticket = createSessionToken();
+    const createdAt = nowIso();
+    const expiresAt = new Date(Date.now() + loginTicketTtlMs).toISOString();
+    const existingSecret = typeof user.mfaSecret === 'string' ? user.mfaSecret.trim() : '';
+    const setupRequired = !existingSecret;
+
+    const challenge = {
+      id: crypto.randomUUID(),
+      userId: normalizedUserId,
+      membershipIds: uniqueMembershipIds,
+      selectedMembershipId: normalizedSelectedMembershipId,
+      requestedTenantId: normalizedRequestedTenantId,
+      setupRequired,
+      createdAt,
+      expiresAt,
+      attempts: 0,
+      provisionalSecret: '',
+      provisionalRecoveryCodeHashes: [],
+    };
+
+    let setup = null;
+    if (setupRequired) {
+      const secret = generateMfaSecret();
+      const recovery = generateRecoveryCodes();
+      challenge.provisionalSecret = secret;
+      challenge.provisionalRecoveryCodeHashes = recovery.hashes;
+      setup = {
+        issuer: 'Arcana',
+        accountName: user.email,
+        secret,
+        otpauthUrl: buildOtpAuthUrl({
+          secret,
+          email: user.email,
+          issuer: 'Arcana',
+        }),
+        recoveryCodes: recovery.codes,
+      };
+    }
+
+    state.pendingMfaChallenges[ticket] = challenge;
+    await save();
+    return {
+      ticket,
+      expiresAt,
+      setupRequired,
+      setup,
+    };
+  }
+
+  async function verifyMfaChallenge({
+    ticket,
+    code,
+  }) {
+    const normalizedTicket = typeof ticket === 'string' ? ticket.trim() : '';
+    const normalizedCode = normalizeMfaCode(code);
+    if (!normalizedTicket || !normalizedCode) {
+      return { ok: false, error: 'missing_fields' };
+    }
+
+    const challenge = state.pendingMfaChallenges[normalizedTicket];
+    if (!challenge) return { ok: false, error: 'invalid_ticket' };
+
+    const expiresAtMs = Date.parse(challenge.expiresAt || '');
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      delete state.pendingMfaChallenges[normalizedTicket];
+      await save();
+      return { ok: false, error: 'expired_ticket', userId: challenge.userId };
+    }
+
+    const user = state.users[challenge.userId];
+    if (!user || user.status !== 'active') {
+      delete state.pendingMfaChallenges[normalizedTicket];
+      await save();
+      return { ok: false, error: 'user_not_active', userId: challenge.userId };
+    }
+
+    const challengeSecret = String(challenge.provisionalSecret || '').trim();
+    const userSecret = String(user.mfaSecret || '').trim();
+    const effectiveSecret = challenge.setupRequired ? challengeSecret : userSecret;
+    const numericCode = /^\d{6}$/.test(normalizedCode);
+    const codeNormalizedForRecovery = normalizeRecoveryCode(normalizedCode);
+    const challengeRecoveryHashes = Array.isArray(challenge.provisionalRecoveryCodeHashes)
+      ? challenge.provisionalRecoveryCodeHashes
+      : [];
+    const userRecoveryHashes = Array.isArray(user.mfaRecoveryCodeHashes)
+      ? user.mfaRecoveryCodeHashes
+      : [];
+    const effectiveRecoveryHashes = challenge.setupRequired ? challengeRecoveryHashes : userRecoveryHashes;
+    const recoveryHash = hashRecoveryCode(codeNormalizedForRecovery);
+
+    let verified = false;
+    let usedRecoveryCode = false;
+    let usedRecoveryIndex = -1;
+
+    if (numericCode && effectiveSecret) {
+      verified = verifyTotpCode(effectiveSecret, normalizedCode);
+    }
+    if (!verified && codeNormalizedForRecovery) {
+      usedRecoveryIndex = effectiveRecoveryHashes.findIndex((item) => safeEqualText(item, recoveryHash));
+      if (usedRecoveryIndex >= 0) {
+        verified = true;
+        usedRecoveryCode = true;
+      }
+    }
+
+    if (!verified) {
+      challenge.attempts = Math.max(0, Number(challenge.attempts) || 0) + 1;
+      if (challenge.attempts >= MFA_MAX_VERIFY_ATTEMPTS) {
+        delete state.pendingMfaChallenges[normalizedTicket];
+      }
+      await save();
+      return {
+        ok: false,
+        error: challenge.attempts >= MFA_MAX_VERIFY_ATTEMPTS ? 'too_many_attempts' : 'invalid_code',
+        userId: challenge.userId,
+      };
+    }
+
+    const now = nowIso();
+    let setupCompleted = false;
+    if (challenge.setupRequired) {
+      user.mfaSecret = challengeSecret;
+      user.mfaRecoveryCodeHashes = [...challengeRecoveryHashes];
+      user.mfaRequired = true;
+      user.updatedAt = now;
+      setupCompleted = true;
+    }
+
+    if (usedRecoveryCode) {
+      const targetHashes = Array.isArray(user.mfaRecoveryCodeHashes) ? user.mfaRecoveryCodeHashes : [];
+      const targetIndex = targetHashes.findIndex((item) => safeEqualText(item, recoveryHash));
+      if (targetIndex >= 0) {
+        targetHashes.splice(targetIndex, 1);
+        user.mfaRecoveryCodeHashes = targetHashes;
+        user.updatedAt = now;
+      }
+    }
+
+    delete state.pendingMfaChallenges[normalizedTicket];
+    await save();
+
+    return {
+      ok: true,
+      userId: challenge.userId,
+      membershipIds: Array.isArray(challenge.membershipIds) ? [...challenge.membershipIds] : [],
+      selectedMembershipId: String(challenge.selectedMembershipId || ''),
+      requestedTenantId: normalizeTenantId(challenge.requestedTenantId),
+      usedRecoveryCode,
+      setupCompleted,
+      recoveryCodesRemaining: Array.isArray(user.mfaRecoveryCodeHashes)
+        ? user.mfaRecoveryCodeHashes.length
+        : 0,
+    };
   }
 
   async function createSession({ userId, membershipId }) {
@@ -1058,6 +1394,8 @@ async function createAuthStore({
     getMembershipById,
     createPendingLoginTicket,
     consumePendingLoginTicket,
+    createPendingMfaChallenge,
+    verifyMfaChallenge,
     createSession,
     getSessionContextByToken,
     getSessionById,

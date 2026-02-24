@@ -74,6 +74,16 @@ ARCANA_API_RATE_LIMIT_WRITE_MAX=120
 - `ARCANA_API_RATE_LIMIT_WRITE_MAX`: max write-anrop per IP inom fönstret
 - `POST /api/v1/auth/login` och `POST /api/v1/auth/select-tenant` styrs fortsatt av dedikerade auth-limiters
 
+### OWNER MFA (TOTP + recovery)
+- OWNER-login kräver MFA-challenge.
+- `POST /api/v1/auth/login` kan returnera:
+  - `requiresMfa: true`
+  - `mfaTicket`
+  - `mfa.setupRequired` (första setup)
+  - vid setup även `mfa.secret`, `mfa.otpauthUrl` och `mfa.recoveryCodes`
+- Slutför med `POST /api/v1/auth/mfa/verify` (`mfaTicket`, `code`, valfritt `tenantId`).
+- `code` kan vara 6-siffrig TOTP eller recovery-kod.
+
 ### Scheduler / Automation (Pilot driftstöd)
 
 ```env
@@ -120,6 +130,7 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `GET /healthz` (liveness)
 - `GET /readyz` (readiness)
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/mfa/verify`
 - `POST /api/v1/auth/select-tenant` (om användaren har flera tenants)
 - `POST /api/v1/auth/switch-tenant` (inloggad OWNER/STAFF, byter tenant utan ny login)
 - `GET /api/v1/auth/me`
