@@ -165,6 +165,7 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `PATCH /api/v1/users/staff/:membershipId` (OWNER)
 - `GET /api/v1/monitor/status` (OWNER/STAFF)
 - `GET /api/v1/monitor/metrics` (OWNER/STAFF)
+- `GET /api/v1/monitor/slo` (OWNER/STAFF, availability + incident response + restore recency)
 - `GET /api/v1/monitor/readiness` (OWNER/STAFF, Go/No-Go score + blocker-matris)
 - `GET /api/v1/ops/state/manifest` (OWNER)
 - `GET /api/v1/ops/state/backups` (OWNER)
@@ -292,6 +293,7 @@ Owner action `action` (endast OWNER):
 - Monitor-panel i UI:
   - driftstatus, minne, datastores och tenant-KPI (`GET /api/v1/monitor/status`)
   - latency/fel-metrics (`GET /api/v1/monitor/metrics`)
+  - SLO/SLI-status (`GET /api/v1/monitor/slo`)
   - readiness/Go-No-Go matris (`GET /api/v1/monitor/readiness`)
 - Ops backup-panel i UI (OWNER):
   - state manifest (`GET /api/v1/ops/state/manifest`)

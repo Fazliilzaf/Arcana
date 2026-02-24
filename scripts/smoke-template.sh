@@ -327,6 +327,22 @@ if [[ -z "$MONITOR_METRICS_P95" || "$MONITOR_METRICS_P95" == "null" || -z "$MONI
 fi
 echo "✅ monitor/metrics OK (p95Ms: ${MONITOR_METRICS_P95}, sampled: ${MONITOR_METRICS_SAMPLED})"
 
+MONITOR_SLO_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/slo" \
+  -H "Authorization: Bearer $TOKEN")"
+MONITOR_SLO_STATUS="$(printf '%s' "$MONITOR_SLO_RESPONSE" | json_get summary.overallStatus 2>/dev/null || true)"
+MONITOR_SLO_COUNT="$(printf '%s' "$MONITOR_SLO_RESPONSE" | json_get slos | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
+if [[ "$MONITOR_SLO_STATUS" != "green" && "$MONITOR_SLO_STATUS" != "yellow" && "$MONITOR_SLO_STATUS" != "red" && "$MONITOR_SLO_STATUS" != "unknown" ]]; then
+  echo "❌ monitor/slo saknar giltig summary.overallStatus"
+  printf '%s\n' "$MONITOR_SLO_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_SLO_COUNT" -lt 3 ]]; then
+  echo "❌ monitor/slo returnerade för få SLO-rader (${MONITOR_SLO_COUNT})"
+  printf '%s\n' "$MONITOR_SLO_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/slo OK (overall: ${MONITOR_SLO_STATUS}, slos: ${MONITOR_SLO_COUNT})"
+
 READINESS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/readiness" \
   -H "Authorization: Bearer $TOKEN")"
 READINESS_SCORE="$(printf '%s' "$READINESS_RESPONSE" | json_get score 2>/dev/null || true)"
