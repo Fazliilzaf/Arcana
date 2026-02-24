@@ -3183,7 +3183,6 @@
       const tr = document.createElement('tr');
       tr.classList.add('row-link');
       const evaluationId = String(evaluation.id || '');
-      const incidentId = String(evaluation.incidentId || evaluationId);
       tr.setAttribute('data-eid', evaluationId);
       if (evaluationId && evaluationId === state.selectedRiskEvaluationId) tr.classList.add('risk-row-selected');
       const reasonCodes = Array.isArray(evaluation.reasonCodes) ? evaluation.reasonCodes : [];
@@ -3262,6 +3261,7 @@
       const tr = document.createElement('tr');
       tr.classList.add('row-link');
       const evaluationId = String(evaluation.id || '');
+      const incidentId = String(evaluation.incidentId || evaluationId);
       tr.setAttribute('data-eid', evaluationId);
       if (evaluationId && evaluationId === state.selectedRiskEvaluationId) tr.classList.add('risk-row-selected');
       const reasonCodes = Array.isArray(evaluation.reasonCodes) ? evaluation.reasonCodes : [];
