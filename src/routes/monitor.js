@@ -163,6 +163,23 @@ function pickReadinessBand(score) {
   return 'controlled_go';
 }
 
+function statusFromPercentTarget(value, target, { yellowDelta = 1 } = {}) {
+  const safeValue = Number(value);
+  const safeTarget = Number(target);
+  if (!Number.isFinite(safeValue) || !Number.isFinite(safeTarget)) return 'unknown';
+  if (safeValue >= safeTarget) return 'green';
+  if (safeValue >= safeTarget - Math.max(0, Number(yellowDelta) || 0)) return 'yellow';
+  return 'red';
+}
+
+function worstStatus(statuses = []) {
+  const list = Array.isArray(statuses) ? statuses : [];
+  if (list.includes('red')) return 'red';
+  if (list.includes('yellow')) return 'yellow';
+  if (list.includes('unknown')) return 'unknown';
+  return 'green';
+}
+
 function isRecentWithinDays(isoTs, maxDays, nowMs = Date.now()) {
   const ageDays = toAgeDaysSince(isoTs, nowMs);
   return ageDays !== null && ageDays <= maxDays;
@@ -537,6 +554,137 @@ function createMonitorRouter({
         }
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte läsa monitor metrics.' });
+      }
+    }
+  );
+
+  router.get(
+    '/monitor/slo',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        const tenantId = req.auth.tenantId;
+        const schedulerStatus =
+          scheduler && typeof scheduler.getStatus === 'function'
+            ? scheduler.getStatus()
+            : null;
+        const [incidentSummary, latestRestoreDrillAudit] = await Promise.all([
+          typeof templateStore?.summarizeIncidents === 'function'
+            ? templateStore.summarizeIncidents({ tenantId })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
+                action: 'scheduler.job.restore_drill_preview.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+        ]);
+
+        const runtimeMetrics =
+          runtimeMetricsStore && typeof runtimeMetricsStore.getSnapshot === 'function'
+            ? runtimeMetricsStore.getSnapshot({ areaLimit: 10 })
+            : null;
+        const restoreGate = buildRestoreDrillGate({
+          schedulerStatus,
+          latestRestoreDrillAudit,
+          monitorRestoreDrillMaxAgeDays: config?.monitorRestoreDrillMaxAgeDays,
+          nowMs: Date.now(),
+        });
+
+        const sampledRequests = Number(runtimeMetrics?.totals?.sampledRequests || 0);
+        const serverErrors = Number(runtimeMetrics?.totals?.statusBuckets?.['5xx'] || 0);
+        const availabilityPct =
+          sampledRequests > 0
+            ? Number((((sampledRequests - serverErrors) / sampledRequests) * 100).toFixed(3))
+            : 100;
+
+        const openIncidents = Number(incidentSummary?.totals?.openUnresolved || 0);
+        const breachedOpen = Number(incidentSummary?.totals?.breachedOpen || 0);
+        const incidentResponsePct =
+          openIncidents > 0
+            ? Number((((openIncidents - breachedOpen) / openIncidents) * 100).toFixed(3))
+            : 100;
+        const breachRatePct =
+          openIncidents > 0 ? Number(((breachedOpen / openIncidents) * 100).toFixed(3)) : 0;
+
+        const slos = [
+          {
+            id: 'availability_http',
+            label: 'HTTP availability',
+            targetPct: 99.5,
+            sliPct: availabilityPct,
+            status: statusFromPercentTarget(availabilityPct, 99.5, { yellowDelta: 0.5 }),
+            evidence: {
+              sampledRequests,
+              serverErrors,
+            },
+          },
+          {
+            id: 'incident_response',
+            label: 'Incident response (open incidents utan breach)',
+            targetPct: 95,
+            sliPct: incidentResponsePct,
+            status: statusFromPercentTarget(incidentResponsePct, 95, { yellowDelta: 5 }),
+            evidence: {
+              openIncidents,
+              breachedOpen,
+              breachRatePct,
+            },
+          },
+          {
+            id: 'restore_drill_recency',
+            label: 'Restore drill recency',
+            target: '<=30 dagar',
+            sliDays: restoreGate.ageDays,
+            status: restoreGate.healthy30d
+              ? 'green'
+              : restoreGate.ageDays !== null && restoreGate.ageDays <= 45
+                ? 'yellow'
+                : 'red',
+            evidence: {
+              lastSuccessAt: restoreGate.lastSuccessAt,
+              schedulerEnabled: Boolean(schedulerStatus?.enabled),
+              schedulerStarted: Boolean(schedulerStatus?.started),
+            },
+          },
+        ];
+
+        const overallStatus = worstStatus(slos.map((item) => item.status));
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'monitor.slo.read',
+          outcome: 'success',
+          targetType: 'monitor_slo',
+          targetId: tenantId,
+          metadata: {
+            overallStatus,
+            availabilityPct,
+            incidentResponsePct,
+            restoreDrillAgeDays: restoreGate.ageDays,
+          },
+        });
+
+        return res.json({
+          generatedAt: new Date().toISOString(),
+          tenantId,
+          summary: {
+            overallStatus,
+            sampledRequests,
+            openIncidents,
+            breachedOpen,
+          },
+          slos,
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa monitor SLO.' });
       }
     }
   );
