@@ -297,6 +297,29 @@ function evaluateCategory({
   };
 }
 
+function collectBlockingRequiredChecks(categories = []) {
+  const blockers = [];
+  for (const category of Array.isArray(categories) ? categories : []) {
+    const categoryId = normalizeText(category?.id) || null;
+    const categoryLabel = normalizeText(category?.label) || null;
+    const checks = Array.isArray(category?.checks) ? category.checks : [];
+    for (const check of checks) {
+      if (check?.required !== true) continue;
+      const status = normalizeStatus(check?.status);
+      if (status === 'green') continue;
+      blockers.push({
+        categoryId,
+        categoryLabel,
+        checkId: normalizeText(check?.id) || null,
+        label: normalizeText(check?.label) || null,
+        status,
+        target: normalizeText(check?.target) || null,
+      });
+    }
+  }
+  return blockers;
+}
+
 function pickReadinessBand(score) {
   if (score < READINESS_BANDS.noGoMaxExclusive) return 'no_go';
   if (score < READINESS_BANDS.limitedBetaMaxExclusive) return 'limited_beta';
@@ -1906,7 +1929,8 @@ function createMonitorRouter({
         );
         const score = Number((weightedScore / totalWeight).toFixed(2));
         const band = pickReadinessBand(score);
-        const blockersAllGreen = categories.every((item) => item.status === 'green');
+        const blockingRequiredChecks = collectBlockingRequiredChecks(categories);
+        const blockersAllGreen = blockingRequiredChecks.length === 0;
         const outputGateNoGoTriggered = outputGateViolations.length > 0;
         const policyFloorNoGoTriggered =
           policyRules.length === 0 || policyFloorBypassViolations.length > 0;
@@ -2028,6 +2052,7 @@ function createMonitorRouter({
             band,
             goAllowed,
             blockersAllGreen,
+            blockingRequiredChecks: blockingRequiredChecks.length,
             triggeredNoGo: triggeredNoGo.length,
             remediationTotal: Number(remediation?.summary?.total || 0),
             remediationP0: Number(remediation?.summary?.byPriority?.P0 || 0),
@@ -2048,6 +2073,10 @@ function createMonitorRouter({
           goNoGo: {
             allowed: goAllowed,
             blockerCategoriesGreen: blockersAllGreen,
+            blockingRequiredChecksCount: blockingRequiredChecks.length,
+            blockingRequiredCheckIds: blockingRequiredChecks
+              .map((item) => item.checkId)
+              .filter(Boolean),
             triggeredNoGoCount: triggeredNoGo.length,
             triggeredNoGoIds: triggeredNoGo.map((item) => item.id),
           },
@@ -2055,6 +2084,10 @@ function createMonitorRouter({
           noGoTriggers,
           remediation,
           evidence: {
+            blockingRequiredChecks: {
+              count: blockingRequiredChecks.length,
+              checks: blockingRequiredChecks.slice(0, 20),
+            },
             restoreDrill: {
               maxAgeDays: restoreDrillGate.maxAgeDays,
               lastSuccessAt: restoreDrillGate.lastSuccessAt,
