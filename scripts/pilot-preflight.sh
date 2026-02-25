@@ -56,9 +56,16 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
 
   if [[ -n "${ARCANA_OWNER_EMAIL:-}" && -n "${ARCANA_OWNER_PASSWORD:-}" ]]; then
     OPS_STRICT_SCRIPT="ops:suite:strict"
+    case "${ARCANA_PREFLIGHT_USE_HEAL_ALL:-false}" in
+      1|true|TRUE|yes|YES|on|ON)
+        OPS_STRICT_SCRIPT="ops:suite:strict:heal:all"
+        ;;
+    esac
     case "${ARCANA_PREFLIGHT_USE_HEAL:-false}" in
       1|true|TRUE|yes|YES|on|ON)
-        OPS_STRICT_SCRIPT="ops:suite:strict:heal"
+        if [[ "$OPS_STRICT_SCRIPT" == "ops:suite:strict" ]]; then
+          OPS_STRICT_SCRIPT="ops:suite:strict:heal"
+        fi
         ;;
     esac
 
