@@ -85,6 +85,53 @@ function splitCsv(value, fallback = []) {
     .filter(Boolean);
 }
 
+function uniqueList(values = []) {
+  const seen = new Set();
+  const out = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const normalized = normalizeText(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function resolveRequestedChecks({
+  checksById,
+  explicitChecks = [],
+  useRequiredChecks = false,
+}) {
+  const out = [];
+  const seen = new Set();
+  const pushCheck = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  };
+
+  let expandRequired = Boolean(useRequiredChecks);
+  for (const rawCheck of Array.isArray(explicitChecks) ? explicitChecks : []) {
+    const checkId = normalizeText(rawCheck);
+    if (!checkId) continue;
+    if (checkId === 'required') {
+      expandRequired = true;
+      continue;
+    }
+    pushCheck(checkId);
+  }
+
+  if (expandRequired) {
+    for (const check of Array.from(checksById.values())) {
+      if (check?.required !== true) continue;
+      pushCheck(check.checkId);
+    }
+  }
+
+  return out;
+}
+
 function parseArgs(argv) {
   const args = {
     baseUrl: process.env.BASE_URL || 'http://localhost:3000',
@@ -97,6 +144,10 @@ function parseArgs(argv) {
     checks: splitCsv(
       process.env.ARCANA_PREFLIGHT_READINESS_CHECKS || 'owner_mfa_enforced,cors_strict',
       ['owner_mfa_enforced', 'cors_strict']
+    ),
+    useRequiredChecks: parseBoolean(
+      process.env.ARCANA_PREFLIGHT_READINESS_USE_REQUIRED_CHECKS,
+      false
     ),
     failStatuses: splitCsv(
       process.env.ARCANA_PREFLIGHT_READINESS_FAIL_STATUSES || 'red',
@@ -157,6 +208,14 @@ function parseArgs(argv) {
     if (item === '--checks') {
       args.checks = splitCsv(argv[index + 1], args.checks);
       index += 1;
+      continue;
+    }
+    if (item === '--use-required-checks') {
+      args.useRequiredChecks = true;
+      continue;
+    }
+    if (item === '--no-use-required-checks') {
+      args.useRequiredChecks = false;
       continue;
     }
     if (item === '--fail-statuses') {
@@ -505,7 +564,10 @@ async function main() {
       'Saknar credentials. Sätt ARCANA_OWNER_EMAIL och ARCANA_OWNER_PASSWORD (eller --email/--password).'
     );
   }
-  if (!Array.isArray(args.checks) || args.checks.length === 0) {
+  if (
+    (!Array.isArray(args.checks) || args.checks.length === 0) &&
+    args.useRequiredChecks !== true
+  ) {
     throw new Error('Minst en readiness check krävs (--checks).');
   }
 
@@ -523,6 +585,16 @@ async function main() {
   });
 
   const checksById = collectChecksById(readiness);
+  const resolvedChecks = resolveRequestedChecks({
+    checksById,
+    explicitChecks: uniqueList(args.checks),
+    useRequiredChecks: args.useRequiredChecks === true,
+  });
+  if (resolvedChecks.length === 0) {
+    throw new Error(
+      'Inga checks kunde väljas. Använd --checks <id1,id2> och/eller --use-required-checks (eller "required" i --checks).'
+    );
+  }
   const failStatuses = new Set(
     args.failStatuses.map((item) => normalizeText(item).toLowerCase()).filter(Boolean)
   );
@@ -530,7 +602,7 @@ async function main() {
   const summary = [];
   const failedCheckIds = new Set();
 
-  for (const checkId of args.checks) {
+  for (const checkId of resolvedChecks) {
     const check = checksById.get(checkId);
     if (!check) {
       summary.push(`${checkId}=missing`);
@@ -561,7 +633,7 @@ async function main() {
   }
 
   let corsRuntimeProbe = null;
-  if (args.corsRuntimeProbe && args.checks.includes('cors_strict')) {
+  if (args.corsRuntimeProbe && resolvedChecks.includes('cors_strict')) {
     const corsCheck = checksById.get('cors_strict') || null;
     const corsCheckStatus = normalizeText(corsCheck?.status).toLowerCase() || 'missing';
     if (corsCheckStatus === 'green') {
@@ -624,6 +696,9 @@ async function main() {
   process.stdout.write(`Readiness guard: ${baseUrl}\n`);
   process.stdout.write(
     `  score=${Number(score.toFixed(2))} band=${band} goAllowed=${goAllowed} checks=${summary.join(', ')}\n`
+  );
+  process.stdout.write(
+    `  resolvedChecks: count=${resolvedChecks.length} ids=${resolvedChecks.slice(0, 12).join(',')}${resolvedChecks.length > 12 ? ',…' : ''}\n`
   );
   if (corsRuntimeProbe) {
     const probeStatus = corsRuntimeProbe.skipped
