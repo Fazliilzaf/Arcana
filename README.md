@@ -220,7 +220,7 @@ Kör detta i ordning:
 
 Snabbaste vägen (allt i ett):
 - `npm run preflight:pilot -- --public-url https://arcana.hairtpclinic.se`
-- Om `ARCANA_OWNER_EMAIL` och `ARCANA_OWNER_PASSWORD` är satta kör preflight även `preflight:readiness:guard` + `ops:suite:strict` mot publik miljö (fail-fast på kritiska blocker-checks + no-go fail).
+- Om `ARCANA_OWNER_EMAIL` och `ARCANA_OWNER_PASSWORD` är satta kör preflight även `preflight:readiness:guard` + `ops:suite:strict` mot publik miljö (fail-fast på kritiska blocker-checks + no-go fail; blocker-kontroll baseras på required checks).
 - Sätt `ARCANA_PREFLIGHT_USE_HEAL=true` för att köra `ops:suite:strict:heal` i sista steget.
 - Sätt `ARCANA_PREFLIGHT_USE_HEAL_ALL=true` för att köra `ops:suite:strict:heal:all` (output-gates + owner-MFA-remediation) i sista steget.
 - Om guard blockerar på `owner_mfa_enforced`: kör `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run owner:mfa:setup` (per aktiv OWNER).
