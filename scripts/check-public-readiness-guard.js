@@ -166,6 +166,7 @@ function parseArgs(argv) {
       process.env.ARCANA_PREFLIGHT_READINESS_CORS_PROBE_PATH || '/healthz',
       '/healthz'
     ),
+    reportFile: normalizeText(process.env.ARCANA_PREFLIGHT_READINESS_REPORT_FILE || ''),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -252,9 +253,23 @@ function parseArgs(argv) {
       index += 1;
       continue;
     }
+    if (item === '--report-file') {
+      args.reportFile = String(argv[index + 1] || '').trim();
+      index += 1;
+      continue;
+    }
   }
 
   return args;
+}
+
+async function writeJsonReport(filePath, payload) {
+  const resolvedPath = normalizeText(filePath);
+  if (!resolvedPath) return null;
+  const absolutePath = path.resolve(resolvedPath);
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return absolutePath;
 }
 
 function generateTotpCode(secretRaw) {
@@ -693,6 +708,41 @@ async function main() {
   const goAllowed = readiness?.goNoGo?.allowed === true ? 'yes' : 'no';
   const band = normalizeText(readiness?.band) || '-';
   const score = Number(readiness?.score || 0);
+  const report = {
+    generatedAt: new Date().toISOString(),
+    baseUrl,
+    auth: {
+      tenantId: auth.authTenantId || tenantId || null,
+    },
+    readiness: {
+      generatedAt: readiness?.generatedAt || null,
+      score,
+      band,
+      goAllowed: readiness?.goNoGo?.allowed === true,
+    },
+    checks: {
+      requested: uniqueList(args.checks),
+      useRequiredChecks: args.useRequiredChecks === true,
+      resolved: resolvedChecks,
+      failStatuses: Array.from(failStatuses),
+      summary,
+    },
+    failures,
+    failedCheckIds: Array.from(failedCheckIds),
+    corsRuntimeProbe,
+    ownerMfaGapReport: ownerGapReport,
+    outcome: failures.length > 0 ? 'blocked' : 'passed',
+  };
+  let reportFilePath = null;
+  let reportWriteError = '';
+  if (normalizeText(args.reportFile)) {
+    try {
+      reportFilePath = await writeJsonReport(args.reportFile, report);
+    } catch (error) {
+      reportWriteError =
+        normalizeText(error?.message || 'report_write_failed') || 'report_write_failed';
+    }
+  }
   process.stdout.write(`Readiness guard: ${baseUrl}\n`);
   process.stdout.write(
     `  score=${Number(score.toFixed(2))} band=${band} goAllowed=${goAllowed} checks=${summary.join(', ')}\n`
@@ -700,6 +750,12 @@ async function main() {
   process.stdout.write(
     `  resolvedChecks: count=${resolvedChecks.length} ids=${resolvedChecks.slice(0, 12).join(',')}${resolvedChecks.length > 12 ? ',…' : ''}\n`
   );
+  if (reportFilePath) {
+    process.stdout.write(`  reportFile=${reportFilePath}\n`);
+  }
+  if (reportWriteError) {
+    process.stdout.write(`  reportFileError=${reportWriteError}\n`);
+  }
   if (corsRuntimeProbe) {
     const probeStatus = corsRuntimeProbe.skipped
       ? 'unknown'

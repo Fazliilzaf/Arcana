@@ -5,6 +5,47 @@ PUBLIC_URL="${BASE_URL:-}"
 RUN_LOCAL=1
 RUN_PUBLIC=1
 
+classify_guard_failures() {
+  local report_file="$1"
+  local healable_csv="$2"
+  node - "$report_file" "$healable_csv" <<'NODE'
+const fs = require('node:fs');
+const reportFile = process.argv[2];
+const healableCsv = String(process.argv[3] || 'owner_mfa_enforced');
+const healableChecks = new Set(
+  healableCsv
+    .split(',')
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+);
+let failures = [];
+try {
+  const payload = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
+  failures = Array.isArray(payload?.failures) ? payload.failures : [];
+} catch {
+  console.log('guardBlockers=unknown ids=- nonHealable=-');
+  process.exit(3);
+}
+const ids = Array.from(
+  new Set(
+    failures
+      .map((item) => String(item?.checkId || '').trim())
+      .filter(Boolean)
+  )
+);
+if (ids.length === 0) {
+  console.log('guardBlockers=unknown ids=- nonHealable=-');
+  process.exit(3);
+}
+const nonHealable = ids.filter((id) => !healableChecks.has(id));
+const state = nonHealable.length === 0 ? 'healable' : 'mixed';
+console.log(
+  `guardBlockers=${state} ids=${ids.join(',')} nonHealable=${nonHealable.join(',') || '-'}`
+);
+process.exit(nonHealable.length === 0 ? 0 : 2);
+NODE
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --public-url)
@@ -61,6 +102,13 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
         VERIFY_REQUIRED_CHECKS=0
         ;;
     esac
+    HEALABLE_GUARD_CHECKS="${ARCANA_PREFLIGHT_HEALABLE_GUARD_CHECKS:-owner_mfa_enforced}"
+    FORCE_OPS_ON_GUARD_FAIL=0
+    case "${ARCANA_PREFLIGHT_FORCE_OPS_ON_GUARD_FAIL:-false}" in
+      1|true|TRUE|yes|YES|on|ON)
+        FORCE_OPS_ON_GUARD_FAIL=1
+        ;;
+    esac
 
     OPS_STRICT_SCRIPT="ops:suite:strict"
     ALLOW_GUARD_FAIL_IN_HEAL_MODE=0
@@ -79,14 +127,36 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
         ;;
     esac
 
+    GUARD_REPORT_FILE="$(mktemp)"
+    POST_GUARD_REPORT_FILE="$(mktemp)"
+    cleanup_guard_reports() {
+      rm -f "$GUARD_REPORT_FILE" "$POST_GUARD_REPORT_FILE"
+    }
+    trap cleanup_guard_reports EXIT
+
     echo "4) Public readiness guard ($PUBLIC_URL)"
     set +e
-    BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard
+    BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard -- --report-file "$GUARD_REPORT_FILE"
     GUARD_EXIT_CODE=$?
     set -e
     if [[ "$GUARD_EXIT_CODE" -ne 0 ]]; then
       if [[ "$GUARD_EXIT_CODE" -eq 2 && "$ALLOW_GUARD_FAIL_IN_HEAL_MODE" -eq 1 ]]; then
-        echo "⚠️ Readiness guard blocker kvarstår, fortsätter p.g.a. heal-läge (${OPS_STRICT_SCRIPT})."
+        set +e
+        GUARD_CLASSIFICATION_OUTPUT="$(classify_guard_failures "$GUARD_REPORT_FILE" "$HEALABLE_GUARD_CHECKS")"
+        GUARD_CLASSIFICATION_EXIT=$?
+        set -e
+        if [[ "$FORCE_OPS_ON_GUARD_FAIL" -eq 1 ]]; then
+          echo "⚠️ Readiness guard blocker kvarstår, fortsätter p.g.a. force-override (ARCANA_PREFLIGHT_FORCE_OPS_ON_GUARD_FAIL=true)."
+          echo "   ${GUARD_CLASSIFICATION_OUTPUT}"
+        elif [[ "$GUARD_CLASSIFICATION_EXIT" -eq 0 ]]; then
+          echo "⚠️ Readiness guard blocker kvarstår men är healbar, fortsätter p.g.a. heal-läge (${OPS_STRICT_SCRIPT})."
+          echo "   ${GUARD_CLASSIFICATION_OUTPUT}"
+        else
+          echo "❌ Public readiness guard blocker innehåller ej-healbar check. Avbryter före ${OPS_STRICT_SCRIPT}."
+          echo "   ${GUARD_CLASSIFICATION_OUTPUT}"
+          echo "   Sätt ARCANA_PREFLIGHT_FORCE_OPS_ON_GUARD_FAIL=true för att tvinga fortsatt körning."
+          exit "$GUARD_EXIT_CODE"
+        fi
       else
         echo "❌ Public readiness guard misslyckades (exit: $GUARD_EXIT_CODE)."
         exit "$GUARD_EXIT_CODE"
@@ -106,16 +176,16 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
 
     RUN_POST_GUARD_VERIFY=0
     POST_GUARD_EXIT_CODE=0
-    POST_GUARD_ARGS=""
+    POST_GUARD_ARGS=()
     POST_GUARD_LABEL="6) Public readiness guard verify"
     if [[ "$VERIFY_REQUIRED_CHECKS" -eq 1 ]]; then
       RUN_POST_GUARD_VERIFY=1
-      POST_GUARD_ARGS="--use-required-checks"
+      POST_GUARD_ARGS+=(--use-required-checks)
       POST_GUARD_LABEL="6) Public readiness guard verify (required checks)"
     fi
     if [[ "$ALLOW_GUARD_FAIL_IN_HEAL_MODE" -eq 1 && "${GUARD_EXIT_CODE:-0}" -eq 2 ]]; then
       RUN_POST_GUARD_VERIFY=1
-      if [[ -z "$POST_GUARD_ARGS" ]]; then
+      if [[ "${#POST_GUARD_ARGS[@]}" -eq 0 ]]; then
         POST_GUARD_LABEL="6) Public readiness guard verify after heal"
       else
         POST_GUARD_LABEL="6) Public readiness guard verify after heal (required checks)"
@@ -123,7 +193,7 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
     fi
     if [[ "${OPS_EXIT_CODE:-0}" -ne 0 ]]; then
       RUN_POST_GUARD_VERIFY=1
-      if [[ -z "$POST_GUARD_ARGS" ]]; then
+      if [[ "${#POST_GUARD_ARGS[@]}" -eq 0 ]]; then
         POST_GUARD_LABEL="6) Public readiness guard verify after ops failure"
       else
         POST_GUARD_LABEL="6) Public readiness guard verify after ops failure (required checks)"
@@ -133,11 +203,7 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
     if [[ "$RUN_POST_GUARD_VERIFY" -eq 1 ]]; then
       echo "${POST_GUARD_LABEL} ($PUBLIC_URL)"
       set +e
-      if [[ -n "$POST_GUARD_ARGS" ]]; then
-        BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard -- $POST_GUARD_ARGS
-      else
-        BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard
-      fi
+      BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard -- --report-file "$POST_GUARD_REPORT_FILE" "${POST_GUARD_ARGS[@]}"
       POST_GUARD_EXIT_CODE=$?
       set -e
       if [[ "$POST_GUARD_EXIT_CODE" -ne 0 ]]; then
