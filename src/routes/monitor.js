@@ -735,6 +735,30 @@ function createMonitorRouter({
           scheduler && typeof scheduler.getStatus === 'function'
             ? scheduler.getStatus()
             : null;
+        const schedulerJobs = Array.isArray(schedulerStatus?.jobs) ? schedulerStatus.jobs : [];
+        const schedulerJobFreshness = schedulerJobs.map((job) => {
+          const freshness = buildSchedulerFreshnessCheck(job);
+          const freshnessValue =
+            freshness?.value && typeof freshness.value === 'object' ? freshness.value : {};
+          return {
+            id: normalizeText(job?.id) || null,
+            name: normalizeText(job?.name) || null,
+            enabled: Boolean(job?.enabled),
+            running: Boolean(job?.running),
+            intervalMs: Number(job?.intervalMs || 0),
+            runCount: Number(job?.runCount || 0),
+            lastRunAt: toIso(job?.lastRunAt),
+            lastSuccessAt: toIso(job?.lastSuccessAt),
+            lastStatus: normalizeText(job?.lastStatus) || null,
+            lastError: normalizeText(job?.lastError) || null,
+            nextRunAt: toIso(job?.nextRunAt),
+            freshnessStatus: normalizeStatus(freshness?.status),
+            freshnessTarget: normalizeText(freshness?.target) || null,
+            freshnessAgeHours: Number.isFinite(Number(freshnessValue?.ageHours))
+              ? Number(freshnessValue.ageHours)
+              : null,
+          };
+        });
         const restoreDrillGate = buildRestoreDrillGate({
           schedulerStatus,
           latestRestoreDrillAudit,
@@ -804,9 +828,8 @@ function createMonitorRouter({
                   enabled: Boolean(schedulerStatus.enabled),
                   started: Boolean(schedulerStatus.started),
                   startedAt: toIso(schedulerStatus.startedAt),
-                  jobsEnabled: Array.isArray(schedulerStatus.jobs)
-                    ? schedulerStatus.jobs.filter((item) => item?.enabled).length
-                    : 0,
+                  jobsEnabled: schedulerJobs.filter((item) => item?.enabled).length,
+                  jobs: schedulerJobFreshness,
                   restoreDrill: {
                     maxAgeDays: restoreDrillGate.maxAgeDays,
                     lastSuccessAt: restoreDrillGate.lastSuccessAt,
@@ -828,6 +851,7 @@ function createMonitorRouter({
                   started: false,
                   startedAt: null,
                   jobsEnabled: 0,
+                  jobs: [],
                   restoreDrill: {
                     maxAgeDays: restoreDrillGate.maxAgeDays,
                     lastSuccessAt: null,

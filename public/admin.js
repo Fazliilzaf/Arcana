@@ -46,6 +46,7 @@
       kpi_owner_coverage: 'Ägaråtgärdstäckning',
       kpi_readiness: 'Readiness',
       kpi_pilot_report: 'Pilotrapport',
+      monitor_scheduler_jobs: 'Schedulerjobb (krav)',
       open_queue: 'Öppna kö',
       see_incidents: 'Se incidenter',
       overview_insights: 'Översiktsinsikter',
@@ -97,6 +98,7 @@
       kpi_owner_coverage: 'Owner action coverage',
       kpi_readiness: 'Readiness',
       kpi_pilot_report: 'Pilot report',
+      monitor_scheduler_jobs: 'Scheduler jobs (required)',
       open_queue: 'Open queue',
       see_incidents: 'View incidents',
       overview_insights: 'Overview insights',
@@ -455,6 +457,8 @@
     runSchedulerSuiteBtn: document.getElementById('runSchedulerSuiteBtn'),
     monitorPanelStatus: document.getElementById('monitorPanelStatus'),
     monitorResult: document.getElementById('monitorResult'),
+    monitorSchedulerSummary: document.getElementById('monitorSchedulerSummary'),
+    monitorSchedulerResult: document.getElementById('monitorSchedulerResult'),
     monitorRemediationSummary: document.getElementById('monitorRemediationSummary'),
     monitorRemediationResult: document.getElementById('monitorRemediationResult'),
     loadStateManifestBtn: document.getElementById('loadStateManifestBtn'),
@@ -6156,6 +6160,60 @@
     return 9;
   }
 
+  function renderMonitorScheduler(statusResponse = null) {
+    if (!els.monitorSchedulerSummary || !els.monitorSchedulerResult) return;
+    const scheduler = statusResponse?.runtime?.scheduler || null;
+    if (!scheduler || typeof scheduler !== 'object') {
+      els.monitorSchedulerSummary.textContent = '';
+      els.monitorSchedulerResult.textContent = isEnglishLanguage()
+        ? 'No scheduler data yet.'
+        : 'Ingen scheduler-data ännu.';
+      return;
+    }
+
+    const requiredOrder = [
+      'alert_probe',
+      'nightly_pilot_report',
+      'backup_prune',
+      'restore_drill_preview',
+    ];
+    const byId = new Map(
+      (Array.isArray(scheduler?.jobs) ? scheduler.jobs : []).map((job) => [String(job?.id || ''), job])
+    );
+    const jobs = requiredOrder
+      .map((jobId) => byId.get(jobId))
+      .filter((job) => Boolean(job));
+
+    if (jobs.length === 0) {
+      els.monitorSchedulerSummary.textContent = isEnglishLanguage()
+        ? 'Required jobs missing in monitor status.'
+        : 'Required-jobs saknas i monitor-status.';
+      els.monitorSchedulerResult.textContent = isEnglishLanguage()
+        ? 'No scheduler job details available.'
+        : 'Ingen scheduler-jobbdetalj tillgänglig.';
+      return;
+    }
+
+    const stale = jobs.filter((job) => String(job?.freshnessStatus || '') === 'red').length;
+    const warn = jobs.filter((job) => String(job?.freshnessStatus || '') === 'yellow').length;
+    const running = jobs.filter((job) => job?.running === true).length;
+    els.monitorSchedulerSummary.textContent = isEnglishLanguage()
+      ? `required=${jobs.length} stale=${stale} warn=${warn} running=${running}`
+      : `krav=${jobs.length} stale=${stale} varning=${warn} kör=${running}`;
+
+    const lines = jobs.map((job) => {
+      const id = String(job?.id || '-');
+      const enabled = job?.enabled === true ? (isEnglishLanguage() ? 'yes' : 'ja') : isEnglishLanguage() ? 'no' : 'nej';
+      const freshness = String(job?.freshnessStatus || 'unknown');
+      const lastSuccess = formatDateTime(job?.lastSuccessAt);
+      const lastSuccessAge = formatRelativeAge(job?.lastSuccessAt);
+      const nextRun = formatDateTime(job?.nextRunAt);
+      const lastStatus = String(job?.lastStatus || '-');
+      return `${id} | enabled=${enabled} | freshness=${freshness} | lastSuccess=${lastSuccess} (${lastSuccessAge}) | nextRun=${nextRun} | status=${lastStatus}`;
+    });
+    els.monitorSchedulerResult.textContent = lines.join('\n');
+  }
+
   function renderMonitorRemediation(readiness) {
     const remediation = readiness?.remediation || null;
     const summary = remediation?.summary || {};
@@ -6254,6 +6312,7 @@
       }
       renderReadinessKpi(readinessResponse);
       renderPilotReportKpi(statusResponse);
+      renderMonitorScheduler(statusResponse);
       renderMonitorRemediation(readinessResponse);
       const templatesTotal = statusResponse?.kpis?.templatesTotal ?? 0;
       const evaluationsTotal = statusResponse?.kpis?.evaluationsTotal ?? 0;
@@ -6271,6 +6330,7 @@
     } catch (error) {
       renderReadinessKpi(null);
       renderPilotReportKpi(null);
+      renderMonitorScheduler(null);
       if (els.monitorRemediationSummary) els.monitorRemediationSummary.textContent = '';
       if (els.monitorRemediationResult) {
         els.monitorRemediationResult.textContent = isEnglishLanguage()
@@ -7203,6 +7263,10 @@
     if (els.pilotReportResult) els.pilotReportResult.textContent = 'Ingen rapport körd ännu.';
     if (els.mailInsightsResult) els.mailInsightsResult.textContent = 'Ingen mail-data ännu.';
     if (els.monitorResult) els.monitorResult.textContent = 'Ingen monitor-data ännu.';
+    if (els.monitorSchedulerSummary) els.monitorSchedulerSummary.textContent = '';
+    if (els.monitorSchedulerResult) {
+      els.monitorSchedulerResult.textContent = 'Ingen scheduler-data ännu.';
+    }
     if (els.monitorRemediationSummary) els.monitorRemediationSummary.textContent = '';
     if (els.monitorRemediationResult) {
       els.monitorRemediationResult.textContent = 'Ingen readiness-remediation ännu.';
