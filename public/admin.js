@@ -45,6 +45,7 @@
       kpi_templates: 'Mallar',
       kpi_owner_coverage: 'Ägaråtgärdstäckning',
       kpi_readiness: 'Readiness',
+      kpi_pilot_report: 'Pilotrapport',
       open_queue: 'Öppna kö',
       see_incidents: 'Se incidenter',
       overview_insights: 'Översiktsinsikter',
@@ -95,6 +96,7 @@
       kpi_templates: 'Templates',
       kpi_owner_coverage: 'Owner action coverage',
       kpi_readiness: 'Readiness',
+      kpi_pilot_report: 'Pilot report',
       open_queue: 'Open queue',
       see_incidents: 'View incidents',
       overview_insights: 'Overview insights',
@@ -320,6 +322,8 @@
     slaIndicatorMeta: document.getElementById('slaIndicatorMeta'),
     readinessBandValue: document.getElementById('readinessBandValue'),
     readinessBandMeta: document.getElementById('readinessBandMeta'),
+    pilotReportValue: document.getElementById('pilotReportValue'),
+    pilotReportMeta: document.getElementById('pilotReportMeta'),
     latestActivityList: document.getElementById('latestActivityList'),
     riskTrendBars: document.getElementById('riskTrendBars'),
     riskTrendMeta: document.getElementById('riskTrendMeta'),
@@ -2415,6 +2419,39 @@
     setKpiMeta(
       els.readinessBandMeta,
       metaText,
+      tone
+    );
+  }
+
+  function renderPilotReportKpi(monitorStatus = null) {
+    if (!els.pilotReportValue || !els.pilotReportMeta) return;
+    const pilotReport = monitorStatus?.gates?.pilotReport || null;
+    if (!pilotReport || typeof pilotReport !== 'object') {
+      setText(els.pilotReportValue, '-');
+      setKpiMeta(
+        els.pilotReportMeta,
+        isEnglishLanguage() ? 'Waiting for monitor data.' : 'Väntar på monitor-data.'
+      );
+      return;
+    }
+
+    const ageHoursRaw = Number(pilotReport?.ageHours);
+    const ageHours = Number.isFinite(ageHoursRaw) ? Number(ageHoursRaw.toFixed(1)) : null;
+    const maxAgeHours = Number(pilotReport?.maxAgeHours || 0);
+    const healthy = pilotReport?.healthy === true;
+    const noGo = pilotReport?.noGo === true;
+    const latestReportFile = String(pilotReport?.latestReport?.fileName || '-');
+
+    let tone = 'ok';
+    if (noGo || !healthy) tone = 'bad';
+    else if (ageHours !== null && ageHours > 24) tone = 'warn';
+
+    setText(els.pilotReportValue, ageHours === null ? '-' : `${ageHours}h`);
+    setKpiMeta(
+      els.pilotReportMeta,
+      isEnglishLanguage()
+        ? `healthy=${healthy ? 'yes' : 'no'} • no-go=${noGo ? 'yes' : 'no'} • maxAge=${maxAgeHours}h • latest=${latestReportFile}`
+        : `healthy=${healthy ? 'ja' : 'nej'} • no-go=${noGo ? 'ja' : 'nej'} • maxAge=${maxAgeHours}h • senaste=${latestReportFile}`,
       tone
     );
   }
@@ -6214,6 +6251,7 @@
         );
       }
       renderReadinessKpi(readinessResponse);
+      renderPilotReportKpi(statusResponse);
       renderMonitorRemediation(readinessResponse);
       const templatesTotal = statusResponse?.kpis?.templatesTotal ?? 0;
       const evaluationsTotal = statusResponse?.kpis?.evaluationsTotal ?? 0;
@@ -6230,6 +6268,7 @@
       );
     } catch (error) {
       renderReadinessKpi(null);
+      renderPilotReportKpi(null);
       if (els.monitorRemediationSummary) els.monitorRemediationSummary.textContent = '';
       if (els.monitorRemediationResult) {
         els.monitorRemediationResult.textContent = isEnglishLanguage()
@@ -7154,6 +7193,8 @@
     setKpiMeta(els.slaIndicatorMeta, 'Inga öppna incidents.');
     setText(els.readinessBandValue, '-');
     setKpiMeta(els.readinessBandMeta, 'Väntar på monitor-data.');
+    setText(els.pilotReportValue, '-');
+    setKpiMeta(els.pilotReportMeta, 'Väntar på monitor-data.');
     if (els.riskQueueSummary) els.riskQueueSummary.innerHTML = '';
     renderRiskDetail(null);
     if (els.riskReviewsTableBody) els.riskReviewsTableBody.innerHTML = '';
