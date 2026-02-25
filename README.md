@@ -228,7 +228,8 @@ Snabbaste vägen (allt i ett):
 - Om `ops:suite:strict` failar kör preflight ändå verifierings-steget för diagnos och returnerar sedan samma fail-exit-kod.
 - Sätt `ARCANA_PREFLIGHT_USE_HEAL=true` för att köra `ops:suite:strict:heal` i sista steget.
 - Sätt `ARCANA_PREFLIGHT_USE_HEAL_ALL=true` för att köra `ops:suite:strict:heal:all` (output-gates + owner-MFA-remediation) i sista steget.
-- När heal-läge är aktivt (`ARCANA_PREFLIGHT_USE_HEAL`/`ARCANA_PREFLIGHT_USE_HEAL_ALL`) fortsätter preflight efter readiness-guard `exit 2`, kör heal-steget och verifierar guard igen efteråt.
+- När heal-läge är aktivt (`ARCANA_PREFLIGHT_USE_HEAL`/`ARCANA_PREFLIGHT_USE_HEAL_ALL`) fortsätter preflight efter readiness-guard `exit 2` endast om blocker-checkarna är healbara (default: `owner_mfa_enforced` via `ARCANA_PREFLIGHT_HEALABLE_GUARD_CHECKS`), kör heal-steget och verifierar guard igen efteråt.
+- För att tvinga fortsatt körning i heal-läge även med ej-healbara guard-blockers: `ARCANA_PREFLIGHT_FORCE_OPS_ON_GUARD_FAIL=true`.
 - Om guard blockerar på `owner_mfa_enforced`: kör `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run owner:mfa:setup` (per aktiv OWNER).
 - Emergency fallback för `owner_mfa_enforced` (disable non-compliant OWNER memberships om minst en compliant OWNER redan finns):
   - Preview: `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run owner:mfa:remediate`
@@ -272,8 +273,9 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
   - För att köra på alla required checks i readiness: `npm run preflight:readiness:guard -- --use-required-checks` eller `--checks required`
   - Guard kör även CORS runtime-probe när `cors_strict` är med i check-listan och `cors_strict=green` (tillåten origin måste få ACAO-header, otillåten origin måste blockeras utan ACAO-header).
   - Vid `owner_mfa_enforced` visar guard även vilka aktiva OWNER-konton som saknar `mfaRequired/mfaConfigured` (från `/api/v1/users/staff`).
-  - Konfigurering: `ARCANA_PREFLIGHT_READINESS_CHECKS`, `ARCANA_PREFLIGHT_READINESS_USE_REQUIRED_CHECKS`, `ARCANA_PREFLIGHT_READINESS_FAIL_STATUSES`, `ARCANA_PREFLIGHT_READINESS_ALLOW_MISSING`, `ARCANA_PREFLIGHT_READINESS_CORS_RUNTIME_PROBE`, `ARCANA_PREFLIGHT_READINESS_CORS_PROBE_PATH`
-  - CLI-flaggor: `--use-required-checks`, `--no-use-required-checks`, `--cors-runtime-probe`, `--no-cors-runtime-probe`, `--cors-probe-path /healthz`
+  - Guard kan skriva JSON-rapport för automation: `--report-file /tmp/readiness-guard.json` (eller `ARCANA_PREFLIGHT_READINESS_REPORT_FILE`).
+  - Konfigurering: `ARCANA_PREFLIGHT_READINESS_CHECKS`, `ARCANA_PREFLIGHT_READINESS_USE_REQUIRED_CHECKS`, `ARCANA_PREFLIGHT_READINESS_FAIL_STATUSES`, `ARCANA_PREFLIGHT_READINESS_ALLOW_MISSING`, `ARCANA_PREFLIGHT_READINESS_CORS_RUNTIME_PROBE`, `ARCANA_PREFLIGHT_READINESS_CORS_PROBE_PATH`, `ARCANA_PREFLIGHT_READINESS_REPORT_FILE`
+  - CLI-flaggor: `--use-required-checks`, `--no-use-required-checks`, `--cors-runtime-probe`, `--no-cors-runtime-probe`, `--cors-probe-path /healthz`, `--report-file /tmp/readiness-guard.json`
   - Styr OWNER-gap listing: `ARCANA_PREFLIGHT_READINESS_SHOW_OWNER_MFA_GAPS=true|false`
 
 4) Mail-baserade mallutkast (när export finns):
