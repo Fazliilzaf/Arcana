@@ -440,6 +440,8 @@
     runOrchestratorBtn: document.getElementById('runOrchestratorBtn'),
     orchestratorStatus: document.getElementById('orchestratorStatus'),
     orchestratorResult: document.getElementById('orchestratorResult'),
+    orchestratorMetaSummary: document.getElementById('orchestratorMetaSummary'),
+    orchestratorMetaResult: document.getElementById('orchestratorMetaResult'),
     fetchCalibrationSuggestionBtn: document.getElementById('fetchCalibrationSuggestionBtn'),
     applyCalibrationSuggestionBtn: document.getElementById('applyCalibrationSuggestionBtn'),
     calibrationNoteInput: document.getElementById('calibrationNoteInput'),
@@ -465,6 +467,10 @@
     runReadinessOwnerMfaRemediationBtn: document.getElementById('runReadinessOwnerMfaRemediationBtn'),
     monitorPanelStatus: document.getElementById('monitorPanelStatus'),
     monitorResult: document.getElementById('monitorResult'),
+    monitorObservabilitySummary: document.getElementById('monitorObservabilitySummary'),
+    monitorObservabilityResult: document.getElementById('monitorObservabilityResult'),
+    monitorPublicChatBetaSummary: document.getElementById('monitorPublicChatBetaSummary'),
+    monitorPublicChatBetaResult: document.getElementById('monitorPublicChatBetaResult'),
     monitorSchedulerSummary: document.getElementById('monitorSchedulerSummary'),
     monitorSchedulerResult: document.getElementById('monitorSchedulerResult'),
     monitorReadinessHistorySummary: document.getElementById('monitorReadinessHistorySummary'),
@@ -5921,6 +5927,90 @@
     }
   }
 
+  function renderOrchestratorMeta(metaResponse = null) {
+    if (!els.orchestratorMetaSummary || !els.orchestratorMetaResult) return;
+
+    const agents = metaResponse?.agents && typeof metaResponse.agents === 'object'
+      ? metaResponse.agents
+      : {};
+    const intents = metaResponse?.intents && typeof metaResponse.intents === 'object'
+      ? metaResponse.intents
+      : {};
+    const roadmap = metaResponse?.roadmap && typeof metaResponse.roadmap === 'object'
+      ? metaResponse.roadmap
+      : {};
+    const policyFloor = metaResponse?.policyFloor && typeof metaResponse.policyFloor === 'object'
+      ? metaResponse.policyFloor
+      : {};
+    const phases = Array.isArray(roadmap?.phases) ? roadmap.phases : [];
+    const policyRules = Array.isArray(policyFloor?.rules) ? policyFloor.rules : [];
+    const agentLabels = Object.values(agents).map((item) => String(item || '').trim()).filter(Boolean);
+    const intentLabels = Object.values(intents).map((item) => String(item || '').trim()).filter(Boolean);
+
+    if (agentLabels.length === 0 && intentLabels.length === 0 && phases.length === 0) {
+      els.orchestratorMetaSummary.textContent = '';
+      els.orchestratorMetaResult.textContent = isEnglishLanguage()
+        ? 'No orchestrator roadmap data yet.'
+        : 'Ingen orchestrator-roadmap ännu.';
+      return;
+    }
+
+    els.orchestratorMetaSummary.textContent = isEnglishLanguage()
+      ? `agents=${agentLabels.length} intents=${intentLabels.length} phases=${phases.length} policyRules=${policyRules.length}`
+      : `agents=${agentLabels.length} intents=${intentLabels.length} faser=${phases.length} policyRules=${policyRules.length}`;
+
+    const lines = [];
+    lines.push(
+      `roadmapVersion=${String(roadmap?.version || '-')} | policyVersion=${String(policyFloor?.version || '-')} | policyImmutable=${policyFloor?.immutable === true ? 'yes' : 'no'}`
+    );
+    lines.push(`agents: ${agentLabels.join(', ') || '-'}`);
+    lines.push(`intents: ${intentLabels.join(', ') || '-'}`);
+    lines.push('');
+    lines.push(isEnglishLanguage() ? 'roadmap phases:' : 'roadmap-faser:');
+    if (phases.length === 0) {
+      lines.push(isEnglishLanguage() ? '- no phases available' : '- inga faser tillgängliga');
+    } else {
+      phases.forEach((phase, index) => {
+        const label = String(phase?.label || phase?.id || `phase_${index + 1}`);
+        const status = String(phase?.status || '-');
+        const phaseAgents = Array.isArray(phase?.agents)
+          ? phase.agents.map((item) => String(item || '').trim()).filter(Boolean)
+          : [];
+        const capabilities = Array.isArray(phase?.capabilities)
+          ? phase.capabilities.map((item) => String(item || '').trim()).filter(Boolean)
+          : [];
+        lines.push(
+          `${index + 1}. ${label} [${status}] | agents=${phaseAgents.join(',') || '-'} | capabilities=${capabilities.join(',') || '-'}`
+        );
+      });
+    }
+    lines.push('');
+    lines.push(
+      `policyFloorRules(${policyRules.length}): ${policyRules.map((item) => String(item?.id || '').trim()).filter(Boolean).join(', ') || '-'}`
+    );
+    els.orchestratorMetaResult.textContent = lines.join('\n');
+  }
+
+  async function loadOrchestratorMeta({ updateStatus = false } = {}) {
+    try {
+      const response = await api('/orchestrator/meta');
+      renderOrchestratorMeta(response);
+      if (updateStatus) {
+        const phases = Array.isArray(response?.roadmap?.phases) ? response.roadmap.phases.length : 0;
+        setStatus(els.orchestratorStatus, `Roadmap laddad: phases=${phases}`);
+      }
+    } catch (error) {
+      renderOrchestratorMeta(null);
+      if (updateStatus) {
+        setStatus(
+          els.orchestratorStatus,
+          error.message || 'Kunde inte läsa orchestrator-roadmap.',
+          true
+        );
+      }
+    }
+  }
+
   async function runOrchestrator() {
     try {
       if (!canTemplateWrite()) throw new Error('Du saknar behörighet.');
@@ -5939,7 +6029,7 @@
         els.orchestratorStatus,
         `Klar: intent=${response?.intent || '-'} risk=L${response?.output?.risk?.riskLevel || '-'}`
       );
-      await loadDashboard();
+      await Promise.all([loadDashboard(), loadOrchestratorMeta()]);
     } catch (error) {
       setStatus(els.orchestratorStatus, error.message || 'Kunde inte köra orchestrator.', true);
     }
@@ -6170,6 +6260,126 @@
     if (priority === 'P2') return 2;
     if (priority === 'P3') return 3;
     return 9;
+  }
+
+  function renderMonitorObservability(observabilityResponse = null) {
+    if (!els.monitorObservabilitySummary || !els.monitorObservabilityResult) return;
+    const summary = observabilityResponse?.summary && typeof observabilityResponse.summary === 'object'
+      ? observabilityResponse.summary
+      : null;
+    if (!summary) {
+      els.monitorObservabilitySummary.textContent = '';
+      els.monitorObservabilityResult.textContent = isEnglishLanguage()
+        ? 'No observability data yet.'
+        : 'Ingen observability-data ännu.';
+      return;
+    }
+
+    const status = String(summary?.overallStatus || 'unknown').toLowerCase();
+    const alerts = Number(summary?.triggeredAlertsCount || 0);
+    const hasTraffic = summary?.hasTraffic === true;
+    const sampledRequests = Number(summary?.sampledRequests || 0);
+    const metrics = observabilityResponse?.metrics && typeof observabilityResponse.metrics === 'object'
+      ? observabilityResponse.metrics
+      : {};
+    const thresholds =
+      observabilityResponse?.thresholds && typeof observabilityResponse.thresholds === 'object'
+        ? observabilityResponse.thresholds
+        : {};
+    const checks = Array.isArray(observabilityResponse?.checks) ? observabilityResponse.checks : [];
+    const triggeredAlerts = Array.isArray(observabilityResponse?.triggeredAlerts)
+      ? observabilityResponse.triggeredAlerts
+      : [];
+
+    els.monitorObservabilitySummary.textContent = isEnglishLanguage()
+      ? `status=${status} alerts=${alerts} hasTraffic=${hasTraffic ? 'yes' : 'no'} sampled=${sampledRequests}`
+      : `status=${status} alerts=${alerts} harTrafik=${hasTraffic ? 'ja' : 'nej'} sampled=${sampledRequests}`;
+
+    const lines = [];
+    lines.push(
+      `metrics: errorRatePct=${Number(metrics?.errorRatePct || 0)} p95Ms=${Number(metrics?.p95Ms || 0)} p99Ms=${Number(metrics?.p99Ms || 0)} slowRequests=${Number(metrics?.slowRequests || 0)}`
+    );
+    lines.push(
+      `thresholds: maxErrorRatePct=${Number(thresholds?.maxErrorRatePct || 0)} maxP95Ms=${Number(thresholds?.maxP95Ms || 0)} maxSlowRequests=${Number(thresholds?.maxSlowRequests || 0)}`
+    );
+    lines.push(`generatedAt: ${formatDateTime(observabilityResponse?.generatedAt)}`);
+    lines.push('');
+    lines.push(
+      isEnglishLanguage()
+        ? `checks (${checks.length}):`
+        : `checks (${checks.length}):`
+    );
+    checks.forEach((check) => {
+      lines.push(
+        `- ${String(check?.id || '-')} status=${String(check?.status || '-')} required=${check?.required === true ? 'yes' : 'no'} target=${String(check?.target || '-')}`
+      );
+    });
+    lines.push('');
+    if (triggeredAlerts.length === 0) {
+      lines.push(
+        isEnglishLanguage() ? 'No triggered alerts.' : 'Inga aktiva alerts.'
+      );
+    } else {
+      lines.push(
+        isEnglishLanguage() ? 'Triggered alerts:' : 'Aktiva alerts:'
+      );
+      triggeredAlerts.forEach((alert) => {
+        lines.push(
+          `- ${String(alert?.id || '-')} target=${String(alert?.target || '-')} value=${JSON.stringify(alert?.value || {})}`
+        );
+      });
+    }
+    els.monitorObservabilityResult.textContent = lines.join('\n');
+  }
+
+  function renderMonitorPublicChatBeta(statusResponse = null) {
+    if (!els.monitorPublicChatBetaSummary || !els.monitorPublicChatBetaResult) return;
+    const beta = statusResponse?.security?.publicChatBeta;
+    if (!beta || typeof beta !== 'object') {
+      els.monitorPublicChatBetaSummary.textContent = '';
+      els.monitorPublicChatBetaResult.textContent = isEnglishLanguage()
+        ? 'No patient beta gate data yet.'
+        : 'Ingen patient beta gate-data ännu.';
+      return;
+    }
+
+    const enabled = beta?.enabled === true;
+    const keyConfigured = beta?.keyConfigured === true;
+    const allowHostsCount = Number(beta?.allowHostsCount || 0);
+    const allowLocalhost = beta?.allowLocalhost === true;
+    const headerName = String(beta?.headerName || 'x-arcana-beta-key');
+    const ready = !enabled || keyConfigured || allowHostsCount > 0;
+
+    els.monitorPublicChatBetaSummary.textContent = isEnglishLanguage()
+      ? `enabled=${enabled ? 'yes' : 'no'} ready=${ready ? 'yes' : 'no'} key=${keyConfigured ? 'yes' : 'no'} allowHosts=${allowHostsCount}`
+      : `enabled=${enabled ? 'ja' : 'nej'} ready=${ready ? 'ja' : 'nej'} nyckel=${keyConfigured ? 'ja' : 'nej'} allowHosts=${allowHostsCount}`;
+
+    const lines = [
+      `headerName=${headerName}`,
+      `allowLocalhost=${allowLocalhost ? 'yes' : 'no'}`,
+      `keyConfigured=${keyConfigured ? 'yes' : 'no'}`,
+      `allowHostsCount=${allowHostsCount}`,
+    ];
+    if (enabled && !ready) {
+      lines.push(
+        isEnglishLanguage()
+          ? 'Action: set ARCANA_PUBLIC_CHAT_BETA_KEY or ARCANA_PUBLIC_CHAT_BETA_ALLOW_HOSTS.'
+          : 'Åtgärd: sätt ARCANA_PUBLIC_CHAT_BETA_KEY eller ARCANA_PUBLIC_CHAT_BETA_ALLOW_HOSTS.'
+      );
+    } else if (enabled) {
+      lines.push(
+        isEnglishLanguage()
+          ? 'Patient beta gate is active and configured.'
+          : 'Patient beta gate är aktiv och konfigurerad.'
+      );
+    } else {
+      lines.push(
+        isEnglishLanguage()
+          ? 'Patient beta gate is disabled (open access mode).'
+          : 'Patient beta gate är avstängd (öppet läge).'
+      );
+    }
+    els.monitorPublicChatBetaResult.textContent = lines.join('\n');
   }
 
   function renderMonitorScheduler(statusResponse = null) {
@@ -6477,10 +6687,11 @@
   async function loadMonitorStatus() {
     try {
       setStatus(els.monitorPanelStatus, 'Laddar monitor-status...');
-      const [statusResponse, readinessResponse, readinessHistoryResponse] = await Promise.all([
+      const [statusResponse, readinessResponse, readinessHistoryResponse, observabilityResponse] = await Promise.all([
         api('/monitor/status'),
         api('/monitor/readiness'),
         api('/monitor/readiness/history?limit=30'),
+        api('/monitor/observability?areaLimit=12'),
       ]);
       if (els.monitorResult) {
         els.monitorResult.textContent = JSON.stringify(
@@ -6488,6 +6699,7 @@
             status: statusResponse,
             readiness: readinessResponse,
             readinessHistory: readinessHistoryResponse,
+            observability: observabilityResponse,
           },
           null,
           2
@@ -6495,6 +6707,8 @@
       }
       renderReadinessKpi(readinessResponse);
       renderPilotReportKpi(statusResponse);
+      renderMonitorObservability(observabilityResponse);
+      renderMonitorPublicChatBeta(statusResponse);
       renderMonitorScheduler(statusResponse);
       renderReadinessHistory(readinessHistoryResponse);
       renderReadinessNoGo(readinessResponse);
@@ -6511,13 +6725,17 @@
       const pilotReportHealthy = statusResponse?.gates?.pilotReport?.healthy === true ? 'yes' : 'no';
       const pilotReportAgeHours =
         statusResponse?.gates?.pilotReport?.ageHours ?? statusResponse?.kpis?.pilotReportAgeHours ?? '-';
+      const observabilityStatus = String(observabilityResponse?.summary?.overallStatus || 'unknown');
+      const observabilityAlerts = Number(observabilityResponse?.summary?.triggeredAlertsCount || 0);
       setStatus(
         els.monitorPanelStatus,
-        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}, band=${band}, goAllowed=${goAllowed}, requiredBlockers=${requiredBlockers}, noGo=${triggeredNoGoCount}, remediation=${remediationTotal}, P0=${p0}, pilotReportHealthy=${pilotReportHealthy}, pilotReportAgeHours=${pilotReportAgeHours}`
+        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}, band=${band}, goAllowed=${goAllowed}, requiredBlockers=${requiredBlockers}, noGo=${triggeredNoGoCount}, remediation=${remediationTotal}, P0=${p0}, pilotReportHealthy=${pilotReportHealthy}, pilotReportAgeHours=${pilotReportAgeHours}, observability=${observabilityStatus}, alerts=${observabilityAlerts}`
       );
     } catch (error) {
       renderReadinessKpi(null);
       renderPilotReportKpi(null);
+      renderMonitorObservability(null);
+      renderMonitorPublicChatBeta(null);
       renderMonitorScheduler(null);
       renderReadinessHistory(null);
       renderReadinessNoGo(null);
@@ -7186,6 +7404,7 @@
     await loadSessionProfile();
     await loadTenants();
     await loadDashboard();
+    await loadOrchestratorMeta();
     await loadStaffMembers();
     await loadSessionsPanel();
     await loadTemplates({ preserveSelection: true });
@@ -7538,10 +7757,28 @@
     setStatus(els.tenantOnboardStatus, '');
     if (els.riskLabResult) els.riskLabResult.textContent = 'Ingen förhandsgranskning körd ännu.';
     if (els.orchestratorResult) els.orchestratorResult.textContent = 'Ingen körning ännu.';
+    if (els.orchestratorMetaSummary) els.orchestratorMetaSummary.textContent = '';
+    if (els.orchestratorMetaResult) {
+      els.orchestratorMetaResult.textContent = isEnglishLanguage()
+        ? 'No orchestrator roadmap data yet.'
+        : 'Ingen orchestrator-roadmap ännu.';
+    }
     if (els.calibrationResult) els.calibrationResult.textContent = 'Inget kalibreringsförslag ännu.';
     if (els.pilotReportResult) els.pilotReportResult.textContent = 'Ingen rapport körd ännu.';
     if (els.mailInsightsResult) els.mailInsightsResult.textContent = 'Ingen mail-data ännu.';
     if (els.monitorResult) els.monitorResult.textContent = 'Ingen monitor-data ännu.';
+    if (els.monitorObservabilitySummary) els.monitorObservabilitySummary.textContent = '';
+    if (els.monitorObservabilityResult) {
+      els.monitorObservabilityResult.textContent = isEnglishLanguage()
+        ? 'No observability data yet.'
+        : 'Ingen observability-data ännu.';
+    }
+    if (els.monitorPublicChatBetaSummary) els.monitorPublicChatBetaSummary.textContent = '';
+    if (els.monitorPublicChatBetaResult) {
+      els.monitorPublicChatBetaResult.textContent = isEnglishLanguage()
+        ? 'No patient beta gate data yet.'
+        : 'Ingen patient beta gate-data ännu.';
+    }
     if (els.monitorSchedulerSummary) els.monitorSchedulerSummary.textContent = '';
     if (els.monitorSchedulerResult) {
       els.monitorSchedulerResult.textContent = 'Ingen scheduler-data ännu.';

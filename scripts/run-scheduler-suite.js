@@ -848,6 +848,9 @@ async function main() {
   const monitorStatus = await fetchJson(baseUrl, '/api/v1/monitor/status', {
     token: auth.token,
   });
+  const observability = await fetchJson(baseUrl, '/api/v1/monitor/observability?areaLimit=12', {
+    token: auth.token,
+  });
   const readiness = await fetchJson(baseUrl, '/api/v1/monitor/readiness', {
     token: auth.token,
   });
@@ -1086,6 +1089,16 @@ async function main() {
         kpis: monitorStatus?.kpis || {},
         gates: monitorStatus?.gates || {},
       },
+      observability: {
+        generatedAt: observability?.generatedAt || null,
+        summary: observability?.summary || {},
+        thresholds: observability?.thresholds || {},
+        metrics: observability?.metrics || {},
+        checks: Array.isArray(observability?.checks) ? observability.checks : [],
+        triggeredAlerts: Array.isArray(observability?.triggeredAlerts)
+          ? observability.triggeredAlerts
+          : [],
+      },
       readiness: {
         generatedAt: readiness?.generatedAt || null,
         score: Number(readiness?.score || 0),
@@ -1128,6 +1141,25 @@ async function main() {
   const goAllowed = readiness?.goNoGo?.allowed === true ? 'yes' : 'no';
   const pilotHealthy = monitorStatus?.gates?.pilotReport?.healthy === true ? 'yes' : 'no';
   const restoreHealthy = monitorStatus?.gates?.restoreDrill?.healthy === true ? 'yes' : 'no';
+  const observabilityOverall = String(
+    observability?.summary?.overallStatus || monitorStatus?.kpis?.observabilityStatus || 'unknown'
+  ).toLowerCase();
+  const observabilityAlertsCount = Number(
+    observability?.summary?.triggeredAlertsCount ??
+      monitorStatus?.kpis?.observabilityAlertCount ??
+      0
+  );
+  const observabilityHasTraffic = observability?.summary?.hasTraffic === true;
+  const observabilitySampledRequests = Number(observability?.summary?.sampledRequests || 0);
+  const observabilityErrorRatePct = Number(observability?.metrics?.errorRatePct || 0);
+  const observabilityP95Ms = Number(observability?.metrics?.p95Ms || 0);
+  const observabilitySlowRequests = Number(observability?.metrics?.slowRequests || 0);
+  const observabilityTriggeredAlertIds = Array.isArray(observability?.triggeredAlerts)
+    ? observability.triggeredAlerts
+        .map((item) => normalizeText(item?.id))
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
   const sloOverall = String(slo?.summary?.overallStatus || '-');
   const blockerCategoriesGreen = readiness?.goNoGo?.blockerCategoriesGreen === true;
   const triggeredNoGoCount = triggeredNoGo.length;
@@ -1206,6 +1238,15 @@ async function main() {
   }
   if (monitorStatus?.gates?.pilotReport?.noGo === true) strictFailures.push('pilot report gate is no-go');
   if (monitorStatus?.gates?.restoreDrill?.noGo === true) strictFailures.push('restore drill gate is no-go');
+  if (observabilityOverall === 'red' || observabilityAlertsCount > 0) {
+    const alertSuffix =
+      observabilityTriggeredAlertIds.length > 0
+        ? ` [${observabilityTriggeredAlertIds.join(', ')}]`
+        : '';
+    strictFailures.push(
+      `observability alert gate triggered (status=${observabilityOverall}, alerts=${observabilityAlertsCount})${alertSuffix}`
+    );
+  }
   if (sloOverall === 'red' || sloOverall === 'unknown') {
     strictFailures.push(`slo overall status is ${sloOverall}`);
   }
@@ -1261,6 +1302,14 @@ async function main() {
     if (previewEmails.length > 0) {
       advisories.push(`owner MFA gaps: ${previewEmails.join(', ')}`);
     }
+  }
+  if (observabilityOverall === 'yellow') {
+    advisories.push(
+      `observability warning: status=${observabilityOverall}, alerts=${observabilityAlertsCount}, p95Ms=${observabilityP95Ms}`
+    );
+  }
+  if (!observabilityHasTraffic) {
+    advisories.push('observability has no sampled traffic in current metrics window');
   }
   if (!corsRuntimeProbeEnabled) {
     advisories.push(
@@ -1433,6 +1482,12 @@ async function main() {
   process.stdout.write(
     `   tenantAccessCheck: enabled=${tenantAccessCheckEnabled ? 'yes' : 'no'} attempted=${tenantAccessCheckAttempted ? 'yes' : 'no'} ok=${tenantAccessCheckOk ? 'yes' : 'no'} status=${tenantAccessCheckStatus || '-'} tenant=${tenantAccessCheckTenantId}\n`
   );
+  process.stdout.write(
+    `   observability: status=${observabilityOverall} alerts=${observabilityAlertsCount} hasTraffic=${observabilityHasTraffic ? 'yes' : 'no'} sampled=${observabilitySampledRequests} errorRatePct=${observabilityErrorRatePct} p95Ms=${observabilityP95Ms} slowRequests=${observabilitySlowRequests}\n`
+  );
+  if (observabilityTriggeredAlertIds.length > 0) {
+    process.stdout.write(`   observabilityAlerts: ${observabilityTriggeredAlertIds.join(', ')}\n`);
+  }
   process.stdout.write(
     `   gates: pilotReportHealthy=${pilotHealthy} restoreHealthy=${restoreHealthy} sloOverall=${sloOverall}\n`
   );
