@@ -95,10 +95,17 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
     echo
 
     echo "5) Public ${OPS_STRICT_SCRIPT} ($PUBLIC_URL)"
+    set +e
     BASE_URL="$PUBLIC_URL" npm run "$OPS_STRICT_SCRIPT"
+    OPS_EXIT_CODE=$?
+    set -e
+    if [[ "$OPS_EXIT_CODE" -ne 0 ]]; then
+      echo "⚠️ Public ${OPS_STRICT_SCRIPT} misslyckades (exit: $OPS_EXIT_CODE). Kör verifiering för diagnos."
+    fi
     echo
 
     RUN_POST_GUARD_VERIFY=0
+    POST_GUARD_EXIT_CODE=0
     POST_GUARD_ARGS=""
     POST_GUARD_LABEL="6) Public readiness guard verify"
     if [[ "$VERIFY_REQUIRED_CHECKS" -eq 1 ]]; then
@@ -114,15 +121,36 @@ if [[ "$RUN_PUBLIC" -eq 1 ]]; then
         POST_GUARD_LABEL="6) Public readiness guard verify after heal (required checks)"
       fi
     fi
+    if [[ "${OPS_EXIT_CODE:-0}" -ne 0 ]]; then
+      RUN_POST_GUARD_VERIFY=1
+      if [[ -z "$POST_GUARD_ARGS" ]]; then
+        POST_GUARD_LABEL="6) Public readiness guard verify after ops failure"
+      else
+        POST_GUARD_LABEL="6) Public readiness guard verify after ops failure (required checks)"
+      fi
+    fi
 
     if [[ "$RUN_POST_GUARD_VERIFY" -eq 1 ]]; then
       echo "${POST_GUARD_LABEL} ($PUBLIC_URL)"
+      set +e
       if [[ -n "$POST_GUARD_ARGS" ]]; then
         BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard -- $POST_GUARD_ARGS
       else
         BASE_URL="$PUBLIC_URL" npm run preflight:readiness:guard
       fi
+      POST_GUARD_EXIT_CODE=$?
+      set -e
+      if [[ "$POST_GUARD_EXIT_CODE" -ne 0 ]]; then
+        echo "⚠️ Public readiness guard verify misslyckades (exit: $POST_GUARD_EXIT_CODE)."
+      fi
       echo
+    fi
+
+    if [[ "${OPS_EXIT_CODE:-0}" -ne 0 ]]; then
+      exit "$OPS_EXIT_CODE"
+    fi
+    if [[ "${POST_GUARD_EXIT_CODE:-0}" -ne 0 ]]; then
+      exit "$POST_GUARD_EXIT_CODE"
     fi
   else
     echo "4) Public readiness guard SKIP (saknar ARCANA_OWNER_EMAIL/ARCANA_OWNER_PASSWORD)"
