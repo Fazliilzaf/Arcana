@@ -289,6 +289,7 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - Om OWNER kräver MFA: lägg till `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>`.
 - Scriptet försöker även läsa `mfaSecret` från `AUTH_STORE_PATH` (default `./data/auth.json`) om MFA-kod/secret inte skickas.
 - Ops-suite-artifact inkluderar monitor status + readiness + readiness-historik + SLO-snapshot.
+- Ops-suite kör som standard en tenant access-check refresh (`tenants.access_check`) före readiness snapshot för färsk tenant-isolation-evidens.
 - Strict output visar även blockerande `triggeredNoGo` IDs och topp-P0-remediation för snabb åtgärd.
 - Ops-suite visar även blocker-checks (`required` + ej green) med topplista och playbook-hints.
 - Ops-suite visar även `categoryIssues` (icke-gröna readiness-kategorier) med top-checks för diagnos när blockerChecks är tom.
@@ -299,7 +300,9 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - Strikt heal mode (alla remediation-flaggor): `npm run ops:suite:strict:heal:all`
 - Flagga direkt: `npm run ops:suite -- --remediate-output-gates --remediation-limit 50`
 - Flagga direkt för OWNER MFA memberships: `npm run ops:suite -- --remediate-owner-mfa-memberships --owner-mfa-remediation-limit 50`
-- Motsvarande env vars: `ARCANA_OPS_SUITE_REMEDIATE_OUTPUT_GATES=true`, `ARCANA_OPS_SUITE_REMEDIATION_LIMIT=50`, `ARCANA_OPS_SUITE_REMEDIATE_OWNER_MFA_MEMBERSHIPS=true`, `ARCANA_OPS_SUITE_OWNER_MFA_REMEDIATION_LIMIT=50`
+- Flagga direkt för tenant access-check refresh: `npm run ops:suite -- --refresh-tenant-access-check` (default på)
+- Slå av tenant access-check refresh: `npm run ops:suite -- --no-refresh-tenant-access-check`
+- Motsvarande env vars: `ARCANA_OPS_SUITE_REMEDIATE_OUTPUT_GATES=true`, `ARCANA_OPS_SUITE_REMEDIATION_LIMIT=50`, `ARCANA_OPS_SUITE_REMEDIATE_OWNER_MFA_MEMBERSHIPS=true`, `ARCANA_OPS_SUITE_OWNER_MFA_REMEDIATION_LIMIT=50`, `ARCANA_OPS_SUITE_REFRESH_TENANT_ACCESS_CHECK=true`
 - Strikt driftgate (exit code 2 vid no-go): `npm run ops:suite:strict`
 - Lista scheduler-genererade rapporter: `npm run report:scheduler:list`
 - Förhandsvisa report-prune: `npm run report:scheduler:prune`

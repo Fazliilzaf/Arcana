@@ -146,6 +146,10 @@ function parseArgs(argv) {
       1,
       200
     ),
+    refreshTenantAccessCheck: parseBoolean(
+      process.env.ARCANA_OPS_SUITE_REFRESH_TENANT_ACCESS_CHECK,
+      true
+    ),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -227,6 +231,14 @@ function parseArgs(argv) {
         200
       );
       index += 1;
+      continue;
+    }
+    if (item === '--refresh-tenant-access-check') {
+      args.refreshTenantAccessCheck = true;
+      continue;
+    }
+    if (item === '--no-refresh-tenant-access-check') {
+      args.refreshTenantAccessCheck = false;
       continue;
     }
   }
@@ -536,6 +548,52 @@ async function remediateOwnerMfaMemberships({
   };
 }
 
+async function runTenantAccessCheck({
+  baseUrl,
+  token,
+  tenantId = '',
+}) {
+  const normalizedTenantId = normalizeText(tenantId).toLowerCase();
+  if (!normalizedTenantId) {
+    return {
+      enabled: true,
+      attempted: false,
+      ok: false,
+      status: null,
+      tenantId: null,
+      error: 'missing_tenant_id',
+    };
+  }
+
+  try {
+    const response = await fetchJson(
+      baseUrl,
+      `/api/v1/tenants/${encodeURIComponent(normalizedTenantId)}/access-check`,
+      { token }
+    );
+    return {
+      enabled: true,
+      attempted: true,
+      ok: response?.ok === true,
+      status: 200,
+      tenantId: normalizeText(response?.tenantId).toLowerCase() || normalizedTenantId,
+      role: normalizeText(response?.role).toUpperCase() || null,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      enabled: true,
+      attempted: true,
+      ok: false,
+      status: Number(error?.status || 0) || null,
+      tenantId: normalizedTenantId,
+      role: null,
+      error: normalizeText(error?.message || 'tenant_access_check_failed') || 'tenant_access_check_failed',
+      payload: error?.payload || null,
+    };
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const baseUrl = normalizeBaseUrl(args.baseUrl);
@@ -573,6 +631,20 @@ async function main() {
       tenantId: auth.authTenantId || tenantId || undefined,
     },
   });
+  const tenantAccessCheckRefresh = args.refreshTenantAccessCheck
+    ? await runTenantAccessCheck({
+        baseUrl,
+        token: auth.token,
+        tenantId: auth.authTenantId || tenantId || '',
+      })
+    : {
+        enabled: false,
+        attempted: false,
+        ok: false,
+        status: null,
+        tenantId: auth.authTenantId || tenantId || null,
+        error: 'disabled',
+      };
   let readinessOutputGateRemediation = null;
   if (args.remediateOutputGates) {
     readinessOutputGateRemediation = await fetchJson(
@@ -707,12 +779,14 @@ async function main() {
       remediationLimit: parsePositiveInt(args.remediationLimit, 50, 1, 200),
       remediateOwnerMfaMemberships: Boolean(args.remediateOwnerMfaMemberships),
       ownerMfaRemediationLimit: parsePositiveInt(args.ownerMfaRemediationLimit, 50, 1, 200),
+      refreshTenantAccessCheck: Boolean(args.refreshTenantAccessCheck),
     },
     auth: {
       flow: auth.authFlow,
       tenantId: auth.authTenantId || tenantId || null,
     },
     ops: {
+      tenantAccessCheckRefresh,
       readinessOutputGateRemediation,
       ownerMfaMembershipRemediation,
     },
@@ -793,6 +867,11 @@ async function main() {
   const ownerMfaDisabled = Number(ownerMfaMembershipRemediation?.disabledCount || 0);
   const ownerMfaSkipped = Number(ownerMfaMembershipRemediation?.skippedCount || 0);
   const ownerMfaRemaining = Number(ownerMfaMembershipRemediation?.after?.nonCompliantOwners || 0);
+  const tenantAccessCheckEnabled = Boolean(args.refreshTenantAccessCheck);
+  const tenantAccessCheckAttempted = tenantAccessCheckRefresh?.attempted === true;
+  const tenantAccessCheckOk = tenantAccessCheckRefresh?.ok === true;
+  const tenantAccessCheckStatus = Number(tenantAccessCheckRefresh?.status || 0) || 0;
+  const tenantAccessCheckTenantId = normalizeText(tenantAccessCheckRefresh?.tenantId) || '-';
   const blockerCheckCount = blockerChecks.length;
   const blockerCheckLabels =
     blockerChecksTop
@@ -837,6 +916,16 @@ async function main() {
     strictFailures.push(`slo overall status is ${sloOverall}`);
   }
   if (
+    tenantAccessCheckEnabled &&
+    tenantAccessCheckAttempted &&
+    !tenantAccessCheckOk &&
+    tenantAccessCheckStatus !== 404
+  ) {
+    strictFailures.push(
+      `tenant access-check refresh failed (status=${tenantAccessCheckStatus || 'n/a'})`
+    );
+  }
+  if (
     !remediationRunEnabled &&
     triggeredNoGoIds.includes('output_without_risk_policy_gate')
   ) {
@@ -850,6 +939,31 @@ async function main() {
   ) {
     advisories.push(
       'run with --remediate-owner-mfa-memberships to disable non-compliant OWNER memberships (requires at least one compliant OWNER)'
+    );
+  }
+  if (!tenantAccessCheckEnabled && triggeredNoGoIds.includes('tenant_isolation_unverified')) {
+    advisories.push(
+      'run with --refresh-tenant-access-check to refresh tenants.access_check evidence before readiness gate'
+    );
+  }
+  if (
+    tenantAccessCheckEnabled &&
+    tenantAccessCheckAttempted &&
+    !tenantAccessCheckOk &&
+    tenantAccessCheckStatus === 404
+  ) {
+    advisories.push(
+      'tenant access-check endpoint unavailable (404); upgrade API routes or disable refresh with --no-refresh-tenant-access-check'
+    );
+  }
+  if (
+    tenantAccessCheckEnabled &&
+    tenantAccessCheckAttempted &&
+    !tenantAccessCheckOk &&
+    tenantAccessCheckStatus !== 404
+  ) {
+    advisories.push(
+      `tenant access-check refresh failed (status=${tenantAccessCheckStatus || 'n/a'})`
     );
   }
   if (blockerChecksTop.length > 0) {
@@ -928,6 +1042,9 @@ async function main() {
       `   ownerMfaRemediation: disabled=${ownerMfaDisabled} skipped=${ownerMfaSkipped} remainingNonCompliant=${ownerMfaRemaining}\n`
     );
   }
+  process.stdout.write(
+    `   tenantAccessCheck: enabled=${tenantAccessCheckEnabled ? 'yes' : 'no'} attempted=${tenantAccessCheckAttempted ? 'yes' : 'no'} ok=${tenantAccessCheckOk ? 'yes' : 'no'} status=${tenantAccessCheckStatus || '-'} tenant=${tenantAccessCheckTenantId}\n`
+  );
   process.stdout.write(
     `   gates: pilotReportHealthy=${pilotHealthy} restoreHealthy=${restoreHealthy} sloOverall=${sloOverall}\n`
   );
