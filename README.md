@@ -182,7 +182,7 @@ Om prod-inloggning fastnar på gammalt lösenord:
 - `POST /api/v1/ops/reports/prune` (OWNER, dry-run eller apply)
 - `POST /api/v1/ops/state/restore` (OWNER, dry-run + restore med confirmText)
 - `GET /api/v1/ops/scheduler/status` (OWNER)
-- `POST /api/v1/ops/scheduler/run` (OWNER, body: `{ "jobId": "alert_probe" }`)
+- `POST /api/v1/ops/scheduler/run` (OWNER, body: `{ "jobId": "alert_probe" }` eller `{ "jobId": "required_suite" }`)
 - `GET /api/v1/ops/secrets/status` (OWNER, rotation status/freshness)
 - `POST /api/v1/ops/secrets/snapshot` (OWNER, dry-run default)
 - `GET /api/v1/ops/secrets/history` (OWNER, query: `secretId`, `limit`)
@@ -310,6 +310,7 @@ Owner action `action` (endast OWNER):
   - latency/fel-metrics (`GET /api/v1/monitor/metrics`)
   - SLO/SLI-status (`GET /api/v1/monitor/slo`)
   - readiness/Go-No-Go matris (`GET /api/v1/monitor/readiness`)
+  - kör required scheduler-suite (`POST /api/v1/ops/scheduler/run` med `{"jobId":"required_suite"}`)
 - Ops backup-panel i UI (OWNER):
   - state manifest (`GET /api/v1/ops/state/manifest`)
   - skapa backup (`POST /api/v1/ops/state/backup`)

@@ -461,6 +461,26 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
   OPS_SCHED_JOB_COUNT="$(printf '%s' "$OPS_SCHED_STATUS_RESPONSE" | json_get scheduler.jobs | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
   echo "✅ ops/scheduler/status OK (enabled: ${OPS_SCHED_ENABLED}, jobs: ${OPS_SCHED_JOB_COUNT})"
 
+  OPS_SCHED_SUITE_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"jobId":"required_suite"}')"
+  OPS_SCHED_SUITE_OK="$(printf '%s' "$OPS_SCHED_SUITE_RESPONSE" | json_get ok 2>/dev/null || true)"
+  OPS_SCHED_SUITE_TOTAL="$(printf '%s' "$OPS_SCHED_SUITE_RESPONSE" | json_get suite.total 2>/dev/null || true)"
+  OPS_SCHED_SUITE_FAILED="$(printf '%s' "$OPS_SCHED_SUITE_RESPONSE" | json_get suite.failed 2>/dev/null || true)"
+  if [[ "$OPS_SCHED_SUITE_OK" == "true" ]]; then
+    if [[ -z "$OPS_SCHED_SUITE_TOTAL" || "$OPS_SCHED_SUITE_TOTAL" -lt 4 ]]; then
+      echo "❌ ops/scheduler/run required_suite saknar full suite-total"
+      printf '%s\n' "$OPS_SCHED_SUITE_RESPONSE"
+      exit 1
+    fi
+    echo "✅ ops/scheduler/run required_suite OK (total: ${OPS_SCHED_SUITE_TOTAL}, failed: ${OPS_SCHED_SUITE_FAILED})"
+  else
+    echo "❌ ops/scheduler/run required_suite misslyckades"
+    printf '%s\n' "$OPS_SCHED_SUITE_RESPONSE"
+    exit 1
+  fi
+
   OPS_SCHED_RUN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \

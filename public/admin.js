@@ -452,6 +452,7 @@
     mailInsightsStatus: document.getElementById('mailInsightsStatus'),
     mailInsightsResult: document.getElementById('mailInsightsResult'),
     refreshMonitorBtn: document.getElementById('refreshMonitorBtn'),
+    runSchedulerSuiteBtn: document.getElementById('runSchedulerSuiteBtn'),
     monitorPanelStatus: document.getElementById('monitorPanelStatus'),
     monitorResult: document.getElementById('monitorResult'),
     monitorRemediationSummary: document.getElementById('monitorRemediationSummary'),
@@ -2157,6 +2158,7 @@
     if (els.mailSeedsLimit) els.mailSeedsLimit.disabled = !owner;
     if (els.mailSeedsNamePrefix) els.mailSeedsNamePrefix.disabled = !owner;
     if (els.refreshMonitorBtn) els.refreshMonitorBtn.disabled = !writer;
+    if (els.runSchedulerSuiteBtn) els.runSchedulerSuiteBtn.disabled = !owner;
     if (els.refreshTenantsBtn) els.refreshTenantsBtn.disabled = !writer;
     if (els.onboardTenantBtn) els.onboardTenantBtn.disabled = !owner;
     if (els.loadSessionsBtn) els.loadSessionsBtn.disabled = !writer;
@@ -6279,6 +6281,38 @@
     }
   }
 
+  async function runSchedulerRequiredSuite() {
+    if (!isOwner()) {
+      if (els.monitorResult) els.monitorResult.textContent = 'Endast OWNER.';
+      return;
+    }
+    try {
+      setStatus(els.monitorPanelStatus, 'Kör scheduler-suite (required jobs)...');
+      const response = await api('/ops/scheduler/run', {
+        method: 'POST',
+        body: { jobId: 'required_suite' },
+      });
+      if (els.monitorResult) {
+        els.monitorResult.textContent = JSON.stringify(response, null, 2);
+      }
+      const succeeded = Number(response?.suite?.succeeded || 0);
+      const total = Number(response?.suite?.total || 0);
+      const failed = Number(response?.suite?.failed || 0);
+      setStatus(
+        els.monitorPanelStatus,
+        `Scheduler-suite klar: ${succeeded}/${total} lyckades, failed=${failed}`,
+        failed > 0
+      );
+      await loadMonitorStatus();
+    } catch (error) {
+      setStatus(
+        els.monitorPanelStatus,
+        error.message || 'Kunde inte köra scheduler-suite.',
+        true
+      );
+    }
+  }
+
   async function loadStateManifest() {
     if (!isOwner()) {
       if (els.opsResult) els.opsResult.textContent = 'Endast OWNER.';
@@ -7521,6 +7555,7 @@
     applyMailTemplateSeeds({ dryRun: false })
   );
   els.refreshMonitorBtn?.addEventListener('click', loadMonitorStatus);
+  els.runSchedulerSuiteBtn?.addEventListener('click', runSchedulerRequiredSuite);
   els.loadStateManifestBtn?.addEventListener('click', loadStateManifest);
   els.createStateBackupBtn?.addEventListener('click', createStateBackup);
   els.listStateBackupsBtn?.addEventListener('click', listStateBackups);
