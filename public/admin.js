@@ -6245,16 +6245,21 @@
     const latestScore = Number(latest?.score || 0);
     const latestBand = String(latest?.band || '-');
     const latestGoAllowed = latest?.goAllowed === true;
+    const latestRequiredBlockers = Number(latest?.blockingRequiredChecks || 0);
     const latestNoGo = Number(latest?.triggeredNoGo || 0);
     const latestRemediation = Number(latest?.remediationTotal || 0);
     const scoreDelta = Number(trend?.scoreDelta || 0);
+    const requiredDelta = Number(trend?.blockingRequiredChecksDelta || 0);
     const scoreDeltaLabel = Number.isFinite(scoreDelta)
       ? `${scoreDelta >= 0 ? '+' : ''}${Number(scoreDelta.toFixed(2))}`
       : '-';
+    const requiredDeltaLabel = Number.isFinite(requiredDelta)
+      ? `${requiredDelta >= 0 ? '+' : ''}${requiredDelta}`
+      : '-';
 
     els.monitorReadinessHistorySummary.textContent = isEnglishLanguage()
-      ? `latest score=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goAllowed=${latestGoAllowed ? 'yes' : 'no'} noGo=${latestNoGo} remediation=${latestRemediation}`
-      : `senaste score=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goTillåten=${latestGoAllowed ? 'ja' : 'nej'} noGo=${latestNoGo} remediation=${latestRemediation}`;
+      ? `latest score=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goAllowed=${latestGoAllowed ? 'yes' : 'no'} required=${latestRequiredBlockers} (${requiredDeltaLabel}) noGo=${latestNoGo} remediation=${latestRemediation}`
+      : `senaste score=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goTillåten=${latestGoAllowed ? 'ja' : 'nej'} required=${latestRequiredBlockers} (${requiredDeltaLabel}) noGo=${latestNoGo} remediation=${latestRemediation}`;
 
     const lines = entries.slice(0, 10).map((item) => {
       const ts = formatDateTime(item?.ts);
@@ -6262,10 +6267,11 @@
       const score = Number(item?.score || 0);
       const band = String(item?.band || '-');
       const goAllowed = item?.goAllowed === true;
+      const requiredBlockers = Number(item?.blockingRequiredChecks || 0);
       const triggeredNoGo = Number(item?.triggeredNoGo || 0);
       const remediationTotal = Number(item?.remediationTotal || 0);
       const remediationP0 = Number(item?.remediationP0 || 0);
-      return `${ts} (${age}) | score=${Number(score.toFixed(2))} | band=${band} | go=${goAllowed ? 'yes' : 'no'} | noGo=${triggeredNoGo} | remediation=${remediationTotal} (P0=${remediationP0})`;
+      return `${ts} (${age}) | score=${Number(score.toFixed(2))} | band=${band} | go=${goAllowed ? 'yes' : 'no'} | required=${requiredBlockers} | noGo=${triggeredNoGo} | remediation=${remediationTotal} (P0=${remediationP0})`;
     });
     els.monitorReadinessHistoryResult.textContent = lines.join('\n');
   }
