@@ -296,6 +296,9 @@ MONITOR_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/status" \
 MONITOR_TEMPLATES="$(printf '%s' "$MONITOR_RESPONSE" | json_get kpis.templatesTotal)"
 MONITOR_RESTORE_DRILL_HEALTHY="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.restoreDrill.healthy 2>/dev/null || true)"
 MONITOR_RESTORE_DRILL_NOGO="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.restoreDrill.noGo 2>/dev/null || true)"
+MONITOR_PILOT_REPORT_HEALTHY="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.pilotReport.healthy 2>/dev/null || true)"
+MONITOR_PILOT_REPORT_NOGO="$(printf '%s' "$MONITOR_RESPONSE" | json_get gates.pilotReport.noGo 2>/dev/null || true)"
+MONITOR_SCHED_JOB_COUNT="$(printf '%s' "$MONITOR_RESPONSE" | json_get runtime.scheduler.jobs | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
 MONITOR_RISK_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.riskMax 2>/dev/null || true)"
 MONITOR_ORCHESTRATOR_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.orchestratorMax 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.publicChatMax 2>/dev/null || true)"
@@ -309,12 +312,27 @@ if [[ "$MONITOR_RESTORE_DRILL_NOGO" != "true" && "$MONITOR_RESTORE_DRILL_NOGO" !
   printf '%s\n' "$MONITOR_RESPONSE"
   exit 1
 fi
+if [[ "$MONITOR_PILOT_REPORT_HEALTHY" != "true" && "$MONITOR_PILOT_REPORT_HEALTHY" != "false" ]]; then
+  echo "❌ monitor/status saknar gates.pilotReport.healthy"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_PILOT_REPORT_NOGO" != "true" && "$MONITOR_PILOT_REPORT_NOGO" != "false" ]]; then
+  echo "❌ monitor/status saknar gates.pilotReport.noGo"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ -z "$MONITOR_SCHED_JOB_COUNT" || "$MONITOR_SCHED_JOB_COUNT" -lt 4 ]]; then
+  echo "❌ monitor/status saknar scheduler jobs-lista"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
 if [[ -z "$MONITOR_RISK_LIMIT_MAX" || "$MONITOR_RISK_LIMIT_MAX" == "null" || -z "$MONITOR_ORCHESTRATOR_LIMIT_MAX" || "$MONITOR_ORCHESTRATOR_LIMIT_MAX" == "null" || -z "$MONITOR_PUBLIC_CHAT_LIMIT_MAX" || "$MONITOR_PUBLIC_CHAT_LIMIT_MAX" == "null" ]]; then
   echo "❌ monitor/status saknar dedikerade rate limit-fält"
   printf '%s\n' "$MONITOR_RESPONSE"
   exit 1
 fi
-echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO})"
+echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO}, pilotReportHealthy: ${MONITOR_PILOT_REPORT_HEALTHY}, schedulerJobs: ${MONITOR_SCHED_JOB_COUNT})"
 
 MONITOR_METRICS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/metrics?areaLimit=6" \
   -H "Authorization: Bearer $TOKEN")"
