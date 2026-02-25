@@ -1228,6 +1228,12 @@ function createMonitorRouter({
           .slice(0, limit)
           .map((item) => {
             const metadata = item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+            const blockingRequiredChecksRaw = Number(metadata?.blockingRequiredChecks);
+            const blockingRequiredChecks = Number.isFinite(blockingRequiredChecksRaw)
+              ? Math.max(0, blockingRequiredChecksRaw)
+              : metadata?.blockersAllGreen === true
+                ? 0
+                : null;
             return {
               ts: toIso(item?.ts),
               actorUserId: normalizeText(item?.actorUserId) || null,
@@ -1235,6 +1241,7 @@ function createMonitorRouter({
               band: normalizeText(metadata?.band) || null,
               goAllowed: metadata?.goAllowed === true,
               blockersAllGreen: metadata?.blockersAllGreen === true,
+              blockingRequiredChecks,
               triggeredNoGo: Number(metadata?.triggeredNoGo || 0),
               remediationTotal: Number(metadata?.remediationTotal || 0),
               remediationP0: Number(metadata?.remediationP0 || 0),
@@ -1248,6 +1255,9 @@ function createMonitorRouter({
             ? {
                 scoreDelta: Number((Number(latest.score || 0) - Number(previous.score || 0)).toFixed(2)),
                 triggeredNoGoDelta: Number(latest.triggeredNoGo || 0) - Number(previous.triggeredNoGo || 0),
+                blockingRequiredChecksDelta:
+                  Number(latest.blockingRequiredChecks || 0) -
+                  Number(previous.blockingRequiredChecks || 0),
                 remediationTotalDelta:
                   Number(latest.remediationTotal || 0) - Number(previous.remediationTotal || 0),
                 remediationP0Delta: Number(latest.remediationP0 || 0) - Number(previous.remediationP0 || 0),
