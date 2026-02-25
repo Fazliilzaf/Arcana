@@ -49,6 +49,12 @@ function createOpsRouter({
   requireRole,
 }) {
   const router = express.Router();
+  const REQUIRED_SCHEDULER_SUITE_JOB_IDS = Object.freeze([
+    'alert_probe',
+    'nightly_pilot_report',
+    'backup_prune',
+    'restore_drill_preview',
+  ]);
 
   router.get(
     '/ops/scheduler/status',
@@ -103,16 +109,54 @@ function createOpsRouter({
       }
 
       try {
-        const result = await scheduler.runJob(jobId, {
-          trigger: 'manual_api',
-          actorUserId: req.auth.userId,
-          tenantId,
-        });
+        const runSuite = jobId === 'required_suite';
+        let payload = null;
+        let success = false;
+        let statusCode = 200;
 
-        const success = result?.ok === true;
-        const errorCode = String(result?.error || '');
-        const statusCode =
-          success ? 200 : errorCode === 'job_running' || errorCode === 'disabled_job' ? 409 : 400;
+        if (runSuite) {
+          const suiteResults = [];
+          for (const suiteJobId of REQUIRED_SCHEDULER_SUITE_JOB_IDS) {
+            const suiteResult = await scheduler.runJob(suiteJobId, {
+              trigger: 'manual_api_suite',
+              actorUserId: req.auth.userId,
+              tenantId,
+            });
+            suiteResults.push({
+              requestedJobId: suiteJobId,
+              ...suiteResult,
+            });
+          }
+          const failed = suiteResults.filter((item) => item?.ok !== true);
+          const succeeded = suiteResults.length - failed.length;
+          success = failed.length === 0;
+          statusCode = success ? 200 : 409;
+          payload = {
+            ok: success,
+            jobId: 'required_suite',
+            trigger: 'manual_api_suite',
+            suite: {
+              total: suiteResults.length,
+              succeeded,
+              failed: failed.length,
+              results: suiteResults,
+            },
+          };
+        } else {
+          const result = await scheduler.runJob(jobId, {
+            trigger: 'manual_api',
+            actorUserId: req.auth.userId,
+            tenantId,
+          });
+          success = result?.ok === true;
+          const errorCode = String(result?.error || '');
+          statusCode =
+            success ? 200 : errorCode === 'job_running' || errorCode === 'disabled_job' ? 409 : 400;
+          payload = {
+            ok: success,
+            ...result,
+          };
+        }
 
         await authStore.addAuditEvent({
           tenantId: req.auth.tenantId,
@@ -123,14 +167,11 @@ function createOpsRouter({
           targetId: jobId,
           metadata: {
             requestedTenantId: tenantId,
-            result,
+            result: payload,
           },
         });
 
-        return res.status(statusCode).json({
-          ok: success,
-          ...result,
-        });
+        return res.status(statusCode).json(payload);
       } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte köra scheduler-jobb.' });
