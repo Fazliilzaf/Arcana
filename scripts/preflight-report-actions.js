@@ -53,6 +53,17 @@ function pushAction(actions, action) {
   });
 }
 
+function includesText(items, needle) {
+  const normalizedNeedle = normalizeText(needle).toLowerCase();
+  if (!normalizedNeedle) return false;
+  for (const item of Array.isArray(items) ? items : []) {
+    if (String(item || '').toLowerCase().includes(normalizedNeedle)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function buildActions(report) {
   const actions = [];
   const exitCode = Number(report?.exit?.code ?? 0);
@@ -66,13 +77,32 @@ function buildActions(report) {
   const opsSuite =
     diagnostics?.opsSuite && typeof diagnostics.opsSuite === 'object' ? diagnostics.opsSuite : {};
   const strict = opsSuite?.strict && typeof opsSuite.strict === 'object' ? opsSuite.strict : {};
+  const opsReadiness =
+    opsSuite?.readiness && typeof opsSuite.readiness === 'object' ? opsSuite.readiness : {};
   const publicUrl = normalizeText(options?.publicUrl) || '<public-url>';
 
   const failedCheckIds = Array.isArray(guard?.failedCheckIds) ? guard.failedCheckIds : [];
   const failedSet = new Set(failedCheckIds.map((item) => normalizeText(item)).filter(Boolean));
+  const blockerCheckIds = Array.isArray(opsReadiness?.blockerCheckIds)
+    ? opsReadiness.blockerCheckIds
+    : [];
+  for (const checkId of blockerCheckIds) {
+    const normalized = normalizeText(checkId);
+    if (normalized) failedSet.add(normalized);
+  }
+
+  const strictFailures = Array.isArray(strict?.failures) ? strict.failures : [];
+  const advisories = Array.isArray(strict?.advisories) ? strict.advisories : [];
+  const hasOutputGateGap =
+    includesText(strictFailures, 'output_without_risk_policy_gate') ||
+    includesText(advisories, '--remediate-output-gates');
+  const hasOwnerMfaGap =
+    failedSet.has('owner_mfa_enforced') ||
+    includesText(advisories, '--remediate-owner-mfa-memberships');
 
   if (failedSet.has('cors_strict')) {
-    const envLine = normalizeText(guard?.corsStrictEnv);
+    const envLine =
+      normalizeText(guard?.corsStrictEnv) || normalizeText(opsReadiness?.corsStrictRecommendation);
     pushAction(actions, {
       id: 'cors_strict_runtime_env',
       priority: 'P0',
@@ -101,8 +131,16 @@ function buildActions(report) {
     });
   }
 
-  const strictFailures = Array.isArray(strict?.failures) ? strict.failures : [];
-  if (strictFailures.some((item) => String(item).includes('output_without_risk_policy_gate'))) {
+  if (hasOutputGateGap && hasOwnerMfaGap) {
+    pushAction(actions, {
+      id: 'ops_heal_all',
+      priority: 'P1',
+      title: 'Kör strict heal-all',
+      command:
+        `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite:strict:heal:all`,
+      details: 'Kör output-gate remediation + owner-MFA remediation i samma pass.',
+    });
+  } else if (hasOutputGateGap) {
     pushAction(actions, {
       id: 'ops_heal_output_gates',
       priority: 'P1',
@@ -112,8 +150,60 @@ function buildActions(report) {
     });
   }
 
-  const advisories = Array.isArray(strict?.advisories) ? strict.advisories : [];
-  for (const advisory of advisories.slice(0, 4)) {
+  if (includesText(strictFailures, 'scheduler suite not fully successful')) {
+    pushAction(actions, {
+      id: 'ops_required_suite_rerun',
+      priority: 'P1',
+      title: 'Kör required scheduler suite igen',
+      command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite`,
+      details: 'Verifiera att required_suite går igenom innan strict-gate.',
+    });
+  }
+
+  if (
+    includesText(strictFailures, 'pilot report gate is no-go') ||
+    includesText(strictFailures, 'restore drill gate is no-go')
+  ) {
+    pushAction(actions, {
+      id: 'ops_refresh_pilot_restore',
+      priority: 'P1',
+      title: 'Uppdatera pilot report + restore drill evidens',
+      command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite`,
+      details: 'required_suite kör nightly report och restore drill i samma körning.',
+    });
+  }
+
+  if (includesText(strictFailures, 'tenant access-check refresh failed')) {
+    pushAction(actions, {
+      id: 'tenant_access_check_investigate',
+      priority: 'P1',
+      title: 'Felsök tenant access-check refresh',
+      command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite -- --refresh-tenant-access-check`,
+      details: 'Om endpoint saknas temporärt: kör med `--no-refresh-tenant-access-check` och uppgradera API-routes.',
+    });
+  }
+
+  if (includesText(strictFailures, 'readiness blocker categories are not all green') && failedSet.size === 0) {
+    pushAction(actions, {
+      id: 'readiness_guard_required',
+      priority: 'P1',
+      title: 'Kör readiness guard på required checks',
+      command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run preflight:readiness:guard -- --use-required-checks`,
+      details: 'Identifiera blocker-checks innan ny strict-körning.',
+    });
+  }
+
+  if (includesText(strictFailures, 'cors runtime probe failed')) {
+    pushAction(actions, {
+      id: 'cors_runtime_probe_investigate',
+      priority: 'P1',
+      title: 'Verifiera CORS runtime-probe',
+      command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite:strict`,
+      details: 'Kontrollera reverse proxy/host-routing om allowed origin inte får ACAO eller denied origin läcker ACAO.',
+    });
+  }
+
+  for (const advisory of advisories.slice(0, 3)) {
     pushAction(actions, {
       id: `advisory:${Buffer.from(String(advisory)).toString('base64').slice(0, 18)}`,
       priority: 'P2',
