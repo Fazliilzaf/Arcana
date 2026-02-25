@@ -93,13 +93,13 @@ services:
       - key: ARCANA_OBSERVABILITY_ALERT_MAX_SLOW_REQUESTS
         value: 25
       - key: ARCANA_PUBLIC_CHAT_BETA_ENABLED
-        value: false
+        value: true
       - key: ARCANA_PUBLIC_CHAT_BETA_HEADER
         value: x-arcana-beta-key
       - key: ARCANA_PUBLIC_CHAT_BETA_KEY
         sync: false
       - key: ARCANA_PUBLIC_CHAT_BETA_ALLOW_HOSTS
-        sync: false
+        value: arcana.hairtpclinic.se,*.hairtpclinic.se,hairtpclinic.se,www.hairtpclinic.se
       - key: ARCANA_PUBLIC_CHAT_BETA_ALLOW_LOCALHOST
         value: true
       - key: ARCANA_ALERT_WEBHOOK_URL

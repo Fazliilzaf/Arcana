@@ -302,6 +302,9 @@ MONITOR_SCHED_JOB_COUNT="$(printf '%s' "$MONITOR_RESPONSE" | json_get runtime.sc
 MONITOR_RISK_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.riskMax 2>/dev/null || true)"
 MONITOR_ORCHESTRATOR_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.orchestratorMax 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.publicChatMax 2>/dev/null || true)"
+MONITOR_PUBLIC_CHAT_BETA_ENABLED="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.enabled 2>/dev/null || true)"
+MONITOR_PUBLIC_CHAT_BETA_KEY_CONFIGURED="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.keyConfigured 2>/dev/null || true)"
+MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.allowHostsCount 2>/dev/null || true)"
 if [[ "$MONITOR_RESTORE_DRILL_HEALTHY" != "true" && "$MONITOR_RESTORE_DRILL_HEALTHY" != "false" ]]; then
   echo "❌ monitor/status saknar gates.restoreDrill.healthy"
   printf '%s\n' "$MONITOR_RESPONSE"
@@ -332,7 +335,27 @@ if [[ -z "$MONITOR_RISK_LIMIT_MAX" || "$MONITOR_RISK_LIMIT_MAX" == "null" || -z 
   printf '%s\n' "$MONITOR_RESPONSE"
   exit 1
 fi
-echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO}, pilotReportHealthy: ${MONITOR_PILOT_REPORT_HEALTHY}, schedulerJobs: ${MONITOR_SCHED_JOB_COUNT})"
+if [[ "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" != "true" && "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" != "false" ]]; then
+  echo "❌ monitor/status saknar security.publicChatBeta.enabled"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_PUBLIC_CHAT_BETA_KEY_CONFIGURED" != "true" && "$MONITOR_PUBLIC_CHAT_BETA_KEY_CONFIGURED" != "false" ]]; then
+  echo "❌ monitor/status saknar security.publicChatBeta.keyConfigured"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ -z "$MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT" || "$MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT" == "null" ]]; then
+  echo "❌ monitor/status saknar security.publicChatBeta.allowHostsCount"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" == "true" && "$MONITOR_PUBLIC_CHAT_BETA_KEY_CONFIGURED" != "true" && "${MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT:-0}" -lt 1 ]]; then
+  echo "❌ monitor/status visar aktiv patient-beta utan key eller allowHosts"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO}, pilotReportHealthy: ${MONITOR_PILOT_REPORT_HEALTHY}, schedulerJobs: ${MONITOR_SCHED_JOB_COUNT}, betaEnabled: ${MONITOR_PUBLIC_CHAT_BETA_ENABLED}, betaAllowHosts: ${MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT})"
 
 MONITOR_METRICS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/metrics?areaLimit=6" \
   -H "Authorization: Bearer $TOKEN")"
@@ -344,6 +367,28 @@ if [[ -z "$MONITOR_METRICS_P95" || "$MONITOR_METRICS_P95" == "null" || -z "$MONI
   exit 1
 fi
 echo "✅ monitor/metrics OK (p95Ms: ${MONITOR_METRICS_P95}, sampled: ${MONITOR_METRICS_SAMPLED})"
+
+MONITOR_OBSERVABILITY_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/observability?areaLimit=6" \
+  -H "Authorization: Bearer $TOKEN")"
+MONITOR_OBSERVABILITY_STATUS="$(printf '%s' "$MONITOR_OBSERVABILITY_RESPONSE" | json_get summary.overallStatus 2>/dev/null || true)"
+MONITOR_OBSERVABILITY_ALERTS="$(printf '%s' "$MONITOR_OBSERVABILITY_RESPONSE" | json_get summary.triggeredAlertsCount 2>/dev/null || true)"
+MONITOR_OBSERVABILITY_CHECKS="$(printf '%s' "$MONITOR_OBSERVABILITY_RESPONSE" | json_get checks | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
+if [[ "$MONITOR_OBSERVABILITY_STATUS" != "green" && "$MONITOR_OBSERVABILITY_STATUS" != "yellow" && "$MONITOR_OBSERVABILITY_STATUS" != "red" && "$MONITOR_OBSERVABILITY_STATUS" != "unknown" ]]; then
+  echo "❌ monitor/observability saknar giltig summary.overallStatus"
+  printf '%s\n' "$MONITOR_OBSERVABILITY_RESPONSE"
+  exit 1
+fi
+if [[ -z "$MONITOR_OBSERVABILITY_ALERTS" || "$MONITOR_OBSERVABILITY_ALERTS" == "null" ]]; then
+  echo "❌ monitor/observability saknar triggeredAlertsCount"
+  printf '%s\n' "$MONITOR_OBSERVABILITY_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_OBSERVABILITY_CHECKS" -lt 3 ]]; then
+  echo "❌ monitor/observability returnerade för få checks (${MONITOR_OBSERVABILITY_CHECKS})"
+  printf '%s\n' "$MONITOR_OBSERVABILITY_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/observability OK (status: ${MONITOR_OBSERVABILITY_STATUS}, alerts: ${MONITOR_OBSERVABILITY_ALERTS}, checks: ${MONITOR_OBSERVABILITY_CHECKS})"
 
 MONITOR_SLO_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/slo" \
   -H "Authorization: Bearer $TOKEN")"
@@ -842,7 +887,14 @@ echo "✅ risk/settings restore OK (modifier: ${RESTORED_MODIFIER})"
 ORCHESTRATOR_META_RESPONSE="$(curl -s "$BASE_URL/api/v1/orchestrator/meta" \
   -H "Authorization: Bearer $TOKEN")"
 ORCHESTRATOR_AGENT_COUNT="$(printf '%s' "$ORCHESTRATOR_META_RESPONSE" | json_get agents | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(d&&typeof d==='object'?Object.keys(d).length:0));")"
-echo "✅ orchestrator/meta OK (agents: ${ORCHESTRATOR_AGENT_COUNT})"
+ORCHESTRATOR_INTENT_COUNT="$(printf '%s' "$ORCHESTRATOR_META_RESPONSE" | json_get intents | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(d&&typeof d==='object'?Object.keys(d).length:0));")"
+ORCHESTRATOR_ROADMAP_PHASES="$(printf '%s' "$ORCHESTRATOR_META_RESPONSE" | json_get roadmap.phases | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
+if [[ "$ORCHESTRATOR_AGENT_COUNT" -lt 3 || "$ORCHESTRATOR_INTENT_COUNT" -lt 4 || "$ORCHESTRATOR_ROADMAP_PHASES" -lt 2 ]]; then
+  echo "❌ orchestrator/meta saknar agents/intents/roadmap"
+  printf '%s\n' "$ORCHESTRATOR_META_RESPONSE"
+  exit 1
+fi
+echo "✅ orchestrator/meta OK (agents: ${ORCHESTRATOR_AGENT_COUNT}, intents: ${ORCHESTRATOR_INTENT_COUNT}, phases: ${ORCHESTRATOR_ROADMAP_PHASES})"
 
 ORCHESTRATOR_RUN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/orchestrator/admin-run" \
   -H "Authorization: Bearer $TOKEN" \
