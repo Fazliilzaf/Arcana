@@ -1,6 +1,7 @@
 const { assertCapabilityClass } = require('./capabilityContract');
 const { GenerateTaskPlanCapability } = require('./generateTaskPlan');
 const { SummarizeIncidentsCapability } = require('./summarizeIncidents');
+const { AnalyzeInboxCapability } = require('./analyzeInbox');
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const { COO_AGENT_NAME } = require('../agents/cooDailyBriefAgent');
 
@@ -11,6 +12,7 @@ function normalizeText(value) {
 const CAPABILITY_DEFINITIONS = Object.freeze([
   assertCapabilityClass(GenerateTaskPlanCapability),
   assertCapabilityClass(SummarizeIncidentsCapability),
+  assertCapabilityClass(AnalyzeInboxCapability),
 ]);
 
 const CAPABILITY_MAP = new Map(
@@ -43,6 +45,17 @@ const AGENT_BUNDLE_DEFINITIONS = Object.freeze([
       'ValidateDisclaimers',
       'OptimizeVariables',
     ]),
+  }),
+  Object.freeze({
+    name: 'CCO',
+    version: '1.0.0',
+    role: 'CCO',
+    capabilities: Object.freeze(['AnalyzeInbox']),
+    allowedRoles: Object.freeze([ROLE_OWNER, ROLE_STAFF]),
+    allowedChannels: Object.freeze(['admin']),
+    persistStrategy: 'analysis',
+    outputType: 'InboxAnalysis',
+    plannedCapabilities: Object.freeze(['PrepareResponseDrafts']),
   }),
 ]);
 

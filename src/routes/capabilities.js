@@ -564,8 +564,10 @@ async function hydrateSummarizeIncidentsInput({
   const normalizedInput = {
     includeClosed: safeInput.includeClosed === true,
     timeframeDays: Math.max(1, Math.min(90, toNumber(safeInput.timeframeDays, 14))),
-    debug: safeInput.debug === true,
   };
+  if (safeInput.debug === true) {
+    normalizedInput.debug = true;
+  }
 
   const snapshotIncidents = Array.isArray(safeSnapshot.incidents)
     ? safeSnapshot.incidents
