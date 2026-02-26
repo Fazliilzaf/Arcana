@@ -985,3 +985,50 @@ test('capability meta exposes registry + agent bundles', async () => {
     assert.equal(cco.capabilities.includes('AnalyzeInbox'), true);
   });
 });
+
+test('capabilities router fails fast when Graph read is enabled without required credentials', () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+    ARCANA_GRAPH_TENANT_ID: process.env.ARCANA_GRAPH_TENANT_ID,
+    ARCANA_GRAPH_CLIENT_ID: process.env.ARCANA_GRAPH_CLIENT_ID,
+    ARCANA_GRAPH_CLIENT_SECRET: process.env.ARCANA_GRAPH_CLIENT_SECRET,
+    ARCANA_GRAPH_USER_ID: process.env.ARCANA_GRAPH_USER_ID,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  delete process.env.ARCANA_GRAPH_TENANT_ID;
+  delete process.env.ARCANA_GRAPH_CLIENT_ID;
+  delete process.env.ARCANA_GRAPH_CLIENT_SECRET;
+  delete process.env.ARCANA_GRAPH_USER_ID;
+
+  try {
+    assert.throws(
+      () =>
+        createCapabilitiesRouter({
+          authStore: {
+            async addAuditEvent() {},
+          },
+          tenantConfigStore: {
+            async getTenantConfig() {
+              return {};
+            },
+          },
+          requireAuth(_req, _res, next) {
+            next();
+          },
+          requireRole() {
+            return (_req, _res, next) => next();
+          },
+          executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+          capabilityAnalysisStore: null,
+          templateStore: null,
+        }),
+      /ARCANA_GRAPH_READ_ENABLED=true requires: ARCANA_GRAPH_TENANT_ID, ARCANA_GRAPH_CLIENT_ID, ARCANA_GRAPH_CLIENT_SECRET, ARCANA_GRAPH_USER_ID\./
+    );
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
