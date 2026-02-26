@@ -2671,6 +2671,85 @@
         </section>
 
         <section class="panel">
+          <h2>Arcana Incident Intelligence</h2>
+          <div class="seg" style="margin-top:10px;align-items:center;flex-wrap:wrap">
+            <label class="mini" for="incidentIntelTimeframeDays" style="margin:0;display:flex;align-items:center;gap:8px">
+              Tidsfönster (dagar):
+              <input id="incidentIntelTimeframeDays" type="number" value="14" min="1" max="90" style="width:96px" />
+            </label>
+            <label class="mini" for="incidentIntelIncludeClosed" style="margin:0;display:flex;align-items:center;gap:6px">
+              <input id="incidentIntelIncludeClosed" type="checkbox" />
+              Inkludera stängda
+            </label>
+            <button id="runIncidentIntelligenceBtn" class="btn primary">Uppdatera incidentanalys</button>
+          </div>
+          <div id="incidentIntelligenceStatus" class="status-line"></div>
+          <div id="incidentIntelligenceSummary" class="code-block" style="margin-top:8px">Ingen incidentanalys ännu.</div>
+          <div class="grid" style="margin-top:10px">
+            <div>
+              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Severity breakdown</h3>
+              <div id="incidentIntelligenceSeverity" class="code-block">L3=0, L4=0, L5=0</div>
+            </div>
+            <div>
+              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Eskalationsrisk</h3>
+              <div id="incidentIntelligenceRisk" class="code-block">-</div>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Toppmönster</h3>
+            <ul id="incidentIntelligencePatterns" class="list">
+              <li class="muted mini">Inga mönster ännu.</li>
+            </ul>
+          </div>
+          <div style="margin-top:10px">
+            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Rekommenderade åtgärder</h3>
+            <ul id="incidentIntelligenceRecommendations" class="list">
+              <li class="muted mini">Inga rekommendationer ännu.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Arcana Daily Brief</h2>
+          <div class="seg" style="margin-top:10px;align-items:center;flex-wrap:wrap">
+            <label class="mini" for="dailyBriefTimeframeDays" style="margin:0;display:flex;align-items:center;gap:8px">
+              Tidsfonster (dagar):
+              <input id="dailyBriefTimeframeDays" type="number" value="14" min="1" max="90" style="width:96px" />
+            </label>
+            <label class="mini" for="dailyBriefMaxTasks" style="margin:0;display:flex;align-items:center;gap:8px">
+              Max tasks:
+              <input id="dailyBriefMaxTasks" type="number" value="5" min="1" max="5" style="width:72px" />
+            </label>
+            <label class="mini" for="dailyBriefIncludeClosed" style="margin:0;display:flex;align-items:center;gap:6px">
+              <input id="dailyBriefIncludeClosed" type="checkbox" />
+              Inkludera stangda incidenter
+            </label>
+            <button id="runDailyBriefBtn" class="btn primary">Kora COO Daily Brief</button>
+          </div>
+          <div id="dailyBriefStatus" class="status-line"></div>
+          <div class="grid" style="margin-top:10px">
+            <div>
+              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Prioritetsniva</h3>
+              <div id="dailyBriefPriority" class="code-block">-</div>
+            </div>
+            <div>
+              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Severity breakdown</h3>
+              <div id="dailyBriefSeverity" class="code-block">L3=0, L4=0, L5=0</div>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Executive summary</h3>
+            <div id="dailyBriefSummary" class="code-block">Ingen daily brief an.</div>
+          </div>
+          <div style="margin-top:10px">
+            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Topp-rekommendationer</h3>
+            <ul id="dailyBriefRecommendations" class="list">
+              <li class="muted mini">Inga rekommendationer an.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="panel">
           <h2>Riskkalibrering</h2>
           <div class="seg" style="margin-top:10px">
             <button id="fetchCalibrationSuggestionBtn" class="btn">Hämta förslag</button>
@@ -2753,6 +2832,11 @@
             <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Patient chat beta gate</h3>
             <div id="monitorPublicChatBetaSummary" class="status-line"></div>
             <div id="monitorPublicChatBetaResult" class="code-block" style="margin-top:8px">Ingen beta gate-data ännu.</div>
+          </div>
+          <div style="margin-top:12px">
+            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Patient conversion loop</h3>
+            <div id="monitorPatientConversionSummary" class="status-line"></div>
+            <div id="monitorPatientConversionResult" class="code-block" style="margin-top:8px">Ingen conversion-signaldata ännu.</div>
           </div>
           <div style="margin-top:12px">
             <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700" data-i18n="monitor_scheduler_jobs">Scheduler jobs (required)</h3>
@@ -2980,6 +3064,36 @@
           </div>
           <div id="versionStatus" class="status-line"></div>
           <div id="versionRiskBlock" class="code-block" style="margin-top:8px"></div>
+          <div class="seg" style="margin-top:10px">
+            <h4 style="margin:0 0 8px">Revisionshistorik</h4>
+            <div class="grid">
+              <div>
+                <label for="revisionFromSelect">Diff från revision</label>
+                <select id="revisionFromSelect"></select>
+              </div>
+              <div>
+                <label for="revisionToSelect">Diff till revision</label>
+                <select id="revisionToSelect"></select>
+              </div>
+              <div style="display:flex;align-items:flex-end">
+                <button id="loadRevisionDiffBtn" class="btn small">Visa diff</button>
+              </div>
+              <div>
+                <label for="rollbackRevisionSelect">Rollback till revision (OWNER)</label>
+                <select id="rollbackRevisionSelect"></select>
+              </div>
+              <div>
+                <label for="rollbackRevisionNoteInput">Rollback-notering (valfritt)</label>
+                <input id="rollbackRevisionNoteInput" type="text" placeholder="Ex. Återställ efter policy review" />
+              </div>
+              <div style="display:flex;align-items:flex-end">
+                <button id="rollbackRevisionBtn" class="btn small">Rollback revision</button>
+              </div>
+            </div>
+            <div id="revisionStatus" class="status-line"></div>
+            <div id="revisionSummary" class="mini muted" style="margin-top:6px">Ingen revisionsdata ännu.</div>
+            <div id="revisionDiffBlock" class="code-block" style="margin-top:8px">Välj en version för att ladda revisioner.</div>
+          </div>
         </div>
       </section>
 

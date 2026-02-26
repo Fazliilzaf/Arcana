@@ -24,7 +24,16 @@ function parsePositiveInt(value) {
   return parsed;
 }
 
+function parseBool(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
 const RISK_GOLD_SET_DEFAULT_PATH = path.join(process.cwd(), 'docs', 'risk', 'gold-set-v1.json');
+const DUAL_SIGNOFF_ALLOWED_ROLES = new Set([ROLE_OWNER, ROLE_STAFF]);
 
 async function readTenantConfigSafe(tenantConfigStore, tenantId) {
   const config = await tenantConfigStore.getTenantConfig(tenantId);
@@ -44,10 +53,67 @@ async function readTenantConfigSafe(tenantConfigStore, tenantId) {
   };
 }
 
+async function resolveRiskDualSignOff({
+  req,
+  authStore,
+  tenantId,
+  required = false,
+} = {}) {
+  const rawSignOff = req?.body?.signOff;
+  const signOff =
+    rawSignOff && typeof rawSignOff === 'object' && !Array.isArray(rawSignOff)
+      ? rawSignOff
+      : null;
+  const approverUserId = normalizeText(signOff?.approverUserId || '');
+  const note = normalizeText(signOff?.note || signOff?.reason || '');
+
+  if (!approverUserId) {
+    if (required) {
+      throw new Error('Dual sign-off krävs: signOff.approverUserId saknas.');
+    }
+    return null;
+  }
+
+  const actorUserId = normalizeText(req?.auth?.userId || '');
+  if (actorUserId && approverUserId === actorUserId) {
+    throw new Error('Dual sign-off kräver annan approver än aktuell användare.');
+  }
+
+  if (!authStore || typeof authStore.listTenantMembers !== 'function') {
+    throw new Error('Dual sign-off kunde inte verifieras (listTenantMembers saknas).');
+  }
+
+  const members = await authStore.listTenantMembers(tenantId);
+  const approver =
+    (Array.isArray(members) ? members : []).find(
+      (item) =>
+        normalizeText(item?.user?.id || '') === approverUserId &&
+        normalizeText(item?.membership?.status || '').toLowerCase() === 'active' &&
+        DUAL_SIGNOFF_ALLOWED_ROLES.has(
+          normalizeText(item?.membership?.role || '').toUpperCase()
+        )
+    ) || null;
+
+  if (!approver) {
+    throw new Error(
+      'Dual sign-off kunde inte verifieras: approver saknas eller har ogiltig roll/status i tenant.'
+    );
+  }
+
+  return {
+    approverUserId,
+    approverMembershipId: normalizeText(approver?.membership?.id || '') || null,
+    approverRole: normalizeText(approver?.membership?.role || '').toUpperCase() || null,
+    approverEmail: normalizeText(approver?.user?.email || '') || null,
+    note,
+  };
+}
+
 function createRiskRouter({
   tenantConfigStore,
   templateStore,
   authStore,
+  config = null,
   requireAuth,
   requireRole,
 }) {
@@ -97,6 +163,12 @@ function createRiskRouter({
       const beforeVersion = parsePositiveInt(currentSettings?.riskThresholdVersion) || 1;
       const nextModifier = normalizeRiskModifier(req.body?.riskSensitivityModifier);
       const note = normalizeText(req.body?.note || '');
+      const dualSignOff = await resolveRiskDualSignOff({
+        req,
+        authStore,
+        tenantId: req.auth.tenantId,
+        required: Boolean(config?.riskDualSignoffRequired),
+      });
       const updated = await tenantConfigStore.updateTenantConfig({
         tenantId: req.auth.tenantId,
         patch: {
@@ -106,6 +178,8 @@ function createRiskRouter({
         riskChangeMeta: {
           changeSource: 'manual_update',
           note,
+          dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+          signOff: dualSignOff,
         },
       });
       const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
@@ -136,6 +210,8 @@ function createRiskRouter({
             },
           ],
           note,
+          dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+          signOff: dualSignOff,
         },
       });
 
@@ -220,6 +296,12 @@ function createRiskRouter({
           return res.status(400).json({ error: 'version måste vara ett positivt heltal.' });
         }
         const note = normalizeText(req.body?.note || '');
+        const dualSignOff = await resolveRiskDualSignOff({
+          req,
+          authStore,
+          tenantId: req.auth.tenantId,
+          required: Boolean(config?.riskDualSignoffRequired),
+        });
 
         const currentSettings = await readTenantConfigSafe(tenantConfigStore, req.auth.tenantId);
         const beforeModifier = normalizeRiskModifier(currentSettings?.riskSensitivityModifier);
@@ -244,6 +326,8 @@ function createRiskRouter({
             changeSource: 'rollback',
             note,
             rollbackFromVersion: targetVersion,
+            dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+            signOff: dualSignOff,
           },
         });
         const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
@@ -268,6 +352,8 @@ function createRiskRouter({
               riskSensitivityModifier: afterModifier,
               riskThresholdVersion: afterVersion,
             },
+            dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+            signOff: dualSignOff,
           },
         });
 
@@ -306,6 +392,8 @@ function createRiskRouter({
       const content = normalizeText(req.body?.content);
       const scope = normalizeText(req.body?.scope || 'output') || 'output';
       const variables = Array.isArray(req.body?.variables) ? req.body.variables : undefined;
+      const strictVariables =
+        req.body?.strictVariables === undefined ? true : parseBool(req.body?.strictVariables, true);
 
       if (!isValidCategory(category)) {
         return res.status(400).json({ error: 'Ogiltig kategori.' });
@@ -327,7 +415,9 @@ function createRiskRouter({
         category,
         content,
         tenantRiskModifier: settings.riskSensitivityModifier,
+        riskThresholdVersion: settings.riskThresholdVersion,
         variableValidation,
+        enforceStrictTemplateVariables: strictVariables,
       });
 
       await authStore.addAuditEvent({
@@ -339,6 +429,7 @@ function createRiskRouter({
         targetId: req.auth.tenantId,
         metadata: {
           category,
+          strictVariables,
           riskLevel: evaluation.riskLevel,
           decision: evaluation.decision,
         },
@@ -369,10 +460,15 @@ function createRiskRouter({
         const modifier = hasModifierQuery
           ? normalizeRiskModifier(req.query?.modifier)
           : settings.riskSensitivityModifier;
+        const hasThresholdVersionQuery = req.query?.thresholdVersion !== undefined;
+        const thresholdVersion = hasThresholdVersionQuery
+          ? parsePositiveInt(req.query?.thresholdVersion) || settings.riskThresholdVersion
+          : settings.riskThresholdVersion;
         const inputFile = RISK_GOLD_SET_DEFAULT_PATH;
         const evaluated = await evaluateGoldSetFile({
           filePath: inputFile,
           tenantRiskModifier: modifier,
+          riskThresholdVersion: thresholdVersion,
         });
 
         await authStore.addAuditEvent({
@@ -384,6 +480,7 @@ function createRiskRouter({
           targetId: req.auth.tenantId,
           metadata: {
             modifier,
+            thresholdVersion,
             inputFile,
             datasetVersion: evaluated?.dataset?.version || 'unknown',
             cases: Number(evaluated?.report?.totals?.cases || 0),
@@ -394,6 +491,10 @@ function createRiskRouter({
 
         return res.json({
           settings,
+          calibrationInput: {
+            modifier,
+            thresholdVersion,
+          },
           dataset: evaluated.dataset,
           report: evaluated.report,
         });
@@ -504,6 +605,12 @@ function createRiskRouter({
         const beforeVersion = parsePositiveInt(currentSettings?.riskThresholdVersion) || 1;
         const nextModifier = normalizeRiskModifier(req.body?.suggestedModifier);
         const note = normalizeText(req.body?.note || '');
+        const dualSignOff = await resolveRiskDualSignOff({
+          req,
+          authStore,
+          tenantId: req.auth.tenantId,
+          required: Boolean(config?.riskDualSignoffRequired),
+        });
 
         const updated = await tenantConfigStore.updateTenantConfig({
           tenantId: req.auth.tenantId,
@@ -514,6 +621,8 @@ function createRiskRouter({
           riskChangeMeta: {
             changeSource: 'calibration_apply',
             note,
+            dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+            signOff: dualSignOff,
           },
         });
         const afterModifier = normalizeRiskModifier(updated?.riskSensitivityModifier);
@@ -544,6 +653,8 @@ function createRiskRouter({
                 after: afterModifier,
               },
             ],
+            dualSignOffRequired: Boolean(config?.riskDualSignoffRequired),
+            signOff: dualSignOff,
           },
         });
 

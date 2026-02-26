@@ -13,6 +13,10 @@ const REQUIRED_SCHEDULER_JOBS = Object.freeze([
   'nightly_pilot_report',
   'backup_prune',
   'restore_drill_preview',
+  'restore_drill_full',
+  'audit_integrity_check',
+  'secrets_rotation_snapshot',
+  'release_governance_review',
   'alert_probe',
 ]);
 const READINESS_BANDS = Object.freeze({
@@ -44,10 +48,22 @@ const REMEDIATION_GUIDANCE_BY_NOGO = Object.freeze({
     owner: 'ops_owner',
     playbook: 'Kör restore_drill_preview och verifiera success i scheduler + audit.',
   },
+  restore_drill_full_unverified_30d: {
+    owner: 'ops_owner',
+    playbook: 'Kör restore_drill_full och verifiera sandbox-restore success i scheduler + audit.',
+  },
   nightly_pilot_report_unverified: {
     owner: 'ops_owner',
     playbook:
       'Kör nightly_pilot_report och verifiera success i scheduler + rapportfil i /ops/reports.',
+  },
+  audit_integrity_unverified_daily: {
+    owner: 'security_owner',
+    playbook: 'Kör audit_integrity_check och verifiera daglig success + 0 integrity-issues.',
+  },
+  secret_rotation_unverified_daily: {
+    owner: 'security_owner',
+    playbook: 'Kör secrets_rotation_snapshot och verifiera daglig success i scheduler + audit.',
   },
   audit_chain_not_immutable: {
     owner: 'security_owner',
@@ -114,7 +130,8 @@ const REMEDIATION_GUIDANCE_BY_CHECK = Object.freeze({
   },
   scheduler_required_jobs_enabled: {
     owner: 'ops_owner',
-    playbook: 'Aktivera nightly_pilot_report, backup_prune, restore_drill_preview och alert_probe.',
+    playbook:
+      'Aktivera nightly_pilot_report, backup_prune, restore_drill_preview, restore_drill_full, audit_integrity_check, secrets_rotation_snapshot, release_governance_review och alert_probe.',
   },
   scheduler_job_freshness: {
     owner: 'ops_owner',
@@ -123,6 +140,18 @@ const REMEDIATION_GUIDANCE_BY_CHECK = Object.freeze({
   restore_drill_30d: {
     owner: 'ops_owner',
     playbook: 'Kör restore drill och säkerställ success <= 30 dagar.',
+  },
+  restore_drill_full_30d: {
+    owner: 'ops_owner',
+    playbook: 'Kör restore_drill_full och verifiera sandbox-restore success <= 30 dagar.',
+  },
+  audit_integrity_daily: {
+    owner: 'security_owner',
+    playbook: 'Kör audit_integrity_check dagligen och följ upp failures omedelbart.',
+  },
+  secret_rotation_daily: {
+    owner: 'security_owner',
+    playbook: 'Kör secrets_rotation_snapshot dagligen och följ upp stale/pending rotation.',
   },
   nightly_pilot_report_freshness: {
     owner: 'ops_owner',
@@ -156,6 +185,11 @@ const REMEDIATION_GUIDANCE_BY_CHECK = Object.freeze({
     owner: 'growth_owner',
     playbook:
       'När beta-läge är aktivt: sätt ARCANA_PUBLIC_CHAT_BETA_KEY eller ARCANA_PUBLIC_CHAT_BETA_ALLOW_HOSTS och verifiera gate via monitor/observability.',
+  },
+  patient_conversion_feedback_loop: {
+    owner: 'growth_owner',
+    playbook:
+      'Följ patient-channel conversion-signaler i monitor, justera beta allowlist och optimera CTA-flöden tills feedback-loopen är grön.',
   },
   observability_signals: {
     owner: 'ops_owner',
@@ -228,6 +262,71 @@ function parseHistoryLimit(value, fallback = 30) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(1, Math.min(200, parsed));
+}
+
+function buildPatientFeedbackReadiness({
+  publicChatBetaEnabled = false,
+  patientConversionSummary = null,
+  maxFreshnessHours = 72,
+}) {
+  const summary = patientConversionSummary && typeof patientConversionSummary === 'object'
+    ? patientConversionSummary
+    : null;
+  const window = summary?.window && typeof summary.window === 'object' ? summary.window : {};
+
+  const totalRequests = Number(window.totalRequests || 0);
+  const deniedRatePct = Number(window.deniedRatePct || 0);
+  const conversionIntentRatePct = Number(window.conversionIntentRatePct || 0);
+  const feedbackHealthy = window.feedbackHealthy === true;
+  const latestEventAt = toIso(window.latestEventAt);
+  const ageHoursSinceLatest = Number.isFinite(Number(window.ageHoursSinceLatest))
+    ? Number(window.ageHoursSinceLatest)
+    : null;
+  const freshnessTarget = Number.isFinite(Number(maxFreshnessHours))
+    ? Math.max(1, Math.min(720, Number(maxFreshnessHours)))
+    : 72;
+
+  let status = 'unknown';
+  let evidence = '';
+
+  if (!publicChatBetaEnabled) {
+    status = 'green';
+    evidence = 'Beta-gate ej aktiv, feedback-loop är inte blockerande.';
+  } else if (!summary) {
+    status = 'yellow';
+    evidence = 'Patient conversion-store saknas i runtime.';
+  } else if (totalRequests === 0) {
+    status = 'yellow';
+    evidence = `Inga patient chat-signaler senaste ${Number(summary?.windowDays || 0)} dagar.`;
+  } else if (deniedRatePct > 85) {
+    status = 'red';
+    evidence = `Hög beta-blockering: deniedRate=${deniedRatePct}% i signalfönstret.`;
+  } else if (ageHoursSinceLatest !== null && ageHoursSinceLatest > freshnessTarget) {
+    status = 'yellow';
+    evidence = `Signal-loop stale: senaste event är ${ageHoursSinceLatest}h gammalt (mål <= ${freshnessTarget}h).`;
+  } else if (feedbackHealthy) {
+    status = 'green';
+    evidence = `Feedback-loop aktiv: conversionIntentRate=${conversionIntentRatePct}%.`;
+  } else {
+    status = 'yellow';
+    evidence = 'Trafik finns men saknar tydliga konverteringssignaler ännu.';
+  }
+
+  return {
+    status,
+    evidence,
+    value: {
+      totalRequests,
+      deniedRatePct,
+      conversionIntentRatePct,
+      feedbackHealthy,
+      latestEventAt,
+      ageHoursSinceLatest,
+      freshnessTargetHours: freshnessTarget,
+      topDeniedHosts: Array.isArray(window.topDeniedHosts) ? window.topDeniedHosts : [],
+      topIntentSignals: Array.isArray(window.topIntentSignals) ? window.topIntentSignals : [],
+    },
+  };
 }
 
 function statusScore(status) {
@@ -585,6 +684,31 @@ function buildNightlyPilotReportGate({
   };
 }
 
+function buildSchedulerJobRecencyGate({
+  schedulerStatus = null,
+  latestAuditEvent = null,
+  jobId = '',
+  maxAgeHours = 24,
+  nowMs = Date.now(),
+} = {}) {
+  const normalizedJobId = normalizeText(jobId);
+  const schedulerJobs = Array.isArray(schedulerStatus?.jobs) ? schedulerStatus.jobs : [];
+  const job = schedulerJobs.find((item) => String(item?.id || '') === normalizedJobId) || null;
+  const clampedMaxAgeHours = Math.max(1, Math.min(24 * 365, Number(maxAgeHours || 24)));
+  const lastSuccessAt = newestIsoTimestamp([latestAuditEvent?.ts, job?.lastSuccessAt]);
+  const ageHours = toAgeHoursSince(lastSuccessAt, nowMs);
+  const healthy = ageHours !== null && ageHours <= clampedMaxAgeHours;
+  return {
+    jobId: normalizedJobId || null,
+    maxAgeHours: clampedMaxAgeHours,
+    lastSuccessAt,
+    ageHours,
+    healthy,
+    noGo: !schedulerStatus?.enabled || !schedulerStatus?.started || !healthy,
+    job,
+  };
+}
+
 function buildSchedulerFreshnessCheck(job) {
   if (!job) {
     return buildCheck({
@@ -811,7 +935,10 @@ function createMonitorRouter({
   templateStore,
   tenantConfigStore,
   secretRotationStore = null,
+  patientConversionStore = null,
   runtimeMetricsStore = null,
+  sloTicketStore = null,
+  executionGateway = null,
   config,
   scheduler = null,
   requireAuth,
@@ -836,13 +963,20 @@ function createMonitorRouter({
           members,
           auditEvents,
           latestRestoreDrillAudit,
+          latestRestoreDrillFullAudit,
           latestNightlyReportAudit,
+          latestAuditIntegrityAudit,
+          latestSecretRotationAudit,
           latestSchedulerReports,
           tenantConfig,
+          patientConversionSummary,
+          sloTicketSummary,
           authFile,
           templateFile,
           tenantFile,
           secretRotationFile,
+          patientSignalFile,
+          sloTicketFile,
         ] =
           await Promise.all([
             templateStore.listTemplates({ tenantId }),
@@ -862,7 +996,28 @@ function createMonitorRouter({
             typeof authStore.getLatestAuditEvent === 'function'
               ? authStore.getLatestAuditEvent({
                   tenantId,
+                  action: 'scheduler.job.restore_drill_full.run',
+                  outcome: 'success',
+                })
+              : Promise.resolve(null),
+            typeof authStore.getLatestAuditEvent === 'function'
+              ? authStore.getLatestAuditEvent({
+                  tenantId,
                   action: 'scheduler.job.nightly_pilot_report.run',
+                  outcome: 'success',
+                })
+              : Promise.resolve(null),
+            typeof authStore.getLatestAuditEvent === 'function'
+              ? authStore.getLatestAuditEvent({
+                  tenantId,
+                  action: 'scheduler.job.audit_integrity_check.run',
+                  outcome: 'success',
+                })
+              : Promise.resolve(null),
+            typeof authStore.getLatestAuditEvent === 'function'
+              ? authStore.getLatestAuditEvent({
+                  tenantId,
+                  action: 'scheduler.job.secrets_rotation_snapshot.run',
                   outcome: 'success',
                 })
               : Promise.resolve(null),
@@ -871,10 +1026,23 @@ function createMonitorRouter({
               limit: 1,
             }),
             tenantConfigStore.getTenantConfig(tenantId),
+            patientConversionStore && typeof patientConversionStore.getSummary === 'function'
+              ? patientConversionStore.getSummary({
+                  tenantId,
+                  windowDays: parseDays(config?.patientSignalWindowDays, 14),
+                  freshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+                  topLimit: 8,
+                })
+              : Promise.resolve(null),
+            sloTicketStore && typeof sloTicketStore.summarize === 'function'
+              ? sloTicketStore.summarize({ tenantId })
+              : Promise.resolve(null),
             readFileMeta(authStore.filePath),
             readFileMeta(templateStore.filePath),
             readFileMeta(tenantConfigStore.filePath),
             readFileMeta(config?.secretRotationStorePath),
+            readFileMeta(config?.patientSignalStorePath),
+            readFileMeta(config?.sloTicketStorePath),
           ]);
 
         const now = Date.now();
@@ -895,6 +1063,10 @@ function createMonitorRouter({
         const runtimeMetrics =
           runtimeMetricsStore && typeof runtimeMetricsStore.getSnapshot === 'function'
             ? runtimeMetricsStore.getSnapshot({ areaLimit: 8 })
+            : null;
+        const gatewayRuntimeStats =
+          executionGateway && typeof executionGateway.getRuntimeStats === 'function'
+            ? executionGateway.getRuntimeStats()
             : null;
         const observability = buildObservabilitySnapshot({
           runtimeMetrics,
@@ -946,6 +1118,27 @@ function createMonitorRouter({
           monitorPilotReportMaxAgeHours: config?.monitorPilotReportMaxAgeHours,
           nowMs: now,
         });
+        const restoreDrillFullGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestRestoreDrillFullAudit,
+          jobId: 'restore_drill_full',
+          maxAgeHours: 24 * 30,
+          nowMs: now,
+        });
+        const auditIntegrityDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestAuditIntegrityAudit,
+          jobId: 'audit_integrity_check',
+          maxAgeHours: 36,
+          nowMs: now,
+        });
+        const secretRotationDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestSecretRotationAudit,
+          jobId: 'secrets_rotation_snapshot',
+          maxAgeHours: 36,
+          nowMs: now,
+        });
 
         const secretRotationStatus =
           secretRotationStore && typeof secretRotationStore.getSecretsStatus === 'function'
@@ -957,6 +1150,12 @@ function createMonitorRouter({
           ? config.corsAllowedOrigins
           : [];
         const effectiveCorsAllowedOrigins = collectAllowedCorsOrigins(config);
+        const publicChatBetaEnabled = Boolean(config?.publicChatBetaEnabled);
+        const patientFeedback = buildPatientFeedbackReadiness({
+          publicChatBetaEnabled,
+          patientConversionSummary,
+          maxFreshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+        });
 
         await authStore.addAuditEvent({
           tenantId,
@@ -978,6 +1177,12 @@ function createMonitorRouter({
             platform: process.platform,
             aiProvider: config?.aiProvider || 'openai',
             aiModel: config?.openaiModel || '',
+            semanticModelMode: normalizeText(config?.semanticModelMode || 'heuristic') || 'heuristic',
+            distributed: {
+              configuredBackend: normalizeText(config?.distributedBackend || 'memory') || 'memory',
+              active: runtimeState?.distributed?.active === true,
+              redis: runtimeState?.distributed?.redisStatus || null,
+            },
             memoryMb: {
               rss: mb(memoryUsage.rss),
               heapTotal: mb(memoryUsage.heapTotal),
@@ -1016,6 +1221,27 @@ function createMonitorRouter({
                     healthy: restoreDrillGate.healthy,
                     noGo: restoreDrillGate.noGo,
                   },
+                  restoreDrillFull: {
+                    maxAgeHours: restoreDrillFullGate.maxAgeHours,
+                    lastSuccessAt: restoreDrillFullGate.lastSuccessAt,
+                    ageHours: restoreDrillFullGate.ageHours,
+                    healthy: restoreDrillFullGate.healthy,
+                    noGo: restoreDrillFullGate.noGo,
+                  },
+                  auditIntegrityDaily: {
+                    maxAgeHours: auditIntegrityDailyGate.maxAgeHours,
+                    lastSuccessAt: auditIntegrityDailyGate.lastSuccessAt,
+                    ageHours: auditIntegrityDailyGate.ageHours,
+                    healthy: auditIntegrityDailyGate.healthy,
+                    noGo: auditIntegrityDailyGate.noGo,
+                  },
+                  secretRotationDaily: {
+                    maxAgeHours: secretRotationDailyGate.maxAgeHours,
+                    lastSuccessAt: secretRotationDailyGate.lastSuccessAt,
+                    ageHours: secretRotationDailyGate.ageHours,
+                    healthy: secretRotationDailyGate.healthy,
+                    noGo: secretRotationDailyGate.noGo,
+                  },
                   pilotReport: {
                     maxAgeHours: pilotReportGate.maxAgeHours,
                     lastSuccessAt: pilotReportGate.lastSuccessAt,
@@ -1038,6 +1264,27 @@ function createMonitorRouter({
                     healthy: false,
                     noGo: true,
                   },
+                  restoreDrillFull: {
+                    maxAgeHours: restoreDrillFullGate.maxAgeHours,
+                    lastSuccessAt: null,
+                    ageHours: null,
+                    healthy: false,
+                    noGo: true,
+                  },
+                  auditIntegrityDaily: {
+                    maxAgeHours: auditIntegrityDailyGate.maxAgeHours,
+                    lastSuccessAt: null,
+                    ageHours: null,
+                    healthy: false,
+                    noGo: true,
+                  },
+                  secretRotationDaily: {
+                    maxAgeHours: secretRotationDailyGate.maxAgeHours,
+                    lastSuccessAt: null,
+                    ageHours: null,
+                    healthy: false,
+                    noGo: true,
+                  },
                   pilotReport: {
                     maxAgeHours: pilotReportGate.maxAgeHours,
                     lastSuccessAt: null,
@@ -1047,6 +1294,27 @@ function createMonitorRouter({
                     latestReport: pilotReportGate.latestReport,
                   },
                 },
+            gateway: gatewayRuntimeStats || {
+              queue: {
+                enabled: false,
+                activeTenants: 0,
+              },
+              idempotency: {
+                ttlMs: 0,
+                entries: 0,
+                pending: 0,
+              },
+              retries: {
+                agentMaxAttempts: 0,
+                baseDelayMs: 0,
+                backoffFactor: 0,
+              },
+              deadLetters: {
+                entries: 0,
+                maxEntries: 0,
+                latest: null,
+              },
+            },
           },
           security: {
             cors: {
@@ -1062,6 +1330,11 @@ function createMonitorRouter({
               loginRotationScope: config?.authLoginSessionRotationScope || 'none',
             },
             rateLimits: {
+              backend:
+                runtimeState?.distributed?.active === true &&
+                normalizeText(config?.distributedBackend).toLowerCase() === 'redis'
+                  ? 'redis'
+                  : 'memory',
               loginMax: Number(config?.authLoginRateLimitMax || 0),
               selectTenantMax: Number(config?.authSelectTenantRateLimitMax || 0),
               apiReadMax: Number(config?.apiRateLimitReadMax || 0),
@@ -1090,7 +1363,52 @@ function createMonitorRouter({
                 ? config.publicChatBetaAllowHosts.length
                 : 0,
               allowLocalhost: Boolean(config?.publicChatBetaAllowLocalhost),
+              killSwitch: Boolean(config?.publicChatKillSwitch),
+              maxTurns: Number(config?.publicChatMaxTurns || 0),
+              promptInjectionFilterEnabled: Boolean(
+                config?.publicChatPromptInjectionFilterEnabled
+              ),
             },
+          },
+          patientChannel: {
+            betaGate: {
+              enabled: Boolean(config?.publicChatBetaEnabled),
+              headerName: normalizeText(config?.publicChatBetaHeader) || 'x-arcana-beta-key',
+              keyConfigured: Boolean(normalizeText(config?.publicChatBetaKey)),
+              allowHostsCount: Array.isArray(config?.publicChatBetaAllowHosts)
+                ? config.publicChatBetaAllowHosts.length
+                : 0,
+              allowLocalhost: Boolean(config?.publicChatBetaAllowLocalhost),
+              killSwitch: Boolean(config?.publicChatKillSwitch),
+              maxTurns: Number(config?.publicChatMaxTurns || 0),
+              promptInjectionFilterEnabled: Boolean(
+                config?.publicChatPromptInjectionFilterEnabled
+              ),
+            },
+            conversionFeedback: patientConversionSummary
+              ? {
+                  windowDays: Number(patientConversionSummary?.windowDays || 0),
+                  summary: patientConversionSummary?.window || null,
+                  check: patientFeedback,
+                }
+              : null,
+          },
+          sloTickets: sloTicketSummary || {
+            generatedAt: new Date().toISOString(),
+            tenantId,
+            totals: {
+              tickets: 0,
+              open: 0,
+              resolved: 0,
+              openBreaches: 0,
+            },
+            bySeverity: {
+              critical: 0,
+              high: 0,
+              medium: 0,
+              low: 0,
+            },
+            latestOpenAt: null,
           },
           tenant: {
             tenantId,
@@ -1111,6 +1429,12 @@ function createMonitorRouter({
             incidentsBreachedOpen: Number(incidentSummary?.totals?.breachedOpen || 0),
             restoreDrillAgeDays: restoreDrillGate.ageDays,
             restoreDrillHealthy: restoreDrillGate.healthy,
+            restoreDrillFullAgeHours: restoreDrillFullGate.ageHours,
+            restoreDrillFullHealthy: restoreDrillFullGate.healthy,
+            auditIntegrityDailyAgeHours: auditIntegrityDailyGate.ageHours,
+            auditIntegrityDailyHealthy: auditIntegrityDailyGate.healthy,
+            secretRotationDailyAgeHours: secretRotationDailyGate.ageHours,
+            secretRotationDailyHealthy: secretRotationDailyGate.healthy,
             pilotReportAgeHours: pilotReportGate.ageHours,
             pilotReportHealthy: pilotReportGate.healthy,
             observabilityStatus: observability?.summary?.overallStatus || 'unknown',
@@ -1120,6 +1444,14 @@ function createMonitorRouter({
             staffActive: activeStaff,
             staffDisabled: disabledStaff,
             auditEvents24h: recentAuditCount,
+            patientRequestsWindow: Number(patientFeedback?.value?.totalRequests || 0),
+            patientDeniedRatePct: Number(patientFeedback?.value?.deniedRatePct || 0),
+            patientConversionIntentRatePct: Number(
+              patientFeedback?.value?.conversionIntentRatePct || 0
+            ),
+            patientFeedbackHealthy: patientFeedback?.value?.feedbackHealthy === true,
+            sloTicketsOpen: Number(sloTicketSummary?.totals?.open || 0),
+            sloTicketsOpenBreaches: Number(sloTicketSummary?.totals?.openBreaches || 0),
           },
           observability,
           gates: {
@@ -1129,6 +1461,27 @@ function createMonitorRouter({
               ageDays: restoreDrillGate.ageDays,
               healthy: restoreDrillGate.healthy,
               noGo: restoreDrillGate.noGo,
+            },
+            restoreDrillFull: {
+              maxAgeHours: restoreDrillFullGate.maxAgeHours,
+              lastSuccessAt: restoreDrillFullGate.lastSuccessAt,
+              ageHours: restoreDrillFullGate.ageHours,
+              healthy: restoreDrillFullGate.healthy,
+              noGo: restoreDrillFullGate.noGo,
+            },
+            auditIntegrityDaily: {
+              maxAgeHours: auditIntegrityDailyGate.maxAgeHours,
+              lastSuccessAt: auditIntegrityDailyGate.lastSuccessAt,
+              ageHours: auditIntegrityDailyGate.ageHours,
+              healthy: auditIntegrityDailyGate.healthy,
+              noGo: auditIntegrityDailyGate.noGo,
+            },
+            secretRotationDaily: {
+              maxAgeHours: secretRotationDailyGate.maxAgeHours,
+              lastSuccessAt: secretRotationDailyGate.lastSuccessAt,
+              ageHours: secretRotationDailyGate.ageHours,
+              healthy: secretRotationDailyGate.healthy,
+              noGo: secretRotationDailyGate.noGo,
             },
             pilotReport: {
               maxAgeHours: pilotReportGate.maxAgeHours,
@@ -1144,6 +1497,8 @@ function createMonitorRouter({
             templates: templateFile,
             tenantConfig: tenantFile,
             secretRotation: secretRotationFile,
+            patientSignals: patientSignalFile,
+            sloTickets: sloTicketFile,
           },
         });
       } catch (error) {
@@ -1198,6 +1553,66 @@ function createMonitorRouter({
   );
 
   router.get(
+    '/monitor/gateway/dead-letters',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        const limit = parseHistoryLimit(req.query?.limit, 100);
+        const requestedTenantId = normalizeText(req.query?.tenantId);
+        const actorRole = normalizeText(req.auth?.role).toUpperCase();
+        const actorTenantId = normalizeText(req.auth?.tenantId);
+
+        if (
+          requestedTenantId &&
+          requestedTenantId !== actorTenantId &&
+          actorRole !== ROLE_OWNER
+        ) {
+          return res.status(403).json({ error: 'Endast OWNER kan läsa dead-letters för annan tenant.' });
+        }
+
+        const tenantId = requestedTenantId || actorTenantId;
+        const deadLetters =
+          executionGateway && typeof executionGateway.listDeadLetters === 'function'
+            ? executionGateway.listDeadLetters({ tenantId, limit })
+            : [];
+        const runtime =
+          executionGateway && typeof executionGateway.getRuntimeStats === 'function'
+            ? executionGateway.getRuntimeStats()
+            : null;
+
+        await authStore.addAuditEvent({
+          tenantId: actorTenantId || null,
+          actorUserId: req.auth.userId,
+          action: 'monitor.gateway_dead_letters.read',
+          outcome: 'success',
+          targetType: 'monitor_gateway_dead_letters',
+          targetId: tenantId || actorTenantId || null,
+          metadata: {
+            requestedTenantId: requestedTenantId || null,
+            limit,
+          },
+        });
+
+        return res.json({
+          tenantId: tenantId || null,
+          limit,
+          count: Array.isArray(deadLetters) ? deadLetters.length : 0,
+          deadLetters: Array.isArray(deadLetters) ? deadLetters : [],
+          runtime,
+          generatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa gateway dead-letters.' });
+      }
+    }
+  );
+
+  router.get(
     '/monitor/observability',
     requireAuth,
     requireRole(ROLE_OWNER, ROLE_STAFF),
@@ -1244,6 +1659,71 @@ function createMonitorRouter({
   );
 
   router.get(
+    '/monitor/patient-channel',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!patientConversionStore || typeof patientConversionStore.getSummary !== 'function') {
+        return res.status(503).json({ error: 'Patient conversion-store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const summary = await patientConversionStore.getSummary({
+          tenantId,
+          windowDays: parseDays(config?.patientSignalWindowDays, 14),
+          freshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+          topLimit: 8,
+        });
+        const feedback = buildPatientFeedbackReadiness({
+          publicChatBetaEnabled: Boolean(config?.publicChatBetaEnabled),
+          patientConversionSummary: summary,
+          maxFreshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'monitor.patient_channel.read',
+          outcome: 'success',
+          targetType: 'monitor_patient_channel',
+          targetId: tenantId,
+          metadata: {
+            totalRequests: Number(summary?.window?.totalRequests || 0),
+            deniedRatePct: Number(summary?.window?.deniedRatePct || 0),
+            conversionIntentRatePct: Number(summary?.window?.conversionIntentRatePct || 0),
+            feedbackStatus: feedback.status,
+          },
+        });
+
+        return res.json({
+          generatedAt: new Date().toISOString(),
+          tenantId,
+          betaGate: {
+            enabled: Boolean(config?.publicChatBetaEnabled),
+            headerName: normalizeText(config?.publicChatBetaHeader) || 'x-arcana-beta-key',
+            keyConfigured: Boolean(normalizeText(config?.publicChatBetaKey)),
+            allowHostsCount: Array.isArray(config?.publicChatBetaAllowHosts)
+              ? config.publicChatBetaAllowHosts.length
+              : 0,
+            allowLocalhost: Boolean(config?.publicChatBetaAllowLocalhost),
+            killSwitch: Boolean(config?.publicChatKillSwitch),
+            maxTurns: Number(config?.publicChatMaxTurns || 0),
+            promptInjectionFilterEnabled: Boolean(config?.publicChatPromptInjectionFilterEnabled),
+          },
+          feedback,
+          conversion: summary,
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa patient channel monitor.' });
+      }
+    }
+  );
+
+  router.get(
     '/monitor/slo',
     requireAuth,
     requireRole(ROLE_OWNER, ROLE_STAFF),
@@ -1254,7 +1734,16 @@ function createMonitorRouter({
           scheduler && typeof scheduler.getStatus === 'function'
             ? scheduler.getStatus()
             : null;
-        const [incidentSummary, latestRestoreDrillAudit, latestNightlyReportAudit, latestSchedulerReports] =
+        const [
+          incidentSummary,
+          latestRestoreDrillAudit,
+          latestRestoreDrillFullAudit,
+          latestNightlyReportAudit,
+          latestAuditIntegrityAudit,
+          latestSecretRotationAudit,
+          latestSchedulerReports,
+          sloTicketSummary,
+        ] =
           await Promise.all([
           typeof templateStore?.summarizeIncidents === 'function'
             ? templateStore.summarizeIncidents({ tenantId })
@@ -1269,7 +1758,28 @@ function createMonitorRouter({
           typeof authStore.getLatestAuditEvent === 'function'
             ? authStore.getLatestAuditEvent({
                 tenantId,
+                action: 'scheduler.job.restore_drill_full.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
                 action: 'scheduler.job.nightly_pilot_report.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
+                action: 'scheduler.job.audit_integrity_check.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
+                action: 'scheduler.job.secrets_rotation_snapshot.run',
                 outcome: 'success',
               })
             : Promise.resolve(null),
@@ -1277,17 +1787,21 @@ function createMonitorRouter({
             reportsDir: config?.reportsDir,
             limit: 1,
           }),
+          sloTicketStore && typeof sloTicketStore.summarize === 'function'
+            ? sloTicketStore.summarize({ tenantId })
+            : Promise.resolve(null),
         ]);
 
         const runtimeMetrics =
           runtimeMetricsStore && typeof runtimeMetricsStore.getSnapshot === 'function'
             ? runtimeMetricsStore.getSnapshot({ areaLimit: 10 })
             : null;
+        const nowMs = Date.now();
         const restoreGate = buildRestoreDrillGate({
           schedulerStatus,
           latestRestoreDrillAudit,
           monitorRestoreDrillMaxAgeDays: config?.monitorRestoreDrillMaxAgeDays,
-          nowMs: Date.now(),
+          nowMs,
         });
         const latestSchedulerReport =
           Array.isArray(latestSchedulerReports) && latestSchedulerReports.length > 0
@@ -1298,7 +1812,28 @@ function createMonitorRouter({
           latestNightlyReportAudit,
           latestReportFile: latestSchedulerReport,
           monitorPilotReportMaxAgeHours: config?.monitorPilotReportMaxAgeHours,
-          nowMs: Date.now(),
+          nowMs,
+        });
+        const restoreFullGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestRestoreDrillFullAudit,
+          jobId: 'restore_drill_full',
+          maxAgeHours: 24 * 30,
+          nowMs,
+        });
+        const auditIntegrityDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestAuditIntegrityAudit,
+          jobId: 'audit_integrity_check',
+          maxAgeHours: 36,
+          nowMs,
+        });
+        const secretRotationDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestSecretRotationAudit,
+          jobId: 'secrets_rotation_snapshot',
+          maxAgeHours: 36,
+          nowMs,
         });
 
         const sampledRequests = Number(runtimeMetrics?.totals?.sampledRequests || 0);
@@ -1331,6 +1866,8 @@ function createMonitorRouter({
             : 100;
         const breachRatePct =
           openIncidents > 0 ? Number(((breachedOpen / openIncidents) * 100).toFixed(3)) : 0;
+        const sloOpenBreaches = Number(sloTicketSummary?.totals?.openBreaches || 0);
+        const sloOpenTickets = Number(sloTicketSummary?.totals?.open || 0);
 
         const slos = [
           {
@@ -1401,6 +1938,59 @@ function createMonitorRouter({
               latestReport: pilotReportGate.latestReport,
             },
           },
+          {
+            id: 'restore_drill_full_recency',
+            label: 'Restore drill full recency',
+            target: '<=30 dagar',
+            sliHours: restoreFullGate.ageHours,
+            status: restoreFullGate.healthy
+              ? 'green'
+              : restoreFullGate.ageHours !== null && restoreFullGate.ageHours <= 24 * 45
+                ? 'yellow'
+                : 'red',
+            evidence: {
+              lastSuccessAt: restoreFullGate.lastSuccessAt,
+              schedulerEnabled: Boolean(schedulerStatus?.enabled),
+              schedulerStarted: Boolean(schedulerStatus?.started),
+            },
+          },
+          {
+            id: 'audit_integrity_daily',
+            label: 'Audit integrity daily recency',
+            target: '<=36h',
+            sliHours: auditIntegrityDailyGate.ageHours,
+            status: auditIntegrityDailyGate.healthy ? 'green' : 'red',
+            evidence: {
+              lastSuccessAt: auditIntegrityDailyGate.lastSuccessAt,
+              schedulerEnabled: Boolean(schedulerStatus?.enabled),
+              schedulerStarted: Boolean(schedulerStatus?.started),
+            },
+          },
+          {
+            id: 'secrets_rotation_daily',
+            label: 'Secret rotation snapshot daily recency',
+            target: '<=36h',
+            sliHours: secretRotationDailyGate.ageHours,
+            status: secretRotationDailyGate.healthy ? 'green' : 'red',
+            evidence: {
+              lastSuccessAt: secretRotationDailyGate.lastSuccessAt,
+              schedulerEnabled: Boolean(schedulerStatus?.enabled),
+              schedulerStarted: Boolean(schedulerStatus?.started),
+            },
+          },
+          {
+            id: 'slo_ticket_backlog',
+            label: 'SLO ticket backlog',
+            target: 'openBreaches = 0',
+            value: sloOpenBreaches,
+            status:
+              sloOpenBreaches === 0 ? 'green' : sloOpenBreaches <= 2 ? 'yellow' : 'red',
+            evidence: {
+              openTickets: sloOpenTickets,
+              openBreaches: sloOpenBreaches,
+              latestOpenAt: sloTicketSummary?.latestOpenAt || null,
+            },
+          },
         ];
 
         const overallStatus = worstStatus(slos.map((item) => item.status));
@@ -1417,7 +2007,12 @@ function createMonitorRouter({
             availabilityPct,
             incidentResponsePct,
             restoreDrillAgeDays: restoreGate.ageDays,
+            restoreDrillFullAgeHours: restoreFullGate.ageHours,
+            auditIntegrityDailyAgeHours: auditIntegrityDailyGate.ageHours,
+            secretRotationDailyAgeHours: secretRotationDailyGate.ageHours,
             pilotReportAgeHours: pilotReportGate.ageHours,
+            sloOpenBreaches,
+            sloOpenTickets,
           },
         });
 
@@ -1429,6 +2024,8 @@ function createMonitorRouter({
             sampledRequests,
             openIncidents,
             breachedOpen,
+            sloOpenTickets,
+            sloOpenBreaches,
           },
           slos,
         });
@@ -1557,10 +2154,14 @@ function createMonitorRouter({
           incidentSummary,
           openIncidents,
           latestRestoreDrillAudit,
+          latestRestoreDrillFullAudit,
           latestNightlyReportAudit,
+          latestAuditIntegrityAudit,
+          latestSecretRotationAudit,
           latestSchedulerReports,
           tenantConfig,
           secretRotationStatus,
+          patientConversionSummary,
           activeVersionSource,
         ] = await Promise.all([
           authStore.listTenantMembers(tenantId),
@@ -1581,7 +2182,28 @@ function createMonitorRouter({
           typeof authStore.getLatestAuditEvent === 'function'
             ? authStore.getLatestAuditEvent({
                 tenantId,
+                action: 'scheduler.job.restore_drill_full.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
                 action: 'scheduler.job.nightly_pilot_report.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
+                action: 'scheduler.job.audit_integrity_check.run',
+                outcome: 'success',
+              })
+            : Promise.resolve(null),
+          typeof authStore.getLatestAuditEvent === 'function'
+            ? authStore.getLatestAuditEvent({
+                tenantId,
+                action: 'scheduler.job.secrets_rotation_snapshot.run',
                 outcome: 'success',
               })
             : Promise.resolve(null),
@@ -1593,6 +2215,14 @@ function createMonitorRouter({
           secretRotationStore && typeof secretRotationStore.getSecretsStatus === 'function'
             ? secretRotationStore.getSecretsStatus({
                 maxAgeDays: parseDays(config?.secretRotationMaxAgeDays, 90),
+              })
+            : Promise.resolve(null),
+          patientConversionStore && typeof patientConversionStore.getSummary === 'function'
+            ? patientConversionStore.getSummary({
+                tenantId,
+                windowDays: parseDays(config?.patientSignalWindowDays, 14),
+                freshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+                topLimit: 8,
               })
             : Promise.resolve(null),
           supportsActiveVersionSnapshots
@@ -1615,6 +2245,27 @@ function createMonitorRouter({
           latestNightlyReportAudit,
           latestReportFile: latestSchedulerReport,
           monitorPilotReportMaxAgeHours: config?.monitorPilotReportMaxAgeHours,
+          nowMs,
+        });
+        const restoreDrillFullGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestRestoreDrillFullAudit,
+          jobId: 'restore_drill_full',
+          maxAgeHours: 24 * 30,
+          nowMs,
+        });
+        const auditIntegrityDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestAuditIntegrityAudit,
+          jobId: 'audit_integrity_check',
+          maxAgeHours: 36,
+          nowMs,
+        });
+        const secretRotationDailyGate = buildSchedulerJobRecencyGate({
+          schedulerStatus,
+          latestAuditEvent: latestSecretRotationAudit,
+          jobId: 'secrets_rotation_snapshot',
+          maxAgeHours: 36,
           nowMs,
         });
         const schedulerJobs = Array.isArray(schedulerStatus?.jobs) ? schedulerStatus.jobs : [];
@@ -1680,6 +2331,11 @@ function createMonitorRouter({
           !publicChatBetaEnabled ||
           publicChatBetaKeyConfigured ||
           publicChatBetaAllowHostsCount > 0;
+        const patientFeedback = buildPatientFeedbackReadiness({
+          publicChatBetaEnabled,
+          patientConversionSummary,
+          maxFreshnessHours: parsePositiveInt(config?.patientSignalFreshnessHours) || 72,
+        });
 
         const openIncidentsList = Array.isArray(openIncidents) ? openIncidents : [];
         const unownedOpenIncidents = openIncidentsList.filter(
@@ -1944,6 +2600,17 @@ function createMonitorRouter({
                   : 'Beta är aktiv men saknar både key och allowHosts.',
               inferred: false,
             }),
+            buildCheck({
+              id: 'patient_conversion_feedback_loop',
+              label: 'Patient conversion feedback-loop',
+              status: patientFeedback.status,
+              required: false,
+              target:
+                'Kontinuerliga patient-signaler med färska event och konverteringsintenter i beta-fönstret',
+              value: patientFeedback.value,
+              evidence: patientFeedback.evidence,
+              inferred: false,
+            }),
           ],
         });
 
@@ -2093,6 +2760,54 @@ function createMonitorRouter({
                 ageDays: restoreDrillGate.ageDays,
                 healthy30d: restoreDrillGate.healthy30d,
               },
+            }),
+            buildCheck({
+              id: 'restore_drill_full_30d',
+              label: 'Full restore drill verifierad senaste 30 dagar',
+              status: restoreDrillFullGate.healthy ? 'green' : 'red',
+              required: true,
+              target: 'restore_drill_full success <= 30 dagar',
+              value: {
+                lastSuccessAt: restoreDrillFullGate.lastSuccessAt,
+                ageHours: restoreDrillFullGate.ageHours,
+                ageDays:
+                  restoreDrillFullGate.ageHours === null
+                    ? null
+                    : Number((Number(restoreDrillFullGate.ageHours || 0) / 24).toFixed(2)),
+              },
+              evidence: restoreDrillFullGate.lastSuccessAt
+                ? ''
+                : 'Ingen lyckad restore_drill_full hittad.',
+            }),
+            buildCheck({
+              id: 'audit_integrity_daily',
+              label: 'Audit-integrity körs dagligen',
+              status: auditIntegrityDailyGate.healthy ? 'green' : 'red',
+              required: true,
+              target: `audit_integrity_check success <= ${auditIntegrityDailyGate.maxAgeHours}h`,
+              value: {
+                lastSuccessAt: auditIntegrityDailyGate.lastSuccessAt,
+                ageHours: auditIntegrityDailyGate.ageHours,
+                maxAgeHours: auditIntegrityDailyGate.maxAgeHours,
+              },
+              evidence: auditIntegrityDailyGate.lastSuccessAt
+                ? ''
+                : 'Ingen lyckad audit_integrity_check hittad.',
+            }),
+            buildCheck({
+              id: 'secret_rotation_daily',
+              label: 'Secret-rotation snapshot körs dagligen',
+              status: secretRotationDailyGate.healthy ? 'green' : 'red',
+              required: true,
+              target: `secrets_rotation_snapshot success <= ${secretRotationDailyGate.maxAgeHours}h`,
+              value: {
+                lastSuccessAt: secretRotationDailyGate.lastSuccessAt,
+                ageHours: secretRotationDailyGate.ageHours,
+                maxAgeHours: secretRotationDailyGate.maxAgeHours,
+              },
+              evidence: secretRotationDailyGate.lastSuccessAt
+                ? ''
+                : 'Ingen lyckad secrets_rotation_snapshot hittad.',
             }),
             buildCheck({
               id: 'nightly_pilot_report_freshness',
@@ -2304,6 +3019,15 @@ function createMonitorRouter({
               : 'Ingen lyckad restore_drill_preview hittad.',
           },
           {
+            id: 'restore_drill_full_unverified_30d',
+            label: 'Full restore-test ej verifierat senaste 30 dagar',
+            status: restoreDrillFullGate.healthy ? 'clear' : 'triggered',
+            inferred: false,
+            evidence: restoreDrillFullGate.lastSuccessAt
+              ? `Senaste restore_drill_full success: ${restoreDrillFullGate.lastSuccessAt}`
+              : 'Ingen lyckad restore_drill_full hittad.',
+          },
+          {
             id: 'nightly_pilot_report_unverified',
             label: 'Nattlig pilotrapport ej verifierad inom tidsfönster',
             status: pilotReportGate.healthy ? 'clear' : 'triggered',
@@ -2316,6 +3040,24 @@ function createMonitorRouter({
               ageHours: pilotReportGate.ageHours,
               latestReport: pilotReportGate.latestReport,
             },
+          },
+          {
+            id: 'audit_integrity_unverified_daily',
+            label: 'Daglig audit-integrity ej verifierad',
+            status: auditIntegrityDailyGate.healthy ? 'clear' : 'triggered',
+            inferred: false,
+            evidence: auditIntegrityDailyGate.lastSuccessAt
+              ? `Senaste audit_integrity_check success: ${auditIntegrityDailyGate.lastSuccessAt}`
+              : 'Ingen lyckad audit_integrity_check hittad.',
+          },
+          {
+            id: 'secret_rotation_unverified_daily',
+            label: 'Daglig secret-rotation snapshot ej verifierad',
+            status: secretRotationDailyGate.healthy ? 'clear' : 'triggered',
+            inferred: false,
+            evidence: secretRotationDailyGate.lastSuccessAt
+              ? `Senaste secrets_rotation_snapshot success: ${secretRotationDailyGate.lastSuccessAt}`
+              : 'Ingen lyckad secrets_rotation_snapshot hittad.',
           },
           {
             id: 'audit_chain_not_immutable',
@@ -2367,6 +3109,9 @@ function createMonitorRouter({
             triggeredNoGo: triggeredNoGo.length,
             remediationTotal: Number(remediation?.summary?.total || 0),
             remediationP0: Number(remediation?.summary?.byPriority?.P0 || 0),
+            patientFeedbackStatus: patientFeedback.status,
+            patientFeedbackHealthy: patientFeedback?.value?.feedbackHealthy === true,
+            patientRequestsWindow: Number(patientFeedback?.value?.totalRequests || 0),
           },
         });
 
@@ -2441,6 +3186,12 @@ function createMonitorRouter({
               triggeredAlerts: Array.isArray(observability?.triggeredAlerts)
                 ? observability.triggeredAlerts
                 : [],
+            },
+            patientChannel: {
+              betaEnabled: publicChatBetaEnabled,
+              windowDays: Number(patientConversionSummary?.windowDays || 0),
+              summary: patientConversionSummary?.window || null,
+              feedback: patientFeedback,
             },
             releaseGuards: {
               activeTemplateVersions: activeTemplateVersions.length,

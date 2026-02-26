@@ -68,7 +68,7 @@ function createAuthMiddleware({ authStore }) {
     bodyKey = 'tenantId',
     optional = true,
   } = {}) {
-    return (req, res, next) => {
+    return async (req, res, next) => {
       if (!req.auth) {
         return res.status(401).json({ error: 'Inloggning krävs.' });
       }
@@ -86,6 +86,25 @@ function createAuthMiddleware({ authStore }) {
       }
 
       if (normalized !== req.auth.tenantId) {
+        if (authStore && typeof authStore.addAuditEvent === 'function') {
+          try {
+            await authStore.addAuditEvent({
+              tenantId: req.auth.tenantId || null,
+              actorUserId: req.auth.userId || null,
+              action: 'tenant.scope.denied',
+              outcome: 'forbidden',
+              targetType: 'tenant',
+              targetId: normalized,
+              metadata: {
+                expectedTenantId: req.auth.tenantId || null,
+                providedTenantId: normalized,
+                path: req.path || null,
+              },
+            });
+          } catch {
+            // Ignore audit write errors for middleware deny path.
+          }
+        }
         return res.status(403).json({ error: 'Du har inte åtkomst till denna tenant.' });
       }
 

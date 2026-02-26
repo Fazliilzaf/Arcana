@@ -12,6 +12,8 @@ const {
   applyChannelSignature,
 } = require('../templates/variables');
 const { evaluateTemplateRisk } = require('../risk/templateRisk');
+const { evaluatePolicyFloorText } = require('../policy/floor');
+const { createExecutionGateway } = require('../gateway/executionGateway');
 
 function asNonEmptyString(value) {
   if (typeof value !== 'string') return '';
@@ -107,6 +109,7 @@ async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   if (!tenantConfigStore || typeof tenantConfigStore.getTenantConfig !== 'function') {
     return {
       riskSensitivityModifier: 0,
+      riskThresholdVersion: 1,
       templateVariableAllowlistByCategory: {},
       templateRequiredVariablesByCategory: {},
       templateSignaturesByChannel: {},
@@ -115,10 +118,13 @@ async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   try {
     const tenantConfig = await tenantConfigStore.getTenantConfig(tenantId);
     const value = Number(tenantConfig?.riskSensitivityModifier ?? 0);
+    const thresholdVersion = Number.parseInt(String(tenantConfig?.riskThresholdVersion ?? 1), 10);
     return {
       riskSensitivityModifier: Number.isFinite(value)
         ? Math.max(-10, Math.min(10, value))
         : 0,
+      riskThresholdVersion:
+        Number.isFinite(thresholdVersion) && thresholdVersion > 0 ? thresholdVersion : 1,
       templateVariableAllowlistByCategory:
         tenantConfig?.templateVariableAllowlistByCategory || {},
       templateRequiredVariablesByCategory:
@@ -128,6 +134,7 @@ async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   } catch {
     return {
       riskSensitivityModifier: 0,
+      riskThresholdVersion: 1,
       templateVariableAllowlistByCategory: {},
       templateRequiredVariablesByCategory: {},
       templateSignaturesByChannel: {},
@@ -210,8 +217,14 @@ function createMailInsightsRouter({
   config,
   requireAuth,
   requireRole,
+  executionGateway = null,
 }) {
   const router = express.Router();
+  const gateway =
+    executionGateway ||
+    createExecutionGateway({
+      buildVersion: process.env.npm_package_version || 'dev',
+    });
 
   router.get(
     '/mail/insights',
@@ -514,8 +527,16 @@ function createMailInsightsRouter({
           });
         }
 
+        const correlationId =
+          asNonEmptyString(req.correlationId) || asNonEmptyString(req.get('x-correlation-id')) || null;
+        const idempotencyBase =
+          asNonEmptyString(req.get('x-idempotency-key')) ||
+          asNonEmptyString(req.body?.idempotencyKey) ||
+          '';
+
         const created = [];
         const skippedExisting = [];
+        const blocked = [];
         for (const row of previewRows) {
           if (row.skippedExisting) {
             skippedExisting.push({
@@ -528,58 +549,125 @@ function createMailInsightsRouter({
             continue;
           }
 
-          const template = await templateStore.createTemplate({
-            tenantId,
-            category: row.category,
-            name: row.templateName,
-            channel,
-            locale,
-            createdBy: req.auth.userId,
+          const gatewayResult = await gateway.run({
+            context: {
+              tenant_id: tenantId,
+              actor: {
+                id: req.auth.userId,
+                role: req.auth.role,
+              },
+              channel: 'marketing',
+              intent: 'mail.template_seeds.apply',
+              payload: {
+                category: row.category,
+                templateName: row.templateName,
+                seedId: row.seedId,
+              },
+              correlation_id: correlationId,
+              idempotency_key: [idempotencyBase, row.seedId || row.templateName].filter(Boolean).join('::') || null,
+            },
+            handlers: {
+              audit: async (event) => {
+                await authStore.addAuditEvent({
+                  tenantId,
+                  actorUserId: req.auth.userId,
+                  action: event.action,
+                  outcome: event.outcome,
+                  targetType: 'gateway_run',
+                  targetId: String(event?.metadata?.runId || ''),
+                  metadata: event.metadata || {},
+                });
+              },
+              inputRisk: async () =>
+                evaluateTemplateRisk({
+                  scope: 'input',
+                  category: row.category,
+                  content: row.instruction,
+                  tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
+                  riskThresholdVersion: tenantRuntime.riskThresholdVersion,
+                  variableValidation: row.variableValidation,
+                }),
+              agentRun: async () => ({ row }),
+              outputRisk: async ({ agentResult }) =>
+                evaluateTemplateRisk({
+                  scope: 'output',
+                  category: agentResult?.row?.category,
+                  content: agentResult?.row?.content,
+                  tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
+                  riskThresholdVersion: tenantRuntime.riskThresholdVersion,
+                  variableValidation: agentResult?.row?.variableValidation,
+                  enforceStrictTemplateVariables: true,
+                }),
+              policyFloor: async ({ agentResult }) =>
+                evaluatePolicyFloorText({
+                  text: agentResult?.row?.content || '',
+                  context: 'templates',
+                }),
+              persist: async ({ inputRisk, outputRisk, agentResult }) => {
+                const currentRow = agentResult?.row || row;
+                const template = await templateStore.createTemplate({
+                  tenantId,
+                  category: currentRow.category,
+                  name: currentRow.templateName,
+                  channel,
+                  locale,
+                  createdBy: req.auth.userId,
+                });
+                const draft = await templateStore.createDraftVersion({
+                  templateId: template.id,
+                  content: currentRow.content,
+                  title: currentRow.draftTitle,
+                  source: 'mail_seed',
+                  variablesUsed: currentRow.variableValidation.variablesUsed,
+                  createdBy: req.auth.userId,
+                });
+                const evaluated = await templateStore.evaluateVersion({
+                  templateId: template.id,
+                  versionId: draft.id,
+                  inputEvaluation: inputRisk?.evaluation || null,
+                  outputEvaluation: outputRisk?.evaluation || null,
+                });
+                return {
+                  artifact_refs: {
+                    run_id: null,
+                    draft_id: evaluated.id,
+                    version_id: evaluated.id,
+                  },
+                  template,
+                  evaluated,
+                  row: currentRow,
+                };
+              },
+              response: ({ persisted }) => ({
+                category: persisted?.row?.category,
+                topic: persisted?.row?.topic,
+                seedId: persisted?.row?.seedId,
+                templateId: persisted?.template?.id,
+                templateName: persisted?.template?.name,
+                versionId: persisted?.evaluated?.id,
+                decision: persisted?.evaluated?.risk?.decision || 'allow',
+                riskLevel: persisted?.evaluated?.risk?.riskLevel || 1,
+                unknownVariables: persisted?.row?.variableValidation?.unknownVariables || [],
+                missingRequiredVariables: persisted?.row?.variableValidation?.missingRequiredVariables || [],
+              }),
+            },
           });
 
-          const draft = await templateStore.createDraftVersion({
-            templateId: template.id,
-            content: row.content,
-            title: row.draftTitle,
-            source: 'mail_seed',
-            variablesUsed: row.variableValidation.variablesUsed,
-            createdBy: req.auth.userId,
-          });
+          if (gatewayResult.decision === 'blocked' || gatewayResult.decision === 'critical_escalate') {
+            blocked.push({
+              category: row.category,
+              topic: row.topic,
+              seedId: row.seedId,
+              templateName: row.templateName,
+              decision: gatewayResult.decision,
+              reasonCodes: gatewayResult?.policy_summary?.reason_codes || [],
+              unknownVariables: row.variableValidation.unknownVariables,
+              missingRequiredVariables: row.variableValidation.missingRequiredVariables,
+            });
+            continue;
+          }
 
-          const inputEvaluation = evaluateTemplateRisk({
-            scope: 'input',
-            category: row.category,
-            content: row.instruction,
-            tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
-            variableValidation: row.variableValidation,
-          });
-          const outputEvaluation = evaluateTemplateRisk({
-            scope: 'output',
-            category: row.category,
-            content: row.content,
-            tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
-            variableValidation: row.variableValidation,
-          });
-
-          const evaluated = await templateStore.evaluateVersion({
-            templateId: template.id,
-            versionId: draft.id,
-            inputEvaluation,
-            outputEvaluation,
-          });
-
-          created.push({
-            category: row.category,
-            topic: row.topic,
-            seedId: row.seedId,
-            templateId: template.id,
-            templateName: template.name,
-            versionId: evaluated.id,
-            decision: evaluated?.risk?.decision || 'allow',
-            riskLevel: evaluated?.risk?.riskLevel || 1,
-            unknownVariables: row.variableValidation.unknownVariables,
-            missingRequiredVariables: row.variableValidation.missingRequiredVariables,
-          });
+          created.push(gatewayResult.response_payload);
         }
 
         await authStore.addAuditEvent({
@@ -592,6 +680,7 @@ function createMailInsightsRouter({
           metadata: {
             created: created.length,
             skippedExisting: skippedExisting.length,
+            blocked: blocked.length,
             categoryFilter: categoryFilter || null,
             offset,
           },
@@ -607,8 +696,10 @@ function createMailInsightsRouter({
           selected: pagedSeeds.length,
           skipExisting,
           skippedExisting: skippedExisting.length,
+          blocked: blocked.length,
           created: created.length,
           skipped: skippedExisting,
+          blockedRows: blocked,
           templates: created,
         });
       } catch (error) {

@@ -2,6 +2,10 @@ const { buildClinicMessages } = require('../clinic/buildMessages');
 const { maybeSummarizeConversation } = require('../memory/summarize');
 const { runChatWithTools } = require('../openai/runChatWithTools');
 const { redactForStorage } = require('../privacy/redact');
+const { evaluateTemplateRisk } = require('../risk/templateRisk');
+const { evaluatePolicyFloorText } = require('../policy/floor');
+const { createExecutionGateway } = require('../gateway/executionGateway');
+const { getRuntimeProfile } = require('../agents/runtimeRegistry');
 
 function normalizeText(value) {
   if (typeof value !== 'string') return '';
@@ -47,11 +51,46 @@ function matchesAllowedHost(candidateHost, allowedHost) {
   return false;
 }
 
+function parsePositiveInt(value, fallback = 0) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function looksLikePromptInjection(message = '') {
+  const text = normalizeText(message).toLowerCase();
+  if (!text) return false;
+  const patterns = [
+    /\bignore\b.*\b(instruction|instructions|policy|policies)\b/i,
+    /\bingorera\b.*\b(instruktion|instruktioner|policy|policys)\b/i,
+    /\b(system prompt|systemprompt|developer prompt|dev prompt)\b/i,
+    /\b(reveal|visa)\b.*\b(prompt|instruktion)\b/i,
+    /\b(jailbreak|bypass|override)\b/i,
+  ];
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function countConversationTurns(conversation = null, role = 'user') {
+  const normalizedRole = normalizeText(role).toLowerCase();
+  const messages = Array.isArray(conversation?.messages) ? conversation.messages : [];
+  return messages.filter((item) => normalizeText(item?.role).toLowerCase() === normalizedRole).length;
+}
+
 function evaluatePublicChatBetaGate({
   req,
   sourceUrl = '',
   betaGate = null,
 }) {
+  if (Boolean(betaGate?.killSwitch)) {
+    return {
+      allowed: false,
+      reason: 'kill_switch',
+      message:
+        normalizeText(betaGate?.killSwitchMessage) ||
+        'Patientchatten är tillfälligt pausad. Kontakta kliniken direkt.',
+    };
+  }
+
   const enabled = Boolean(betaGate?.enabled);
   if (!enabled) {
     return {
@@ -104,6 +143,144 @@ function evaluatePublicChatBetaGate({
       normalizeText(betaGate?.denyMessage) ||
       'Den här chatten är i begränsad beta. Kontakta kliniken för åtkomst.',
   };
+}
+
+function analyzePatientConversionSignals(message = '') {
+  const text = normalizeText(message).toLowerCase();
+  if (!text) {
+    return {
+      intents: [],
+      score: 0,
+      stage: 'unknown',
+    };
+  }
+
+  const intentRules = [
+    {
+      id: 'booking',
+      score: 4,
+      regex: /\b(boka|bokning|appointment|book|konsultation|consultation|boka tid|online[- ]?konsultation)\b/i,
+    },
+    {
+      id: 'contact',
+      score: 3,
+      regex: /\b(kontakt|kontakta|telefon|ring|call|e-?post|epost|mail|email)\b/i,
+    },
+    {
+      id: 'finance',
+      score: 2,
+      regex: /\b(finans|financing|delbetal|avbetal|betalplan|klarna|lån|loan)\b/i,
+    },
+    {
+      id: 'pricing',
+      score: 2,
+      regex: /\b(pris|priser|kostnad|kosta|kr|sek|grafts?)\b/i,
+    },
+  ];
+
+  const intents = [];
+  let score = 0;
+  for (const rule of intentRules) {
+    if (!rule.regex.test(text)) continue;
+    intents.push(rule.id);
+    score += rule.score;
+  }
+
+  let stage = 'awareness';
+  if (intents.includes('booking')) {
+    stage = 'action';
+  } else if (intents.includes('contact') || intents.includes('finance')) {
+    stage = 'consideration';
+  } else if (intents.includes('pricing')) {
+    stage = 'evaluation';
+  }
+
+  return {
+    intents,
+    score,
+    stage,
+  };
+}
+
+function buildPatientSignalBase({
+  req,
+  sourceUrl = '',
+  tenantId = '',
+  brand = '',
+  betaGate = null,
+  betaDecision = null,
+  signal = null,
+}) {
+  return {
+    tenantId: normalizeText(tenantId) || null,
+    brand: normalizeText(brand) || null,
+    gateEnabled: Boolean(betaGate?.enabled),
+    gateReason: normalizeText(betaDecision?.reason).toLowerCase() || null,
+    sourceHost: extractHost(sourceUrl) || null,
+    originHost: extractHost(req.get('origin')) || null,
+    refererHost: extractHost(req.get('referer')) || null,
+    requestHost: normalizeText(req.hostname).toLowerCase() || null,
+    intents: Array.isArray(signal?.intents) ? signal.intents : [],
+    intentScore: Number(signal?.score || 0),
+    metadata: {
+      stage: normalizeText(signal?.stage).toLowerCase() || 'unknown',
+    },
+    correlationId: normalizeText(req.correlationId) || normalizeText(req.get('x-correlation-id')) || null,
+  };
+}
+
+function buildForcedBlockRiskEvaluation({ reasonCode = '', scope = 'input' } = {}) {
+  const normalizedReason = normalizeText(reasonCode) || 'CHAT_PRECHECK_BLOCKED';
+  return {
+    scope,
+    category: 'CONSULTATION',
+    tenantRiskModifier: 0,
+    riskLevel: 4,
+    riskColor: 'orange',
+    riskScore: 90,
+    semanticScore: 0,
+    ruleScore: 0,
+    decision: 'blocked',
+    reasonCodes: [normalizedReason],
+    ruleHits: [],
+    policyHits: [],
+    policyAdjustments: [],
+    versions: {
+      ruleSetVersion: 'rules.v1',
+      thresholdVersion: 'threshold.v1',
+      semanticModelVersion: 'semantic.heuristic.v1',
+      fusionVersion: 'fusion.weighted.v1',
+      buildVersion: normalizeText(process.env.npm_package_version || process.env.ARCANA_BUILD_VERSION || 'dev'),
+    },
+    evaluatedAt: new Date().toISOString(),
+  };
+}
+
+function buildForcedBlockResponse({ forcedBlock = null, conversationId = '', patientRuntime = null } = {}) {
+  if (!forcedBlock) return null;
+  const payload = {
+    error: normalizeText(forcedBlock?.message) || 'Din förfrågan blockerades av säkerhetsskäl.',
+    code: normalizeText(forcedBlock?.reasonCode) || 'chat_precheck_blocked',
+    runtime: {
+      id: normalizeText(patientRuntime?.id) || null,
+      domain: normalizeText(patientRuntime?.domain) || null,
+    },
+  };
+  if (normalizeText(conversationId)) {
+    payload.conversationId = normalizeText(conversationId);
+  }
+  return payload;
+}
+
+async function recordPatientSignalSafely(patientConversionStore, payload) {
+  if (!patientConversionStore || typeof patientConversionStore.recordEvent !== 'function') {
+    return;
+  }
+  try {
+    await patientConversionStore.recordEvent(payload);
+  } catch (error) {
+    console.error('[chat] failed to record patient conversion event', error?.message || error);
+  }
 }
 
 function buildHairTPFallbackReply({ brand, message }) {
@@ -585,123 +762,431 @@ function createChatHandler({
   model,
   memoryStore,
   resolveBrand,
+  resolveTenantId,
   getKnowledgeRetriever,
+  authStore = null,
+  executionGateway = null,
+  patientConversionStore = null,
   betaGate = null,
 }) {
+  const gateway =
+    executionGateway ||
+    createExecutionGateway({
+      buildVersion: process.env.npm_package_version || 'dev',
+    });
+  const patientRuntime = getRuntimeProfile('patient');
+
+  async function writeAuditEvent({
+    tenantId,
+    action,
+    outcome = 'success',
+    targetType = 'chat',
+    targetId = '',
+    metadata = {},
+  }) {
+    if (!authStore || typeof authStore.addAuditEvent !== 'function') return;
+    await authStore.addAuditEvent({
+      tenantId: normalizeText(tenantId) || null,
+      actorUserId: null,
+      action,
+      outcome,
+      targetType,
+      targetId: normalizeText(targetId),
+      metadata,
+    });
+  }
+
   return async function chat(req, res) {
+    const requestStartedMs = Date.now();
+    let signalBase = null;
+    let signalConversationId = null;
+    let signalAllowed = false;
     try {
       const body = req.body || {};
       const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl : '';
       const message =
         typeof body.message === 'string' ? body.message.trim() : '';
+      const correlationId =
+        normalizeText(req.correlationId) || normalizeText(req.get('x-correlation-id')) || null;
+      const idempotencyKey =
+        normalizeText(req.get('x-idempotency-key')) ||
+        normalizeText(body.idempotencyKey) ||
+        null;
       if (!message) {
         return res.status(400).json({ error: 'Meddelande saknas.' });
-      }
-
-      const betaDecision = evaluatePublicChatBetaGate({
-        req,
-        sourceUrl,
-        betaGate,
-      });
-      if (!betaDecision.allowed) {
-        return res.status(403).json({
-          error: betaDecision.message,
-          code: 'chat_beta_gate_denied',
-        });
       }
 
       const brand =
         typeof resolveBrand === 'function'
           ? resolveBrand(req, sourceUrl)
           : undefined;
+      const tenantId =
+        typeof resolveTenantId === 'function'
+          ? resolveTenantId(req, sourceUrl, brand)
+          : brand;
+      const signal = analyzePatientConversionSignals(message);
+
+      const betaDecision = evaluatePublicChatBetaGate({
+        req,
+        sourceUrl,
+        betaGate,
+      });
+      signalAllowed = betaDecision.allowed === true;
+      let forcedBlock = null;
+      signalBase = buildPatientSignalBase({
+        req,
+        sourceUrl,
+        tenantId,
+        brand,
+        betaGate,
+        betaDecision,
+        signal,
+      });
+
+      if (!betaDecision.allowed) {
+        const gateBlockedCode =
+          betaDecision.reason === 'kill_switch'
+            ? 'chat_kill_switch_active'
+            : 'chat_beta_gate_denied';
+        forcedBlock = {
+          reasonCode: gateBlockedCode,
+          message: betaDecision.message,
+          statusCode: betaDecision.reason === 'kill_switch' ? 503 : 403,
+          signalEventType: 'beta_denied',
+          metadata: {
+            sourceHost: signalBase?.sourceHost || null,
+            runtimeId: patientRuntime.id,
+          },
+        };
+      }
+
+      const promptInjectionFilterEnabled = betaGate?.promptInjectionFilterEnabled !== false;
+      if (!forcedBlock && promptInjectionFilterEnabled && looksLikePromptInjection(message)) {
+        const promptInjectionMessage =
+          normalizeText(betaGate?.promptInjectionMessage) ||
+          'Jag kan inte hjälpa till med den typen av instruktion. Kontakta kliniken direkt för fortsatt hjälp.';
+        forcedBlock = {
+          reasonCode: 'chat_prompt_injection_blocked',
+          message: promptInjectionMessage,
+          statusCode: 403,
+          signalEventType: 'prompt_injection_blocked',
+          metadata: {
+            sourceHost: signalBase?.sourceHost || null,
+            runtimeId: patientRuntime.id,
+          },
+        };
+      }
 
       const incomingConversationId =
         typeof body.conversationId === 'string' ? body.conversationId : '';
 
       let conversationId = incomingConversationId;
-      let conversation = conversationId
-        ? await memoryStore.getConversation(conversationId)
-        : null;
+      let conversation = null;
+      let knowledge = [];
 
-      if (conversation && conversation.brand && brand && conversation.brand !== brand) {
-        conversationId = '';
-        conversation = null;
-      }
-
-      if (!conversationId) {
-        conversationId = await memoryStore.createConversation(brand);
-        conversation = await memoryStore.getConversation(conversationId);
-      }
-
-      await memoryStore.ensureConversation(conversationId, brand);
-
-      const convoBefore = await memoryStore.getConversation(conversationId);
-      const summaryResult = await maybeSummarizeConversation({
-        openai,
-        model,
-        conversation: convoBefore,
-        brand,
-      });
-      if (summaryResult.summarized) {
-        await memoryStore.setSummary(conversationId, summaryResult.summary);
-        await memoryStore.replaceMessages(
-          conversationId,
-          summaryResult.remainingMessages
-        );
-      }
-
-      conversation = await memoryStore.getConversation(conversationId);
-
-      const knowledgeRetriever =
-        typeof getKnowledgeRetriever === 'function'
-          ? await getKnowledgeRetriever(brand)
+      if (!forcedBlock) {
+        conversation = conversationId
+          ? await memoryStore.getConversation(conversationId)
           : null;
-      const knowledge = knowledgeRetriever
-        ? await knowledgeRetriever.search(message)
-        : [];
 
-      const fallbackReply = buildHairTPFallbackReply({ brand, message });
-      if (fallbackReply) {
-        await memoryStore.appendMessage(
-          conversationId,
-          'user',
-          redactForStorage(message)
-        );
-        await memoryStore.appendMessage(
-          conversationId,
-          'assistant',
-          redactForStorage(fallbackReply)
-        );
-        return res.json({ reply: fallbackReply, conversationId });
+        if (conversation && conversation.brand && brand && conversation.brand !== brand) {
+          conversationId = '';
+          conversation = null;
+        }
+
+        if (!conversationId) {
+          conversationId = await memoryStore.createConversation(brand);
+          conversation = await memoryStore.getConversation(conversationId);
+        }
+        signalConversationId = conversationId || null;
+
+        await memoryStore.ensureConversation(conversationId, brand);
+
+        const maxTurns = parsePositiveInt(betaGate?.maxTurns, 0);
+        const userTurnsBefore = countConversationTurns(conversation, 'user');
+        if (maxTurns > 0 && userTurnsBefore >= maxTurns) {
+          const turnLimitMessage =
+            'Den här konversationen har nått max antal meddelanden i beta. Fortsätt via klinikens kontaktkanaler för personlig hjälp.';
+          forcedBlock = {
+            reasonCode: 'chat_turn_limit_reached',
+            message: turnLimitMessage,
+            statusCode: 429,
+            signalEventType: 'turn_limit_blocked',
+            metadata: {
+              maxTurns,
+              userTurnsBefore,
+              runtimeId: patientRuntime.id,
+            },
+          };
+        }
       }
 
-      const messages = await buildClinicMessages({
-        brand,
-        conversation,
-        knowledge,
-        currentUserMessage: message,
+      if (!forcedBlock) {
+        const convoBefore = await memoryStore.getConversation(conversationId);
+        const summaryResult = await maybeSummarizeConversation({
+          openai,
+          model,
+          conversation: convoBefore,
+          brand,
+        });
+        if (summaryResult.summarized) {
+          await memoryStore.setSummary(conversationId, summaryResult.summary);
+          await memoryStore.replaceMessages(
+            conversationId,
+            summaryResult.remainingMessages
+          );
+        }
+
+        conversation = await memoryStore.getConversation(conversationId);
+
+        const knowledgeRetriever =
+          typeof getKnowledgeRetriever === 'function'
+            ? await getKnowledgeRetriever(brand)
+            : null;
+        knowledge = knowledgeRetriever
+          ? await knowledgeRetriever.search(message)
+          : [];
+      }
+
+      const gatewayResult = await gateway.run({
+        context: {
+          tenant_id: tenantId || 'public-chat',
+          actor: {
+            id: normalizeText(req.ip) || 'anonymous',
+            role: 'PUBLIC',
+          },
+          channel: 'patient',
+          intent: 'chat.response',
+          payload: {
+            message,
+            sourceUrl,
+            brand: brand || null,
+            conversationId,
+            runtimeId: patientRuntime.id,
+          },
+          correlation_id: correlationId,
+          idempotency_key: idempotencyKey,
+        },
+        handlers: {
+          audit: async (event) => {
+            await writeAuditEvent({
+              tenantId,
+              action: event.action,
+              outcome: event.outcome,
+              targetType: 'gateway_run',
+              targetId: String(event?.metadata?.runId || ''),
+              metadata: {
+                ...(event?.metadata || {}),
+                correlationId,
+              },
+            });
+          },
+          inputRisk: async () => {
+            if (forcedBlock) {
+              return buildForcedBlockRiskEvaluation({
+                reasonCode: forcedBlock.reasonCode,
+                scope: 'input',
+              });
+            }
+            return evaluateTemplateRisk({
+              scope: 'input',
+              category: 'CONSULTATION',
+              content: message,
+              tenantRiskModifier: 0,
+              riskThresholdVersion: 1,
+            });
+          },
+          agentRun: async () => {
+            if (forcedBlock) {
+              return {
+                reply: forcedBlock.message,
+                fallbackUsed: true,
+                forcedBlock: true,
+              };
+            }
+            const fallbackReply = buildHairTPFallbackReply({ brand, message });
+            if (fallbackReply) {
+              return {
+                reply: fallbackReply,
+                fallbackUsed: true,
+              };
+            }
+            const messages = await buildClinicMessages({
+              brand,
+              conversation,
+              knowledge,
+              currentUserMessage: message,
+            });
+            const reply = await runChatWithTools({
+              openai,
+              model,
+              messages,
+              maxTurns: Number(patientRuntime.maxTurns || 4),
+            });
+            return {
+              reply,
+              fallbackUsed: false,
+            };
+          },
+          outputRisk: async ({ agentResult }) =>
+            evaluateTemplateRisk({
+              scope: 'output',
+              category: 'CONSULTATION',
+              content: normalizeText(agentResult?.reply),
+              tenantRiskModifier: 0,
+              riskThresholdVersion: 1,
+            }),
+          policyFloor: async ({ agentResult }) =>
+            evaluatePolicyFloorText({
+              text: normalizeText(agentResult?.reply),
+              context: 'patient_response',
+            }),
+          persist: async ({ agentResult }) => {
+            if (forcedBlock) {
+              const error = new Error('chat_forced_block_persist_forbidden');
+              error.nonRetryable = true;
+              throw error;
+            }
+            await memoryStore.appendMessage(
+              conversationId,
+              'user',
+              redactForStorage(message)
+            );
+            await memoryStore.appendMessage(
+              conversationId,
+              'assistant',
+              redactForStorage(normalizeText(agentResult?.reply))
+            );
+            await recordPatientSignalSafely(patientConversionStore, {
+              ...signalBase,
+              eventType: 'chat_response',
+              allowed: true,
+              conversationId,
+              fallbackUsed: Boolean(agentResult?.fallbackUsed),
+              responseMs: Date.now() - requestStartedMs,
+            });
+            return {
+              artifact_refs: {
+                run_id: null,
+                conversation_id: conversationId,
+              },
+            };
+          },
+          safeResponse: () =>
+            buildForcedBlockResponse({
+              forcedBlock,
+              conversationId,
+              patientRuntime,
+            }) || {
+              reply:
+                'Jag kan inte svara säkert på detta. Kontakta kliniken direkt och ring 112 vid akuta besvär.',
+              conversationId,
+              runtime: {
+                id: patientRuntime.id,
+                domain: patientRuntime.domain,
+              },
+            },
+          response: ({ agentResult }) =>
+            buildForcedBlockResponse({
+              forcedBlock,
+              conversationId,
+              patientRuntime,
+            }) || {
+              reply: normalizeText(agentResult?.reply),
+              conversationId,
+              runtime: {
+                id: patientRuntime.id,
+                domain: patientRuntime.domain,
+              },
+            },
+        },
       });
 
-      await memoryStore.appendMessage(
-        conversationId,
-        'user',
-        redactForStorage(message)
-      );
+      if (gatewayResult.decision === 'blocked' || gatewayResult.decision === 'critical_escalate') {
+        const blockedEventType = normalizeText(forcedBlock?.signalEventType) || 'chat_blocked';
+        await recordPatientSignalSafely(patientConversionStore, {
+          ...signalBase,
+          eventType: blockedEventType,
+          allowed: false,
+          conversationId,
+          fallbackUsed: false,
+          responseMs: Date.now() - requestStartedMs,
+          metadata: {
+            ...(signalBase?.metadata || {}),
+            decision: gatewayResult.decision,
+            reasonCodes: gatewayResult?.policy_summary?.reason_codes || [],
+            reason: forcedBlock?.reasonCode || null,
+            ...(forcedBlock?.metadata || {}),
+          },
+        });
+        await writeAuditEvent({
+          tenantId,
+          action: 'chat.blocked',
+          outcome: 'blocked',
+          targetType: 'chat',
+          targetId: conversationId || correlationId || '',
+          metadata: {
+            decision: gatewayResult.decision,
+            policy: gatewayResult.policy_summary,
+            risk: gatewayResult.risk_summary,
+            correlationId,
+            runtimeId: patientRuntime.id,
+            reason: forcedBlock?.reasonCode || null,
+            ...(forcedBlock?.metadata || {}),
+          },
+        });
+        return res.status(Number(forcedBlock?.statusCode || 403)).json(
+          gatewayResult.safe_response || {
+            reply:
+              'Jag kan inte svara säkert på detta. Kontakta kliniken direkt och ring 112 vid akuta besvär.',
+            conversationId,
+            runtime: {
+              id: patientRuntime.id,
+              domain: patientRuntime.domain,
+            },
+          }
+        );
+      }
 
-      const reply = await runChatWithTools({
-        openai,
-        model,
-        messages,
+      await writeAuditEvent({
+        tenantId,
+        action: 'chat.response',
+        outcome: 'success',
+        targetType: 'chat',
+        targetId: conversationId,
+        metadata: {
+          decision: gatewayResult.decision,
+          correlationId,
+          runtimeId: patientRuntime.id,
+        },
       });
 
-      await memoryStore.appendMessage(
-        conversationId,
-        'assistant',
-        redactForStorage(reply)
-      );
-
-      return res.json({ reply, conversationId });
+      return res.json(gatewayResult.response_payload);
     } catch (error) {
+      await recordPatientSignalSafely(patientConversionStore, {
+        ...(signalBase || {}),
+        eventType: 'chat_error',
+        allowed: signalAllowed,
+        conversationId: signalConversationId,
+        responseMs: Date.now() - requestStartedMs,
+        metadata: {
+          ...(signalBase?.metadata || {}),
+          error: normalizeText(error?.message || '').slice(0, 160) || 'chat_failed',
+        },
+      });
+      await writeAuditEvent({
+        tenantId: signalBase?.tenantId || null,
+        action: 'chat.error',
+        outcome: 'error',
+        targetType: 'chat',
+        targetId: signalConversationId || '',
+        metadata: {
+          correlationId:
+            normalizeText(req.correlationId) || normalizeText(req.get('x-correlation-id')) || null,
+          error: normalizeText(error?.message || '').slice(0, 160) || 'chat_failed',
+          runtimeId: patientRuntime.id,
+        },
+      });
       console.error(error);
       return res.status(500).json({ error: 'Något gick fel.' });
     }

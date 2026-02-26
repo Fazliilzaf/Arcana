@@ -1,3 +1,5 @@
+const { createInMemoryRateLimitStore } = require('./rateLimitStores');
+
 function clampNumber(value, fallback, min, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -13,57 +15,53 @@ function createRateLimiter({
   max = 30,
   keyGenerator = defaultKeyGenerator,
   message = 'För många förfrågningar. Försök igen snart.',
+  store = null,
+  scope = 'default',
 } = {}) {
   const safeWindowMs = clampNumber(windowMs, 60_000, 5_000, 24 * 60 * 60 * 1000);
   const safeMax = clampNumber(max, 30, 1, 10_000);
-  const bucket = new Map();
+  const normalizedScope = String(scope || 'default').trim() || 'default';
+  const rateLimitStore =
+    store && typeof store.consume === 'function' ? store : createInMemoryRateLimitStore();
 
-  function sweep(now) {
-    if (bucket.size <= 2_000) return;
-    for (const [key, entry] of bucket.entries()) {
-      if (!entry || entry.resetAt <= now) {
-        bucket.delete(key);
-      }
-    }
-  }
-
-  return function rateLimiter(req, res, next) {
-    const now = Date.now();
-    sweep(now);
-
-    const key = String((typeof keyGenerator === 'function' && keyGenerator(req)) || 'anonymous');
-    const existing = bucket.get(key);
-
-    if (!existing || existing.resetAt <= now) {
-      const resetAt = now + safeWindowMs;
-      bucket.set(key, {
-        count: 1,
-        resetAt,
+  return async function rateLimiter(req, res, next) {
+    try {
+      const nowMs = Date.now();
+      const key = String((typeof keyGenerator === 'function' && keyGenerator(req)) || 'anonymous');
+      const result = await rateLimitStore.consume({
+        scope: normalizedScope,
+        key,
+        windowMs: safeWindowMs,
+        max: safeMax,
+        nowMs,
       });
-      res.setHeader('X-RateLimit-Limit', String(safeMax));
-      res.setHeader('X-RateLimit-Remaining', String(Math.max(0, safeMax - 1)));
-      res.setHeader('X-RateLimit-Reset', String(Math.ceil(resetAt / 1000)));
+      const limit = Number.isFinite(Number(result?.limit)) ? Number(result.limit) : safeMax;
+      const remaining = Number.isFinite(Number(result?.remaining))
+        ? Math.max(0, Number(result.remaining))
+        : 0;
+      const resetAtMs = Number.isFinite(Number(result?.resetAt))
+        ? Number(result.resetAt)
+        : nowMs + safeWindowMs;
+      res.setHeader('X-RateLimit-Limit', String(limit));
+      res.setHeader('X-RateLimit-Remaining', String(remaining));
+      res.setHeader('X-RateLimit-Reset', String(Math.ceil(resetAtMs / 1000)));
+
+      if (result?.allowed === false) {
+        const retryAfterSec = Number.isFinite(Number(result?.retryAfterSec))
+          ? Math.max(1, Number(result.retryAfterSec))
+          : 1;
+        res.setHeader('Retry-After', String(retryAfterSec));
+        return res.status(429).json({
+          error: message,
+          retryAfterSec,
+        });
+      }
+
+      return next();
+    } catch {
+      // Fail-open to avoid total outage if backend is degraded.
       return next();
     }
-
-    if (existing.count >= safeMax) {
-      const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
-      res.setHeader('Retry-After', String(retryAfterSec));
-      res.setHeader('X-RateLimit-Limit', String(safeMax));
-      res.setHeader('X-RateLimit-Remaining', '0');
-      res.setHeader('X-RateLimit-Reset', String(Math.ceil(existing.resetAt / 1000)));
-      return res.status(429).json({
-        error: message,
-        retryAfterSec,
-      });
-    }
-
-    existing.count += 1;
-    bucket.set(key, existing);
-    res.setHeader('X-RateLimit-Limit', String(safeMax));
-    res.setHeader('X-RateLimit-Remaining', String(Math.max(0, safeMax - existing.count)));
-    res.setHeader('X-RateLimit-Reset', String(Math.ceil(existing.resetAt / 1000)));
-    return next();
   };
 }
 
