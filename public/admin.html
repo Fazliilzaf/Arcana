@@ -1308,6 +1308,9 @@
       border-color: rgba(255, 230, 201, 0.42);
       background: linear-gradient(160deg, rgba(255, 246, 235, 0.15), rgba(255, 238, 217, 0.07));
     }
+    .overview-card.overview-card--daily-brief #runDailyBriefBtn {
+      color: var(--text);
+    }
     .risk-trend-list {
       display: flex;
       flex-direction: column;
@@ -2171,49 +2174,6 @@
         <button class="btn small sectionNavBtn" data-target="opsSection" data-i18n="nav_ops">Drift</button>
       </nav>
 
-      <div id="overviewSection" data-section-group="overviewSection" class="row cols-6" style="margin-bottom:14px">
-        <article class="panel">
-          <h3 data-i18n="kpi_templates">Mallar</h3>
-          <div id="templatesTotal" class="value">0</div>
-        </article>
-        <article class="panel">
-          <h3>Aktiva versioner</h3>
-          <div id="templatesActive" class="value">0</div>
-        </article>
-        <article class="panel">
-          <h3>Riskutvärderingar</h3>
-          <div id="riskTotal" class="value">0</div>
-          <div class="kpi-meta">Öppna review-kön för L3-utkast.</div>
-          <button id="openReviewsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="open_queue">Öppna kö</button>
-        </article>
-        <article class="panel">
-          <h3>High/Critical öppna</h3>
-          <div id="riskOpen" class="value">0</div>
-          <div class="kpi-meta">Prioritera incidents med SLA.</div>
-          <button id="openIncidentsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="see_incidents">Se incidenter</button>
-        </article>
-        <article class="panel">
-          <h3 data-i18n="kpi_owner_coverage">Ägaråtgärdstäckning</h3>
-          <div id="ownerCoverageValue" class="value">0%</div>
-          <div id="ownerCoverageMeta" class="kpi-meta">Ingen riskhistorik ännu.</div>
-        </article>
-        <article class="panel">
-          <h3>SLA-indikator</h3>
-          <div id="slaIndicatorValue" class="value">0</div>
-          <div id="slaIndicatorMeta" class="kpi-meta">Inga öppna incidents.</div>
-        </article>
-        <article class="panel">
-          <h3 data-i18n="kpi_readiness">Readiness</h3>
-          <div id="readinessBandValue" class="value">-</div>
-          <div id="readinessBandMeta" class="kpi-meta">Väntar på monitor-data.</div>
-        </article>
-        <article class="panel">
-          <h3 data-i18n="kpi_pilot_report">Pilot Report</h3>
-          <div id="pilotReportValue" class="value">-</div>
-          <div id="pilotReportMeta" class="kpi-meta">Väntar på monitor-data.</div>
-        </article>
-      </div>
-
       <div class="overview-layout" data-section-group="overviewSection">
         <section class="panel">
           <h2 data-i18n="overview_insights">Översiktsinsikter</h2>
@@ -2285,6 +2245,49 @@
             <li class="notification-item"><div class="notification-detail">Inga notifieringar ännu.</div></li>
           </ul>
         </aside>
+      </div>
+
+      <div id="overviewSection" data-section-group="overviewSection" class="row cols-6" style="margin-bottom:14px">
+        <article class="panel">
+          <h3 data-i18n="kpi_templates">Mallar</h3>
+          <div id="templatesTotal" class="value">0</div>
+        </article>
+        <article class="panel">
+          <h3>Aktiva versioner</h3>
+          <div id="templatesActive" class="value">0</div>
+        </article>
+        <article class="panel">
+          <h3>Riskutvärderingar</h3>
+          <div id="riskTotal" class="value">0</div>
+          <div class="kpi-meta">Öppna review-kön för L3-utkast.</div>
+          <button id="openReviewsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="open_queue">Öppna kö</button>
+        </article>
+        <article class="panel">
+          <h3>High/Critical öppna</h3>
+          <div id="riskOpen" class="value">0</div>
+          <div class="kpi-meta">Prioritera incidents med SLA.</div>
+          <button id="openIncidentsQueueBtn" class="btn small" style="margin-top:8px" data-i18n="see_incidents">Se incidenter</button>
+        </article>
+        <article class="panel">
+          <h3 data-i18n="kpi_owner_coverage">Ägaråtgärdstäckning</h3>
+          <div id="ownerCoverageValue" class="value">0%</div>
+          <div id="ownerCoverageMeta" class="kpi-meta">Ingen riskhistorik ännu.</div>
+        </article>
+        <article class="panel">
+          <h3>SLA-indikator</h3>
+          <div id="slaIndicatorValue" class="value">0</div>
+          <div id="slaIndicatorMeta" class="kpi-meta">Inga öppna incidents.</div>
+        </article>
+        <article class="panel">
+          <h3 data-i18n="kpi_readiness">Readiness</h3>
+          <div id="readinessBandValue" class="value">-</div>
+          <div id="readinessBandMeta" class="kpi-meta">Väntar på monitor-data.</div>
+        </article>
+        <article class="panel">
+          <h3 data-i18n="kpi_pilot_report">Pilot Report</h3>
+          <div id="pilotReportValue" class="value">-</div>
+          <div id="pilotReportMeta" class="kpi-meta">Väntar på monitor-data.</div>
+        </article>
       </div>
 
       <div id="settingsSection" data-section-group="settingsSection" class="row cols-2">
