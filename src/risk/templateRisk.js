@@ -1,5 +1,6 @@
 const { normalizeCategory } = require('../templates/constants');
 const { evaluatePolicyFloorText } = require('../policy/floor');
+const { computeSemanticRiskScore, normalizeSemanticMode } = require('./semanticScoring');
 
 const RISK_LEVEL_COLORS = Object.freeze({
   1: 'green',
@@ -7,6 +8,11 @@ const RISK_LEVEL_COLORS = Object.freeze({
   3: 'yellow',
   4: 'orange',
   5: 'red',
+});
+
+const RISK_ENGINE_VERSION_BASE = Object.freeze({
+  ruleSetVersion: 'rules.v1',
+  fusionVersion: 'fusion.weighted.v1',
 });
 
 const RULES = Object.freeze([
@@ -40,25 +46,6 @@ const RULES = Object.freeze([
 function normalizeText(value) {
   if (typeof value !== 'string') return '';
   return value.trim();
-}
-
-function computeSemanticScore(content, category) {
-  const text = normalizeText(content).toLowerCase();
-  if (!text) return 0;
-
-  let score = 8;
-  if (text.length > 600) score += 6;
-  if (text.includes('måste') || text.includes('alltid')) score += 5;
-  if (text.includes('omedelbart')) score += 5;
-  if (text.includes('garanti')) score += 14;
-  if (text.includes('diagnos')) score += 14;
-  if (text.includes('akut') && !text.includes('ring 112')) score += 16;
-
-  const normalizedCategory = normalizeCategory(category);
-  if (normalizedCategory === 'AFTERCARE' && text.includes('symtom')) score += 4;
-  if (normalizedCategory === 'CONSULTATION' && text.includes('resultat')) score += 4;
-
-  return Math.min(100, score);
 }
 
 function evaluateRules(content) {
@@ -120,18 +107,28 @@ function evaluateTemplateRisk({
   content = '',
   category = '',
   tenantRiskModifier = 0,
+  riskThresholdVersion = 1,
   variableValidation = null,
+  enforceStrictTemplateVariables = false,
 }) {
   const safeContent = normalizeText(content);
-  const semanticScore = computeSemanticScore(safeContent, category);
+  const semanticMode = normalizeSemanticMode(process.env.ARCANA_SEMANTIC_MODEL_MODE || 'heuristic');
+  const semanticEvaluation = computeSemanticRiskScore({
+    content: safeContent,
+    category,
+    mode: semanticMode,
+  });
+  const semanticScore = semanticEvaluation.score;
   const { ruleHits, ruleScore } = evaluateRules(safeContent);
 
   let variableScorePenalty = 0;
   const reasonCodes = [];
+  let strictTemplateVariableViolation = false;
   if (variableValidation) {
     if (Array.isArray(variableValidation.unknownVariables) && variableValidation.unknownVariables.length) {
       variableScorePenalty += 20;
       reasonCodes.push('UNAPPROVED_TEMPLATE_VARIABLE');
+      if (enforceStrictTemplateVariables) strictTemplateVariableViolation = true;
     }
     if (
       Array.isArray(variableValidation.missingRequiredVariables) &&
@@ -139,6 +136,7 @@ function evaluateTemplateRisk({
     ) {
       variableScorePenalty += 18;
       reasonCodes.push('MISSING_REQUIRED_DISCLAIMER');
+      if (enforceStrictTemplateVariables) strictTemplateVariableViolation = true;
     }
   }
 
@@ -174,8 +172,18 @@ function evaluateTemplateRisk({
     }
   }
 
+  if (strictTemplateVariableViolation && level < 4) {
+    level = 4;
+    policyAdjustments.push({
+      reasonCode: 'STRICT_TEMPLATE_VARIABLE_POLICY',
+      floorApplied: 4,
+    });
+  }
+
   const dedupedReasonCodes = Array.from(new Set(reasonCodes));
   const finalDecision = decisionForLevel(level);
+  const normalizedThresholdVersion = Math.max(1, Number.parseInt(String(riskThresholdVersion), 10) || 1);
+  const buildVersion = normalizeText(process.env.npm_package_version || process.env.ARCANA_BUILD_VERSION || 'dev');
 
   return {
     scope,
@@ -185,12 +193,19 @@ function evaluateTemplateRisk({
     riskColor: RISK_LEVEL_COLORS[level],
     riskScore: fusedScore,
     semanticScore,
+    semanticMeta: semanticEvaluation.meta,
     ruleScore,
     decision: finalDecision,
     reasonCodes: dedupedReasonCodes,
     ruleHits,
     policyHits: policyFloorEvaluation.hits,
     policyAdjustments,
+    versions: {
+      ...RISK_ENGINE_VERSION_BASE,
+      semanticModelVersion: semanticEvaluation.modelVersion,
+      thresholdVersion: `threshold.v${normalizedThresholdVersion}`,
+      buildVersion,
+    },
     evaluatedAt: new Date().toISOString(),
   };
 }
@@ -199,4 +214,5 @@ module.exports = {
   evaluateTemplateRisk,
   decisionForLevel,
   toRiskLevel,
+  RISK_ENGINE_VERSION_BASE,
 };

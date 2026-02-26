@@ -5,6 +5,11 @@ Node + Express-app med en patientvänlig chatt som:
 - kan öppna bokning via Cliento-widget (”Boka tid”)
 - kan svara utifrån en lokal kunskapsbas (Markdown/TXT)
 
+Arkitekturkontrakt:
+- `docs/architecture/execution-gateway-contract.md`
+- `docs/architecture/capability-framework-contract-v1.md`
+- `docs/architecture/capability-base-class-contract-v1.md`
+
 ## Kom igång
 1) Skapa `.env` (utgå från `.env.example`)
 2) Installera deps: `npm install`
@@ -50,10 +55,9 @@ ARCANA_BOOTSTRAP_RESET_OWNER_MFA=false
 
 Vid uppstart bootstrapas första OWNER automatiskt om ovan variabler finns.
 
-### CORS (strict läge i produktion)
-`CORS_STRICT` defaultar nu till:
-- `true` i produktion (`NODE_ENV=production`)
-- `false` i lokal utveckling
+### CORS (strict by default)
+`CORS_STRICT` defaultar nu till `true` i alla miljöer.
+`CORS_ALLOW_NO_ORIGIN` defaultar till `false`.
 
 Rekommenderad production-konfiguration:
 
@@ -74,6 +78,14 @@ Default-värden för hardening:
 AUTH_SESSION_TTL_HOURS=12
 AUTH_SESSION_IDLE_MINUTES=180
 AUTH_LOGIN_SESSION_ROTATION=tenant
+ARCANA_DISTRIBUTED_BACKEND=memory
+ARCANA_REDIS_URL=
+ARCANA_REDIS_REQUIRED=false
+ARCANA_REDIS_CONNECT_TIMEOUT_MS=4000
+ARCANA_REDIS_KEY_PREFIX=arcana
+ARCANA_GATEWAY_QUEUE_LOCK_TTL_MS=30000
+ARCANA_GATEWAY_QUEUE_ACQUIRE_TIMEOUT_MS=10000
+ARCANA_GATEWAY_QUEUE_POLL_INTERVAL_MS=80
 ARCANA_API_RATE_LIMIT_WINDOW_SEC=60
 ARCANA_API_RATE_LIMIT_READ_MAX=300
 ARCANA_API_RATE_LIMIT_WRITE_MAX=120
@@ -82,12 +94,24 @@ ARCANA_ORCHESTRATOR_RATE_LIMIT_MAX=80
 ARCANA_PUBLIC_RATE_LIMIT_WINDOW_SEC=60
 ARCANA_PUBLIC_CLINIC_RATE_LIMIT_MAX=180
 ARCANA_PUBLIC_CHAT_RATE_LIMIT_MAX=90
+ARCANA_SEMANTIC_MODEL_MODE=heuristic
 ARCANA_PUBLIC_CHAT_BETA_ENABLED=false
 ARCANA_PUBLIC_CHAT_BETA_HEADER=x-arcana-beta-key
 ARCANA_PUBLIC_CHAT_BETA_KEY=
 ARCANA_PUBLIC_CHAT_BETA_ALLOW_HOSTS=
 ARCANA_PUBLIC_CHAT_BETA_ALLOW_LOCALHOST=true
 ARCANA_PUBLIC_CHAT_BETA_DENY_MESSAGE=Den här chatten är i begränsad beta. Kontakta kliniken för åtkomst.
+ARCANA_PUBLIC_CHAT_KILL_SWITCH=false
+ARCANA_PUBLIC_CHAT_KILL_SWITCH_MESSAGE=Patientchatten är tillfälligt pausad. Kontakta kliniken via telefon eller e-post.
+ARCANA_PUBLIC_CHAT_MAX_TURNS=12
+ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_FILTER_ENABLED=true
+ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_MESSAGE=Jag kan inte hjälpa till med den typen av instruktion. Kontakta kliniken direkt för fortsatt hjälp.
+ARCANA_RISK_DUAL_SIGNOFF_REQUIRED=false
+ARCANA_PATIENT_SIGNAL_STORE_PATH=./data/patient-signals.json
+ARCANA_PATIENT_SIGNAL_MAX_EVENTS=20000
+ARCANA_PATIENT_SIGNAL_RETENTION_DAYS=180
+ARCANA_PATIENT_SIGNAL_WINDOW_DAYS=14
+ARCANA_PATIENT_SIGNAL_FRESHNESS_HOURS=72
 ```
 
 - `AUTH_SESSION_IDLE_MINUTES`: invalidates session efter inaktivitet (revoke reason: `idle_timeout`)
@@ -98,7 +122,15 @@ ARCANA_PUBLIC_CHAT_BETA_DENY_MESSAGE=Den här chatten är i begränsad beta. Kon
 - `ARCANA_ORCHESTRATOR_RATE_LIMIT_MAX`: dedikerad limiter för `/api/v1/orchestrator/*`
 - `ARCANA_PUBLIC_CLINIC_RATE_LIMIT_MAX`: dedikerad limiter för `/api/public/clinics/*`
 - `ARCANA_PUBLIC_CHAT_RATE_LIMIT_MAX`: dedikerad limiter för `POST /chat`
+- `ARCANA_DISTRIBUTED_BACKEND=redis`: aktiverar distribuerad rate-limit + gateway-runtime (tenant lock + idempotency) via Redis
+- `ARCANA_REDIS_REQUIRED=true`: fail-fast i startup om Redis inte kan ansluta
+- `ARCANA_SEMANTIC_MODEL_MODE`: `heuristic|linear|hybrid` för semantisk risk scoring (versionsloggas i varje evaluering)
 - `ARCANA_PUBLIC_CHAT_BETA_*`: valfri beta-gate för `POST /chat` (header key + host allowlist)
+- `ARCANA_PUBLIC_CHAT_KILL_SWITCH`: stoppknapp för patientchat (blockerar alla publika chat-svar)
+- `ARCANA_PUBLIC_CHAT_MAX_TURNS`: hård turn-limit per konversation innan human handoff krävs
+- `ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_FILTER_ENABLED`: blockera kända prompt-injection-mönster i patientkanal
+- `ARCANA_RISK_DUAL_SIGNOFF_REQUIRED`: kräver `signOff.approverUserId` vid risk-threshold mutations (`/risk/settings*`, calibration apply, rollback)
+- `ARCANA_PATIENT_SIGNAL_*`: patientkanalens conversion-signalstore + feedback-loopfönster för monitor/readiness
 - `POST /api/v1/auth/login` och `POST /api/v1/auth/select-tenant` styrs fortsatt av dedikerade auth-limiters
 
 ### OWNER MFA (TOTP + recovery)
@@ -123,16 +155,36 @@ ARCANA_SCHEDULER_REPORT_WINDOW_DAYS=14
 ARCANA_SCHEDULER_REPORT_INTERVAL_HOURS=24
 ARCANA_SCHEDULER_BACKUP_INTERVAL_HOURS=24
 ARCANA_SCHEDULER_RESTORE_DRILL_INTERVAL_HOURS=168
+ARCANA_SCHEDULER_RESTORE_DRILL_FULL_INTERVAL_HOURS=720
+ARCANA_SCHEDULER_AUDIT_INTEGRITY_INTERVAL_HOURS=24
+ARCANA_SCHEDULER_SECRET_ROTATION_INTERVAL_HOURS=24
+ARCANA_SCHEDULER_RELEASE_GOVERNANCE_INTERVAL_HOURS=24
+ARCANA_SCHEDULER_RELEASE_GOVERNANCE_AUTO_REVIEW_ENABLED=true
+ARCANA_SCHEDULER_SECRET_ROTATION_DRY_RUN=true
+ARCANA_SCHEDULER_SECRET_ROTATION_NOTE=Scheduled secret rotation snapshot
 ARCANA_SCHEDULER_ALERT_PROBE_INTERVAL_MINUTES=15
 ARCANA_SCHEDULER_INCIDENT_AUTO_ESCALATION_ENABLED=true
 ARCANA_SCHEDULER_INCIDENT_AUTO_ESCALATION_LIMIT=25
 ARCANA_SCHEDULER_INCIDENT_AUTO_ASSIGN_OWNER_ENABLED=true
 ARCANA_SCHEDULER_INCIDENT_AUTO_ASSIGN_OWNER_LIMIT=100
+ARCANA_SCHEDULER_SLO_AUTO_TICKETING_ENABLED=true
+ARCANA_SCHEDULER_SLO_TICKET_MAX_PER_RUN=8
+ARCANA_RELEASE_POST_LAUNCH_STABILIZATION_DAYS=14
+ARCANA_RELEASE_ENFORCE_POST_LAUNCH_STABILIZATION=false
+ARCANA_STABILITY_WINDOW_DAYS=14
+ARCANA_STABILITY_WINDOW_HISTORY_LIMIT=200
+ARCANA_STABILITY_WINDOW_RUN_REQUIRED_SUITE=false
+ARCANA_STABILITY_WINDOW_REQUIRE_COMPLETE=false
+ARCANA_STABILITY_WINDOW_FAIL_ON_WINDOW=false
+ARCANA_STABILITY_WINDOW_FAIL_ON_RELEASE_BLOCKERS=false
+ARCANA_STABILITY_WINDOW_OUT_FILE=./data/reports/stability-window-latest.json
 ARCANA_ALERT_WEBHOOK_URL=
 ARCANA_ALERT_WEBHOOK_SECRET=
 ARCANA_ALERT_WEBHOOK_TIMEOUT_MS=4000
 ARCANA_SECRET_ROTATION_STORE_PATH=./data/secret-rotation.json
 ARCANA_SECRET_ROTATION_MAX_AGE_DAYS=90
+ARCANA_SLO_TICKET_STORE_PATH=./data/slo-tickets.json
+ARCANA_SLO_TICKET_STORE_MAX_ENTRIES=3000
 ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS=30
 ARCANA_MONITOR_PILOT_REPORT_MAX_AGE_HOURS=36
 ARCANA_METRICS_MAX_SAMPLES=5000
@@ -145,15 +197,22 @@ ARCANA_SCHEDULER_JITTER_SEC=4
 ARCANA_SCHEDULER_RUN_ON_STARTUP=false
 ```
 
-- Schedulern kör nightly rapport, backup+prune, restore-drill preview och alert-probe.
+- Schedulern kör nightly rapport, backup+prune, restore-drill preview, restore-drill full (sandbox), audit-integrity check, secrets-rotation snapshot, release-governance review och alert-probe.
 - Nightly rapporter (`Pilot_Scheduler_*.json`) prunas automatiskt enligt `ARCANA_REPORT_RETENTION_MAX_FILES`/`ARCANA_REPORT_RETENTION_MAX_AGE_DAYS`.
 - `alert_probe` auto-tilldelar owner på öppna oägda incidents (owner prioriteras, fallback staff).
 - `alert_probe` auto-eskalerar breachade öppna incidents (L4/L5) och skriver audit-event `incidents.auto_escalate`.
+- `alert_probe` skapar också SLO-tickets vid availability/latency/restore/pilot-report breach (`slo.ticket.created` i audit, event `slo.breach.ticket` till webhook).
+- `release_governance_review` skapar daglig auto-review för aktiv `launched` cycle (en gång per dag), dedupe: ingen dubbelreview samma dag.
+- Vid behov kan post-launch stabilisering göras hård med `ARCANA_RELEASE_ENFORCE_POST_LAUNCH_STABILIZATION=true` (fönster styrs av `ARCANA_RELEASE_POST_LAUNCH_STABILIZATION_DAYS`, default 14).
+- `audit_integrity_check` kör daglig hash-chain-kontroll och skickar critical alert vid integrity-fel.
+- `secrets_rotation_snapshot` kör daglig secret-rotation snapshot (dry-run/commit styrs av env) och varnar vid stale/pending rotation.
+- `restore_drill_full` kör månatlig sandbox-restore av senaste backup utan att skriva till live stores.
 - Om `ARCANA_ALERT_WEBHOOK_URL` är satt skickas webhook-notifieringar för `incidents.auto_assign_owner` och `incidents.auto_escalate`.
 - Sätt `ARCANA_ALERT_WEBHOOK_SECRET` för HMAC-signatur (`x-arcana-signature: sha256=...`).
 - Secret rotation metadata för provider/webhook-nycklar lagras i `ARCANA_SECRET_ROTATION_STORE_PATH` (fingerprints + versioner, aldrig råa hemligheter).
 - Status syns i `GET /api/v1/monitor/status` under `runtime.scheduler`.
 - `monitor/status` exponerar även `gates.restoreDrill` (`healthy`/`noGo`) baserat på senaste lyckade `restore_drill_preview` i audit-loggen (persist över restart) och max-age (`ARCANA_MONITOR_RESTORE_DRILL_MAX_AGE_DAYS`).
+- `monitor/status` exponerar även `gates.restoreDrillFull`, `gates.auditIntegrityDaily` och `gates.secretRotationDaily` för månatlig full restore + dagliga kontroller.
 - `monitor/status` exponerar även `gates.pilotReport` (`healthy`/`noGo`) baserat på senaste lyckade `nightly_pilot_report` + senaste scheduler-rapportfil och max-age (`ARCANA_MONITOR_PILOT_REPORT_MAX_AGE_HOURS`).
 - `monitor/status` exponerar även `observability` (5xx error-rate, latency p95/p99, slow requests) med alerts/trösklar från `ARCANA_OBSERVABILITY_ALERT_*`.
 
@@ -166,9 +225,46 @@ ARCANA_SCHEDULER_RUN_ON_STARTUP=false
   - `ARCANA_PUBLIC_BASE_URL`
   - `ARCANA_OWNER_EMAIL`
   - `ARCANA_OWNER_PASSWORD`
-  - `ARCANA_OWNER_MFA_SECRET`
+  - `ARCANA_OWNER_MFA_SECRET` (eller `ARCANA_OWNER_MFA_RECOVERY_CODE`)
 - Optional GitHub Secret:
   - `ARCANA_DRIFT_ALERT_WEBHOOK_URL`
+
+### CI-gate (GitHub Actions)
+- Workflow: `.github/workflows/ci.yml`
+- Kör nu även `npm run ops:suite:strict` mot lokal runtime (server startas i bakgrunden i CI) utöver syntax, test, no-bypass och smoke.
+
+### Stabilitetsfönster (GitHub Actions)
+- Workflow: `.github/workflows/stability-window.yml`
+- Kör daglig `report:stability-window` mot publik miljö och laddar upp artifact `data/reports/stability-window-latest.json`.
+- Required GitHub Secrets:
+  - `ARCANA_PUBLIC_BASE_URL`
+  - `ARCANA_OWNER_EMAIL`
+  - `ARCANA_OWNER_PASSWORD`
+  - `ARCANA_OWNER_MFA_SECRET` eller `ARCANA_OWNER_MFA_RECOVERY_CODE`
+
+### Finalization Sweep (GitHub Actions)
+- Workflow: `.github/workflows/finalization-sweep.yml`
+- Kör hela slutkedjan dagligen i lokal runtime:
+  - syntax
+  - unit tests
+  - no-bypass lint
+  - ops strict suite
+  - pentest evidence gate
+  - release readiness gate
+  - stability window gate
+  - go-live gate
+- Laddar upp artifact: `data/reports/finalization-sweep-latest.json`.
+- Markerar workflow-fel endast vid oväntade interna regressionsfel; kända externa/tidslåsta blocker-steg spåras separat i rapporten.
+
+### Finalization Sweep Public (GitHub Actions)
+- Workflow: `.github/workflows/finalization-sweep-public.yml`
+- Kör samma finalization-sweep dagligen mot publik miljö (`ARCANA_PUBLIC_BASE_URL`).
+- Laddar upp artifact: `data/reports/finalization-sweep-public-latest.json`.
+- Kräver GitHub Secrets:
+  - `ARCANA_PUBLIC_BASE_URL`
+  - `ARCANA_OWNER_EMAIL`
+  - `ARCANA_OWNER_PASSWORD`
+  - `ARCANA_OWNER_MFA_SECRET` eller `ARCANA_OWNER_MFA_RECOVERY_CODE`
 
 `POST /api/v1/auth/change-password` har nu global invalidation som default:
 - revokerar alla user-sessioner (alla tenants) vid lösenordsbyte
@@ -219,7 +315,7 @@ Notera:
 - `GET /api/v1/monitor/status` (OWNER/STAFF)
 - `GET /api/v1/monitor/metrics` (OWNER/STAFF)
 - `GET /api/v1/monitor/observability` (OWNER/STAFF, 5xx error-rate + p95 latency + slow requests + alert-status)
-- `GET /api/v1/monitor/slo` (OWNER/STAFF, availability + latency p95 + incident response + restore recency + pilot report recency)
+- `GET /api/v1/monitor/slo` (OWNER/STAFF, availability + latency p95 + incident response + restore recency + pilot report recency + SLO ticket backlog)
 - `GET /api/v1/monitor/readiness` (OWNER/STAFF, Go/No-Go score + blocker-matris)
 - `GET /api/v1/monitor/readiness/history` (OWNER/STAFF, readiness-trend från audit-events)
   - inkluderar deterministiska no-go checks för output risk/policy-gate, policy-floor bypass, L5 manual intervention, restore drill och nightly pilot report recency
@@ -233,11 +329,22 @@ Notera:
 - `POST /api/v1/ops/state/restore` (OWNER, dry-run + restore med confirmText)
 - `GET /api/v1/ops/scheduler/status` (OWNER)
 - `POST /api/v1/ops/scheduler/run` (OWNER, body: `{ "jobId": "alert_probe" }` eller `{ "jobId": "required_suite" }`)
+- `GET /api/v1/ops/release/cycles` (OWNER/STAFF)
+- `POST /api/v1/ops/release/cycles` (OWNER)
+- `GET /api/v1/ops/release/status` (OWNER/STAFF)
+- `POST /api/v1/ops/release/cycles/:cycleId/evidence` (OWNER)
+- `POST /api/v1/ops/release/cycles/:cycleId/signoff` (OWNER/STAFF)
+- `POST /api/v1/ops/release/cycles/:cycleId/launch` (OWNER)
+- `POST /api/v1/ops/release/cycles/:cycleId/review` (OWNER/STAFF)
+- `POST /api/v1/ops/release/cycles/:cycleId/reality-audit` (OWNER/STAFF)
 - `POST /api/v1/ops/readiness/remediate-output-gates` (OWNER, preview/apply av active-version output gate remediation)
 - `POST /api/v1/ops/readiness/remediate-owner-mfa-memberships` (OWNER, preview/apply av disable-remediation för non-compliant OWNER memberships)
 - `GET /api/v1/ops/secrets/status` (OWNER, rotation status/freshness)
 - `POST /api/v1/ops/secrets/snapshot` (OWNER, dry-run default)
 - `GET /api/v1/ops/secrets/history` (OWNER, query: `secretId`, `limit`)
+- `GET /api/v1/ops/slo-tickets` (OWNER/STAFF, query: `status`, `limit`)
+- `GET /api/v1/ops/slo-tickets/summary` (OWNER/STAFF)
+- `POST /api/v1/ops/slo-tickets/:ticketId/resolve` (OWNER)
 - `GET /api/v1/audit/events` (OWNER/STAFF)
 - `GET /api/v1/audit/integrity` (OWNER/STAFF, verifierar append-only checksumkedja)
 - `GET /api/v1/incidents` (OWNER/STAFF, query: `status`, `severity`, `sinceDays`, `ownerUserId`)
@@ -302,7 +409,8 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - Tvinga fortsatt preflight i heal-läge trots ej-healbar guard-blocker: `npm run pilot:public -- --preflight-force-on-guard-fail`
 - Kör full preflight inkl lokal verify: `npm run pilot:public -- --with-local-verify`
 - Lägg till mail-seeds i samma körning: `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=fazli@hairtpclinic.com npm run pilot:public -- --with-mail-seeds`
-- Om OWNER kräver MFA: sätt `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>` (scriptet försöker även läsa `AUTH_STORE_PATH`, default `./data/auth.json`).
+- Om OWNER kräver MFA: sätt `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>`, `ARCANA_OWNER_MFA_SECRET=<base32-secret>` eller `ARCANA_OWNER_MFA_RECOVERY_CODE=<recovery-kod>` (scriptet försöker även läsa `AUTH_STORE_PATH`, default `./data/auth.json`).
+- För preflight/ops-automation rekommenderas `ARCANA_OWNER_MFA_SECRET` (recovery-koder är engångskoder).
 
 1) Lokal kvalitet:
 - `npm run verify`
@@ -316,7 +424,8 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - `BASE_URL=https://arcana.hairtpclinic.se npm run smoke:public`
 - För auth-check i samma körning:
   - `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run smoke:public`
-- Om OWNER kräver MFA: lägg till `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>`.
+- Om OWNER kräver MFA: lägg till `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>`, `ARCANA_OWNER_MFA_SECRET=<base32-secret>` eller `ARCANA_OWNER_MFA_RECOVERY_CODE=<recovery-kod>`.
+- För återkommande driftkörningar: använd helst `ARCANA_OWNER_MFA_SECRET`.
 - För endast reachability (utan login), t.ex. i låst CI-miljö:
   - `BASE_URL=https://arcana.hairtpclinic.se ARCANA_SMOKE_SKIP_AUTH=true npm run smoke:public`
 - `smoke:public` läser även owner-credentials från lokal `.env` om env-variabler inte skickas in.
@@ -354,14 +463,17 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - `npm run report:pilot`
 - Filen sparas i `data/reports/` (git-ignorerad), t.ex. `data/reports/Pilot_Baseline_14d_YYYYMMDD-HHMMSS.json`.
 - Rapportfilen inkluderar `readinessSnapshot` med Go/No-Go, no-go triggers, prioriterad remediation-lista och readiness-historiktrend.
+- KPI-/readiness-gate mot senaste pilotrapport: `npm run pilot:evidence:check`
+- Strikt variant: `npm run pilot:evidence:check:strict`
+- Om rapporten saknar `readinessSnapshot` används readiness-fallback från `data/reports/preflight-latest.json`.
 - För publik miljö: `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run report:pilot`
-- Om OWNER kräver MFA: sätt `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>`.
+- Om OWNER kräver MFA: sätt `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>`, `ARCANA_OWNER_MFA_SECRET=<base32-secret>` eller `ARCANA_OWNER_MFA_RECOVERY_CODE=<recovery-kod>`.
 - För kompakt readiness i rapport: `npm run report:pilot -- --readiness-mode compact` (default: `full`).
 - Valfritt: `npm run report:pilot -- --days 30`
 - Kör required scheduler-suite + monitor snapshot i en körning: `npm run ops:suite`
 - Publik variant: `BASE_URL=https://arcana.hairtpclinic.se ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite`
-- Om OWNER kräver MFA: lägg till `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>` eller `ARCANA_OWNER_MFA_SECRET=<base32-secret>`.
-- Scriptet försöker även läsa `mfaSecret` från `AUTH_STORE_PATH` (default `./data/auth.json`) om MFA-kod/secret inte skickas.
+- Om OWNER kräver MFA: lägg till `ARCANA_OWNER_MFA_CODE=<6-siffrig-kod>`, `ARCANA_OWNER_MFA_SECRET=<base32-secret>` eller `ARCANA_OWNER_MFA_RECOVERY_CODE=<recovery-kod>`.
+- Scriptet försöker även läsa `mfaSecret` från `AUTH_STORE_PATH` (default `./data/auth.json`) om MFA-kod/secret/recovery inte skickas.
 - Ops-suite-artifact inkluderar monitor status + readiness + readiness-historik + SLO-snapshot, samt `strict`-sektion med failures/advisories/exitCode.
 - Ops-suite kör som standard en tenant access-check refresh (`tenants.access_check`) före readiness snapshot för färsk tenant-isolation-evidens.
 - Ops-suite kör även CORS runtime-probe som standard när `cors_strict` är grön (tillåten origin måste få ACAO-header, otillåten origin får inte få ACAO-header). Om `cors_strict` inte är grön markeras probe som `unknown/skipped` istället för separat blocker.
@@ -388,10 +500,37 @@ Enklaste publik-körning (interaktivt lösenord, minimerar copy/paste-fel):
 - Strikt driftgate (exit code 2 vid no-go): `npm run ops:suite:strict`
 - Lista scheduler-genererade rapporter: `npm run report:scheduler:list`
 - Förhandsvisa report-prune: `npm run report:scheduler:prune`
+- Slutchecklist för full finalisering: `docs/ops/arcana-finalization-runbook.md`
+- Master-checklista med status: `docs/ops/master-checklist-status-2026-02-26.md`
+- Closure-runbook för sista externa blockerare: `docs/ops/external-blocker-closure.md`
+- Release governance runbook: `docs/ops/release-governance-runbook.md`
+- Drift-runbooks: `docs/ops/runbooks/`
+- P0 reality audit rerun + evidens: `docs/ops/p0-reality-audit-rerun-2026-02-25.md`
+- P1/P2 hardening sweep (distributed runtime + revisions + orchestrator gateway): `docs/ops/phase2-hardening-sweep-2026-02-26.md`
 - Kör report-prune: `npm run report:scheduler:prune:apply`
+- Generera final release readiness report: `npm run report:release-readiness -- --pentest-evidence-path ./docs/security/pentest-latest.md`
+- Validera pentest-evidence (måste vara giltig, signerad referens, ej placeholders): `npm run check:pentest:evidence:strict`
+- Uppdatera pentest-evidence med verkliga leverantörsdata: `npm run pentest:evidence:upsert -- --vendor ... --scope-date ... --report-date ... --required-fixes-completed yes --signed-report-reference ...`
+- Generera stabilitetsfönster-report: `npm run report:stability-window -- --window-days 14`
+- Strikt stabilitetsfönster-gate: `npm run report:stability-window:strict`
+- Samlad bred go-live gate: `npm run release:go-live:gate`
+- Full sweep av hela slutkedjan: `npm run finalization:sweep:local`
+- Strikt full sweep (exit 2 vid blocker): `npm run finalization:sweep:strict:local`
+- Full sweep + bootstrap av release cycle (launch/review/reality-audit före gates): `npm run finalization:sweep:strict:local:bootstrap`
+- Full sweep + bootstrap (tvinga ny release cycle): `npm run finalization:sweep:strict:local:bootstrap:fresh`
+- Sweep-guard (fail endast vid oväntade regressionssteg): `npm run finalization:sweep:guard`
+- Closure-status rapport (JSON + Markdown): `npm run report:closure-status`
+- Closure-guard (fail endast vid oväntade closure-blockers): `npm run closure:guard`
+- Closure-guard strict done (fail tills allt är stängt): `npm run closure:guard:done`
+- Kör release cycle automation (create + evidence + 3 sign-offs): `npm run release:cycle:auto`
+  - Återanvänd senaste cycle (utan att skapa ny): `npm run release:cycle:auto:reuse`
+  - Lås formell final live sign-off på befintlig cycle: `npm run release:cycle:final-lock`
+  - staged launch + review + reality-audit i samma körning:
+    - `npm run release:cycle:auto -- --launch --review-now --reality-audit-now --change-governance-version 2026-Q1`
 
 Tips:
 - Om `mail/insights` visar `ready:false` saknas ingestad maildata för tenant (det är okej tills ni kör ingest).
+- `finalization:sweep:*:bootstrap` återanvänder befintlig launched cycle som standard (`--bootstrap-mode if_missing`) så stabilitetsfönstret inte nollställs av misstag. Använd `*:bootstrap:fresh` för att tvinga ny cycle.
 
 ### Viktiga endpoints (Template Engine)
 - `GET /api/v1/templates/meta`
@@ -400,7 +539,11 @@ Tips:
 - `GET /api/v1/templates/:templateId/versions`
 - `GET /api/v1/templates/:templateId/versions/:versionId`
 - `POST /api/v1/templates/:templateId/drafts/generate`
-- `PATCH /api/v1/templates/:templateId/versions/:versionId`
+- `PATCH /api/v1/templates/:templateId/versions/:versionId` (stödjer optimistic locking via `If-Match: W/"r<revision>"`)
+- `GET /api/v1/templates/:templateId/versions/:versionId/revisions`
+- `GET /api/v1/templates/:templateId/versions/:versionId/revisions/:revisionNo`
+- `GET /api/v1/templates/:templateId/versions/:versionId/revisions/diff?from=<n>&to=<m>`
+- `POST /api/v1/templates/:templateId/versions/:versionId/revisions/:revisionNo/rollback` (OWNER, eval före persist via gateway)
 - `POST /api/v1/templates/:templateId/versions/:versionId/evaluate`
 - `POST /api/v1/templates/:templateId/versions/:versionId/activate` (OWNER)
 - `POST /api/v1/templates/:templateId/versions/:versionId/archive` (OWNER)
@@ -424,6 +567,9 @@ Owner action `action` (endast OWNER):
   - tenant-switcher i header (OWNER/STAFF) använder `POST /api/v1/auth/switch-tenant`
   - tenant-lista + onboarding-form (OWNER) använder `GET /api/v1/tenants/my` och `POST /api/v1/tenants/onboard`
 - Dashboard API: `GET /api/v1/dashboard/owner`
+- Dashboard realtime stream (SSE): `GET /api/v1/dashboard/owner/stream`
+  - används av adminpanelen för eventdriven uppdatering av audit/dashboard utan polling-loop
+  - streamar även `status`-events (latency, 5xx-rate, incidents, SLO-tickets, scheduler running jobs, release governance gate) per tenant
 - Tenant config: `GET /api/v1/tenant-config`, `PATCH /api/v1/tenant-config` (OWNER)
 - Public clinic payload (for external web): `GET /api/public/clinics/:clinicId`
 - Template lifecycle i UI:
@@ -442,10 +588,14 @@ Owner action `action` (endast OWNER):
   - driftstatus, minne, datastores och tenant-KPI (`GET /api/v1/monitor/status`)
   - latency/fel-metrics (`GET /api/v1/monitor/metrics`)
   - observability-alerts/trösklar (`GET /api/v1/monitor/observability`)
+  - gateway retry/idempotency + dead-letter status (`runtime.gateway` i `GET /api/v1/monitor/status`)
+  - gateway dead-letter queue (`GET /api/v1/monitor/gateway/dead-letters`)
+  - patientkanalens conversion-feedback loop (`GET /api/v1/monitor/patient-channel`)
   - SLO/SLI-status (`GET /api/v1/monitor/slo`)
   - readiness/Go-No-Go matris (`GET /api/v1/monitor/readiness`)
   - readiness-historik och trend (`GET /api/v1/monitor/readiness/history`)
   - aktiva No-Go blockers med evidence/detaljer (från readiness-payload)
+  - release governance-status (`GET /api/v1/ops/release/status`)
   - output-gate remediation preview/apply (`POST /api/v1/ops/readiness/remediate-output-gates`)
   - kör required scheduler-suite (`POST /api/v1/ops/scheduler/run` med `{"jobId":"required_suite"}`)
 - Ops backup-panel i UI (OWNER):
@@ -550,6 +700,10 @@ Publika webbfalt kan styras via tenant-config med PATCH (OWNER):
   - `POST /api/v1/orchestrator/admin-run`
 - Returnerar:
   - intent + confidence
+  - runtimeprofil (`admin-runtime.v1`)
+- `POST /api/v1/orchestrator/admin-run` kör nu via `ExecutionGateway`:
+  - `inputRisk -> agentRun -> outputRisk -> policyFloor -> audit -> response`
+  - fail-closed + safe fallback om risk/policy blockerar
 
 ## Strategidokument (Phase 2)
 - Masterplan för hardening, incident/SLA, automation, riskprecision och Go/No-Go:
@@ -558,6 +712,12 @@ Publika webbfalt kan styras via tenant-config med PATCH (OWNER):
   - handlingsplan
   - föreslagna API-anrop
   - säkerhetsvaliderad output (risk + policy floor)
+
+## Arkitekturlåsning (P0)
+- ExecutionGateway-kontrakt:
+  - `docs/architecture/execution-gateway-contract.md`
+- P0-checklista (commitordning + evidenskrav):
+  - `docs/architecture/p0-checklist.md`
 
 ## Steg 7: Pilot Reporting
 - Rapport API:
@@ -604,9 +764,19 @@ Tips vid route-fel (`Cannot GET ...`): stoppa alla gamla processer på port 3000
 Backup inkluderar:
 - `AUTH_STORE_PATH`
 - `TEMPLATE_STORE_PATH`
+
+## Drift: Load/Soak test
+- Kör kapacitetssmoke (default: 60s, concurrency 8, target `/healthz`):
+  - `npm run ops:soak -- --baseUrl http://localhost:3000 --path /healthz --durationSec 60 --concurrency 8`
+- Viktiga outputfält:
+  - `rps`
+  - `errorRatePct`
+  - `latencyMs.p50/p95/p99`
 - `TENANT_CONFIG_STORE_PATH`
 - `MEMORY_STORE_PATH`
 - `ARCANA_SECRET_ROTATION_STORE_PATH`
+- `ARCANA_PATIENT_SIGNAL_STORE_PATH`
+- `ARCANA_SLO_TICKET_STORE_PATH`
 
 ## Drift: Secrets rotation runbook
 - Runbook: `docs/ops/secrets-rotation-runbook.md`

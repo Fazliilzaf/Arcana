@@ -302,6 +302,8 @@ MONITOR_SCHED_JOB_COUNT="$(printf '%s' "$MONITOR_RESPONSE" | json_get runtime.sc
 MONITOR_RISK_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.riskMax 2>/dev/null || true)"
 MONITOR_ORCHESTRATOR_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.orchestratorMax 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_LIMIT_MAX="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.publicChatMax 2>/dev/null || true)"
+MONITOR_RATE_LIMIT_BACKEND="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.rateLimits.backend 2>/dev/null || true)"
+MONITOR_DISTRIBUTED_ACTIVE="$(printf '%s' "$MONITOR_RESPONSE" | json_get runtime.distributed.active 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_BETA_ENABLED="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.enabled 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_BETA_KEY_CONFIGURED="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.keyConfigured 2>/dev/null || true)"
 MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT="$(printf '%s' "$MONITOR_RESPONSE" | json_get security.publicChatBeta.allowHostsCount 2>/dev/null || true)"
@@ -335,6 +337,16 @@ if [[ -z "$MONITOR_RISK_LIMIT_MAX" || "$MONITOR_RISK_LIMIT_MAX" == "null" || -z 
   printf '%s\n' "$MONITOR_RESPONSE"
   exit 1
 fi
+if [[ "$MONITOR_RATE_LIMIT_BACKEND" != "memory" && "$MONITOR_RATE_LIMIT_BACKEND" != "redis" ]]; then
+  echo "❌ monitor/status saknar security.rateLimits.backend"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
+if [[ "$MONITOR_DISTRIBUTED_ACTIVE" != "true" && "$MONITOR_DISTRIBUTED_ACTIVE" != "false" ]]; then
+  echo "❌ monitor/status saknar runtime.distributed.active"
+  printf '%s\n' "$MONITOR_RESPONSE"
+  exit 1
+fi
 if [[ "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" != "true" && "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" != "false" ]]; then
   echo "❌ monitor/status saknar security.publicChatBeta.enabled"
   printf '%s\n' "$MONITOR_RESPONSE"
@@ -355,7 +367,7 @@ if [[ "$MONITOR_PUBLIC_CHAT_BETA_ENABLED" == "true" && "$MONITOR_PUBLIC_CHAT_BET
   printf '%s\n' "$MONITOR_RESPONSE"
   exit 1
 fi
-echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO}, pilotReportHealthy: ${MONITOR_PILOT_REPORT_HEALTHY}, schedulerJobs: ${MONITOR_SCHED_JOB_COUNT}, betaEnabled: ${MONITOR_PUBLIC_CHAT_BETA_ENABLED}, betaAllowHosts: ${MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT})"
+echo "✅ monitor/status OK (templates: ${MONITOR_TEMPLATES}, restoreDrillHealthy: ${MONITOR_RESTORE_DRILL_HEALTHY}, restoreDrillNoGo: ${MONITOR_RESTORE_DRILL_NOGO}, pilotReportHealthy: ${MONITOR_PILOT_REPORT_HEALTHY}, schedulerJobs: ${MONITOR_SCHED_JOB_COUNT}, rateBackend: ${MONITOR_RATE_LIMIT_BACKEND}, distributedActive: ${MONITOR_DISTRIBUTED_ACTIVE}, betaEnabled: ${MONITOR_PUBLIC_CHAT_BETA_ENABLED}, betaAllowHosts: ${MONITOR_PUBLIC_CHAT_BETA_ALLOW_HOSTS_COUNT})"
 
 MONITOR_METRICS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/metrics?areaLimit=6" \
   -H "Authorization: Bearer $TOKEN")"
@@ -389,6 +401,17 @@ if [[ "$MONITOR_OBSERVABILITY_CHECKS" -lt 3 ]]; then
   exit 1
 fi
 echo "✅ monitor/observability OK (status: ${MONITOR_OBSERVABILITY_STATUS}, alerts: ${MONITOR_OBSERVABILITY_ALERTS}, checks: ${MONITOR_OBSERVABILITY_CHECKS})"
+
+MONITOR_GATEWAY_DLQ_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/gateway/dead-letters?limit=5" \
+  -H "Authorization: Bearer $TOKEN")"
+MONITOR_GATEWAY_DLQ_COUNT="$(printf '%s' "$MONITOR_GATEWAY_DLQ_RESPONSE" | json_get count 2>/dev/null || true)"
+MONITOR_GATEWAY_QUEUE_ENABLED="$(printf '%s' "$MONITOR_GATEWAY_DLQ_RESPONSE" | json_get runtime.queue.enabled 2>/dev/null || true)"
+if [[ "$MONITOR_GATEWAY_QUEUE_ENABLED" != "true" && "$MONITOR_GATEWAY_QUEUE_ENABLED" != "false" ]]; then
+  echo "❌ monitor/gateway/dead-letters saknar runtime.queue.enabled"
+  printf '%s\n' "$MONITOR_GATEWAY_DLQ_RESPONSE"
+  exit 1
+fi
+echo "✅ monitor/gateway/dead-letters OK (count: ${MONITOR_GATEWAY_DLQ_COUNT}, queueEnabled: ${MONITOR_GATEWAY_QUEUE_ENABLED})"
 
 MONITOR_SLO_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/slo" \
   -H "Authorization: Bearer $TOKEN")"
@@ -723,6 +746,80 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
     printf '%s\n' "$OPS_SCHED_RESTORE_RUN_RESPONSE"
     exit 1
   fi
+
+  OPS_SCHED_RESTORE_FULL_RUN_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"jobId":"restore_drill_full"}')"
+  OPS_SCHED_RESTORE_FULL_RUN_OK="$(printf '%s' "$OPS_SCHED_RESTORE_FULL_RUN_RESPONSE" | json_get ok 2>/dev/null || true)"
+  OPS_SCHED_RESTORE_FULL_RUN_ERROR="$(printf '%s' "$OPS_SCHED_RESTORE_FULL_RUN_RESPONSE" | json_get error 2>/dev/null || true)"
+  if [[ "$OPS_SCHED_RESTORE_FULL_RUN_OK" == "true" ]]; then
+    OPS_SCHED_RESTORE_FULL_RUN_JOB="$(printf '%s' "$OPS_SCHED_RESTORE_FULL_RUN_RESPONSE" | json_get jobId)"
+    echo "✅ ops/scheduler/run restore full OK (job: ${OPS_SCHED_RESTORE_FULL_RUN_JOB})"
+
+    MONITOR_AFTER_RESTORE_FULL_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/status" \
+      -H "Authorization: Bearer $TOKEN")"
+    MONITOR_AFTER_RESTORE_FULL_HEALTHY="$(printf '%s' "$MONITOR_AFTER_RESTORE_FULL_RESPONSE" | json_get gates.restoreDrillFull.healthy 2>/dev/null || true)"
+    MONITOR_AFTER_RESTORE_FULL_NOGO="$(printf '%s' "$MONITOR_AFTER_RESTORE_FULL_RESPONSE" | json_get gates.restoreDrillFull.noGo 2>/dev/null || true)"
+    if [[ "$MONITOR_AFTER_RESTORE_FULL_HEALTHY" != "true" || "$MONITOR_AFTER_RESTORE_FULL_NOGO" != "false" ]]; then
+      echo "❌ monitor/status restore full-gate uppdaterades inte efter restore_drill_full"
+      printf '%s\n' "$MONITOR_AFTER_RESTORE_FULL_RESPONSE"
+      exit 1
+    fi
+    echo "✅ monitor/status restore full-gate OK efter restore_drill_full"
+  elif [[ "$OPS_SCHED_RESTORE_FULL_RUN_ERROR" == "disabled_job" || "$OPS_SCHED_RESTORE_FULL_RUN_ERROR" == "job_running" ]]; then
+    echo "ℹ️ ops/scheduler/run restore full SKIP (${OPS_SCHED_RESTORE_FULL_RUN_ERROR})"
+  else
+    echo "❌ ops/scheduler/run restore full misslyckades"
+    printf '%s\n' "$OPS_SCHED_RESTORE_FULL_RUN_RESPONSE"
+    exit 1
+  fi
+
+  OPS_RELEASE_CYCLE_CREATE_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/release/cycles" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"targetEnvironment":"production","rolloutStrategy":"tenant_batch","note":"smoke cycle"}')"
+  OPS_RELEASE_CYCLE_ID="$(printf '%s' "$OPS_RELEASE_CYCLE_CREATE_RESPONSE" | json_get cycle.id 2>/dev/null || true)"
+  if [[ -z "$OPS_RELEASE_CYCLE_ID" || "$OPS_RELEASE_CYCLE_ID" == "null" ]]; then
+    echo "❌ ops/release/cycles create saknar cycle.id"
+    printf '%s\n' "$OPS_RELEASE_CYCLE_CREATE_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/release/cycles create OK (cycleId: ${OPS_RELEASE_CYCLE_ID})"
+
+  OPS_RELEASE_EVIDENCE_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/release/cycles/$OPS_RELEASE_CYCLE_ID/evidence" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"source":"smoke","noP0P1Blockers":true,"patientSafetyApproved":true,"restoreDrillsVerified":true,"governanceRunbooksReady":true,"notes":"smoke evidence"}')"
+  OPS_RELEASE_EVIDENCE_OK="$(printf '%s' "$OPS_RELEASE_EVIDENCE_RESPONSE" | json_get ok 2>/dev/null || true)"
+  if [[ "$OPS_RELEASE_EVIDENCE_OK" != "true" ]]; then
+    echo "❌ ops/release/cycles/:id/evidence misslyckades"
+    printf '%s\n' "$OPS_RELEASE_EVIDENCE_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/release/cycles/:id/evidence OK"
+
+  OPS_RELEASE_SIGNOFF_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/release/cycles/$OPS_RELEASE_CYCLE_ID/signoff" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"signoffRole":"owner","note":"smoke owner signoff"}')"
+  OPS_RELEASE_SIGNOFF_OK="$(printf '%s' "$OPS_RELEASE_SIGNOFF_RESPONSE" | json_get ok 2>/dev/null || true)"
+  if [[ "$OPS_RELEASE_SIGNOFF_OK" != "true" ]]; then
+    echo "❌ ops/release/cycles/:id/signoff misslyckades"
+    printf '%s\n' "$OPS_RELEASE_SIGNOFF_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/release/cycles/:id/signoff OK (owner)"
+
+  OPS_RELEASE_STATUS_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/release/status?cycleId=$OPS_RELEASE_CYCLE_ID" \
+    -H "Authorization: Bearer $TOKEN")"
+  OPS_RELEASE_STATUS_CYCLE="$(printf '%s' "$OPS_RELEASE_STATUS_RESPONSE" | json_get cycle.id 2>/dev/null || true)"
+  if [[ "$OPS_RELEASE_STATUS_CYCLE" != "$OPS_RELEASE_CYCLE_ID" ]]; then
+    echo "❌ ops/release/status returnerade fel cycle"
+    printf '%s\n' "$OPS_RELEASE_STATUS_RESPONSE"
+    exit 1
+  fi
+  echo "✅ ops/release/status OK (cycle: ${OPS_RELEASE_STATUS_CYCLE})"
 fi
 
 META_RESPONSE="$(curl -s "$BASE_URL/api/v1/templates/meta" \
@@ -805,12 +902,12 @@ echo "✅ template skapad ($TEMPLATE_ID)"
 DRAFT_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/templates/$TEMPLATE_ID/drafts/generate" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"instruction":"Skriv en vänlig konsultationsbekräftelse med variabel {{patient_name}}."}')"
+  -d '{"instruction":"Skriv en vänlig konsultationsbekräftelse med variabel {{first_name}}."}')"
 VERSION_ID="$(printf '%s' "$DRAFT_RESPONSE" | json_get version.id)"
 GEN_PROVIDER="$(printf '%s' "$DRAFT_RESPONSE" | json_get generation.provider || true)"
 echo "✅ draft genererad ($VERSION_ID, provider: ${GEN_PROVIDER:-unknown})"
 
-UPDATED_CONTENT="Hej {{patient_name}}, detta är en uppdaterad konsultationsbekräftelse från {{clinic_name}}."
+UPDATED_CONTENT="Hej {{first_name}}, detta är en uppdaterad konsultationsbekräftelse från {{clinic_name}}."
 UPDATE_RESPONSE="$(curl -s -X PATCH "$BASE_URL/api/v1/templates/$TEMPLATE_ID/versions/$VERSION_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -946,6 +1043,17 @@ INCIDENTS_TOTAL="$(printf '%s' "$INCIDENT_SUMMARY_RESPONSE" | json_get totals.in
 INCIDENTS_OPEN="$(printf '%s' "$INCIDENT_SUMMARY_RESPONSE" | json_get totals.openUnresolved)"
 INCIDENTS_BREACHED="$(printf '%s' "$INCIDENT_SUMMARY_RESPONSE" | json_get totals.breachedOpen)"
 echo "✅ incidents/summary OK (all: ${INCIDENTS_TOTAL}, open: ${INCIDENTS_OPEN}, breached: ${INCIDENTS_BREACHED})"
+
+SLO_TICKETS_SUMMARY_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/slo-tickets/summary" \
+  -H "Authorization: Bearer $TOKEN")"
+SLO_TICKETS_OPEN="$(printf '%s' "$SLO_TICKETS_SUMMARY_RESPONSE" | json_get totals.open)"
+SLO_TICKETS_OPEN_BREACHES="$(printf '%s' "$SLO_TICKETS_SUMMARY_RESPONSE" | json_get totals.openBreaches)"
+echo "✅ ops/slo-tickets/summary OK (open: ${SLO_TICKETS_OPEN}, openBreaches: ${SLO_TICKETS_OPEN_BREACHES})"
+
+SLO_TICKETS_LIST_RESPONSE="$(curl -s "$BASE_URL/api/v1/ops/slo-tickets?status=open&limit=5" \
+  -H "Authorization: Bearer $TOKEN")"
+SLO_TICKETS_LIST_COUNT="$(printf '%s' "$SLO_TICKETS_LIST_RESPONSE" | json_get count)"
+echo "✅ ops/slo-tickets list OK (open count: ${SLO_TICKETS_LIST_COUNT})"
 
 INCIDENT_LIST_RESPONSE="$(curl -s "$BASE_URL/api/v1/incidents?status=open&limit=5" \
   -H "Authorization: Bearer $TOKEN")"

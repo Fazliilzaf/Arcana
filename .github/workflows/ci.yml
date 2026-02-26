@@ -35,5 +35,57 @@ jobs:
           find ./src ./scripts ./public -type f -name "*.js" -print0 | xargs -0 -n1 node --check
           node --check server.js
 
+      - name: No-bypass lint
+        run: npm run lint:no-bypass
+
+      - name: Unit tests
+        run: npm test
+
       - name: Smoke (local)
         run: npm run smoke:local
+
+      - name: Ops strict suite (local runtime)
+        run: |
+          npm start > /tmp/arcana-server.log 2>&1 &
+          SERVER_PID=$!
+          cleanup() {
+            kill "$SERVER_PID" >/dev/null 2>&1 || true
+            wait "$SERVER_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/healthz >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -sf http://localhost:3000/healthz >/dev/null
+          npm run ops:suite:strict
+
+      - name: Finalization sweep guard (local runtime)
+        env:
+          ARCANA_FINALIZATION_SWEEP_OUT_FILE: ./data/reports/finalization-sweep-latest.json
+          ARCANA_FINALIZATION_SWEEP_BOOTSTRAP_MODE: if_missing
+          ARCANA_EXPECTED_EXTERNAL_FAIL_STEPS: check_pentest_evidence,report_release_readiness,report_stability_window,release_go_live_gate,release_final_live_signoff
+        run: |
+          npm run finalization:sweep:local:bootstrap
+          npm run finalization:sweep:guard
+
+      - name: Closure status report (local runtime)
+        run: npm run report:closure-status
+
+      - name: Closure status guard (known external blockers only)
+        env:
+          ARCANA_EXPECTED_CLOSURE_REMAINING: external_pentest_evidence,stability_window_14_30d,formal_live_signoff
+        run: npm run closure:guard
+
+      - name: Upload closure status artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: closure-status-ci-${{ github.run_id }}
+          path: |
+            ./data/reports/closure-status-latest.json
+            ./data/reports/closure-status-latest.md
+          if-no-files-found: warn
+          retention-days: 14

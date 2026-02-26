@@ -25,6 +25,11 @@ const { createChatHandler } = require('./src/routes/chat');
 const { createAuthStore } = require('./src/security/authStore');
 const { createAuthMiddleware } = require('./src/security/authMiddleware');
 const { createRateLimiter } = require('./src/security/rateLimit');
+const {
+  createInMemoryRateLimitStore,
+  createRedisRateLimitStore,
+} = require('./src/security/rateLimitStores');
+const { createRedisConnection } = require('./src/infra/redisClient');
 const { createAuthRouter } = require('./src/routes/auth');
 const { createTemplateStore } = require('./src/templates/store');
 const { createTemplateRouter } = require('./src/routes/templates');
@@ -39,11 +44,18 @@ const { createReportsRouter } = require('./src/routes/reports');
 const { createMonitorRouter } = require('./src/routes/monitor');
 const { createOpsRouter } = require('./src/routes/ops');
 const { createMailInsightsRouter } = require('./src/routes/mailInsights');
+const { createCapabilitiesRouter } = require('./src/routes/capabilities');
 const { createPublicClinicRouter } = require('./src/routes/publicClinic');
 const { createScheduler } = require('./src/ops/scheduler');
 const { createAlertNotifier } = require('./src/ops/alertNotifier');
 const { createSecretRotationStore } = require('./src/ops/secretRotationStore');
 const { createRuntimeMetricsStore } = require('./src/ops/runtimeMetrics');
+const { createPatientConversionStore } = require('./src/ops/patientConversionStore');
+const { createCapabilityAnalysisStore } = require('./src/capabilities/analysisStore');
+const { createSloTicketStore } = require('./src/ops/sloTicketStore');
+const { createReleaseGovernanceStore } = require('./src/ops/releaseGovernanceStore');
+const { createExecutionGateway } = require('./src/gateway/executionGateway');
+const { createRedisExecutionRuntimeBackend } = require('./src/gateway/redisRuntimeBackend');
 
 const runtimeState = {
   startedAt: new Date().toISOString(),
@@ -118,6 +130,53 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
   }
 
   const auth = createAuthMiddleware({ authStore });
+  const redisConnection = createRedisConnection({
+    url: config.redisUrl,
+    required:
+      config.distributedBackend === 'redis' &&
+      (Boolean(config.redisRequired) || Boolean(config.isProduction)),
+    connectTimeoutMs: config.redisConnectTimeoutMs,
+    logger: console,
+  });
+  const redisStatus = await redisConnection.connect();
+  const redisClient = redisConnection.isConnected() ? redisConnection.getClient() : null;
+  const distributedRedisReady = Boolean(config.distributedBackend === 'redis' && redisClient);
+  if (config.distributedBackend === 'redis' && !distributedRedisReady) {
+    if (config.isProduction) {
+      throw new Error(
+        'ARCANA_DISTRIBUTED_BACKEND=redis kräver aktiv Redis i production (memory fallback är blockerad).'
+      );
+    }
+    console.warn(
+      '[distributed] redis backend requested but unavailable; falling back to in-memory runtime.'
+    );
+  }
+
+  const rateLimitStore = distributedRedisReady
+    ? createRedisRateLimitStore({
+        redisClient,
+        keyPrefix: `${config.redisKeyPrefix}:ratelimit`,
+        logger: console,
+      })
+    : createInMemoryRateLimitStore();
+
+  const gatewayRuntimeBackend = distributedRedisReady
+    ? createRedisExecutionRuntimeBackend({
+        redisClient,
+        keyPrefix: `${config.redisKeyPrefix}:gateway`,
+        logger: console,
+        queueLockTtlMs: config.gatewayQueueLockTtlMs,
+        queueAcquireTimeoutMs: config.gatewayQueueAcquireTimeoutMs,
+        queuePollIntervalMs: config.gatewayQueuePollIntervalMs,
+      })
+    : null;
+
+  runtimeState.distributed = {
+    backend: config.distributedBackend,
+    redisStatus,
+    active: distributedRedisReady,
+  };
+
   const loginRateLimiter = createRateLimiter({
     windowMs: config.authLoginRateLimitWindowSec * 1000,
     max: config.authLoginRateLimitMax,
@@ -127,48 +186,64 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       return `${String(req.ip || 'unknown-ip')}|${email || 'no-email'}`;
     },
     message: 'För många inloggningsförsök. Vänta en stund och prova igen.',
+    store: rateLimitStore,
+    scope: 'auth_login',
   });
   const selectTenantRateLimiter = createRateLimiter({
     windowMs: config.authLoginRateLimitWindowSec * 1000,
     max: config.authSelectTenantRateLimitMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många tenant-val. Vänta en stund och prova igen.',
+    store: rateLimitStore,
+    scope: 'auth_select_tenant',
   });
   const apiReadRateLimiter = createRateLimiter({
     windowMs: config.apiRateLimitWindowSec * 1000,
     max: config.apiRateLimitReadMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många läs-anrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'api_read',
   });
   const apiWriteRateLimiter = createRateLimiter({
     windowMs: config.apiRateLimitWindowSec * 1000,
     max: config.apiRateLimitWriteMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många skriv-anrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'api_write',
   });
   const riskRateLimiter = createRateLimiter({
     windowMs: config.apiRateLimitWindowSec * 1000,
     max: config.riskRateLimitMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många risk-anrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'risk',
   });
   const orchestratorRateLimiter = createRateLimiter({
     windowMs: config.apiRateLimitWindowSec * 1000,
     max: config.orchestratorRateLimitMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många orchestrator-anrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'orchestrator',
   });
   const publicClinicRateLimiter = createRateLimiter({
     windowMs: config.publicRateLimitWindowSec * 1000,
     max: config.publicClinicRateLimitMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många publika klinikanrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'public_clinic',
   });
   const publicChatRateLimiter = createRateLimiter({
     windowMs: config.publicRateLimitWindowSec * 1000,
     max: config.publicChatRateLimitMax,
     keyGenerator: (req) => String(req.ip || 'unknown-ip'),
     message: 'För många chat-anrop. Vänta en stund och försök igen.',
+    store: rateLimitStore,
+    scope: 'public_chat',
   });
 
   app.use('/api/v1', (req, res, next) => {
@@ -200,11 +275,23 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     filePath: config.secretRotationStorePath,
     config,
   });
+  const sloTicketStore = await createSloTicketStore({
+    filePath: config.sloTicketStorePath,
+    maxTickets: config.schedulerSloTicketStoreMaxEntries,
+  });
+  const releaseGovernanceStore = await createReleaseGovernanceStore({
+    filePath: config.releaseGovernanceStorePath,
+    maxCycles: config.releaseGovernanceMaxCycles,
+  });
 
   const scheduler = createScheduler({
     config,
     authStore,
     templateStore,
+    runtimeMetricsStore,
+    secretRotationStore,
+    sloTicketStore,
+    releaseGovernanceStore,
     alertNotifier: createAlertNotifier({
       webhookUrl: config.alertWebhookUrl,
       webhookSecret: config.alertWebhookSecret,
@@ -217,6 +304,19 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
   const memoryStore = await createMemoryStore({
     filePath: config.memoryStorePath,
     ttlMs: config.memoryTtlDays * 24 * 60 * 60 * 1000,
+  });
+  const patientConversionStore = await createPatientConversionStore({
+    filePath: config.patientSignalStorePath,
+    maxEvents: config.patientSignalMaxEvents,
+    retentionDays: config.patientSignalRetentionDays,
+  });
+  const capabilityAnalysisStore = await createCapabilityAnalysisStore({
+    filePath: config.capabilityAnalysisStorePath,
+    maxEntries: config.capabilityAnalysisMaxEntries,
+  });
+  const executionGateway = createExecutionGateway({
+    buildVersion: process.env.npm_package_version || 'dev',
+    runtimeBackend: gatewayRuntimeBackend,
   });
 
   const knowledgeRetrieverByBrand = new Map();
@@ -335,6 +435,14 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       memoryStore,
       resolveBrand,
       getKnowledgeRetriever,
+      authStore,
+      executionGateway,
+      resolveTenantId: (req, sourceUrl, resolvedBrand) => {
+        const fromBrand = typeof resolvedBrand === 'string' ? resolvedBrand.trim() : '';
+        if (fromBrand) return fromBrand;
+        return resolveBrand(req, sourceUrl);
+      },
+      patientConversionStore,
       betaGate: {
         enabled: config.publicChatBetaEnabled,
         headerName: config.publicChatBetaHeader,
@@ -342,6 +450,11 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
         allowHosts: config.publicChatBetaAllowHosts,
         allowLocalhost: config.publicChatBetaAllowLocalhost,
         denyMessage: config.publicChatBetaDenyMessage,
+        killSwitch: config.publicChatKillSwitch,
+        killSwitchMessage: config.publicChatKillSwitchMessage,
+        maxTurns: config.publicChatMaxTurns,
+        promptInjectionFilterEnabled: config.publicChatPromptInjectionFilterEnabled,
+        promptInjectionMessage: config.publicChatPromptInjectionMessage,
       },
     })
   );
@@ -369,6 +482,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       model: config.openaiModel,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
+      executionGateway,
     })
   );
 
@@ -398,6 +512,11 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       templateStore,
       tenantConfigStore,
       authStore,
+      runtimeMetricsStore,
+      scheduler,
+      sloTicketStore,
+      releaseGovernanceStore,
+      config,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
     })
@@ -409,6 +528,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       tenantConfigStore,
       templateStore,
       authStore,
+      config,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
     })
@@ -431,6 +551,20 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       authStore,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
+      executionGateway,
+    })
+  );
+
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore,
+      templateStore,
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway,
+      capabilityAnalysisStore,
     })
   );
 
@@ -451,7 +585,10 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       tenantConfigStore,
       authStore,
       secretRotationStore,
+      patientConversionStore,
       runtimeMetricsStore,
+      sloTicketStore,
+      executionGateway,
       config,
       scheduler,
       requireAuth: auth.requireAuth,
@@ -469,6 +606,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       config,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
+      executionGateway,
     })
   );
 
@@ -481,6 +619,8 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       scheduler,
       templateStore,
       tenantConfigStore,
+      sloTicketStore,
+      releaseGovernanceStore,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
     })
@@ -512,6 +652,11 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       await scheduler.stop();
     } catch (error) {
       console.error('[scheduler] stop failed', error?.message || error);
+    }
+    try {
+      await redisConnection.close();
+    } catch (error) {
+      console.error('[redis] close failed', error?.message || error);
     }
     await new Promise((resolve) => {
       server.close(() => resolve());

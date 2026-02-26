@@ -81,6 +81,18 @@ function normalizeSessionRotationScope(value, fallback = 'tenant') {
   return fallback;
 }
 
+function normalizeDistributedBackend(value, fallback = 'memory') {
+  const normalized = asNonEmptyString(value, fallback).toLowerCase();
+  if (['memory', 'redis'].includes(normalized)) return normalized;
+  return fallback;
+}
+
+function normalizeSemanticMode(value, fallback = 'heuristic') {
+  const normalized = asNonEmptyString(value, fallback).toLowerCase();
+  if (['heuristic', 'linear', 'hybrid'].includes(normalized)) return normalized;
+  return fallback;
+}
+
 function resolveDirectoryPath(value, fallbackPath) {
   const resolved = asNonEmptyString(value, fallbackPath);
   return path.resolve(resolved);
@@ -118,14 +130,15 @@ const config = {
   nodeEnv,
   isProduction,
   trustProxy: asBool(process.env.TRUST_PROXY, false),
-  corsStrict: asBool(process.env.CORS_STRICT, isProduction),
+  corsStrict: asBool(process.env.CORS_STRICT, true),
   corsAllowedOrigins: asStringArray(process.env.CORS_ALLOWED_ORIGINS),
-  corsAllowNoOrigin: asBool(process.env.CORS_ALLOW_NO_ORIGIN, !isProduction),
+  corsAllowNoOrigin: asBool(process.env.CORS_ALLOW_NO_ORIGIN, false),
   corsAllowCredentials: asBool(process.env.CORS_ALLOW_CREDENTIALS, false),
 
   openaiApiKey: asNonEmptyString(process.env.OPENAI_API_KEY),
   openaiModel: asNonEmptyString(process.env.OPENAI_MODEL, 'gpt-4o-mini'),
   aiProvider: normalizeAiProvider(process.env.ARCANA_AI_PROVIDER, 'openai'),
+  semanticModelMode: normalizeSemanticMode(process.env.ARCANA_SEMANTIC_MODEL_MODE, 'heuristic'),
 
   stateRoot,
 
@@ -135,6 +148,71 @@ const config = {
     fileName: 'memory.json',
   }),
   memoryTtlDays: asInt(process.env.MEMORY_TTL_DAYS, 30),
+  patientSignalStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_PATIENT_SIGNAL_STORE_PATH,
+    stateRoot,
+    fileName: 'patient-signals.json',
+  }),
+  capabilityAnalysisStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CAPABILITY_ANALYSIS_STORE_PATH,
+    stateRoot,
+    fileName: 'capability-analysis.json',
+  }),
+  capabilityAnalysisMaxEntries: asInt(process.env.ARCANA_CAPABILITY_ANALYSIS_MAX_ENTRIES, 15000),
+  sloTicketStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_SLO_TICKET_STORE_PATH,
+    stateRoot,
+    fileName: 'slo-tickets.json',
+  }),
+  releaseGovernanceStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_RELEASE_GOVERNANCE_STORE_PATH,
+    stateRoot,
+    fileName: 'release-governance.json',
+  }),
+  patientSignalMaxEvents: asInt(process.env.ARCANA_PATIENT_SIGNAL_MAX_EVENTS, 20000),
+  patientSignalRetentionDays: asInt(process.env.ARCANA_PATIENT_SIGNAL_RETENTION_DAYS, 180),
+  patientSignalWindowDays: asInt(process.env.ARCANA_PATIENT_SIGNAL_WINDOW_DAYS, 14),
+  patientSignalFreshnessHours: asInt(process.env.ARCANA_PATIENT_SIGNAL_FRESHNESS_HOURS, 72),
+  schedulerSloAutoTicketingEnabled: asBool(
+    process.env.ARCANA_SCHEDULER_SLO_AUTO_TICKETING_ENABLED,
+    true
+  ),
+  schedulerSloTicketMaxPerRun: asInt(process.env.ARCANA_SCHEDULER_SLO_TICKET_MAX_PER_RUN, 8),
+  schedulerSloTicketStoreMaxEntries: asInt(
+    process.env.ARCANA_SLO_TICKET_STORE_MAX_ENTRIES,
+    3000
+  ),
+  releaseGovernanceMaxCycles: asInt(process.env.ARCANA_RELEASE_GOVERNANCE_MAX_CYCLES, 400),
+  releaseNoGoFreeDays: asInt(process.env.ARCANA_RELEASE_NO_GO_FREE_DAYS, 14),
+  releasePentestMaxAgeDays: asInt(process.env.ARCANA_RELEASE_PENTEST_MAX_AGE_DAYS, 120),
+  releaseRequirePentestEvidence: asBool(
+    process.env.ARCANA_RELEASE_REQUIRE_PENTEST_EVIDENCE,
+    isProduction
+  ),
+  releaseRequireDistinctSignoffUsers: asBool(
+    process.env.ARCANA_RELEASE_REQUIRE_DISTINCT_SIGNOFF_USERS,
+    true
+  ),
+  releasePostLaunchReviewWindowDays: asInt(
+    process.env.ARCANA_RELEASE_POST_LAUNCH_REVIEW_WINDOW_DAYS,
+    30
+  ),
+  releasePostLaunchStabilizationDays: asInt(
+    process.env.ARCANA_RELEASE_POST_LAUNCH_STABILIZATION_DAYS,
+    14
+  ),
+  releaseEnforcePostLaunchStabilization: asBool(
+    process.env.ARCANA_RELEASE_ENFORCE_POST_LAUNCH_STABILIZATION,
+    false
+  ),
+  releaseRealityAuditIntervalDays: asInt(
+    process.env.ARCANA_RELEASE_REALITY_AUDIT_INTERVAL_DAYS,
+    90
+  ),
+  releaseRequireFinalLiveSignoff: asBool(
+    process.env.ARCANA_RELEASE_REQUIRE_FINAL_LIVE_SIGNOFF,
+    false
+  ),
 
   authStorePath: resolveStatePath({
     explicitPath: process.env.AUTH_STORE_PATH,
@@ -145,7 +223,7 @@ const config = {
   authSessionIdleMinutes: asInt(process.env.AUTH_SESSION_IDLE_MINUTES, 180),
   authLoginTicketTtlMinutes: asInt(process.env.AUTH_LOGIN_TICKET_TTL_MINUTES, 10),
   authAuditMaxEntries: asInt(process.env.AUTH_AUDIT_MAX_ENTRIES, 5000),
-  authAuditAppendOnly: asBool(process.env.AUTH_AUDIT_APPEND_ONLY, true),
+  authAuditAppendOnly: isProduction ? true : asBool(process.env.AUTH_AUDIT_APPEND_ONLY, true),
   authLoginRateLimitWindowSec: asInt(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC, 60),
   authLoginRateLimitMax: asInt(process.env.AUTH_LOGIN_RATE_LIMIT_MAX, 20),
   authSelectTenantRateLimitMax: asInt(process.env.AUTH_SELECT_TENANT_RATE_LIMIT_MAX, 30),
@@ -153,6 +231,20 @@ const config = {
     process.env.AUTH_LOGIN_SESSION_ROTATION,
     'tenant'
   ),
+  distributedBackend: normalizeDistributedBackend(
+    process.env.ARCANA_DISTRIBUTED_BACKEND,
+    'memory'
+  ),
+  redisUrl: asNonEmptyString(process.env.ARCANA_REDIS_URL),
+  redisRequired: asBool(process.env.ARCANA_REDIS_REQUIRED, false),
+  redisConnectTimeoutMs: asInt(process.env.ARCANA_REDIS_CONNECT_TIMEOUT_MS, 4000),
+  redisKeyPrefix: asNonEmptyString(process.env.ARCANA_REDIS_KEY_PREFIX, 'arcana'),
+  gatewayQueueLockTtlMs: asInt(process.env.ARCANA_GATEWAY_QUEUE_LOCK_TTL_MS, 30000),
+  gatewayQueueAcquireTimeoutMs: asInt(
+    process.env.ARCANA_GATEWAY_QUEUE_ACQUIRE_TIMEOUT_MS,
+    10000
+  ),
+  gatewayQueuePollIntervalMs: asInt(process.env.ARCANA_GATEWAY_QUEUE_POLL_INTERVAL_MS, 80),
   apiRateLimitWindowSec: asInt(process.env.ARCANA_API_RATE_LIMIT_WINDOW_SEC, 60),
   apiRateLimitReadMax: asInt(process.env.ARCANA_API_RATE_LIMIT_READ_MAX, 300),
   apiRateLimitWriteMax: asInt(process.env.ARCANA_API_RATE_LIMIT_WRITE_MAX, 120),
@@ -173,6 +265,20 @@ const config = {
     process.env.ARCANA_PUBLIC_CHAT_BETA_DENY_MESSAGE,
     'Den här chatten är i begränsad beta. Kontakta kliniken för åtkomst.'
   ),
+  publicChatKillSwitch: asBool(process.env.ARCANA_PUBLIC_CHAT_KILL_SWITCH, false),
+  publicChatKillSwitchMessage: asNonEmptyString(
+    process.env.ARCANA_PUBLIC_CHAT_KILL_SWITCH_MESSAGE,
+    'Patientchatten är tillfälligt pausad. Kontakta kliniken via telefon eller e-post.'
+  ),
+  publicChatMaxTurns: asInt(process.env.ARCANA_PUBLIC_CHAT_MAX_TURNS, 12),
+  publicChatPromptInjectionFilterEnabled: asBool(
+    process.env.ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_FILTER_ENABLED,
+    true
+  ),
+  publicChatPromptInjectionMessage: asNonEmptyString(
+    process.env.ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_MESSAGE,
+    'Jag kan inte hjälpa till med den typen av instruktion. Kontakta kliniken direkt för fortsatt hjälp.'
+  ),
   defaultTenantId: asNonEmptyString(process.env.ARCANA_DEFAULT_TENANT, brand),
   bootstrapOwnerEmail: asNonEmptyString(process.env.ARCANA_OWNER_EMAIL),
   bootstrapOwnerPassword: asNonEmptyString(process.env.ARCANA_OWNER_PASSWORD),
@@ -185,6 +291,7 @@ const config = {
     fileName: 'templates.json',
   }),
   templateEvalMaxEntries: asInt(process.env.TEMPLATE_EVAL_MAX_ENTRIES, 10000),
+  riskDualSignoffRequired: asBool(process.env.ARCANA_RISK_DUAL_SIGNOFF_REQUIRED, false),
 
   tenantConfigStorePath: resolveStatePath({
     explicitPath: process.env.TENANT_CONFIG_STORE_PATH,
@@ -213,6 +320,34 @@ const config = {
   schedulerRestoreDrillIntervalHours: asInt(
     process.env.ARCANA_SCHEDULER_RESTORE_DRILL_INTERVAL_HOURS,
     168
+  ),
+  schedulerRestoreDrillFullIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_RESTORE_DRILL_FULL_INTERVAL_HOURS,
+    720
+  ),
+  schedulerAuditIntegrityIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_AUDIT_INTEGRITY_INTERVAL_HOURS,
+    24
+  ),
+  schedulerSecretRotationIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_SECRET_ROTATION_INTERVAL_HOURS,
+    24
+  ),
+  schedulerReleaseGovernanceIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_RELEASE_GOVERNANCE_INTERVAL_HOURS,
+    24
+  ),
+  schedulerReleaseGovernanceAutoReviewEnabled: asBool(
+    process.env.ARCANA_SCHEDULER_RELEASE_GOVERNANCE_AUTO_REVIEW_ENABLED,
+    true
+  ),
+  schedulerSecretRotationDryRun: asBool(
+    process.env.ARCANA_SCHEDULER_SECRET_ROTATION_DRY_RUN,
+    true
+  ),
+  schedulerSecretRotationNote: asNonEmptyString(
+    process.env.ARCANA_SCHEDULER_SECRET_ROTATION_NOTE,
+    'Scheduled secret rotation snapshot'
   ),
   schedulerAlertProbeIntervalMinutes: asInt(
     process.env.ARCANA_SCHEDULER_ALERT_PROBE_INTERVAL_MINUTES,

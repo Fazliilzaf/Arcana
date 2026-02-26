@@ -10,6 +10,7 @@ const {
   normalizeIncidentSeverity,
   normalizeIncidentStatus,
 } = require('../incidents/fromEvaluation');
+const { OWNER_ACTIONS } = require('./ownerActions');
 
 function nowIso() {
   return new Date().toISOString();
@@ -65,11 +66,127 @@ function toSafeVersion(version) {
     updatedBy: version.updatedBy || null,
     activatedBy: version.activatedBy || null,
     archivedBy: version.archivedBy || null,
+    revision: Number.parseInt(String(version.revision || 1), 10) || 1,
+    revisionCount: Array.isArray(version.revisions) ? version.revisions.length : 0,
     createdAt: version.createdAt,
     updatedAt: version.updatedAt,
     activatedAt: version.activatedAt || null,
     archivedAt: version.archivedAt || null,
   };
+}
+
+function cloneJson(value) {
+  if (value === undefined) return undefined;
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function toSafeRevision(revision) {
+  if (!revision || typeof revision !== 'object') return null;
+  return {
+    revision: Number.parseInt(String(revision.revision || 1), 10) || 1,
+    source: normalizeText(revision.source) || 'unknown',
+    rollbackFromRevision:
+      Number.parseInt(String(revision.rollbackFromRevision || 0), 10) || null,
+    title: normalizeText(revision.title),
+    content: String(revision.content ?? ''),
+    variablesUsed: Array.isArray(revision.variablesUsed) ? [...revision.variablesUsed] : [],
+    risk: revision.risk ? cloneJson(revision.risk) : null,
+    updatedBy: revision.updatedBy || null,
+    updatedAt: revision.updatedAt || null,
+    note: normalizeText(revision.note || ''),
+  };
+}
+
+function ensureVersionRevisionState(version) {
+  if (!version || typeof version !== 'object') return;
+
+  let revisionNo = Number.parseInt(String(version.revision || 1), 10);
+  if (!Number.isFinite(revisionNo) || revisionNo <= 0) revisionNo = 1;
+
+  if (!Array.isArray(version.revisions) || version.revisions.length === 0) {
+    const seededAt = normalizeText(version.updatedAt) || normalizeText(version.createdAt) || nowIso();
+    version.revisions = [
+      {
+        revision: revisionNo,
+        source: 'seed',
+        rollbackFromRevision: null,
+        title: normalizeText(version.title),
+        content: String(version.content ?? ''),
+        variablesUsed: Array.isArray(version.variablesUsed) ? [...version.variablesUsed] : [],
+        risk: version.risk ? cloneJson(version.risk) : null,
+        updatedBy: version.updatedBy || version.createdBy || null,
+        updatedAt: seededAt,
+        note: '',
+      },
+    ];
+    version.revision = revisionNo;
+    return;
+  }
+
+  const normalizedRevisions = version.revisions
+    .map((item) => toSafeRevision(item))
+    .filter(Boolean)
+    .sort((a, b) => Number(a.revision || 0) - Number(b.revision || 0));
+
+  if (!normalizedRevisions.length) {
+    version.revisions = [];
+    version.revision = 1;
+    return ensureVersionRevisionState(version);
+  }
+
+  const highest = Number(normalizedRevisions[normalizedRevisions.length - 1].revision || 1);
+  version.revisions = normalizedRevisions;
+  version.revision = highest;
+}
+
+function createRevisionSnapshot({
+  version,
+  source = 'manual_edit',
+  rollbackFromRevision = null,
+  note = '',
+}) {
+  ensureVersionRevisionState(version);
+  const nextRevision = (Number(version.revision || 1) || 1) + 1;
+  return {
+    revision: nextRevision,
+    source: normalizeText(source) || 'manual_edit',
+    rollbackFromRevision: Number.parseInt(String(rollbackFromRevision || 0), 10) || null,
+    title: normalizeText(version.title),
+    content: String(version.content ?? ''),
+    variablesUsed: Array.isArray(version.variablesUsed) ? [...version.variablesUsed] : [],
+    risk: version.risk ? cloneJson(version.risk) : null,
+    updatedBy: version.updatedBy || null,
+    updatedAt: normalizeText(version.updatedAt) || nowIso(),
+    note: normalizeText(note || ''),
+  };
+}
+
+function findRevision(version, revisionNumber) {
+  ensureVersionRevisionState(version);
+  const targetRevision = Number.parseInt(String(revisionNumber || 0), 10);
+  if (!Number.isFinite(targetRevision) || targetRevision <= 0) return null;
+  const revisions = Array.isArray(version.revisions) ? version.revisions : [];
+  return revisions.find((item) => Number(item.revision || 0) === targetRevision) || null;
+}
+
+function computeRevisionDiff(beforeRevision, afterRevision) {
+  const before = toSafeRevision(beforeRevision);
+  const after = toSafeRevision(afterRevision);
+  const diff = [];
+  if (!before || !after) return diff;
+  const fields = ['title', 'content', 'variablesUsed', 'risk'];
+  for (const field of fields) {
+    if (JSON.stringify(before[field]) === JSON.stringify(after[field])) continue;
+    diff.push({
+      field,
+      before: before[field],
+      after: after[field],
+    });
+  }
+  return diff;
 }
 
 function toSafeEvaluation(evaluation) {
@@ -89,6 +206,16 @@ function toSafeEvaluation(evaluation) {
     policyAdjustments: Array.isArray(evaluation.policyAdjustments)
       ? [...evaluation.policyAdjustments]
       : [],
+    versions:
+      evaluation.versions && typeof evaluation.versions === 'object'
+        ? {
+            ruleSetVersion: evaluation.versions.ruleSetVersion || null,
+            thresholdVersion: evaluation.versions.thresholdVersion || null,
+            semanticModelVersion: evaluation.versions.semanticModelVersion || null,
+            fusionVersion: evaluation.versions.fusionVersion || null,
+            buildVersion: evaluation.versions.buildVersion || null,
+          }
+        : null,
     ownerDecision: evaluation.ownerDecision || 'pending',
     ownerActions: Array.isArray(evaluation.ownerActions)
       ? evaluation.ownerActions.map((item) => ({
@@ -186,6 +313,8 @@ function combineEvaluations({ inputEvaluation, outputEvaluation }) {
   const riskScore = Math.max(input?.riskScore || 0, output?.riskScore || 0);
   const semanticScore = Math.max(input?.semanticScore || 0, output?.semanticScore || 0);
   const ruleScore = Math.max(input?.ruleScore || 0, output?.ruleScore || 0);
+  const inputVersions = input?.versions && typeof input.versions === 'object' ? input.versions : {};
+  const outputVersions = output?.versions && typeof output.versions === 'object' ? output.versions : {};
 
   let decision = 'allow';
   if (riskLevel >= 4) decision = 'blocked';
@@ -201,16 +330,17 @@ function combineEvaluations({ inputEvaluation, outputEvaluation }) {
     decision,
     reasonCodes,
     policyAdjustments,
+    versions: {
+      ruleSetVersion: outputVersions.ruleSetVersion || inputVersions.ruleSetVersion || 'unknown',
+      thresholdVersion: outputVersions.thresholdVersion || inputVersions.thresholdVersion || 'unknown',
+      semanticModelVersion:
+        outputVersions.semanticModelVersion || inputVersions.semanticModelVersion || 'unknown',
+      fusionVersion: outputVersions.fusionVersion || inputVersions.fusionVersion || 'unknown',
+      buildVersion: outputVersions.buildVersion || inputVersions.buildVersion || 'unknown',
+    },
     evaluatedAt: nowIso(),
   };
 }
-
-const OWNER_ACTIONS = Object.freeze({
-  APPROVE_EXCEPTION: 'approve_exception',
-  MARK_FALSE_POSITIVE: 'mark_false_positive',
-  REQUEST_REVISION: 'request_revision',
-  ESCALATE: 'escalate',
-});
 
 const OWNER_DECISIONS_ALLOW_ACTIVATION = new Set(['approved_exception', 'false_positive']);
 const INCIDENT_OPEN_OWNER_DECISIONS = new Set(['pending', 'revision_requested']);
@@ -272,6 +402,14 @@ async function createTemplateStore({
         : {},
     evaluations: Array.isArray(rawState?.evaluations) ? rawState.evaluations : [],
   };
+
+  for (const template of Object.values(state.templates || {})) {
+    if (!template || typeof template !== 'object') continue;
+    const versions = template.versions && typeof template.versions === 'object' ? template.versions : {};
+    for (const version of Object.values(versions)) {
+      ensureVersionRevisionState(version);
+    }
+  }
 
   function prune() {
     if (!Array.isArray(state.evaluations)) {
@@ -398,7 +536,12 @@ async function createTemplateStore({
   async function listTemplateVersions(templateId) {
     const template = getRawTemplate(templateId);
     if (!template) return null;
-    const versions = Object.values(template.versions || {}).sort((a, b) => b.versionNo - a.versionNo);
+    const versions = Object.values(template.versions || {})
+      .map((version) => {
+        ensureVersionRevisionState(version);
+        return version;
+      })
+      .sort((a, b) => b.versionNo - a.versionNo);
     return versions.map((version) => toSafeVersion(version));
   }
 
@@ -406,6 +549,7 @@ async function createTemplateStore({
     const template = getRawTemplate(templateId);
     if (!template) return null;
     const version = getRawVersion(template, versionId);
+    ensureVersionRevisionState(version);
     return toSafeVersion(version);
   }
 
@@ -438,11 +582,27 @@ async function createTemplateStore({
       updatedBy: createdBy,
       activatedBy: null,
       archivedBy: null,
+      revision: 1,
+      revisions: [],
       createdAt,
       updatedAt: createdAt,
       activatedAt: null,
       archivedAt: null,
     };
+    version.revisions = [
+      {
+        revision: 1,
+        source: normalizeText(source) || 'manual',
+        rollbackFromRevision: null,
+        title: normalizeText(version.title),
+        content: String(version.content ?? ''),
+        variablesUsed: Array.isArray(version.variablesUsed) ? [...version.variablesUsed] : [],
+        risk: version.risk ? cloneJson(version.risk) : null,
+        updatedBy: version.updatedBy || version.createdBy || null,
+        updatedAt: createdAt,
+        note: '',
+      },
+    ];
 
     template.versions[version.id] = version;
     template.updatedAt = nowIso();
@@ -458,21 +618,79 @@ async function createTemplateStore({
     variablesUsed,
     updatedBy = null,
     risk = undefined,
+    expectedRevision = null,
+    source = 'manual_edit',
+    note = '',
   }) {
     const template = getRawTemplate(templateId);
     if (!template) throw new Error('Mallen hittades inte.');
     const version = getRawVersion(template, versionId);
     if (!version) throw new Error('Versionen hittades inte.');
     if (version.state !== 'draft') throw new Error('Bara draft-versioner kan ändras.');
+    ensureVersionRevisionState(version);
 
-    if (content !== undefined) version.content = String(content ?? '');
-    if (title !== undefined) version.title = normalizeText(title) || version.title;
-    if (variablesUsed !== undefined) {
-      version.variablesUsed = Array.isArray(variablesUsed) ? [...variablesUsed] : [];
+    const expectedRevisionValue =
+      expectedRevision === null || expectedRevision === undefined
+        ? null
+        : Number.parseInt(String(expectedRevision), 10);
+    if (
+      expectedRevisionValue !== null &&
+      Number.isFinite(expectedRevisionValue) &&
+      expectedRevisionValue > 0 &&
+      Number(version.revision || 1) !== expectedRevisionValue
+    ) {
+      const error = new Error(
+        'Version-konflikt: draften har ändrats av någon annan. Ladda om och försök igen.'
+      );
+      error.code = 'VERSION_CONFLICT';
+      error.currentRevision = Number(version.revision || 1);
+      error.expectedRevision = expectedRevisionValue;
+      throw error;
     }
-    if (risk !== undefined) version.risk = risk;
+
+    const nextContent = content !== undefined ? String(content ?? '') : version.content;
+    const nextTitle = title !== undefined ? normalizeText(title) || version.title : version.title;
+    const nextVariablesUsed =
+      variablesUsed !== undefined
+        ? Array.isArray(variablesUsed)
+          ? [...variablesUsed]
+          : []
+        : Array.isArray(version.variablesUsed)
+          ? [...version.variablesUsed]
+          : [];
+    const nextRisk = risk !== undefined ? risk : version.risk;
+
+    const changed =
+      String(version.content ?? '') !== String(nextContent ?? '') ||
+      String(version.title ?? '') !== String(nextTitle ?? '') ||
+      JSON.stringify(Array.isArray(version.variablesUsed) ? version.variablesUsed : []) !==
+        JSON.stringify(nextVariablesUsed) ||
+      (risk !== undefined && JSON.stringify(version.risk ?? null) !== JSON.stringify(nextRisk ?? null));
+
+    if (!changed) {
+      if (updatedBy !== null && updatedBy !== undefined) {
+        version.updatedBy = updatedBy;
+      }
+      version.updatedAt = nowIso();
+      template.updatedAt = nowIso();
+      await save();
+      return toSafeVersion(version);
+    }
+
+    version.content = nextContent;
+    version.title = nextTitle;
+    version.variablesUsed = nextVariablesUsed;
+    version.risk = nextRisk;
     version.updatedBy = updatedBy;
     version.updatedAt = nowIso();
+    const revisionSnapshot = createRevisionSnapshot({
+      version,
+      source,
+      note,
+    });
+    version.revision = revisionSnapshot.revision;
+    if (!Array.isArray(version.revisions)) version.revisions = [];
+    version.revisions.push(revisionSnapshot);
     template.updatedAt = nowIso();
     await save();
     return toSafeVersion(version);
@@ -490,6 +708,7 @@ async function createTemplateStore({
     if (!template) throw new Error('Mallen hittades inte.');
     const version = getRawVersion(template, versionId);
     if (!version) throw new Error('Versionen hittades inte.');
+    ensureVersionRevisionState(version);
 
     const combined = combineEvaluations({
       inputEvaluation,
@@ -528,6 +747,12 @@ async function createTemplateStore({
         decision: combined.decision,
         reasonCodes: combined.reasonCodes,
         policyAdjustments: combined.policyAdjustments,
+        versions: combined.versions,
+        ruleSetVersion: combined.versions?.ruleSetVersion || null,
+        thresholdVersion: combined.versions?.thresholdVersion || null,
+        semanticModelVersion: combined.versions?.semanticModelVersion || null,
+        fusionVersion: combined.versions?.fusionVersion || null,
+        buildVersion: combined.versions?.buildVersion || null,
         ownerDecision: preservedOwnerDecision || 'pending',
         ownerActions: [],
         evaluatedAt: combined.evaluatedAt,
@@ -641,6 +866,138 @@ async function createTemplateStore({
       createdBy,
       risk: null,
     });
+  }
+
+  async function listVersionRevisions({
+    templateId,
+    versionId,
+    limit = 50,
+  }) {
+    const template = getRawTemplate(templateId);
+    if (!template) return null;
+    const version = getRawVersion(template, versionId);
+    if (!version) return null;
+    ensureVersionRevisionState(version);
+    const max = Math.max(1, Math.min(500, Number(limit) || 50));
+    const revisions = Array.isArray(version.revisions) ? version.revisions : [];
+    return revisions
+      .slice(Math.max(0, revisions.length - max))
+      .map((item) => toSafeRevision(item));
+  }
+
+  async function getVersionRevision({
+    templateId,
+    versionId,
+    revision,
+  }) {
+    const template = getRawTemplate(templateId);
+    if (!template) return null;
+    const version = getRawVersion(template, versionId);
+    if (!version) return null;
+    const target = findRevision(version, revision);
+    return target ? toSafeRevision(target) : null;
+  }
+
+  async function diffVersionRevisions({
+    templateId,
+    versionId,
+    fromRevision,
+    toRevision,
+  }) {
+    const template = getRawTemplate(templateId);
+    if (!template) return null;
+    const version = getRawVersion(template, versionId);
+    if (!version) return null;
+
+    ensureVersionRevisionState(version);
+    const safeFromRevision = Number.parseInt(String(fromRevision || 0), 10);
+    const safeToRevision =
+      Number.parseInt(String(toRevision || 0), 10) || Number.parseInt(String(version.revision || 1), 10);
+    if (!Number.isFinite(safeToRevision) || safeToRevision <= 0) return null;
+
+    const from = safeFromRevision > 0 ? findRevision(version, safeFromRevision) : null;
+    const to = findRevision(version, safeToRevision);
+    if (!to) return null;
+
+    const before =
+      from ||
+      ({
+        revision: 0,
+        title: '',
+        content: '',
+        variablesUsed: [],
+        risk: null,
+      });
+    const diff = computeRevisionDiff(before, to);
+    return {
+      fromRevision: Number.parseInt(String(before.revision || 0), 10) || 0,
+      toRevision: Number.parseInt(String(to.revision || 0), 10) || 0,
+      diff,
+      from: toSafeRevision(before),
+      to: toSafeRevision(to),
+    };
+  }
+
+  async function rollbackDraftVersion({
+    templateId,
+    versionId,
+    targetRevision,
+    updatedBy = null,
+    expectedRevision = null,
+    note = '',
+  }) {
+    const template = getRawTemplate(templateId);
+    if (!template) throw new Error('Mallen hittades inte.');
+    const version = getRawVersion(template, versionId);
+    if (!version) throw new Error('Versionen hittades inte.');
+    if (version.state !== 'draft') throw new Error('Bara draft-versioner kan rollbackas.');
+    ensureVersionRevisionState(version);
+
+    const target = findRevision(version, targetRevision);
+    if (!target) throw new Error('Revisionen hittades inte.');
+
+    const expectedRevisionValue =
+      expectedRevision === null || expectedRevision === undefined
+        ? null
+        : Number.parseInt(String(expectedRevision), 10);
+    if (
+      expectedRevisionValue !== null &&
+      Number.isFinite(expectedRevisionValue) &&
+      expectedRevisionValue > 0 &&
+      Number(version.revision || 1) !== expectedRevisionValue
+    ) {
+      const error = new Error(
+        'Version-konflikt: draften har ändrats av någon annan. Ladda om och försök igen.'
+      );
+      error.code = 'VERSION_CONFLICT';
+      error.currentRevision = Number(version.revision || 1);
+      error.expectedRevision = expectedRevisionValue;
+      throw error;
+    }
+
+    version.title = normalizeText(target.title) || version.title;
+    version.content = String(target.content ?? '');
+    version.variablesUsed = Array.isArray(target.variablesUsed) ? [...target.variablesUsed] : [];
+    version.risk = target.risk ? cloneJson(target.risk) : null;
+    version.updatedBy = updatedBy;
+    version.updatedAt = nowIso();
+
+    const snapshot = createRevisionSnapshot({
+      version,
+      source: 'rollback',
+      rollbackFromRevision: Number.parseInt(String(target.revision || 0), 10) || null,
+      note,
+    });
+    version.revision = snapshot.revision;
+    if (!Array.isArray(version.revisions)) version.revisions = [];
+    version.revisions.push(snapshot);
+
+    template.updatedAt = nowIso();
+    await save();
+    return {
+      version: toSafeVersion(version),
+      fromRevision: Number.parseInt(String(target.revision || 0), 10) || null,
+    };
   }
 
   async function listEvaluations({
@@ -1222,6 +1579,10 @@ async function createTemplateStore({
     activateVersion,
     archiveVersion,
     cloneVersion,
+    listVersionRevisions,
+    getVersionRevision,
+    diffVersionRevisions,
+    rollbackDraftVersion,
     listEvaluations,
     getEvaluation,
     addOwnerAction,

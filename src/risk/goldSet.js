@@ -134,11 +134,15 @@ function buildLevelMatrix() {
 function evaluateGoldSetCases({
   cases,
   tenantRiskModifier = 0,
+  riskThresholdVersion = 1,
 }) {
   const sourceCases = Array.isArray(cases) ? cases : [];
   const modifier = Number.isFinite(Number(tenantRiskModifier))
     ? Number(tenantRiskModifier)
     : 0;
+  const thresholdVersion = Number.isFinite(Number(riskThresholdVersion))
+    ? Math.max(1, Number.parseInt(String(riskThresholdVersion), 10))
+    : 1;
 
   const expectedBandTotals = {
     safe: 0,
@@ -185,6 +189,7 @@ function evaluateGoldSetCases({
       category,
       content,
       tenantRiskModifier: modifier,
+      riskThresholdVersion: thresholdVersion,
       variableValidation: item.variableValidation || null,
     });
     const predictedRiskLevel = clampRiskLevel(evaluation.riskLevel) || 1;
@@ -254,6 +259,7 @@ function evaluateGoldSetCases({
   return {
     generatedAt: new Date().toISOString(),
     tenantRiskModifier: Number(modifier.toFixed(2)),
+    riskThresholdVersion: thresholdVersion,
     totals: {
       cases: evaluatedCount,
       withExpectedLevel: withExpectedLevelCount,
@@ -283,11 +289,13 @@ function evaluateGoldSetCases({
 async function evaluateGoldSetFile({
   filePath,
   tenantRiskModifier = 0,
+  riskThresholdVersion = 1,
 }) {
   const dataset = await readGoldSetFile(filePath);
   const report = evaluateGoldSetCases({
     cases: dataset.cases,
     tenantRiskModifier,
+    riskThresholdVersion,
   });
   return {
     dataset: {

@@ -1,6 +1,6 @@
 const express = require('express');
 
-const { ROLE_OWNER } = require('../security/roles');
+const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const {
   getStateFileMap,
   buildStateManifest,
@@ -45,10 +45,61 @@ function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function parseReleaseStatus(value, fallback = 'ok') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['ok', 'risk', 'incident'].includes(normalized)) return normalized;
+  return fallback;
+}
+
+function parseNoGoWindowFromAuditEvents(events = [], minDays = 14) {
+  const safeDays = Math.max(1, Number(minDays) || 14);
+  const nowMs = Date.now();
+  const cutoffMs = nowMs - safeDays * 24 * 60 * 60 * 1000;
+  const relevant = (Array.isArray(events) ? events : []).filter((item) => {
+    if (normalizeText(item?.action) !== 'monitor.readiness.read') return false;
+    if (normalizeText(item?.outcome) && normalizeText(item?.outcome) !== 'success') return false;
+    const ts = Date.parse(String(item?.ts || ''));
+    return Number.isFinite(ts) && ts >= cutoffMs && ts <= nowMs;
+  });
+  let clean = relevant.length > 0;
+  let maxTriggeredNoGo = 0;
+  for (const event of relevant) {
+    const metadata =
+      event?.metadata && typeof event.metadata === 'object' ? event.metadata : {};
+    const triggeredNoGo = Number(metadata?.triggeredNoGo || 0);
+    if (triggeredNoGo > 0) clean = false;
+    if (Number.isFinite(triggeredNoGo) && triggeredNoGo > maxTriggeredNoGo) {
+      maxTriggeredNoGo = triggeredNoGo;
+    }
+  }
+  return {
+    days: safeDays,
+    evidenceCount: relevant.length,
+    clean,
+    maxTriggeredNoGo,
+    latestTs: relevant.length > 0 ? relevant[relevant.length - 1].ts || null : null,
+  };
+}
+
+function buildReleaseEvaluationOptions(config = {}) {
+  return {
+    requiredNoGoFreeDays: Number(config?.releaseNoGoFreeDays || 14),
+    requirePentestEvidence: Boolean(config?.releaseRequirePentestEvidence),
+    pentestMaxAgeDays: Number(config?.releasePentestMaxAgeDays || 120),
+    postLaunchReviewWindowDays: Number(config?.releasePostLaunchReviewWindowDays || 30),
+    postLaunchStabilizationDays: Number(config?.releasePostLaunchStabilizationDays || 14),
+    enforcePostLaunchStabilization: Boolean(config?.releaseEnforcePostLaunchStabilization),
+    requireDistinctSignoffUsers: Boolean(config?.releaseRequireDistinctSignoffUsers),
+    realityAuditIntervalDays: Number(config?.releaseRealityAuditIntervalDays || 90),
+    requireFinalLiveSignoff: Boolean(config?.releaseRequireFinalLiveSignoff),
+  };
+}
+
 async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   if (!tenantConfigStore || typeof tenantConfigStore.getTenantConfig !== 'function') {
     return {
       riskSensitivityModifier: 0,
+      riskThresholdVersion: 1,
       templateVariableAllowlistByCategory: {},
       templateRequiredVariablesByCategory: {},
       templateSignaturesByChannel: {},
@@ -57,10 +108,13 @@ async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   try {
     const tenantConfig = await tenantConfigStore.getTenantConfig(tenantId);
     const modifier = Number(tenantConfig?.riskSensitivityModifier ?? 0);
+    const thresholdVersion = Number.parseInt(String(tenantConfig?.riskThresholdVersion ?? 1), 10);
     return {
       riskSensitivityModifier: Number.isFinite(modifier)
         ? Math.max(-10, Math.min(10, modifier))
         : 0,
+      riskThresholdVersion:
+        Number.isFinite(thresholdVersion) && thresholdVersion > 0 ? thresholdVersion : 1,
       templateVariableAllowlistByCategory:
         tenantConfig?.templateVariableAllowlistByCategory || {},
       templateRequiredVariablesByCategory:
@@ -70,6 +124,7 @@ async function getTenantTemplateRuntime(tenantConfigStore, tenantId) {
   } catch {
     return {
       riskSensitivityModifier: 0,
+      riskThresholdVersion: 1,
       templateVariableAllowlistByCategory: {},
       templateRequiredVariablesByCategory: {},
       templateSignaturesByChannel: {},
@@ -164,15 +219,21 @@ function createOpsRouter({
   scheduler = null,
   templateStore = null,
   tenantConfigStore = null,
+  sloTicketStore = null,
+  releaseGovernanceStore = null,
   requireAuth,
   requireRole,
 }) {
   const router = express.Router();
   const REQUIRED_SCHEDULER_SUITE_JOB_IDS = Object.freeze([
-    'alert_probe',
     'nightly_pilot_report',
     'backup_prune',
     'restore_drill_preview',
+    'restore_drill_full',
+    'audit_integrity_check',
+    'secrets_rotation_snapshot',
+    'release_governance_review',
+    'alert_probe',
   ]);
 
   router.get(
@@ -294,6 +355,654 @@ function createOpsRouter({
       } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte köra scheduler-jobb.' });
+      }
+    }
+  );
+
+  router.get(
+    '/ops/release/cycles',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.listCycles !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const limit = parseLimit(req.query?.limit, 20);
+        const list = await releaseGovernanceStore.listCycles({
+          tenantId,
+          limit,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycles.read',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: tenantId,
+          metadata: {
+            count: Number(list?.count || 0),
+            limit,
+          },
+        });
+
+        return res.json({
+          tenantId,
+          limit,
+          ...list,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa release-cykler.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.startCycle !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const targetEnvironment = normalizeText(req.body?.targetEnvironment || 'production');
+        const rolloutStrategy = normalizeText(req.body?.rolloutStrategy || 'tenant_batch');
+        const note = normalizeText(req.body?.note || '');
+        const cycle = await releaseGovernanceStore.startCycle({
+          tenantId,
+          actorUserId: req.auth.userId,
+          targetEnvironment,
+          rolloutStrategy,
+          note,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.start',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycle.id,
+          metadata: {
+            targetEnvironment: cycle.targetEnvironment,
+            rolloutStrategy: cycle.rolloutStrategy,
+          },
+        });
+
+        return res.status(201).json({
+          ok: true,
+          cycle,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte starta release-cykel.' });
+      }
+    }
+  );
+
+  router.get(
+    '/ops/release/status',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.evaluateCycle !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.query?.cycleId || '');
+        const auditEvents = await authStore.listAuditEvents({
+          tenantId,
+          limit: 2000,
+        });
+        const observedNoGoWindow = parseNoGoWindowFromAuditEvents(
+          auditEvents,
+          Number(config?.releaseNoGoFreeDays || 14)
+        );
+
+        const payload = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.status.read',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: payload?.cycle?.id || tenantId,
+          metadata: {
+            cycleId: payload?.cycle?.id || null,
+            releaseGatePassed: payload?.evaluation?.releaseGatePassed === true,
+            blockers: Number(payload?.evaluation?.blockers?.length || 0),
+            observedNoGoWindowDays: observedNoGoWindow.days,
+            observedNoGoEvidenceCount: observedNoGoWindow.evidenceCount,
+            observedNoGoClean: observedNoGoWindow.clean,
+          },
+        });
+
+        return res.json({
+          generatedAt: new Date().toISOString(),
+          tenantId,
+          thresholds: {
+            noGoFreeDays: Number(config?.releaseNoGoFreeDays || 14),
+            requirePentestEvidence: Boolean(config?.releaseRequirePentestEvidence),
+            pentestMaxAgeDays: Number(config?.releasePentestMaxAgeDays || 120),
+            postLaunchReviewWindowDays: Number(config?.releasePostLaunchReviewWindowDays || 30),
+            postLaunchStabilizationDays: Number(config?.releasePostLaunchStabilizationDays || 14),
+            enforcePostLaunchStabilization: Boolean(config?.releaseEnforcePostLaunchStabilization),
+            requireDistinctSignoffUsers: Boolean(config?.releaseRequireDistinctSignoffUsers),
+            realityAuditIntervalDays: Number(config?.releaseRealityAuditIntervalDays || 90),
+            requireFinalLiveSignoff: Boolean(config?.releaseRequireFinalLiveSignoff),
+          },
+          observedNoGoWindow,
+          ...payload,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa release-status.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/evidence',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.recordGateEvidence !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        if (!cycleId) {
+          return res.status(400).json({ error: 'cycleId saknas.' });
+        }
+
+        const recentReadinessEvents = await authStore.listAuditEvents({
+          tenantId,
+          limit: 2500,
+        });
+        const noGoWindow = parseNoGoWindowFromAuditEvents(
+          recentReadinessEvents,
+          Number(config?.releaseNoGoFreeDays || 14)
+        );
+        const latestReadinessEvent = [...recentReadinessEvents]
+          .reverse()
+          .find((item) => normalizeText(item?.action) === 'monitor.readiness.read');
+        const latestReadinessMeta =
+          latestReadinessEvent?.metadata && typeof latestReadinessEvent.metadata === 'object'
+            ? latestReadinessEvent.metadata
+            : {};
+
+        const readinessInput =
+          req.body?.readiness && typeof req.body.readiness === 'object'
+            ? req.body.readiness
+            : {};
+        const strictInput =
+          req.body?.strict && typeof req.body.strict === 'object'
+            ? req.body.strict
+            : {};
+        const requiredChecksInput =
+          req.body?.requiredChecks && typeof req.body.requiredChecks === 'object'
+            ? req.body.requiredChecks
+            : {};
+
+        const readiness = {
+          score: Number(readinessInput.score ?? latestReadinessMeta.score ?? 0),
+          band: normalizeText(readinessInput.band || latestReadinessMeta.band || ''),
+          goAllowed:
+            readinessInput.goAllowed === true || latestReadinessMeta.goAllowed === true,
+          blockerChecksCount: Number(
+            readinessInput.blockerChecksCount ?? latestReadinessMeta.blockingRequiredChecks ?? 0
+          ),
+          triggeredNoGoCount: Number(
+            readinessInput.triggeredNoGoCount ?? latestReadinessMeta.triggeredNoGo ?? 0
+          ),
+          triggeredNoGoIds: Array.isArray(readinessInput.triggeredNoGoIds)
+            ? readinessInput.triggeredNoGoIds
+            : [],
+        };
+        const strictFailures = Array.isArray(strictInput.failures)
+          ? strictInput.failures.map((item) => normalizeText(item)).filter(Boolean)
+          : [];
+        const strict = {
+          passed: strictInput.passed === true || strictFailures.length === 0,
+          failuresCount: Number(strictInput.failuresCount ?? strictFailures.length),
+          failures: strictFailures,
+        };
+        const requiredChecks = {
+          noP0P1Blockers:
+            requiredChecksInput.noP0P1Blockers === true ||
+            req.body?.noP0P1Blockers === true,
+          patientSafetyApproved:
+            requiredChecksInput.patientSafetyApproved === true ||
+            req.body?.patientSafetyApproved === true,
+          restoreDrillsVerified:
+            requiredChecksInput.restoreDrillsVerified === true ||
+            req.body?.restoreDrillsVerified === true,
+          governanceRunbooksReady:
+            requiredChecksInput.governanceRunbooksReady === true ||
+            req.body?.governanceRunbooksReady === true,
+        };
+
+        const cycle = await releaseGovernanceStore.recordGateEvidence({
+          tenantId,
+          cycleId,
+          source: normalizeText(req.body?.source || 'manual'),
+          readiness,
+          strict,
+          requiredChecks,
+          noGoWindow:
+            req.body?.noGoWindow && typeof req.body.noGoWindow === 'object'
+              ? req.body.noGoWindow
+              : noGoWindow,
+          pentestEvidencePath: normalizeText(req.body?.pentestEvidencePath || ''),
+          notes: normalizeText(req.body?.notes || ''),
+        });
+
+        const evaluationPayload = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.evidence.update',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            releaseGatePassed: evaluationPayload?.evaluation?.releaseGatePassed === true,
+            blockers: Number(evaluationPayload?.evaluation?.blockers?.length || 0),
+            noGoWindowDays: Number(cycle?.gateEvidence?.noGoWindow?.days || 0),
+            noGoWindowEvidenceCount: Number(cycle?.gateEvidence?.noGoWindow?.evidenceCount || 0),
+            pentestExists: cycle?.gateEvidence?.pentest?.exists === true,
+          },
+        });
+
+        return res.json({
+          ok: true,
+          cycle,
+          evaluation: evaluationPayload?.evaluation || null,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        return res
+          .status(message.includes('hittades inte') ? 404 : 500)
+          .json({ error: message || 'Kunde inte uppdatera release-evidens.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/signoff',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.recordSignoff !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        const signoffRole = normalizeText(req.body?.signoffRole || '').toLowerCase();
+        if (!cycleId) return res.status(400).json({ error: 'cycleId saknas.' });
+        if (!signoffRole) return res.status(400).json({ error: 'signoffRole saknas.' });
+        if (signoffRole === 'owner' && normalizeText(req.auth.role).toUpperCase() !== 'OWNER') {
+          return res.status(403).json({ error: 'owner sign-off kräver OWNER-roll.' });
+        }
+
+        const cycle = await releaseGovernanceStore.recordSignoff({
+          tenantId,
+          cycleId,
+          signoffRole,
+          actorUserId: req.auth.userId,
+          actorMembershipRole: req.auth.role,
+          note: normalizeText(req.body?.note || ''),
+          requireDistinctUsers: Boolean(config?.releaseRequireDistinctSignoffUsers),
+        });
+
+        const evaluationPayload = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        if (
+          cycle?.status === 'planning' &&
+          evaluationPayload?.evaluation?.releaseGatePassed === true &&
+          evaluationPayload?.evaluation?.signoffComplete === true
+        ) {
+          await releaseGovernanceStore.setCycleStatus({
+            tenantId,
+            cycleId,
+            status: 'launch_ready',
+          });
+        }
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.signoff',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            signoffRole,
+            releaseGatePassed: evaluationPayload?.evaluation?.releaseGatePassed === true,
+            signoffComplete: evaluationPayload?.evaluation?.signoffComplete === true,
+          },
+        });
+
+        const latest = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        return res.json({
+          ok: true,
+          cycle: latest?.cycle || cycle,
+          evaluation: latest?.evaluation || evaluationPayload?.evaluation || null,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        const statusCode =
+          message.includes('hittades inte') ? 404 : message.includes('Sign-off kräver') ? 409 : 500;
+        return res
+          .status(statusCode)
+          .json({ error: message || 'Kunde inte spara release sign-off.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/launch',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.recordLaunch !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        if (!cycleId) return res.status(400).json({ error: 'cycleId saknas.' });
+
+        const evaluationPayload = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        if (!evaluationPayload?.evaluation?.releaseGatePassed) {
+          return res.status(409).json({
+            error: 'Release gate är inte godkänd.',
+            blockers: evaluationPayload?.evaluation?.blockers || [],
+            evaluation: evaluationPayload?.evaluation || null,
+          });
+        }
+
+        const cycle = await releaseGovernanceStore.recordLaunch({
+          tenantId,
+          cycleId,
+          actorUserId: req.auth.userId,
+          strategy: normalizeText(req.body?.strategy || 'tenant_batch'),
+          batchLabel: normalizeText(req.body?.batchLabel || ''),
+          rollbackPlan: normalizeText(req.body?.rollbackPlan || ''),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.launch',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            strategy: cycle?.launch?.strategy || null,
+            batchLabel: cycle?.launch?.batchLabel || null,
+            rollbackPlan: cycle?.launch?.rollbackPlan || null,
+          },
+        });
+
+        return res.status(201).json({
+          ok: true,
+          cycle,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        return res
+          .status(message.includes('hittades inte') ? 404 : 500)
+          .json({ error: message || 'Kunde inte markera launch.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/review',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.addPostLaunchReview !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        if (!cycleId) return res.status(400).json({ error: 'cycleId saknas.' });
+
+        const reviewResult = await releaseGovernanceStore.addPostLaunchReview({
+          tenantId,
+          cycleId,
+          reviewerUserId: req.auth.userId,
+          status: parseReleaseStatus(req.body?.status, 'ok'),
+          note: normalizeText(req.body?.note || ''),
+          openIncidents: Number(req.body?.openIncidents || 0),
+          breachedIncidents: Number(req.body?.breachedIncidents || 0),
+          triggeredNoGoCount: Number(req.body?.triggeredNoGoCount || 0),
+          ts: req.body?.ts || null,
+        });
+
+        const latest = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.review.add',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            status: reviewResult?.review?.status || null,
+            openIncidents: Number(reviewResult?.review?.openIncidents || 0),
+            breachedIncidents: Number(reviewResult?.review?.breachedIncidents || 0),
+            triggeredNoGoCount: Number(reviewResult?.review?.triggeredNoGoCount || 0),
+          },
+        });
+
+        return res.status(201).json({
+          ok: true,
+          review: reviewResult?.review || null,
+          cycle: latest?.cycle || reviewResult?.cycle || null,
+          evaluation: latest?.evaluation || null,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        return res
+          .status(message.includes('hittades inte') ? 404 : 500)
+          .json({ error: message || 'Kunde inte spara post-launch review.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/reality-audit',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!releaseGovernanceStore || typeof releaseGovernanceStore.recordRealityAudit !== 'function') {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        if (!cycleId) return res.status(400).json({ error: 'cycleId saknas.' });
+
+        const cycle = await releaseGovernanceStore.recordRealityAudit({
+          tenantId,
+          cycleId,
+          actorUserId: req.auth.userId,
+          changeGovernanceVersion: normalizeText(req.body?.changeGovernanceVersion || ''),
+          note: normalizeText(req.body?.note || ''),
+          intervalDays: Number(config?.releaseRealityAuditIntervalDays || 90),
+        });
+
+        const latest = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.reality_audit',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            lastRealityAuditAt: cycle?.governance?.lastRealityAuditAt || null,
+            nextRealityAuditDueAt: cycle?.governance?.nextRealityAuditDueAt || null,
+            changeGovernanceVersion: cycle?.governance?.changeGovernanceVersion || null,
+          },
+        });
+
+        return res.json({
+          ok: true,
+          cycle,
+          evaluation: latest?.evaluation || null,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        return res
+          .status(message.includes('hittades inte') ? 404 : 500)
+          .json({ error: message || 'Kunde inte registrera reality audit.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/release/cycles/:cycleId/final-live-signoff',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      if (
+        !releaseGovernanceStore ||
+        typeof releaseGovernanceStore.recordFinalLiveSignoff !== 'function'
+      ) {
+        return res.status(503).json({ error: 'Release governance store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const cycleId = normalizeText(req.params?.cycleId || '');
+        if (!cycleId) return res.status(400).json({ error: 'cycleId saknas.' });
+
+        const evaluationBefore = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+          requireFinalLiveSignoff: false,
+        });
+        const releaseEval = evaluationBefore?.evaluation || null;
+        if (!releaseEval) {
+          return res.status(404).json({ error: 'Release cycle hittades inte.' });
+        }
+        if (releaseEval.releaseGatePassed !== true) {
+          return res.status(409).json({
+            error: 'Release gate är inte godkänd för final live sign-off.',
+            blockers: releaseEval.blockers || [],
+            evaluation: releaseEval,
+          });
+        }
+
+        const stabilization = releaseEval.postLaunchStabilization || {};
+        const requiredDays = Number(stabilization?.requiredDays || config?.releasePostLaunchStabilizationDays || 14);
+        const actualReviews = Number(stabilization?.actualReviews || 0);
+        const stabilizationReady =
+          stabilization?.completed === true &&
+          stabilization?.hasNoGoTrigger !== true &&
+          actualReviews >= requiredDays;
+        if (!stabilizationReady) {
+          return res.status(409).json({
+            error: 'Stabiliseringsfönster är inte komplett för final live sign-off.',
+            stabilization,
+            evaluation: releaseEval,
+          });
+        }
+
+        const wasLocked = releaseEval?.finalLiveSignoff?.locked === true;
+        const cycle = await releaseGovernanceStore.recordFinalLiveSignoff({
+          tenantId,
+          cycleId,
+          actorUserId: req.auth.userId,
+          note: normalizeText(req.body?.note || ''),
+          force: parseBoolean(req.body?.force, false),
+        });
+
+        const latest = await releaseGovernanceStore.evaluateCycle({
+          tenantId,
+          cycleId,
+          ...buildReleaseEvaluationOptions(config),
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.release.cycle.final_live_signoff',
+          outcome: 'success',
+          targetType: 'release_cycle',
+          targetId: cycleId,
+          metadata: {
+            alreadyLocked: wasLocked,
+            lockedAt: cycle?.governance?.finalLiveSignoffAt || null,
+            lockedBy: cycle?.governance?.finalLiveSignoffBy || null,
+          },
+        });
+
+        return res.json({
+          ok: true,
+          alreadyLocked: wasLocked,
+          cycle: latest?.cycle || cycle,
+          evaluation: latest?.evaluation || null,
+        });
+      } catch (error) {
+        console.error(error);
+        const message = normalizeText(error?.message || '');
+        const statusCode = message.includes('hittades inte') ? 404 : 500;
+        return res
+          .status(statusCode)
+          .json({ error: message || 'Kunde inte låsa final live sign-off.' });
       }
     }
   );
@@ -442,6 +1151,7 @@ function createOpsRouter({
               category: template.category,
               content: contentForEvaluation,
               tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
+              riskThresholdVersion: tenantRuntime.riskThresholdVersion,
               variableValidation,
             });
             const outputEvaluation = evaluateTemplateRisk({
@@ -449,7 +1159,9 @@ function createOpsRouter({
               category: template.category,
               content: contentForEvaluation,
               tenantRiskModifier: tenantRuntime.riskSensitivityModifier,
+              riskThresholdVersion: tenantRuntime.riskThresholdVersion,
               variableValidation,
+              enforceStrictTemplateVariables: true,
             });
 
             const repaired = await templateStore.evaluateVersion({
@@ -777,6 +1489,134 @@ function createOpsRouter({
       } catch (error) {
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte läsa secret-rotation historik.' });
+      }
+    }
+  );
+
+  router.get(
+    '/ops/slo-tickets',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!sloTicketStore || typeof sloTicketStore.listTickets !== 'function') {
+        return res.status(503).json({ error: 'SLO ticket-store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const limit = parseLimit(req.query?.limit, 50);
+        const status = normalizeText(req.query?.status || '');
+        const list = await sloTicketStore.listTickets({
+          tenantId,
+          status,
+          limit,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.slo_tickets.read',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: tenantId,
+          metadata: {
+            status: status || 'all',
+            limit,
+            count: Number(list?.count || 0),
+          },
+        });
+
+        return res.json({
+          tenantId,
+          status: status || 'all',
+          limit,
+          count: Number(list?.count || 0),
+          tickets: Array.isArray(list?.tickets) ? list.tickets : [],
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa SLO-tickets.' });
+      }
+    }
+  );
+
+  router.get(
+    '/ops/slo-tickets/summary',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!sloTicketStore || typeof sloTicketStore.summarize !== 'function') {
+        return res.status(503).json({ error: 'SLO ticket-store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const summary = await sloTicketStore.summarize({ tenantId });
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.slo_tickets.summary.read',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: tenantId,
+          metadata: {
+            open: Number(summary?.totals?.open || 0),
+            openBreaches: Number(summary?.totals?.openBreaches || 0),
+            tickets: Number(summary?.totals?.tickets || 0),
+          },
+        });
+
+        return res.json(summary);
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa SLO-ticket summary.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/slo-tickets/:ticketId/resolve',
+    requireAuth,
+    requireRole(ROLE_OWNER),
+    async (req, res) => {
+      if (!sloTicketStore || typeof sloTicketStore.resolveTicket !== 'function') {
+        return res.status(503).json({ error: 'SLO ticket-store är inte tillgänglig.' });
+      }
+      try {
+        const tenantId = req.auth.tenantId;
+        const ticketId = normalizeText(req.params?.ticketId || '');
+        if (!ticketId) {
+          return res.status(400).json({ error: 'ticketId saknas.' });
+        }
+        const note = normalizeText(req.body?.note || '');
+        const resolved = await sloTicketStore.resolveTicket({
+          tenantId,
+          ticketId,
+          resolvedBy: req.auth.userId,
+          note,
+        });
+        if (!resolved) {
+          return res.status(404).json({ error: 'SLO-ticket hittades inte.' });
+        }
+
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth.userId,
+          action: 'ops.slo_tickets.resolve',
+          outcome: 'success',
+          targetType: 'slo_ticket',
+          targetId: ticketId,
+          metadata: {
+            note: note || null,
+          },
+        });
+
+        return res.json({
+          ok: true,
+          ticket: resolved,
+        });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte markera SLO-ticket som löst.' });
       }
     }
   );

@@ -49,6 +49,12 @@ Rollback av hemligheter sker i plattformens secret manager:
   - `security.secrets`
   - `kpis.secretRotationStaleRequired`
   - `kpis.secretRotationPending`
+- Scheduler-jobb:
+  - `secrets_rotation_snapshot` kör daglig kontroll/snapshot enligt env:
+    - `ARCANA_SCHEDULER_SECRET_ROTATION_INTERVAL_HOURS`
+    - `ARCANA_SCHEDULER_SECRET_ROTATION_DRY_RUN`
+    - `ARCANA_SCHEDULER_SECRET_ROTATION_NOTE`
+  - verifiera senaste success via `GET /api/v1/ops/scheduler/status` och readiness-check `secret_rotation_daily`.
 
 ## Incidenthantering
 Om rotation misslyckas:

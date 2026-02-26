@@ -8,6 +8,9 @@
   const LANGUAGE_KEY = 'ARCANA_ADMIN_LANGUAGE';
   const DENSITY_KEY = 'ARCANA_ADMIN_DENSITY';
   const TOAST_AUTO_DISMISS_MS = 6000;
+  const DASHBOARD_STREAM_RETRY_MIN_MS = 1500;
+  const DASHBOARD_STREAM_RETRY_MAX_MS = 15000;
+  const DASHBOARD_STREAM_REFRESH_DEBOUNCE_MS = 1200;
   const BRAND_PRIMARY_COLORS = Object.freeze(['#d8b38f', '#e6c6a5', '#c89f79', '#b78761']);
   const BRAND_ACCENT_COLORS = Object.freeze(['#2e2016', '#3a2a1e', '#4c3a2c', '#6b5747']);
   const DEFAULT_BRAND_PRIMARY_COLOR = '#d8b38f';
@@ -227,6 +230,10 @@
     availableTenants: [],
     templates: [],
     versions: [],
+    versionRevisions: [],
+    selectedRevisionFrom: null,
+    selectedRevisionTo: null,
+    selectedRollbackRevision: null,
     sessions: [],
     selectedTemplateId: '',
     selectedVersionId: '',
@@ -263,6 +270,12 @@
     lastToastAt: 0,
     toastSequence: 0,
     activeSectionGroup: 'overviewSection',
+    dashboardStreamController: null,
+    dashboardStreamReconnectTimer: null,
+    dashboardStreamRetryMs: DASHBOARD_STREAM_RETRY_MIN_MS,
+    dashboardStreamActiveKey: '',
+    dashboardStreamRunId: 0,
+    dashboardRealtimeRefreshTimer: null,
   };
 
   const els = {
@@ -442,6 +455,24 @@
     orchestratorResult: document.getElementById('orchestratorResult'),
     orchestratorMetaSummary: document.getElementById('orchestratorMetaSummary'),
     orchestratorMetaResult: document.getElementById('orchestratorMetaResult'),
+    runIncidentIntelligenceBtn: document.getElementById('runIncidentIntelligenceBtn'),
+    incidentIntelTimeframeDays: document.getElementById('incidentIntelTimeframeDays'),
+    incidentIntelIncludeClosed: document.getElementById('incidentIntelIncludeClosed'),
+    incidentIntelligenceStatus: document.getElementById('incidentIntelligenceStatus'),
+    incidentIntelligenceSummary: document.getElementById('incidentIntelligenceSummary'),
+    incidentIntelligenceSeverity: document.getElementById('incidentIntelligenceSeverity'),
+    incidentIntelligenceRisk: document.getElementById('incidentIntelligenceRisk'),
+    incidentIntelligencePatterns: document.getElementById('incidentIntelligencePatterns'),
+    incidentIntelligenceRecommendations: document.getElementById('incidentIntelligenceRecommendations'),
+    runDailyBriefBtn: document.getElementById('runDailyBriefBtn'),
+    dailyBriefTimeframeDays: document.getElementById('dailyBriefTimeframeDays'),
+    dailyBriefMaxTasks: document.getElementById('dailyBriefMaxTasks'),
+    dailyBriefIncludeClosed: document.getElementById('dailyBriefIncludeClosed'),
+    dailyBriefStatus: document.getElementById('dailyBriefStatus'),
+    dailyBriefPriority: document.getElementById('dailyBriefPriority'),
+    dailyBriefSeverity: document.getElementById('dailyBriefSeverity'),
+    dailyBriefSummary: document.getElementById('dailyBriefSummary'),
+    dailyBriefRecommendations: document.getElementById('dailyBriefRecommendations'),
     fetchCalibrationSuggestionBtn: document.getElementById('fetchCalibrationSuggestionBtn'),
     applyCalibrationSuggestionBtn: document.getElementById('applyCalibrationSuggestionBtn'),
     calibrationNoteInput: document.getElementById('calibrationNoteInput'),
@@ -471,6 +502,8 @@
     monitorObservabilityResult: document.getElementById('monitorObservabilityResult'),
     monitorPublicChatBetaSummary: document.getElementById('monitorPublicChatBetaSummary'),
     monitorPublicChatBetaResult: document.getElementById('monitorPublicChatBetaResult'),
+    monitorPatientConversionSummary: document.getElementById('monitorPatientConversionSummary'),
+    monitorPatientConversionResult: document.getElementById('monitorPatientConversionResult'),
     monitorSchedulerSummary: document.getElementById('monitorSchedulerSummary'),
     monitorSchedulerResult: document.getElementById('monitorSchedulerResult'),
     monitorReadinessHistorySummary: document.getElementById('monitorReadinessHistorySummary'),
@@ -600,6 +633,15 @@
     cloneBtn: document.getElementById('cloneBtn'),
     versionStatus: document.getElementById('versionStatus'),
     versionRiskBlock: document.getElementById('versionRiskBlock'),
+    revisionFromSelect: document.getElementById('revisionFromSelect'),
+    revisionToSelect: document.getElementById('revisionToSelect'),
+    loadRevisionDiffBtn: document.getElementById('loadRevisionDiffBtn'),
+    rollbackRevisionSelect: document.getElementById('rollbackRevisionSelect'),
+    rollbackRevisionNoteInput: document.getElementById('rollbackRevisionNoteInput'),
+    rollbackRevisionBtn: document.getElementById('rollbackRevisionBtn'),
+    revisionStatus: document.getElementById('revisionStatus'),
+    revisionSummary: document.getElementById('revisionSummary'),
+    revisionDiffBlock: document.getElementById('revisionDiffBlock'),
   };
 
   let activeModalResolver = null;
@@ -767,6 +809,18 @@
     return String(value || '')
       .trim()
       .toLowerCase();
+  }
+
+  function parseRevisionNumber(value) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+  }
+
+  function buildRevisionEtag(revision) {
+    const safeRevision = parseRevisionNumber(revision);
+    if (!safeRevision) return '';
+    return `W/\"r${safeRevision}\"`;
   }
 
   function extractTemplateVariables(content) {
@@ -2141,6 +2195,21 @@
     if (els.cloneBtn) els.cloneBtn.disabled = !writer || !hasVersion;
     if (els.activateBtn) els.activateBtn.disabled = !owner || !hasVersion;
     if (els.archiveBtn) els.archiveBtn.disabled = !owner || !hasVersion;
+    if (els.revisionFromSelect) els.revisionFromSelect.disabled = !writer || !hasVersion;
+    if (els.revisionToSelect) els.revisionToSelect.disabled = !writer || !hasVersion;
+    if (els.loadRevisionDiffBtn) {
+      els.loadRevisionDiffBtn.disabled =
+        !writer || !hasVersion || state.versionRevisions.length === 0;
+    }
+    if (els.rollbackRevisionSelect) {
+      els.rollbackRevisionSelect.disabled =
+        !owner || !hasVersion || state.versionRevisions.length === 0;
+    }
+    if (els.rollbackRevisionNoteInput) els.rollbackRevisionNoteInput.disabled = !owner || !hasVersion;
+    if (els.rollbackRevisionBtn) {
+      els.rollbackRevisionBtn.disabled =
+        !owner || !hasVersion || state.versionRevisions.length === 0;
+    }
     if (els.createStaffBtn) els.createStaffBtn.disabled = !owner;
     if (els.generateStaffPasswordBtn) els.generateStaffPasswordBtn.disabled = !owner;
     if (els.copyInviteMessageBtn) {
@@ -2293,13 +2362,21 @@
     });
   }
 
-  async function api(path, { method = 'GET', body, auth = true } = {}) {
-    const headers = { 'Content-Type': 'application/json' };
+  function buildAuthHeaders({ includeJson = true, auth = true } = {}) {
+    const headers = {};
+    if (includeJson) headers['Content-Type'] = 'application/json';
     if (auth && state.token) headers.Authorization = `Bearer ${state.token}`;
+    return headers;
+  }
 
+  async function api(path, { method = 'GET', body, auth = true, headers = null } = {}) {
+    const requestHeaders = {
+      ...buildAuthHeaders({ includeJson: true, auth }),
+      ...(headers && typeof headers === 'object' ? headers : {}),
+    };
     const response = await fetch(`${API_BASE}${path}`, {
       method,
-      headers,
+      headers: requestHeaders,
       body: body ? JSON.stringify(body) : undefined,
     });
 
@@ -2317,6 +2394,212 @@
       throw error;
     }
     return data;
+  }
+
+  function clearDashboardRealtimeRefreshTimer() {
+    if (state.dashboardRealtimeRefreshTimer) {
+      clearTimeout(state.dashboardRealtimeRefreshTimer);
+      state.dashboardRealtimeRefreshTimer = null;
+    }
+  }
+
+  function stopDashboardStream({ resetRetry = true } = {}) {
+    state.dashboardStreamRunId += 1;
+    if (state.dashboardStreamController) {
+      try {
+        state.dashboardStreamController.abort();
+      } catch {
+        // Ignore abort errors for stale streams.
+      }
+      state.dashboardStreamController = null;
+    }
+    if (state.dashboardStreamReconnectTimer) {
+      clearTimeout(state.dashboardStreamReconnectTimer);
+      state.dashboardStreamReconnectTimer = null;
+    }
+    clearDashboardRealtimeRefreshTimer();
+    state.dashboardStreamActiveKey = '';
+    if (resetRetry) {
+      state.dashboardStreamRetryMs = DASHBOARD_STREAM_RETRY_MIN_MS;
+    }
+  }
+
+  function shouldRefreshFromAuditAction(action) {
+    const normalized = String(action || '')
+      .trim()
+      .toLowerCase();
+    if (!normalized) return false;
+    if (normalized === 'dashboard.owner.read') return false;
+    if (normalized === 'audit.events.read') return false;
+    return true;
+  }
+
+  function scheduleDashboardRealtimeRefresh(action) {
+    if (!shouldRefreshFromAuditAction(action)) return;
+    if (!state.token || !state.tenantId) return;
+    if (state.dashboardRealtimeRefreshTimer) return;
+    state.dashboardRealtimeRefreshTimer = setTimeout(async () => {
+      state.dashboardRealtimeRefreshTimer = null;
+      if (!state.token || !state.tenantId) return;
+      try {
+        await Promise.all([loadDashboard(), loadAuditEvents()]);
+      } catch {
+        // Ignore transient refresh errors from live stream.
+      }
+    }, DASHBOARD_STREAM_REFRESH_DEBOUNCE_MS);
+  }
+
+  function currentDashboardStreamKey() {
+    if (!state.token || !state.tenantId) return '';
+    return `${state.tenantId}:${state.token}`;
+  }
+
+  function parseSseEnvelope(raw) {
+    if (typeof raw !== 'string') return null;
+    const lines = raw.split('\n');
+    let event = 'message';
+    let id = '';
+    const dataLines = [];
+
+    for (const line of lines) {
+      if (!line || line.startsWith(':')) continue;
+      if (line.startsWith('event:')) {
+        event = line.slice(6).trim() || 'message';
+        continue;
+      }
+      if (line.startsWith('id:')) {
+        id = line.slice(3).trim();
+        continue;
+      }
+      if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+    }
+
+    const rawData = dataLines.join('\n');
+    let data = null;
+    if (rawData) {
+      try {
+        data = JSON.parse(rawData);
+      } catch {
+        data = { raw: rawData };
+      }
+    }
+    return { event, id, data };
+  }
+
+  function handleDashboardStreamEnvelope(envelope) {
+    if (!envelope || typeof envelope !== 'object') return;
+    const payload = envelope.data && typeof envelope.data === 'object' ? envelope.data : null;
+    if (!payload) return;
+    if (payload.tenantId && payload.tenantId !== state.tenantId) return;
+    if (envelope.event === 'audit') {
+      scheduleDashboardRealtimeRefresh(payload.action);
+      return;
+    }
+    if (envelope.event === 'status') {
+      scheduleDashboardRealtimeRefresh('dashboard.status.stream');
+    }
+  }
+
+  function scheduleDashboardStreamReconnect(streamKey) {
+    if (!streamKey || streamKey !== currentDashboardStreamKey()) return;
+    if (state.dashboardStreamReconnectTimer) return;
+    const delayMs = Math.max(
+      DASHBOARD_STREAM_RETRY_MIN_MS,
+      Math.min(DASHBOARD_STREAM_RETRY_MAX_MS, Number(state.dashboardStreamRetryMs) || DASHBOARD_STREAM_RETRY_MIN_MS)
+    );
+    state.dashboardStreamReconnectTimer = setTimeout(() => {
+      state.dashboardStreamReconnectTimer = null;
+      ensureDashboardStreamConnected();
+    }, delayMs);
+    state.dashboardStreamRetryMs = Math.min(
+      DASHBOARD_STREAM_RETRY_MAX_MS,
+      Math.round(delayMs * 1.8)
+    );
+  }
+
+  async function openDashboardStream(runId, streamKey) {
+    const controller = new AbortController();
+    state.dashboardStreamController = controller;
+
+    try {
+      const response = await fetch(`${API_BASE}/dashboard/owner/stream`, {
+        method: 'GET',
+        headers: {
+          ...buildAuthHeaders({ includeJson: false, auth: true }),
+          Accept: 'text/event-stream',
+        },
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          stopDashboardStream();
+          return;
+        }
+        throw new Error(`dashboard stream HTTP ${response.status}`);
+      }
+      if (!response.body || typeof response.body.getReader !== 'function') {
+        throw new Error('Dashboard stream saknar läsbar body.');
+      }
+
+      state.dashboardStreamRetryMs = DASHBOARD_STREAM_RETRY_MIN_MS;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (runId === state.dashboardStreamRunId) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (!chunk.value) continue;
+        buffer += decoder.decode(chunk.value, { stream: true }).replace(/\r\n/g, '\n');
+
+        let splitIndex = buffer.indexOf('\n\n');
+        while (splitIndex !== -1) {
+          const rawEnvelope = buffer.slice(0, splitIndex).trim();
+          buffer = buffer.slice(splitIndex + 2);
+          if (rawEnvelope) {
+            const envelope = parseSseEnvelope(rawEnvelope);
+            handleDashboardStreamEnvelope(envelope);
+          }
+          splitIndex = buffer.indexOf('\n\n');
+        }
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        console.warn('[admin] dashboard stream disconnected', error?.message || error);
+      }
+    } finally {
+      if (state.dashboardStreamController === controller) {
+        state.dashboardStreamController = null;
+      }
+    }
+
+    if (runId !== state.dashboardStreamRunId) return;
+    scheduleDashboardStreamReconnect(streamKey);
+  }
+
+  function ensureDashboardStreamConnected() {
+    const streamKey = currentDashboardStreamKey();
+    if (!streamKey) {
+      stopDashboardStream();
+      return;
+    }
+    if (state.dashboardStreamActiveKey === streamKey && state.dashboardStreamController) {
+      return;
+    }
+
+    stopDashboardStream({ resetRetry: false });
+    state.dashboardStreamActiveKey = streamKey;
+    state.dashboardStreamRunId += 1;
+    const runId = state.dashboardStreamRunId;
+
+    openDashboardStream(runId, streamKey).catch(() => {
+      scheduleDashboardStreamReconnect(streamKey);
+    });
   }
 
   function dotClassForRiskLevel(level) {
@@ -4698,6 +4981,250 @@
     renderTonePreview();
   }
 
+  function getSelectedVersionSnapshot() {
+    if (!state.selectedVersionId) return null;
+    return state.versions.find((item) => item.id === state.selectedVersionId) || null;
+  }
+
+  function formatRevisionOptionLabel(revision) {
+    const revisionNo = Number(revision?.revision || 0);
+    const source = String(revision?.source || '').trim() || '-';
+    const createdAt = formatDateTime(revision?.createdAt || '', true);
+    return `r${revisionNo} · ${source} · ${createdAt}`;
+  }
+
+  function renderRevisionControls() {
+    const revisions = Array.isArray(state.versionRevisions) ? state.versionRevisions : [];
+    const optionRows = revisions
+      .map((item) => ({
+        revision: Number(item?.revision || 0),
+        label: formatRevisionOptionLabel(item),
+      }))
+      .filter((item) => Number.isFinite(item.revision) && item.revision > 0);
+
+    const revisionSet = new Set(optionRows.map((item) => item.revision));
+    const latestRevision = optionRows.length ? optionRows[optionRows.length - 1].revision : null;
+    const previousRevision = optionRows.length > 1 ? optionRows[optionRows.length - 2].revision : latestRevision;
+
+    if (!revisionSet.has(Number(state.selectedRevisionTo || 0))) {
+      state.selectedRevisionTo = latestRevision;
+    }
+    if (!revisionSet.has(Number(state.selectedRevisionFrom || 0))) {
+      state.selectedRevisionFrom = previousRevision;
+    }
+    if (!revisionSet.has(Number(state.selectedRollbackRevision || 0))) {
+      state.selectedRollbackRevision = previousRevision || latestRevision;
+    }
+
+    const renderSelect = (selectEl, selectedValue) => {
+      if (!selectEl) return;
+      selectEl.innerHTML = '';
+      if (!optionRows.length) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '-';
+        selectEl.appendChild(emptyOption);
+        return;
+      }
+      optionRows.forEach((row) => {
+        const option = document.createElement('option');
+        option.value = String(row.revision);
+        option.textContent = row.label;
+        if (Number(selectedValue || 0) === row.revision) {
+          option.selected = true;
+        }
+        selectEl.appendChild(option);
+      });
+    };
+
+    renderSelect(els.revisionFromSelect, state.selectedRevisionFrom);
+    renderSelect(els.revisionToSelect, state.selectedRevisionTo);
+    renderSelect(els.rollbackRevisionSelect, state.selectedRollbackRevision);
+
+    if (els.revisionSummary) {
+      if (!optionRows.length) {
+        els.revisionSummary.textContent = 'Ingen revisionsdata ännu.';
+      } else {
+        const selectedTo = Number(state.selectedRevisionTo || latestRevision || 0);
+        const selectedRollback = Number(state.selectedRollbackRevision || 0);
+        els.revisionSummary.textContent = `Revisioner: ${optionRows.length} · aktuell r${selectedTo} · rollback-target r${selectedRollback || '-'}`;
+      }
+    }
+    updateLifecyclePermissions();
+  }
+
+  function clearRevisionPanel({
+    statusText = '',
+    summaryText = 'Ingen revisionsdata ännu.',
+    diffText = 'Välj en version för att ladda revisioner.',
+  } = {}) {
+    state.versionRevisions = [];
+    state.selectedRevisionFrom = null;
+    state.selectedRevisionTo = null;
+    state.selectedRollbackRevision = null;
+    if (els.revisionFromSelect) els.revisionFromSelect.innerHTML = '<option value="">-</option>';
+    if (els.revisionToSelect) els.revisionToSelect.innerHTML = '<option value="">-</option>';
+    if (els.rollbackRevisionSelect) els.rollbackRevisionSelect.innerHTML = '<option value="">-</option>';
+    if (els.rollbackRevisionNoteInput) els.rollbackRevisionNoteInput.value = '';
+    setText(els.revisionStatus, statusText);
+    setText(els.revisionSummary, summaryText);
+    setText(els.revisionDiffBlock, diffText);
+    updateLifecyclePermissions();
+  }
+
+  async function loadVersionRevisions({ silent = false } = {}) {
+    if (!state.selectedTemplateId || !state.selectedVersionId) {
+      clearRevisionPanel();
+      return;
+    }
+    try {
+      if (!silent) setStatus(els.revisionStatus, 'Laddar revisionshistorik...');
+      const response = await api(
+        `/templates/${encodeURIComponent(state.selectedTemplateId)}/versions/${encodeURIComponent(
+          state.selectedVersionId
+        )}/revisions?limit=80`
+      );
+      state.versionRevisions = Array.isArray(response?.revisions) ? response.revisions : [];
+      renderRevisionControls();
+      if (!silent) {
+        setStatus(
+          els.revisionStatus,
+          `Revisionshistorik laddad (${state.versionRevisions.length}).`
+        );
+      }
+    } catch (error) {
+      clearRevisionPanel({
+        statusText: '',
+        summaryText: 'Kunde inte läsa revisionshistorik.',
+        diffText: 'Ingen diff tillgänglig.',
+      });
+      setStatus(
+        els.revisionStatus,
+        error.message || 'Kunde inte läsa revisionshistorik.',
+        true
+      );
+    }
+  }
+
+  async function loadRevisionDiff() {
+    try {
+      if (!state.selectedTemplateId || !state.selectedVersionId) {
+        throw new Error('Välj template/version först.');
+      }
+      const fromRevision = parseRevisionNumber(els.revisionFromSelect?.value);
+      const toRevision = parseRevisionNumber(els.revisionToSelect?.value);
+      if (!toRevision) throw new Error('Välj revision att jämföra mot.');
+
+      state.selectedRevisionFrom = fromRevision;
+      state.selectedRevisionTo = toRevision;
+
+      setStatus(els.revisionStatus, 'Laddar revision-diff...');
+      const query = new URLSearchParams();
+      if (fromRevision) query.set('from', String(fromRevision));
+      query.set('to', String(toRevision));
+      const response = await api(
+        `/templates/${encodeURIComponent(state.selectedTemplateId)}/versions/${encodeURIComponent(
+          state.selectedVersionId
+        )}/revisions/diff?${query.toString()}`
+      );
+
+      const rows = Array.isArray(response?.diff) ? response.diff : [];
+      if (!rows.length) {
+        setText(
+          els.revisionDiffBlock,
+          `Diff r${response?.fromRevision || 0} -> r${response?.toRevision || toRevision}: inga fältskillnader.`
+        );
+        setStatus(els.revisionStatus, 'Diff klar (inga ändringar).');
+        return;
+      }
+
+      const lines = [
+        `Diff r${response?.fromRevision || 0} -> r${response?.toRevision || toRevision} (${rows.length} ändringar)`,
+        '',
+      ];
+      rows.forEach((row, index) => {
+        const field = String(row?.field || `field_${index + 1}`);
+        let beforeValue = '';
+        let afterValue = '';
+        try {
+          beforeValue = JSON.stringify(row?.before ?? null);
+        } catch {
+          beforeValue = String(row?.before ?? '');
+        }
+        try {
+          afterValue = JSON.stringify(row?.after ?? null);
+        } catch {
+          afterValue = String(row?.after ?? '');
+        }
+        lines.push(`${index + 1}. ${field}`);
+        lines.push(`   before: ${beforeValue}`);
+        lines.push(`   after : ${afterValue}`);
+      });
+      setText(els.revisionDiffBlock, lines.join('\n'));
+      setStatus(els.revisionStatus, `Diff klar (${rows.length} ändringar).`);
+    } catch (error) {
+      setStatus(els.revisionStatus, error.message || 'Kunde inte läsa revision-diff.', true);
+    }
+  }
+
+  async function rollbackRevision() {
+    try {
+      if (!isOwner()) throw new Error('Endast OWNER kan rollbacka revisioner.');
+      if (!state.selectedTemplateId || !state.selectedVersionId) {
+        throw new Error('Välj template/version först.');
+      }
+      const targetRevision = parseRevisionNumber(els.rollbackRevisionSelect?.value);
+      if (!targetRevision) throw new Error('Välj revision att rollbacka till.');
+      const currentVersion = getSelectedVersionSnapshot();
+      const expectedRevision = parseRevisionNumber(currentVersion?.revision);
+
+      const confirmResult = await openAppModal({
+        title: 'Rollback draft-revision',
+        message: `Återställ draft till revision r${targetRevision}?`,
+        confirmLabel: 'Rollback',
+        cancelLabel: 'Avbryt',
+        confirmTone: 'danger',
+      });
+      if (!confirmResult.confirmed) {
+        setStatus(els.revisionStatus, 'Rollback avbruten.');
+        return;
+      }
+
+      const note = String(els.rollbackRevisionNoteInput?.value || '').trim();
+      const headers = {};
+      const ifMatch = buildRevisionEtag(expectedRevision);
+      if (ifMatch) headers['If-Match'] = ifMatch;
+
+      setStatus(els.revisionStatus, `Rollback till r${targetRevision} pågår...`);
+      const response = await api(
+        `/templates/${encodeURIComponent(state.selectedTemplateId)}/versions/${encodeURIComponent(
+          state.selectedVersionId
+        )}/revisions/${encodeURIComponent(String(targetRevision))}/rollback`,
+        {
+          method: 'POST',
+          headers,
+          body: {
+            note,
+            expectedRevision: expectedRevision || undefined,
+          },
+        }
+      );
+      if (els.rollbackRevisionNoteInput) els.rollbackRevisionNoteInput.value = '';
+      const newRevision = Number(response?.version?.revision || 0);
+      setStatus(
+        els.revisionStatus,
+        `Rollback klar: r${targetRevision} återställd (ny revision r${newRevision || '-'})`
+      );
+      await loadDashboard();
+      await loadTemplates({ preserveSelection: true });
+      if (response?.version?.id) {
+        await selectVersion(response.version.id);
+      }
+    } catch (error) {
+      setStatus(els.revisionStatus, error.message || 'Kunde inte rollbacka revision.', true);
+    }
+  }
+
   function clearVersionEditor() {
     state.selectedVersionId = '';
     state.lastVariableValidation = null;
@@ -4705,6 +5232,7 @@
     if (els.versionTitleInput) els.versionTitleInput.value = '';
     if (els.versionContentInput) els.versionContentInput.value = '';
     if (els.versionRiskBlock) els.versionRiskBlock.textContent = '';
+    clearRevisionPanel();
     renderTemplateEditorAssist();
     updateLifecyclePermissions();
   }
@@ -5212,7 +5740,7 @@
         isEnglishLanguage() ? 'status' : 'status'
       }=${formatTemplateStateLabel(version.state || 'draft')} · ${
         isEnglishLanguage() ? 'created' : 'skapad'
-      }=${version.createdAt}`
+      }=${version.createdAt} · revision=r${Number(version.revision || 1)}`
     );
     if (els.versionTitleInput) els.versionTitleInput.value = version.title || '';
     if (els.versionContentInput) els.versionContentInput.value = version.content || '';
@@ -5236,10 +5764,12 @@
     const local = state.versions.find((item) => item.id === versionId);
     if (local) {
       fillVersionEditor(local);
+      await loadVersionRevisions({ silent: true });
       return;
     }
     const response = await api(`/templates/${state.selectedTemplateId}/versions/${versionId}`);
     fillVersionEditor(response?.version || null);
+    await loadVersionRevisions({ silent: true });
   }
 
   async function loadVersionsForSelectedTemplate({ preserveVersion = true } = {}) {
@@ -5385,13 +5915,18 @@
       if (!state.selectedTemplateId || !state.selectedVersionId) {
         throw new Error('Välj en version först.');
       }
+      const currentVersion = getSelectedVersionSnapshot();
+      const expectedRevision = parseRevisionNumber(currentVersion?.revision);
+      const ifMatch = buildRevisionEtag(expectedRevision);
       setStatus(els.versionStatus, 'Sparar draft...');
       const response = await api(`/templates/${state.selectedTemplateId}/versions/${state.selectedVersionId}`, {
         method: 'PATCH',
+        headers: ifMatch ? { 'If-Match': ifMatch } : null,
         body: {
           title: (els.versionTitleInput?.value || '').trim(),
           content: els.versionContentInput?.value || '',
           instruction: (els.draftInstructionInput?.value || '').trim(),
+          expectedRevision: expectedRevision || undefined,
         },
       });
       rememberVariableValidation(state.selectedVersionId, response?.variableValidation);
@@ -6035,6 +6570,276 @@
     }
   }
 
+  function readIncidentIntelligenceOptions() {
+    const rawDays = Number(els.incidentIntelTimeframeDays?.value || 14);
+    const timeframeDays = Number.isFinite(rawDays) ? Math.max(1, Math.min(90, rawDays)) : 14;
+    if (els.incidentIntelTimeframeDays) {
+      els.incidentIntelTimeframeDays.value = String(timeframeDays);
+    }
+    return {
+      includeClosed: Boolean(els.incidentIntelIncludeClosed?.checked),
+      timeframeDays,
+    };
+  }
+
+  function renderIncidentIntelligenceList(targetEl, rows = [], emptyMessage = '') {
+    if (!targetEl) return;
+    const safeRows = Array.isArray(rows) ? rows.filter((item) => String(item || '').trim()) : [];
+    if (safeRows.length === 0) {
+      targetEl.innerHTML = '';
+      const li = document.createElement('li');
+      li.className = 'muted mini';
+      li.textContent = emptyMessage;
+      targetEl.appendChild(li);
+      return;
+    }
+    targetEl.innerHTML = '';
+    safeRows.forEach((row) => {
+      const li = document.createElement('li');
+      li.textContent = row;
+      targetEl.appendChild(li);
+    });
+  }
+
+  function normalizeIncidentIntelligenceOutput(payload = null) {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload?.output?.data && typeof payload.output === 'object') return payload.output;
+    if (payload?.data && payload?.metadata) return payload;
+    if (payload?.entry?.output?.data) return payload.entry.output;
+    return null;
+  }
+
+  function renderIncidentIntelligence(output = null) {
+    const normalized = normalizeIncidentIntelligenceOutput(output);
+    const data = normalized?.data && typeof normalized.data === 'object' ? normalized.data : null;
+    if (!data) {
+      if (els.incidentIntelligenceSummary) {
+        els.incidentIntelligenceSummary.textContent = 'Ingen incidentanalys ännu.';
+      }
+      if (els.incidentIntelligenceSeverity) {
+        els.incidentIntelligenceSeverity.textContent = 'L3=0, L4=0, L5=0';
+      }
+      if (els.incidentIntelligenceRisk) {
+        els.incidentIntelligenceRisk.textContent = '-';
+      }
+      renderIncidentIntelligenceList(
+        els.incidentIntelligencePatterns,
+        [],
+        'Inga mönster ännu.'
+      );
+      renderIncidentIntelligenceList(
+        els.incidentIntelligenceRecommendations,
+        [],
+        'Inga rekommendationer ännu.'
+      );
+      return;
+    }
+
+    const breakdown =
+      data.severityBreakdown && typeof data.severityBreakdown === 'object'
+        ? data.severityBreakdown
+        : {};
+    const l3 = Number(breakdown.L3 || 0);
+    const l4 = Number(breakdown.L4 || 0);
+    const l5 = Number(breakdown.L5 || 0);
+
+    if (els.incidentIntelligenceSummary) {
+      els.incidentIntelligenceSummary.textContent = String(data.summary || 'Ingen sammanfattning.');
+    }
+    if (els.incidentIntelligenceSeverity) {
+      els.incidentIntelligenceSeverity.textContent = `L3=${l3}, L4=${l4}, L5=${l5}`;
+    }
+    if (els.incidentIntelligenceRisk) {
+      els.incidentIntelligenceRisk.textContent = String(data.escalationRisk || '-');
+    }
+    renderIncidentIntelligenceList(
+      els.incidentIntelligencePatterns,
+      Array.isArray(data.recurringPatterns) ? data.recurringPatterns.slice(0, 3) : [],
+      'Inga återkommande mönster upptäckta.'
+    );
+    renderIncidentIntelligenceList(
+      els.incidentIntelligenceRecommendations,
+      Array.isArray(data.recommendations) ? data.recommendations.slice(0, 5) : [],
+      'Inga rekommendationer ännu.'
+    );
+  }
+
+  async function loadIncidentIntelligence({ quiet = true } = {}) {
+    try {
+      const response = await api('/capabilities/analysis?capability=SummarizeIncidents&limit=1');
+      const entry = Array.isArray(response?.entries) && response.entries.length > 0
+        ? response.entries[0]
+        : null;
+      if (entry?.output) {
+        renderIncidentIntelligence(entry.output);
+        const generatedAt = String(entry?.output?.data?.generatedAt || entry?.createdAt || '').trim();
+        if (!quiet) {
+          setStatus(
+            els.incidentIntelligenceStatus,
+            generatedAt ? `Incidentanalys laddad (${generatedAt}).` : 'Incidentanalys laddad.'
+          );
+        }
+        return;
+      }
+      renderIncidentIntelligence(null);
+      if (!quiet) {
+        setStatus(els.incidentIntelligenceStatus, 'Ingen tidigare incidentanalys hittades.');
+      }
+    } catch (error) {
+      renderIncidentIntelligence(null);
+      if (!quiet) {
+        setStatus(
+          els.incidentIntelligenceStatus,
+          error.message || 'Kunde inte läsa incidentanalys.',
+          true
+        );
+      }
+    }
+  }
+
+  async function runIncidentIntelligence() {
+    try {
+      if (!canTemplateWrite()) throw new Error('Du saknar behörighet.');
+      const input = readIncidentIntelligenceOptions();
+      setStatus(els.incidentIntelligenceStatus, 'Kör SummarizeIncidents...');
+      const response = await api('/capabilities/SummarizeIncidents/run', {
+        method: 'POST',
+        body: {
+          channel: 'admin',
+          input,
+        },
+      });
+      renderIncidentIntelligence(response?.output || null);
+      const generatedAt = String(response?.output?.data?.generatedAt || '').trim();
+      setStatus(
+        els.incidentIntelligenceStatus,
+        generatedAt
+          ? `Incidentanalys uppdaterad (${generatedAt}).`
+          : 'Incidentanalys uppdaterad.'
+      );
+    } catch (error) {
+      setStatus(
+        els.incidentIntelligenceStatus,
+        error.message || 'Kunde inte köra incidentanalys.',
+        true
+      );
+    }
+  }
+
+  function readDailyBriefOptions() {
+    const rawDays = Number(els.dailyBriefTimeframeDays?.value || 14);
+    const rawMaxTasks = Number(els.dailyBriefMaxTasks?.value || 5);
+    const timeframeDays = Number.isFinite(rawDays) ? Math.max(1, Math.min(90, rawDays)) : 14;
+    const maxTasks = Number.isFinite(rawMaxTasks) ? Math.max(1, Math.min(5, rawMaxTasks)) : 5;
+    if (els.dailyBriefTimeframeDays) els.dailyBriefTimeframeDays.value = String(timeframeDays);
+    if (els.dailyBriefMaxTasks) els.dailyBriefMaxTasks.value = String(maxTasks);
+    return {
+      includeClosed: Boolean(els.dailyBriefIncludeClosed?.checked),
+      timeframeDays,
+      maxTasks,
+      includeEvidence: true,
+    };
+  }
+
+  function normalizeDailyBriefOutput(payload = null) {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload?.output?.data && typeof payload.output === 'object') return payload.output;
+    if (payload?.data && payload?.metadata) return payload;
+    if (payload?.entry?.output?.data) return payload.entry.output;
+    return null;
+  }
+
+  function renderDailyBrief(output = null) {
+    const normalized = normalizeDailyBriefOutput(output);
+    const data = normalized?.data && typeof normalized.data === 'object' ? normalized.data : null;
+    if (!data) {
+      if (els.dailyBriefPriority) els.dailyBriefPriority.textContent = '-';
+      if (els.dailyBriefSeverity) els.dailyBriefSeverity.textContent = 'L3=0, L4=0, L5=0';
+      if (els.dailyBriefSummary) els.dailyBriefSummary.textContent = 'Ingen daily brief an.';
+      renderIncidentIntelligenceList(
+        els.dailyBriefRecommendations,
+        [],
+        'Inga rekommendationer an.'
+      );
+      return;
+    }
+
+    const incidentSummary =
+      data.incidentSummary && typeof data.incidentSummary === 'object' ? data.incidentSummary : {};
+    const severity =
+      incidentSummary.severityBreakdown && typeof incidentSummary.severityBreakdown === 'object'
+        ? incidentSummary.severityBreakdown
+        : {};
+    const l3 = Number(severity.L3 || 0);
+    const l4 = Number(severity.L4 || 0);
+    const l5 = Number(severity.L5 || 0);
+
+    if (els.dailyBriefPriority) {
+      els.dailyBriefPriority.textContent = String(data.priorityLevel || '-');
+    }
+    if (els.dailyBriefSeverity) {
+      els.dailyBriefSeverity.textContent = `L3=${l3}, L4=${l4}, L5=${l5}`;
+    }
+    if (els.dailyBriefSummary) {
+      els.dailyBriefSummary.textContent = String(data.executiveSummary || 'Ingen summary.');
+    }
+    renderIncidentIntelligenceList(
+      els.dailyBriefRecommendations,
+      Array.isArray(incidentSummary.recommendations) ? incidentSummary.recommendations.slice(0, 5) : [],
+      'Inga rekommendationer an.'
+    );
+  }
+
+  async function loadDailyBrief({ quiet = true } = {}) {
+    try {
+      const response = await api('/agents/analysis?agent=COO&limit=1');
+      const entry = Array.isArray(response?.entries) && response.entries.length > 0
+        ? response.entries[0]
+        : null;
+      if (entry?.output) {
+        renderDailyBrief(entry.output);
+        if (!quiet) {
+          const generatedAt = String(entry?.output?.data?.generatedAt || '').trim();
+          setStatus(
+            els.dailyBriefStatus,
+            generatedAt ? `Daily brief laddad (${generatedAt}).` : 'Daily brief laddad.'
+          );
+        }
+        return;
+      }
+      renderDailyBrief(null);
+      if (!quiet) setStatus(els.dailyBriefStatus, 'Ingen tidigare daily brief hittades.');
+    } catch (error) {
+      renderDailyBrief(null);
+      if (!quiet) {
+        setStatus(els.dailyBriefStatus, error.message || 'Kunde inte lasa daily brief.', true);
+      }
+    }
+  }
+
+  async function runDailyBrief() {
+    try {
+      if (!canTemplateWrite()) throw new Error('Du saknar behorighet.');
+      const input = readDailyBriefOptions();
+      setStatus(els.dailyBriefStatus, 'Kor COO Daily Brief...');
+      const response = await api('/agents/COO/run', {
+        method: 'POST',
+        body: {
+          channel: 'admin',
+          input,
+        },
+      });
+      renderDailyBrief(response?.output || null);
+      const generatedAt = String(response?.output?.data?.generatedAt || '').trim();
+      setStatus(
+        els.dailyBriefStatus,
+        generatedAt ? `Daily brief uppdaterad (${generatedAt}).` : 'Daily brief uppdaterad.'
+      );
+    } catch (error) {
+      setStatus(els.dailyBriefStatus, error.message || 'Kunde inte kora daily brief.', true);
+    }
+  }
+
   async function fetchCalibrationSuggestion() {
     try {
       setStatus(els.calibrationStatus, 'Hämtar kalibreringsförslag...');
@@ -6382,6 +7187,85 @@
     els.monitorPublicChatBetaResult.textContent = lines.join('\n');
   }
 
+  function renderMonitorPatientConversion(statusResponse = null) {
+    if (!els.monitorPatientConversionSummary || !els.monitorPatientConversionResult) return;
+    const feedback = statusResponse?.patientChannel?.conversionFeedback;
+    if (!feedback || typeof feedback !== 'object') {
+      els.monitorPatientConversionSummary.textContent = '';
+      els.monitorPatientConversionResult.textContent = isEnglishLanguage()
+        ? 'No patient conversion signal data yet.'
+        : 'Ingen patient conversion-signaldata ännu.';
+      return;
+    }
+
+    const summary = feedback?.summary && typeof feedback.summary === 'object' ? feedback.summary : {};
+    const check = feedback?.check && typeof feedback.check === 'object' ? feedback.check : {};
+    const value = check?.value && typeof check.value === 'object' ? check.value : {};
+    const totalRequests = Number(summary?.totalRequests || 0);
+    const deniedRatePct = Number(summary?.deniedRatePct || 0);
+    const conversionRatePct = Number(summary?.conversionIntentRatePct || 0);
+    const feedbackHealthy = summary?.feedbackHealthy === true;
+    const latestEventAt = summary?.latestEventAt || value?.latestEventAt || null;
+    const ageHoursRaw = summary?.ageHoursSinceLatest ?? value?.ageHoursSinceLatest;
+    const ageHoursSinceLatest = Number.isFinite(Number(ageHoursRaw))
+      ? Number(ageHoursRaw)
+      : null;
+    const status = String(check?.status || 'unknown').toLowerCase();
+    const windowDays = Number(feedback?.windowDays || statusResponse?.patientChannel?.windowDays || 0);
+
+    els.monitorPatientConversionSummary.textContent = isEnglishLanguage()
+      ? `status=${status} healthy=${feedbackHealthy ? 'yes' : 'no'} requests=${totalRequests} deniedRate=${deniedRatePct}% conversionRate=${conversionRatePct}%`
+      : `status=${status} healthy=${feedbackHealthy ? 'ja' : 'nej'} requests=${totalRequests} deniedRate=${deniedRatePct}% conversionRate=${conversionRatePct}%`;
+
+    const lines = [
+      `windowDays=${windowDays}`,
+      `latestEvent=${formatDateTime(latestEventAt)} (${formatRelativeAge(latestEventAt)})`,
+      `ageHoursSinceLatest=${ageHoursSinceLatest !== null ? ageHoursSinceLatest : '-'}`,
+      `feedbackHealthy=${feedbackHealthy ? 'yes' : 'no'}`,
+    ];
+    if (check?.evidence) {
+      lines.push(`evidence: ${String(check.evidence)}`);
+    }
+
+    const topDeniedHosts = Array.isArray(summary?.topDeniedHosts) ? summary.topDeniedHosts : [];
+    const topSignals = Array.isArray(summary?.topIntentSignals) ? summary.topIntentSignals : [];
+    const daily = Array.isArray(summary?.daily) ? summary.daily : [];
+
+    lines.push('');
+    lines.push(isEnglishLanguage() ? 'Top denied hosts:' : 'Top denied hosts:');
+    if (topDeniedHosts.length === 0) {
+      lines.push(isEnglishLanguage() ? '- none' : '- inga');
+    } else {
+      topDeniedHosts.slice(0, 5).forEach((item) => {
+        lines.push(`- ${String(item?.key || '-')} count=${Number(item?.count || 0)}`);
+      });
+    }
+
+    lines.push('');
+    lines.push(isEnglishLanguage() ? 'Top intent signals:' : 'Top intent-signaler:');
+    if (topSignals.length === 0) {
+      lines.push(isEnglishLanguage() ? '- none' : '- inga');
+    } else {
+      topSignals.slice(0, 6).forEach((item) => {
+        lines.push(`- ${String(item?.key || '-')} count=${Number(item?.count || 0)}`);
+      });
+    }
+
+    lines.push('');
+    lines.push(isEnglishLanguage() ? 'Recent daily series:' : 'Senaste dagsserie:');
+    if (daily.length === 0) {
+      lines.push(isEnglishLanguage() ? '- no events in window' : '- inga event i fönstret');
+    } else {
+      daily.slice(-7).forEach((item) => {
+        lines.push(
+          `${String(item?.date || '-')} requests=${Number(item?.totalRequests || 0)} denied=${Number(item?.deniedRequests || 0)} conversionSignals=${Number(item?.conversionIntentRequests || 0)}`
+        );
+      });
+    }
+
+    els.monitorPatientConversionResult.textContent = lines.join('\n');
+  }
+
   function renderMonitorScheduler(statusResponse = null) {
     if (!els.monitorSchedulerSummary || !els.monitorSchedulerResult) return;
     const scheduler = statusResponse?.runtime?.scheduler || null;
@@ -6709,6 +7593,7 @@
       renderPilotReportKpi(statusResponse);
       renderMonitorObservability(observabilityResponse);
       renderMonitorPublicChatBeta(statusResponse);
+      renderMonitorPatientConversion(statusResponse);
       renderMonitorScheduler(statusResponse);
       renderReadinessHistory(readinessHistoryResponse);
       renderReadinessNoGo(readinessResponse);
@@ -6727,15 +7612,23 @@
         statusResponse?.gates?.pilotReport?.ageHours ?? statusResponse?.kpis?.pilotReportAgeHours ?? '-';
       const observabilityStatus = String(observabilityResponse?.summary?.overallStatus || 'unknown');
       const observabilityAlerts = Number(observabilityResponse?.summary?.triggeredAlertsCount || 0);
+      const patientFeedbackStatus = String(
+        statusResponse?.patientChannel?.conversionFeedback?.check?.status || 'unknown'
+      );
+      const patientRequests = Number(statusResponse?.kpis?.patientRequestsWindow || 0);
+      const patientConversionRatePct = Number(
+        statusResponse?.kpis?.patientConversionIntentRatePct || 0
+      );
       setStatus(
         els.monitorPanelStatus,
-        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}, band=${band}, goAllowed=${goAllowed}, requiredBlockers=${requiredBlockers}, noGo=${triggeredNoGoCount}, remediation=${remediationTotal}, P0=${p0}, pilotReportHealthy=${pilotReportHealthy}, pilotReportAgeHours=${pilotReportAgeHours}, observability=${observabilityStatus}, alerts=${observabilityAlerts}`
+        `Monitor uppdaterad: templates=${templatesTotal}, evaluations=${evaluationsTotal}, highCriticalOpen=${highCriticalOpen}, band=${band}, goAllowed=${goAllowed}, requiredBlockers=${requiredBlockers}, noGo=${triggeredNoGoCount}, remediation=${remediationTotal}, P0=${p0}, pilotReportHealthy=${pilotReportHealthy}, pilotReportAgeHours=${pilotReportAgeHours}, observability=${observabilityStatus}, alerts=${observabilityAlerts}, patientFeedback=${patientFeedbackStatus}, patientRequests=${patientRequests}, patientConversionRatePct=${patientConversionRatePct}`
       );
     } catch (error) {
       renderReadinessKpi(null);
       renderPilotReportKpi(null);
       renderMonitorObservability(null);
       renderMonitorPublicChatBeta(null);
+      renderMonitorPatientConversion(null);
       renderMonitorScheduler(null);
       renderReadinessHistory(null);
       renderReadinessNoGo(null);
@@ -7398,6 +8291,10 @@
     renderRiskTable(reviewRows, incidentRows);
     fillTenantConfig(tenantConfig?.config || {});
     setStatus(els.tenantConfigStatus, '');
+    await Promise.all([
+      loadIncidentIntelligence({ quiet: true }),
+      loadDailyBrief({ quiet: true }),
+    ]);
   }
 
   async function refreshAll() {
@@ -7418,6 +8315,7 @@
       setStatus(els.opsStatus, '');
       if (els.restoreBackupFileInput) els.restoreBackupFileInput.value = '';
     }
+    ensureDashboardStreamConnected();
   }
 
   function applyAuthContext({ token, membership, memberships }) {
@@ -7569,6 +8467,7 @@
         return;
       }
 
+      stopDashboardStream({ resetRetry: false });
       setStatus(els.loginStatus, 'Byter tenant...');
       const response = await api('/auth/switch-tenant', {
         method: 'POST',
@@ -7595,6 +8494,7 @@
 
   async function restoreSession() {
     if (!state.token) {
+      stopDashboardStream();
       setAuthVisible(false);
       state.availableTenants = [];
       renderTenantSwitchOptions();
@@ -7611,6 +8511,7 @@
       setAuthVisible(true);
       await refreshAll();
     } catch {
+      stopDashboardStream();
       localStorage.removeItem(TOKEN_KEY);
       state.token = '';
       state.role = '';
@@ -7708,6 +8609,7 @@
   }
 
   function logout() {
+    stopDashboardStream();
     localStorage.removeItem(TOKEN_KEY);
     state.token = '';
     state.role = '';
@@ -7800,6 +8702,15 @@
       els.monitorRemediationResult.textContent = 'Ingen readiness-remediation ännu.';
     }
     if (els.opsResult) els.opsResult.textContent = 'Ingen ops-data ännu.';
+    if (els.incidentIntelTimeframeDays) els.incidentIntelTimeframeDays.value = '14';
+    if (els.incidentIntelIncludeClosed) els.incidentIntelIncludeClosed.checked = false;
+    renderIncidentIntelligence(null);
+    setStatus(els.incidentIntelligenceStatus, '');
+    if (els.dailyBriefTimeframeDays) els.dailyBriefTimeframeDays.value = '14';
+    if (els.dailyBriefMaxTasks) els.dailyBriefMaxTasks.value = '5';
+    if (els.dailyBriefIncludeClosed) els.dailyBriefIncludeClosed.checked = false;
+    renderDailyBrief(null);
+    setStatus(els.dailyBriefStatus, '');
     if (els.latestActivityList) {
       els.latestActivityList.innerHTML = '<li class="muted mini">Ingen aktivitet ännu.</li>';
     }
@@ -8042,6 +8953,17 @@
   els.appendSignatureBtn?.addEventListener('click', () => {
     appendTemplateSignatureToContent();
   });
+  els.revisionFromSelect?.addEventListener('change', () => {
+    state.selectedRevisionFrom = parseRevisionNumber(els.revisionFromSelect?.value);
+  });
+  els.revisionToSelect?.addEventListener('change', () => {
+    state.selectedRevisionTo = parseRevisionNumber(els.revisionToSelect?.value);
+  });
+  els.rollbackRevisionSelect?.addEventListener('change', () => {
+    state.selectedRollbackRevision = parseRevisionNumber(els.rollbackRevisionSelect?.value);
+  });
+  els.loadRevisionDiffBtn?.addEventListener('click', loadRevisionDiff);
+  els.rollbackRevisionBtn?.addEventListener('click', rollbackRevision);
   els.generateDraftBtn?.addEventListener('click', generateDraft);
   els.saveDraftBtn?.addEventListener('click', saveDraft);
   els.evaluateBtn?.addEventListener('click', evaluateVersion);
@@ -8136,6 +9058,8 @@
   });
   els.runRiskPreviewBtn?.addEventListener('click', runRiskPreview);
   els.runOrchestratorBtn?.addEventListener('click', runOrchestrator);
+  els.runIncidentIntelligenceBtn?.addEventListener('click', runIncidentIntelligence);
+  els.runDailyBriefBtn?.addEventListener('click', runDailyBrief);
   els.fetchCalibrationSuggestionBtn?.addEventListener('click', fetchCalibrationSuggestion);
   els.applyCalibrationSuggestionBtn?.addEventListener('click', applyCalibrationSuggestion);
   els.runPilotReportBtn?.addEventListener('click', runPilotReport);
@@ -8360,6 +9284,9 @@
     if (!hasOpenDrawer) return;
     event.preventDefault();
     closeAllDrawers();
+  });
+  window.addEventListener('beforeunload', () => {
+    stopDashboardStream({ resetRetry: false });
   });
 
   syncRiskFilterInputs();

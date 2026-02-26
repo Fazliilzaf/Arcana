@@ -5,6 +5,7 @@ const path = require('node:path');
 const { hashPassword, verifyPassword } = require('./password');
 const { ROLE_OWNER, ROLE_STAFF, normalizeRole, isValidRole } = require('./roles');
 const { getRequestContext } = require('../observability/requestContext');
+const { publishRuntimeEvent } = require('../observability/eventBus');
 
 function nowIso() {
   return new Date().toISOString();
@@ -457,10 +458,10 @@ async function createAuthStore({
     };
   }
 
-  const auditChainMigration = inspectAuditChain({ repairMissing: true, maxIssues: 50 });
+  const auditChainMigration = inspectAuditChain({ repairMissing: false, maxIssues: 50 });
   if (auditChainMigration.issues.length > 0) {
     console.warn(
-      `Audit chain warning: ${auditChainMigration.issues.length} issue(s) detected in ${filePath}.`
+      `Audit chain warning: ${auditChainMigration.issues.length} issue(s) detected in ${filePath}. Run scripts/audit-repair.js explicitly if repair is required.`
     );
   }
 
@@ -632,7 +633,9 @@ async function createAuthStore({
     });
     state.auditEvents.push(event);
     await save();
-    return toSafeAuditEvent(event);
+    const safeEvent = toSafeAuditEvent(event);
+    publishRuntimeEvent('audit.event', safeEvent);
+    return safeEvent;
   }
 
   async function createUser({ email, password, mfaRequired = false }) {

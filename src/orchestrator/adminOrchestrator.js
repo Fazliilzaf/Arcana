@@ -233,7 +233,7 @@ function composeDraftResponse({ intent, tenantConfig, role, prompt }) {
   ].join(' ');
 }
 
-function enforceOutputSafety({ text, tenantRiskModifier }) {
+function enforceOutputSafety({ text, tenantRiskModifier, riskThresholdVersion = 1 }) {
   const initialPolicy = evaluatePolicyFloorText({
     text,
     context: 'orchestrator',
@@ -243,6 +243,7 @@ function enforceOutputSafety({ text, tenantRiskModifier }) {
     category: 'INTERNAL',
     content: text,
     tenantRiskModifier,
+    riskThresholdVersion,
   });
 
   if (!initialPolicy.blocked && initialRisk.decision !== 'blocked') {
@@ -266,6 +267,7 @@ function enforceOutputSafety({ text, tenantRiskModifier }) {
     category: 'INTERNAL',
     content: safeText,
     tenantRiskModifier,
+    riskThresholdVersion,
   });
 
   return {
@@ -293,9 +295,17 @@ async function runAdminOrchestration({
     prompt,
   });
   const tenantRiskModifier = Number(tenantConfig?.riskSensitivityModifier ?? 0);
+  const riskThresholdVersion = Number.parseInt(
+    String(tenantConfig?.riskThresholdVersion ?? 1),
+    10
+  );
   const safeOutput = enforceOutputSafety({
     text: draftResponse,
     tenantRiskModifier,
+    riskThresholdVersion:
+      Number.isFinite(riskThresholdVersion) && riskThresholdVersion > 0
+        ? riskThresholdVersion
+        : 1,
   });
 
   return {

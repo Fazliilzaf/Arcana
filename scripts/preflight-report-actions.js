@@ -187,7 +187,8 @@ function buildActions(report) {
       priority: 'P0',
       title: 'Verifiera OWNER credentials för publik smoke',
       command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run smoke:public`,
-      details: 'Om MFA krävs: sätt ARCANA_OWNER_MFA_CODE eller ARCANA_OWNER_MFA_SECRET och kör igen.',
+      details:
+        'Om MFA krävs: sätt ARCANA_OWNER_MFA_CODE, ARCANA_OWNER_MFA_SECRET eller ARCANA_OWNER_MFA_RECOVERY_CODE och kör igen.',
       source: 'preflight',
     });
     pushAction(actions, {
@@ -244,14 +245,36 @@ function buildActions(report) {
 
   if (
     includesText(strictFailures, 'pilot report gate is no-go') ||
-    includesText(strictFailures, 'restore drill gate is no-go')
+    includesText(strictFailures, 'restore drill gate is no-go') ||
+    includesText(strictFailures, 'restore full drill gate is no-go') ||
+    includesText(strictFailures, 'audit integrity daily gate is no-go') ||
+    includesText(strictFailures, 'secret rotation daily gate is no-go')
   ) {
     pushAction(actions, {
       id: 'ops_refresh_pilot_restore',
       priority: 'P1',
-      title: 'Uppdatera pilot report + restore drill evidens',
+      title: 'Uppdatera scheduler governance-evidens',
       command: `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite`,
-      details: 'required_suite kör nightly report och restore drill i samma körning.',
+      details:
+        'required_suite kör nightly report, restore preview/full, audit integrity och secrets-rotation snapshot i samma körning.',
+      source: 'strict',
+    });
+  }
+
+  if (
+    includesText(strictFailures, 'release governance gate is not passed') ||
+    includesText(strictFailures, 'release governance post-launch daily review is not healthy') ||
+    includesText(strictFailures, 'release governance reality-audit is overdue') ||
+    includesText(strictFailures, 'release governance post-launch stabilization window is not healthy')
+  ) {
+    pushAction(actions, {
+      id: 'release_governance_status',
+      priority: 'P1',
+      title: 'Åtgärda release governance blockers',
+      command:
+        `BASE_URL=${publicUrl} ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run ops:suite:strict`,
+      details:
+        'Verifiera /ops/release/status, registrera saknad evidence/sign-off/reviews, säkra post-launch stabiliseringsfönster och markera reality-audit.',
       source: 'strict',
     });
   }

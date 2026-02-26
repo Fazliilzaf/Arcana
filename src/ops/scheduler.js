@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 
 const { buildPilotReport } = require('../reports/pilotReport');
@@ -10,11 +11,14 @@ const {
   listBackups,
   pruneBackups,
   inspectBackupRestore,
+  restoreFromBackup,
 } = require('./stateBackup');
 
 function nowIso() {
   return new Date().toISOString();
 }
+
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
@@ -46,6 +50,10 @@ function sanitizeError(error) {
   return String(error);
 }
 
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function safeInteger(value, fallback = 0) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed)) return fallback;
@@ -64,10 +72,34 @@ function toMinutesMs(value, fallbackMinutes) {
   return minutes * 60 * 1000;
 }
 
+function toAgeHours(isoTs, nowMs = Date.now()) {
+  const ts = Date.parse(String(isoTs || ''));
+  if (!Number.isFinite(ts)) return null;
+  if (ts > nowMs) return 0;
+  return Number(((nowMs - ts) / (60 * 60 * 1000)).toFixed(2));
+}
+
+function toAgeDays(isoTs, nowMs = Date.now()) {
+  const ts = Date.parse(String(isoTs || ''));
+  if (!Number.isFinite(ts)) return null;
+  if (ts > nowMs) return 0;
+  return Number(((nowMs - ts) / (24 * 60 * 60 * 1000)).toFixed(2));
+}
+
+function toUtcDateKey(value = null) {
+  const ts = value ? Date.parse(String(value)) : Date.now();
+  if (!Number.isFinite(ts)) return '';
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
 function createScheduler({
   config,
   authStore,
   templateStore,
+  runtimeMetricsStore = null,
+  secretRotationStore = null,
+  sloTicketStore = null,
+  releaseGovernanceStore = null,
   alertNotifier = null,
   logger = console,
 } = {}) {
@@ -262,6 +294,547 @@ function createScheduler({
     };
   }
 
+  async function runRestoreDrillFull({ tenantId, trigger = 'scheduled', actorUserId = null }) {
+    const latest = await listBackups({
+      backupDir: config.backupDir,
+      limit: 1,
+    });
+
+    if (!Array.isArray(latest) || latest.length === 0) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'no_backups_found',
+      };
+    }
+
+    const backupFile = latest[0];
+    const backupFileName = backupFile?.fileName || null;
+    const backupFilePath = backupFile?.filePath || '';
+    if (!normalizeText(backupFilePath)) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'backup_file_path_missing',
+      };
+    }
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-restore-drill-full-'));
+    try {
+      const sourceMap = getStateFileMap(config);
+      const tempStateFileMap = {};
+      for (const [storeName] of Object.entries(sourceMap || {})) {
+        tempStateFileMap[storeName] = path.join(tempDir, `${storeName}.json`);
+      }
+
+      const restore = await restoreFromBackup({
+        backupFilePath,
+        stateFileMap: tempStateFileMap,
+      });
+
+      let restoredCount = 0;
+      let missingCount = 0;
+      let parseErrorCount = 0;
+      const stores = [];
+
+      for (const item of Array.isArray(restore?.stores) ? restore.stores : []) {
+        const restored = item?.restored === true;
+        if (!restored) {
+          missingCount += 1;
+          stores.push({
+            name: normalizeText(item?.name) || null,
+            restored: false,
+            reason: normalizeText(item?.reason) || 'missing_in_backup',
+            validated: false,
+          });
+          continue;
+        }
+
+        restoredCount += 1;
+        let parseOk = false;
+        try {
+          const restoredRaw = await fs.readFile(item.filePath, 'utf8');
+          JSON.parse(restoredRaw);
+          parseOk = true;
+        } catch (error) {
+          parseErrorCount += 1;
+          parseOk = false;
+          stores.push({
+            name: normalizeText(item?.name) || null,
+            restored: true,
+            reason: 'restore_parse_error',
+            validated: false,
+            error: sanitizeError(error),
+          });
+        }
+
+        if (parseOk) {
+          stores.push({
+            name: normalizeText(item?.name) || null,
+            restored: true,
+            reason: null,
+            validated: true,
+          });
+        }
+      }
+
+      const hasFailures = parseErrorCount > 0;
+      if (hasFailures) {
+        await addAudit({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          action: 'backup.restore_drill_full.failure',
+          outcome: 'failure',
+          targetType: 'backup',
+          targetId: backupFileName || 'unknown',
+          metadata: {
+            trigger,
+            backupFileName,
+            restoredCount,
+            missingCount,
+            parseErrorCount,
+          },
+        });
+
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'backup.restore_drill_full.failure',
+          severity: 'critical',
+          payload: {
+            trigger,
+            backupFileName,
+            restoredCount,
+            missingCount,
+            parseErrorCount,
+          },
+        });
+      }
+
+      return {
+        tenantId,
+        backupFileName,
+        restoredCount,
+        missingCount,
+        parseErrorCount,
+        ok: !hasFailures,
+        stores: stores.slice(0, 25),
+      };
+    } finally {
+      await fs.rm(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  async function runAuditIntegrityCheck({ tenantId, trigger = 'scheduled', actorUserId = null }) {
+    if (typeof authStore?.verifyAuditIntegrity !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'auth_store_verify_integrity_unavailable',
+      };
+    }
+
+    const integrity = await authStore.verifyAuditIntegrity({ maxIssues: 100 });
+    const issues = Array.isArray(integrity?.issues) ? integrity.issues : [];
+    const ok = integrity?.ok === true;
+    const result = {
+      tenantId,
+      ok,
+      checkedEvents: Number(integrity?.checkedEvents || 0),
+      issues: issues.length,
+      issuesPreview: issues.slice(0, 10),
+    };
+
+    if (!ok) {
+      await addAudit({
+        tenantId,
+        actorUserId: actorUserId || 'scheduler',
+        action: 'audit.integrity.failure',
+        outcome: 'failure',
+        targetType: 'audit',
+        targetId: 'integrity',
+        metadata: {
+          trigger,
+          checkedEvents: result.checkedEvents,
+          issues: result.issues,
+        },
+      });
+
+      await sendAlertNotification({
+        tenantId,
+        actorUserId: actorUserId || 'scheduler',
+        eventType: 'audit.integrity.failure',
+        severity: 'critical',
+        payload: {
+          trigger,
+          checkedEvents: result.checkedEvents,
+          issues: result.issues,
+          issuesPreview: result.issuesPreview,
+        },
+      });
+    }
+
+    return result;
+  }
+
+  async function runSecretRotationSnapshot({ tenantId, trigger = 'scheduled', actorUserId = null }) {
+    if (!secretRotationStore || typeof secretRotationStore.captureSnapshot !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'secret_rotation_store_unavailable',
+      };
+    }
+
+    const dryRun = Boolean(config.schedulerSecretRotationDryRun);
+    const source = dryRun ? 'scheduler_secret_rotation_preview' : 'scheduler_secret_rotation_commit';
+    const snapshot = await secretRotationStore.captureSnapshot({
+      actorUserId: actorUserId || 'scheduler',
+      source,
+      note:
+        normalizeText(config.schedulerSecretRotationNote) ||
+        'Scheduled secret rotation snapshot',
+      dryRun,
+      force: false,
+    });
+    const staleRequired = Number(snapshot?.totals?.staleRequired || 0);
+    const pendingRotation = Number(snapshot?.totals?.pendingRotation || 0);
+    const tracked = Number(snapshot?.totals?.tracked || 0);
+    const required = Number(snapshot?.totals?.required || 0);
+    const changedCount = Number(snapshot?.totals?.changedCount || 0);
+
+    let notification = {
+      ok: false,
+      skipped: true,
+      reason: 'no_alert_required',
+    };
+
+    if (staleRequired > 0 || pendingRotation > 0) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: staleRequired > 0 ? 'secrets.rotation.stale_required' : 'secrets.rotation.pending',
+          severity: staleRequired > 0 ? 'critical' : 'warn',
+          payload: {
+            trigger,
+            dryRun,
+            tracked,
+            required,
+            staleRequired,
+            pendingRotation,
+            changedCount,
+          },
+        })
+      );
+    }
+
+    return {
+      tenantId,
+      dryRun,
+      tracked,
+      required,
+      staleRequired,
+      pendingRotation,
+      changedCount,
+      notification,
+    };
+  }
+
+  async function runReleaseGovernanceReview({
+    tenantId,
+    trigger = 'scheduled',
+    actorUserId = null,
+  }) {
+    if (
+      !releaseGovernanceStore ||
+      typeof releaseGovernanceStore.evaluateCycle !== 'function'
+    ) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'release_governance_store_unavailable',
+      };
+    }
+
+    const evaluateReleaseCycle = () =>
+      releaseGovernanceStore.evaluateCycle({
+        tenantId,
+        requiredNoGoFreeDays: Number(config?.releaseNoGoFreeDays || 14),
+        requirePentestEvidence: Boolean(config?.releaseRequirePentestEvidence),
+        pentestMaxAgeDays: Number(config?.releasePentestMaxAgeDays || 120),
+        postLaunchReviewWindowDays: Number(config?.releasePostLaunchReviewWindowDays || 30),
+        postLaunchStabilizationDays: Number(config?.releasePostLaunchStabilizationDays || 14),
+        enforcePostLaunchStabilization: Boolean(config?.releaseEnforcePostLaunchStabilization),
+        requireDistinctSignoffUsers: Boolean(config?.releaseRequireDistinctSignoffUsers),
+        realityAuditIntervalDays: Number(config?.releaseRealityAuditIntervalDays || 90),
+        requireFinalLiveSignoff: Boolean(config?.releaseRequireFinalLiveSignoff),
+      });
+
+    let payload = await evaluateReleaseCycle();
+
+    if (!payload?.cycle) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'no_release_cycle',
+      };
+    }
+
+    let evaluation = payload?.evaluation && typeof payload.evaluation === 'object'
+      ? payload.evaluation
+      : null;
+    let status = normalizeText(payload?.cycle?.status || '').toLowerCase();
+    const autoReviewEnabled = Boolean(config?.schedulerReleaseGovernanceAutoReviewEnabled);
+    let autoReview = {
+      enabled: autoReviewEnabled,
+      created: false,
+      skipped: true,
+      reason: status === 'launched' ? 'not_needed' : 'cycle_not_launched',
+      reviewId: null,
+      status: null,
+      openIncidents: 0,
+      breachedIncidents: 0,
+      highCriticalOpenCount: 0,
+      triggeredNoGoCount: 0,
+    };
+
+    if (status === 'launched' && autoReviewEnabled) {
+      if (typeof releaseGovernanceStore.addPostLaunchReview !== 'function') {
+        autoReview.reason = 'auto_review_api_unavailable';
+      } else {
+        const todayKey = toUtcDateKey();
+        const reviews = Array.isArray(payload?.cycle?.postLaunchReviews)
+          ? payload.cycle.postLaunchReviews
+          : [];
+        const alreadyReviewedToday = reviews.some((item) => toUtcDateKey(item?.ts) === todayKey);
+
+        if (alreadyReviewedToday) {
+          autoReview.reason = 'already_reviewed_today';
+        } else {
+          const incidentsSummary =
+            typeof templateStore?.summarizeIncidents === 'function'
+              ? await templateStore.summarizeIncidents({ tenantId })
+              : null;
+          const riskSummary =
+            typeof templateStore?.summarizeRisk === 'function'
+              ? await templateStore.summarizeRisk({ tenantId })
+              : null;
+
+          const openIncidents = Math.max(
+            0,
+            Number(incidentsSummary?.totals?.openUnresolved || 0)
+          );
+          const breachedIncidents = Math.max(
+            0,
+            Number(incidentsSummary?.totals?.breachedOpen || 0)
+          );
+          const highCriticalOpenCount = Array.isArray(riskSummary?.highCriticalOpen)
+            ? riskSummary.highCriticalOpen.length
+            : Math.max(0, Number(riskSummary?.highCriticalOpenCount || 0));
+          const triggeredNoGoCount = highCriticalOpenCount > 0 ? 1 : 0;
+
+          let reviewStatus = 'ok';
+          if (breachedIncidents > 0 || highCriticalOpenCount > 0) reviewStatus = 'incident';
+          else if (openIncidents > 0) reviewStatus = 'risk';
+
+          const noteParts = [`Auto post-launch review via scheduler (${trigger})`];
+          if (highCriticalOpenCount > 0) {
+            noteParts.push(`highCriticalOpen=${highCriticalOpenCount}`);
+          }
+
+          const reviewResult = await releaseGovernanceStore.addPostLaunchReview({
+            tenantId,
+            cycleId: payload?.cycle?.id || null,
+            reviewerUserId: actorUserId || 'scheduler',
+            status: reviewStatus,
+            note: noteParts.join(' | '),
+            openIncidents,
+            breachedIncidents,
+            triggeredNoGoCount,
+          });
+
+          autoReview = {
+            enabled: true,
+            created: true,
+            skipped: false,
+            reason: null,
+            reviewId: reviewResult?.review?.id || null,
+            status: reviewResult?.review?.status || reviewStatus,
+            openIncidents,
+            breachedIncidents,
+            highCriticalOpenCount,
+            triggeredNoGoCount,
+          };
+
+          await addAudit({
+            tenantId,
+            actorUserId: actorUserId || 'scheduler',
+            action: 'release.governance.post_launch_review.auto',
+            outcome: 'success',
+            targetType: 'release_cycle',
+            targetId: payload?.cycle?.id || 'latest',
+            metadata: {
+              trigger,
+              cycleId: payload?.cycle?.id || null,
+              reviewId: autoReview.reviewId,
+              status: autoReview.status,
+              openIncidents,
+              breachedIncidents,
+              highCriticalOpenCount,
+              triggeredNoGoCount,
+            },
+          });
+
+          if (reviewStatus !== 'ok') {
+            await sendAlertNotification({
+              tenantId,
+              actorUserId: actorUserId || 'scheduler',
+              eventType: 'release.governance.post_launch_review_auto',
+              severity: reviewStatus === 'incident' ? 'critical' : 'warn',
+              payload: {
+                trigger,
+                cycleId: payload?.cycle?.id || null,
+                reviewId: autoReview.reviewId,
+                status: autoReview.status,
+                openIncidents,
+                breachedIncidents,
+                highCriticalOpenCount,
+                triggeredNoGoCount,
+              },
+            });
+          }
+
+          payload = await evaluateReleaseCycle();
+          evaluation = payload?.evaluation && typeof payload.evaluation === 'object'
+            ? payload.evaluation
+            : null;
+          status = normalizeText(payload?.cycle?.status || '').toLowerCase();
+        }
+      }
+    } else if (status === 'launched' && !autoReviewEnabled) {
+      autoReview.reason = 'auto_review_disabled';
+    }
+
+    const blockerCount = Number(evaluation?.blockers?.length || 0);
+    let notification = {
+      ok: false,
+      skipped: true,
+      reason: 'no_alert_required',
+    };
+
+    if (status !== 'launched' && blockerCount > 0) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'release.governance.blocked',
+          severity: blockerCount >= 2 ? 'critical' : 'warn',
+          payload: {
+            trigger,
+            cycleId: payload?.cycle?.id || null,
+            status,
+            releaseGatePassed: evaluation?.releaseGatePassed === true,
+            blockerCount,
+            blockers: Array.isArray(evaluation?.blockers)
+              ? evaluation.blockers.slice(0, 12)
+              : [],
+          },
+        })
+      );
+    } else if (status === 'launched' && evaluation?.postLaunchReview?.healthy !== true) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'release.governance.post_launch_review_missing',
+          severity: 'warn',
+          payload: {
+            trigger,
+            cycleId: payload?.cycle?.id || null,
+            expectedReviews: Number(evaluation?.postLaunchReview?.expectedReviews || 0),
+            actualReviews: Number(evaluation?.postLaunchReview?.actualReviews || 0),
+            coveragePercent: Number(evaluation?.postLaunchReview?.coveragePercent || 0),
+          },
+        })
+      );
+    } else if (evaluation?.realityAudit?.healthy === false) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'release.governance.reality_audit_overdue',
+          severity: 'warn',
+          payload: {
+            trigger,
+            cycleId: payload?.cycle?.id || null,
+            dueAt: evaluation?.realityAudit?.dueAt || null,
+            lastRealityAuditAt: evaluation?.realityAudit?.lastRealityAuditAt || null,
+          },
+        })
+      );
+    } else if (
+      status === 'launched' &&
+      evaluation?.postLaunchStabilization?.enforced === true &&
+      evaluation?.postLaunchStabilization?.healthy === false
+    ) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'release.governance.post_launch_stabilization_incomplete',
+          severity: 'warn',
+          payload: {
+            trigger,
+            cycleId: payload?.cycle?.id || null,
+            requiredDays: Number(evaluation?.postLaunchStabilization?.requiredDays || 0),
+            daysSinceLaunch: Number(evaluation?.postLaunchStabilization?.daysSinceLaunch || 0),
+            actualReviews: Number(evaluation?.postLaunchStabilization?.actualReviews || 0),
+            hasNoGoTrigger: evaluation?.postLaunchStabilization?.hasNoGoTrigger === true,
+          },
+        })
+      );
+    } else if (
+      status === 'launched' &&
+      evaluation?.releaseGatePassed === true &&
+      evaluation?.postLaunchStabilization?.completed === true &&
+      evaluation?.postLaunchStabilization?.hasNoGoTrigger !== true &&
+      Number(evaluation?.postLaunchStabilization?.actualReviews || 0) >=
+        Number(evaluation?.postLaunchStabilization?.requiredDays || 0) &&
+      evaluation?.finalLiveSignoff?.locked !== true
+    ) {
+      notification = summarizeNotificationResult(
+        await sendAlertNotification({
+          tenantId,
+          actorUserId: actorUserId || 'scheduler',
+          eventType: 'release.governance.final_live_signoff_required',
+          severity: 'warn',
+          payload: {
+            trigger,
+            cycleId: payload?.cycle?.id || null,
+            requiredDays: Number(evaluation?.postLaunchStabilization?.requiredDays || 0),
+            actualReviews: Number(evaluation?.postLaunchStabilization?.actualReviews || 0),
+            locked: evaluation?.finalLiveSignoff?.locked === true,
+          },
+        })
+      );
+    }
+
+    return {
+      tenantId,
+      cycleId: payload?.cycle?.id || null,
+      status: payload?.cycle?.status || null,
+      releaseGatePassed: evaluation?.releaseGatePassed === true,
+      blockerCount,
+      blockers: Array.isArray(evaluation?.blockers) ? evaluation.blockers.slice(0, 12) : [],
+      postLaunchReview: evaluation?.postLaunchReview || null,
+      postLaunchStabilization: evaluation?.postLaunchStabilization || null,
+      realityAudit: evaluation?.realityAudit || null,
+      autoReview,
+      notification,
+    };
+  }
+
   async function runAlertProbe({ tenantId, trigger = 'scheduled', actorUserId = null }) {
     const resolveIncidentOwnerUserId = async () => {
       if (typeof authStore?.listTenantMembers !== 'function') return '';
@@ -436,13 +1009,282 @@ function createScheduler({
       typeof templateStore?.summarizeIncidents === 'function'
         ? await templateStore.summarizeIncidents({ tenantId })
         : null;
+    const incidentsOpenCount = Number(incidentSummary?.totals?.openUnresolved || 0);
+    const incidentsBreachedOpenCount = Number(incidentSummary?.totals?.breachedOpen || 0);
+
+    const sloAutoTicketingEnabled =
+      Boolean(config.schedulerSloAutoTicketingEnabled) &&
+      Boolean(sloTicketStore && typeof sloTicketStore.upsertBreach === 'function');
+    const sloTicketMaxPerRun = Math.max(
+      1,
+      Math.min(25, Number(config.schedulerSloTicketMaxPerRun) || 8)
+    );
+    const runtimeMetrics =
+      runtimeMetricsStore && typeof runtimeMetricsStore.getSnapshot === 'function'
+        ? runtimeMetricsStore.getSnapshot({ areaLimit: 8 })
+        : null;
+    const sampledRequests = Number(runtimeMetrics?.totals?.sampledRequests || 0);
+    const serverErrors = Number(runtimeMetrics?.totals?.statusBuckets?.['5xx'] || 0);
+    const p95Ms = Number(runtimeMetrics?.latency?.p95Ms || 0);
+    const slowRequests = Number(runtimeMetrics?.totals?.slowRequests || 0);
+    const errorRatePct =
+      sampledRequests > 0
+        ? Number(((serverErrors / Math.max(1, sampledRequests)) * 100).toFixed(3))
+        : 0;
+    const maxErrorRatePct = Number(config?.observabilityAlertMaxErrorRatePct || 2.5);
+    const maxP95Ms = Number(config?.observabilityAlertMaxP95Ms || config?.metricsSlowRequestMs || 1800);
+    const maxSlowRequests = Math.max(1, Number(config?.observabilityAlertMaxSlowRequests || 25));
+    const restoreMaxAgeDays = Math.max(1, Number(config?.monitorRestoreDrillMaxAgeDays || 30));
+    const pilotMaxAgeHours = Math.max(1, Number(config?.monitorPilotReportMaxAgeHours || 36));
+    const restoreLastSuccessAt = normalizeText(state?.jobs?.restore_drill_preview?.lastSuccessAt);
+    const restoreFullLastSuccessAt = normalizeText(state?.jobs?.restore_drill_full?.lastSuccessAt);
+    const pilotLastSuccessAt = normalizeText(state?.jobs?.nightly_pilot_report?.lastSuccessAt);
+    const restoreAgeDays = toAgeDays(restoreLastSuccessAt);
+    const restoreFullAgeDays = toAgeDays(restoreFullLastSuccessAt);
+    const pilotAgeHours = toAgeHours(pilotLastSuccessAt);
+
+    const sloBreachCandidates = [];
+    if (incidentsOpenCount > 0 && incidentsBreachedOpenCount > 0) {
+      const breachRatePct = Number(
+        ((incidentsBreachedOpenCount / Math.max(1, incidentsOpenCount)) * 100).toFixed(3)
+      );
+      sloBreachCandidates.push({
+        signature: 'incident_response_breach',
+        severity: incidentsBreachedOpenCount >= 2 ? 'critical' : 'high',
+        summary: 'SLO breach: open incidents med SLA-breach',
+        details: `${incidentsBreachedOpenCount}/${incidentsOpenCount} öppna incidents är breachade (${breachRatePct}%).`,
+        metadata: {
+          trigger,
+          incidentsOpenCount,
+          incidentsBreachedOpenCount,
+          breachRatePct,
+        },
+      });
+    }
+    if (sampledRequests > 0 && errorRatePct > maxErrorRatePct) {
+      sloBreachCandidates.push({
+        signature: 'availability_http_breach',
+        severity: errorRatePct > maxErrorRatePct * 1.5 ? 'critical' : 'high',
+        summary: 'SLO breach: HTTP availability',
+        details: `5xx rate ${errorRatePct}% över tröskel ${maxErrorRatePct}%.`,
+        metadata: {
+          trigger,
+          sampledRequests,
+          serverErrors,
+          errorRatePct,
+          thresholdPct: maxErrorRatePct,
+        },
+      });
+    }
+    if (sampledRequests > 0 && p95Ms > maxP95Ms) {
+      sloBreachCandidates.push({
+        signature: 'latency_p95_breach',
+        severity: p95Ms > maxP95Ms * 1.5 ? 'critical' : 'high',
+        summary: 'SLO breach: latency p95',
+        details: `p95 ${p95Ms}ms över tröskel ${maxP95Ms}ms.`,
+        metadata: {
+          trigger,
+          sampledRequests,
+          p95Ms,
+          thresholdMs: maxP95Ms,
+        },
+      });
+    }
+    if (sampledRequests > 0 && slowRequests > maxSlowRequests) {
+      sloBreachCandidates.push({
+        signature: 'slow_requests_breach',
+        severity: slowRequests > maxSlowRequests * 2 ? 'critical' : 'high',
+        summary: 'SLO breach: slow requests',
+        details: `${slowRequests} slow requests över tröskel ${maxSlowRequests}.`,
+        metadata: {
+          trigger,
+          sampledRequests,
+          slowRequests,
+          threshold: maxSlowRequests,
+          slowRequestMs: Number(config?.metricsSlowRequestMs || 1500),
+        },
+      });
+    }
+    if (restoreAgeDays === null || restoreAgeDays > restoreMaxAgeDays) {
+      sloBreachCandidates.push({
+        signature: 'restore_drill_recency_breach',
+        severity: 'critical',
+        summary: 'SLO breach: restore drill recency',
+        details:
+          restoreAgeDays === null
+            ? 'Saknar restore drill success-evidens.'
+            : `Restore drill är ${restoreAgeDays} dagar gammal (mål <= ${restoreMaxAgeDays} dagar).`,
+        metadata: {
+          trigger,
+          restoreAgeDays,
+          thresholdDays: restoreMaxAgeDays,
+          lastSuccessAt: restoreLastSuccessAt || null,
+        },
+      });
+    }
+    if (restoreFullAgeDays === null || restoreFullAgeDays > restoreMaxAgeDays) {
+      sloBreachCandidates.push({
+        signature: 'restore_drill_full_recency_breach',
+        severity: 'critical',
+        summary: 'SLO breach: full restore drill recency',
+        details:
+          restoreFullAgeDays === null
+            ? 'Saknar full restore drill success-evidens.'
+            : `Full restore drill är ${restoreFullAgeDays} dagar gammal (mål <= ${restoreMaxAgeDays} dagar).`,
+        metadata: {
+          trigger,
+          restoreFullAgeDays,
+          thresholdDays: restoreMaxAgeDays,
+          lastSuccessAt: restoreFullLastSuccessAt || null,
+        },
+      });
+    }
+    if (pilotAgeHours === null || pilotAgeHours > pilotMaxAgeHours) {
+      sloBreachCandidates.push({
+        signature: 'pilot_report_recency_breach',
+        severity: pilotAgeHours === null ? 'high' : 'critical',
+        summary: 'SLO breach: nightly pilot report recency',
+        details:
+          pilotAgeHours === null
+            ? 'Saknar nightly pilot report success-evidens.'
+            : `Nightly pilot report är ${pilotAgeHours}h gammal (mål <= ${pilotMaxAgeHours}h).`,
+        metadata: {
+          trigger,
+          pilotAgeHours,
+          thresholdHours: pilotMaxAgeHours,
+          lastSuccessAt: pilotLastSuccessAt || null,
+        },
+      });
+    }
+
+    const sloTicketResult = {
+      enabled: sloAutoTicketingEnabled,
+      maxPerRun: sloTicketMaxPerRun,
+      breachesDetected: sloBreachCandidates.length,
+      processed: 0,
+      created: 0,
+      updated: 0,
+      autoResolved: 0,
+      autoResolvedIds: [],
+      details: [],
+      summary: null,
+    };
+
+    if (sloAutoTicketingEnabled) {
+      const activeSignatures = new Set(
+        sloBreachCandidates
+          .map((item) => normalizeText(item?.signature).toLowerCase())
+          .filter(Boolean)
+      );
+      if (
+        typeof sloTicketStore.listTickets === 'function' &&
+        typeof sloTicketStore.resolveTicket === 'function'
+      ) {
+        const openTickets = await sloTicketStore.listTickets({
+          tenantId,
+          status: 'open',
+          limit: 500,
+        });
+        const candidatesToResolve = Array.isArray(openTickets?.tickets)
+          ? openTickets.tickets.filter((ticket) => {
+              const signature = normalizeText(ticket?.signature).toLowerCase();
+              const source = normalizeText(ticket?.source);
+              if (!signature) return false;
+              if (activeSignatures.has(signature)) return false;
+              return source === 'scheduler.alert_probe';
+            })
+          : [];
+
+        for (const ticket of candidatesToResolve) {
+          const resolved = await sloTicketStore.resolveTicket({
+            tenantId,
+            ticketId: ticket.id,
+            resolvedBy: effectiveActorUserId,
+            note: `auto_resolved:${trigger}`,
+          });
+          if (!resolved) continue;
+          sloTicketResult.autoResolved += 1;
+          if (resolved.id) sloTicketResult.autoResolvedIds.push(resolved.id);
+          await addAudit({
+            tenantId,
+            actorUserId: effectiveActorUserId,
+            action: 'slo.ticket.auto_resolved',
+            outcome: 'success',
+            targetType: 'slo_ticket',
+            targetId: resolved.id,
+            metadata: {
+              trigger,
+              signature: normalizeText(resolved.signature).toLowerCase() || null,
+              source: normalizeText(resolved.source) || null,
+            },
+          });
+        }
+      }
+
+      const candidates = sloBreachCandidates.slice(0, sloTicketMaxPerRun);
+      for (const breach of candidates) {
+        const upsert = await sloTicketStore.upsertBreach({
+          tenantId,
+          signature: breach.signature,
+          severity: breach.severity,
+          summary: breach.summary,
+          details: breach.details,
+          metadata: breach.metadata,
+          source: 'scheduler.alert_probe',
+        });
+        const ticket = upsert?.ticket || null;
+        if (!ticket) continue;
+        sloTicketResult.processed += 1;
+        if (upsert.created) sloTicketResult.created += 1;
+        else sloTicketResult.updated += 1;
+        sloTicketResult.details.push({
+          signature: breach.signature,
+          severity: breach.severity,
+          ticketId: ticket.id,
+          created: upsert.created === true,
+        });
+
+        if (upsert.created) {
+          await addAudit({
+            tenantId,
+            actorUserId: effectiveActorUserId,
+            action: 'slo.ticket.created',
+            outcome: 'success',
+            targetType: 'slo_ticket',
+            targetId: ticket.id,
+            metadata: {
+              trigger,
+              signature: breach.signature,
+              severity: breach.severity,
+              summary: breach.summary,
+            },
+          });
+          await sendAlertNotification({
+            tenantId,
+            actorUserId: effectiveActorUserId,
+            eventType: 'slo.breach.ticket',
+            severity: breach.severity === 'critical' ? 'critical' : 'warn',
+            payload: {
+              trigger,
+              signature: breach.signature,
+              summary: breach.summary,
+              details: breach.details,
+              ticketId: ticket.id,
+            },
+          });
+        }
+      }
+      if (typeof sloTicketStore.summarize === 'function') {
+        sloTicketResult.summary = await sloTicketStore.summarize({ tenantId });
+      }
+    }
 
     return {
       tenantId,
       highCriticalOpenCount: highCriticalOpen.length,
       hasOpenHighCritical: highCriticalOpen.length > 0,
-      incidentsOpenCount: Number(incidentSummary?.totals?.openUnresolved || 0),
-      incidentsBreachedOpenCount: Number(incidentSummary?.totals?.breachedOpen || 0),
+      incidentsOpenCount,
+      incidentsBreachedOpenCount,
       autoOwnerAssignmentEnabled,
       autoAssignedOwnerCount: Number(autoOwnerAssignment?.assignedCount || 0),
       autoOwnerAssignmentTruncated: Boolean(autoOwnerAssignment?.truncated),
@@ -455,6 +1297,7 @@ function createScheduler({
         autoEscalate: summarizeNotificationResult(autoEscalationNotification),
       },
       topReasonCodes,
+      sloAutoTicketing: sloTicketResult,
     };
   }
 
@@ -476,6 +1319,30 @@ function createScheduler({
       name: 'Restore drill preview',
       intervalMs: toHoursMs(config.schedulerRestoreDrillIntervalHours, 168),
       run: runRestoreDrillPreview,
+    },
+    {
+      id: 'restore_drill_full',
+      name: 'Restore drill full (sandbox)',
+      intervalMs: toHoursMs(config.schedulerRestoreDrillFullIntervalHours, 720),
+      run: runRestoreDrillFull,
+    },
+    {
+      id: 'audit_integrity_check',
+      name: 'Audit integrity check',
+      intervalMs: toHoursMs(config.schedulerAuditIntegrityIntervalHours, 24),
+      run: runAuditIntegrityCheck,
+    },
+    {
+      id: 'secrets_rotation_snapshot',
+      name: 'Secrets rotation snapshot',
+      intervalMs: toHoursMs(config.schedulerSecretRotationIntervalHours, 24),
+      run: runSecretRotationSnapshot,
+    },
+    {
+      id: 'release_governance_review',
+      name: 'Release governance review',
+      intervalMs: toHoursMs(config.schedulerReleaseGovernanceIntervalHours, 24),
+      run: runReleaseGovernanceReview,
     },
     {
       id: 'alert_probe',
@@ -510,6 +1377,7 @@ function createScheduler({
       started: started,
       startedAt: state.startedAt,
       defaultTenantId: config.defaultTenantId,
+      sloAutoTicketingEnabled: Boolean(config.schedulerSloAutoTicketingEnabled),
       jobs: Object.values(state.jobs).map((job) => ({ ...job })),
     };
   }
@@ -522,16 +1390,29 @@ function createScheduler({
     }
   }
 
+  function setLongTimeout(jobId, delayMs, onElapsed) {
+    const safeDelay = Math.max(0, Number(delayMs) || 0);
+    if (safeDelay <= MAX_TIMEOUT_MS) {
+      const timer = setTimeout(onElapsed, safeDelay);
+      timers.set(jobId, timer);
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (!started) return;
+      setLongTimeout(jobId, safeDelay - MAX_TIMEOUT_MS, onElapsed);
+    }, MAX_TIMEOUT_MS);
+    timers.set(jobId, timer);
+  }
+
   function scheduleNext(job) {
     const runtime = state.jobs[job.id];
     if (!runtime?.enabled || !started) return;
     const nextRunAt = new Date(Date.now() + job.intervalMs).toISOString();
     runtime.nextRunAt = nextRunAt;
     clearJobTimer(job.id);
-    const timer = setTimeout(async () => {
+    setLongTimeout(job.id, job.intervalMs, async () => {
       await runJob(job.id, { trigger: 'scheduled' });
-    }, job.intervalMs);
-    timers.set(job.id, timer);
+    });
   }
 
   async function runJob(jobId, { trigger = 'manual', actorUserId = null, tenantId } = {}) {
@@ -649,10 +1530,9 @@ function createScheduler({
         : startupDelayMs + job.intervalMs + staggerMs + jitterMs;
       runtime.nextRunAt = new Date(Date.now() + initialDelayMs).toISOString();
       clearJobTimer(job.id);
-      const timer = setTimeout(async () => {
+      setLongTimeout(job.id, initialDelayMs, async () => {
         await runJob(job.id, { trigger: 'scheduled_startup' });
-      }, initialDelayMs);
-      timers.set(job.id, timer);
+      });
       await wait(5);
     }
 

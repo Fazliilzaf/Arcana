@@ -31,6 +31,7 @@ function parseArgs(argv) {
     tenantId: process.env.ARCANA_DEFAULT_TENANT || '',
     mfaCode: process.env.ARCANA_OWNER_MFA_CODE || '',
     mfaSecret: process.env.ARCANA_OWNER_MFA_SECRET || '',
+    mfaRecoveryCode: process.env.ARCANA_OWNER_MFA_RECOVERY_CODE || '',
     authStorePath: process.env.AUTH_STORE_PATH || './data/auth.json',
     showRecoveryCodes: parseBoolean(process.env.ARCANA_OWNER_MFA_SHOW_RECOVERY_CODES, false),
     printToken: parseBoolean(process.env.ARCANA_OWNER_MFA_PRINT_TOKEN, false),
@@ -65,6 +66,11 @@ function parseArgs(argv) {
     }
     if (item === '--mfa-secret') {
       args.mfaSecret = normalizeText(argv[index + 1] || '');
+      index += 1;
+      continue;
+    }
+    if (item === '--mfa-recovery-code') {
+      args.mfaRecoveryCode = normalizeText(argv[index + 1] || '');
       index += 1;
       continue;
     }
@@ -190,6 +196,7 @@ async function completeMfaFlow({
   email = '',
   mfaCode = '',
   mfaSecret = '',
+  mfaRecoveryCode = '',
   authStorePath = './data/auth.json',
 }) {
   if (loginResponse?.requiresMfa !== true) {
@@ -209,6 +216,7 @@ async function completeMfaFlow({
   const setup = loginResponse?.mfa && typeof loginResponse.mfa === 'object' ? loginResponse.mfa : null;
   const setupSecret = normalizeText(setup?.secret || '');
   let resolvedCode = normalizeText(mfaCode || '');
+  const resolvedRecoveryCode = normalizeText(mfaRecoveryCode || '');
   let usedSetupSecret = false;
 
   if (!resolvedCode) {
@@ -225,9 +233,10 @@ async function completeMfaFlow({
     }
   }
 
-  if (!resolvedCode) {
+  const verifyCode = resolvedCode || resolvedRecoveryCode;
+  if (!verifyCode) {
     throw new Error(
-      'MFA-kod kunde inte genereras. Ange --mfa-code eller --mfa-secret (eller AUTH_STORE_PATH med secret). Om recovery saknas helt: gör kontrollerad reset med ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true och deploy.'
+      'MFA-kod kunde inte genereras. Ange --mfa-code, --mfa-secret eller --mfa-recovery-code (eller motsvarande ARCANA_OWNER_MFA_* env / AUTH_STORE_PATH med secret). Om recovery saknas helt: gör kontrollerad reset med ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true och deploy.'
     );
   }
 
@@ -235,7 +244,7 @@ async function completeMfaFlow({
     method: 'POST',
     body: {
       mfaTicket,
-      code: resolvedCode,
+      code: verifyCode,
       tenantId: tenantId || undefined,
     },
   });
@@ -300,6 +309,7 @@ async function main() {
       email,
       mfaCode: args.mfaCode,
       mfaSecret: args.mfaSecret,
+      mfaRecoveryCode: args.mfaRecoveryCode,
       authStorePath: args.authStorePath,
     });
     authResponse = completed.response;

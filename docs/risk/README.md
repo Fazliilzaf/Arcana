@@ -16,3 +16,14 @@ Detta bibliotek innehåller benchmark-data för riskprecision i Arcana.
   - `npm run risk:goldset:report`
 - Läs rapport via API:
   - `GET /api/v1/risk/precision/report`
+  - valfria query-parametrar:
+    - `modifier` (override av tenant risk modifier)
+    - `thresholdVersion` (override av threshold-version för reproducerbar jämförelse)
+
+## Versionsspårning i evalueringar
+- Varje riskevaluering innehåller nu versionsmetadata:
+  - `ruleSetVersion`
+  - `thresholdVersion`
+  - `semanticModelVersion`
+  - `fusionVersion`
+  - `buildVersion`

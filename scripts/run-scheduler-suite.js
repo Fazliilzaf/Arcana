@@ -124,7 +124,8 @@ const BLOCKER_CHECK_HINTS = Object.freeze({
   },
   scheduler_required_jobs_enabled: {
     owner: 'ops_owner',
-    playbook: 'Enable all required jobs: nightly report, backup, restore drill, alert probe.',
+    playbook:
+      'Enable all required jobs: nightly report, backup, restore drill preview/full, audit integrity, secrets rotation snapshot, release governance review, alert probe.',
   },
   scheduler_job_freshness: {
     owner: 'ops_owner',
@@ -133,6 +134,18 @@ const BLOCKER_CHECK_HINTS = Object.freeze({
   restore_drill_30d: {
     owner: 'ops_owner',
     playbook: 'Run restore_drill_preview and verify successful audit event.',
+  },
+  restore_drill_full_30d: {
+    owner: 'ops_owner',
+    playbook: 'Run restore_drill_full and verify sandbox restore succeeds.',
+  },
+  audit_integrity_daily: {
+    owner: 'security_owner',
+    playbook: 'Run audit_integrity_check daily and resolve failures immediately.',
+  },
+  secret_rotation_daily: {
+    owner: 'security_owner',
+    playbook: 'Run secrets_rotation_snapshot daily and review stale/pending rotations.',
   },
   nightly_pilot_report_freshness: {
     owner: 'ops_owner',
@@ -173,10 +186,23 @@ const NOGO_TRIGGER_HINTS = Object.freeze({
     playbook:
       'Run restore_drill_preview and verify scheduler success + audit evidence within the 30-day window.',
   },
+  restore_drill_full_unverified_30d: {
+    owner: 'ops_owner',
+    playbook:
+      'Run restore_drill_full and verify scheduler success + sandbox restore evidence within the 30-day window.',
+  },
   nightly_pilot_report_unverified: {
     owner: 'ops_owner',
     playbook:
       'Run nightly_pilot_report and verify fresh scheduler success and report artifact evidence.',
+  },
+  audit_integrity_unverified_daily: {
+    owner: 'security_owner',
+    playbook: 'Run audit_integrity_check and ensure daily success evidence is fresh.',
+  },
+  secret_rotation_unverified_daily: {
+    owner: 'security_owner',
+    playbook: 'Run secrets_rotation_snapshot and ensure daily success evidence is fresh.',
   },
   audit_chain_not_immutable: {
     owner: 'security_owner',
@@ -212,6 +238,7 @@ function parseArgs(argv) {
     outFile: process.env.ARCANA_SCHEDULER_SUITE_OUT || '',
     mfaCode: process.env.ARCANA_OWNER_MFA_CODE || '',
     mfaSecret: process.env.ARCANA_OWNER_MFA_SECRET || '',
+    mfaRecoveryCode: process.env.ARCANA_OWNER_MFA_RECOVERY_CODE || '',
     authStorePath: process.env.AUTH_STORE_PATH || './data/auth.json',
     failOnNoGo: parseBoolean(process.env.ARCANA_OPS_SUITE_FAIL_ON_NO_GO, false),
     remediateOutputGates: parseBoolean(
@@ -274,6 +301,11 @@ function parseArgs(argv) {
     }
     if (item === '--mfa-secret') {
       args.mfaSecret = String(argv[index + 1] || '').trim();
+      index += 1;
+      continue;
+    }
+    if (item === '--mfa-recovery-code') {
+      args.mfaRecoveryCode = String(argv[index + 1] || '').trim();
       index += 1;
       continue;
     }
@@ -354,6 +386,10 @@ function normalizeBaseUrl(value) {
 }
 
 function generateTotpCode(secretRaw) {
+  return generateTotpCodeAt(secretRaw, Date.now());
+}
+
+function generateTotpCodeAt(secretRaw, timestampMs = Date.now()) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const secret = String(secretRaw || '')
     .toUpperCase()
@@ -377,7 +413,7 @@ function generateTotpCode(secretRaw) {
   const key = Buffer.from(bytes);
   if (!key.length) return '';
 
-  const counter = Math.floor(Date.now() / 1000 / 30);
+  const counter = Math.floor(Math.max(0, Number(timestampMs) || Date.now()) / 1000 / 30);
   const msg = Buffer.alloc(8);
   msg.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
   msg.writeUInt32BE(counter >>> 0, 4);
@@ -388,6 +424,40 @@ function generateTotpCode(secretRaw) {
     .toString()
     .padStart(6, '0');
   return code;
+}
+
+function generateTotpCodes(secretRaw) {
+  const secret = String(secretRaw || '').trim();
+  if (!secret) return [];
+  const now = Date.now();
+  const offsetsMs = [0, -30_000, 30_000, -60_000, 60_000];
+  const codes = [];
+  for (const offset of offsetsMs) {
+    const code = generateTotpCodeAt(secret, now + offset);
+    if (code && !codes.includes(code)) codes.push(code);
+  }
+  return codes;
+}
+
+function isMfaCodeError(error) {
+  const message = normalizeText(error?.message || String(error)).toLowerCase();
+  return (
+    message.includes('mfa') ||
+    message.includes('kod') ||
+    message.includes('invalid_code') ||
+    message.includes('too_many_attempts')
+  );
+}
+
+async function verifyMfaStep({ baseUrl, mfaTicket, code, tenantId = '' }) {
+  return fetchJson(baseUrl, '/api/v1/auth/mfa/verify', {
+    method: 'POST',
+    body: {
+      mfaTicket,
+      code,
+      tenantId: tenantId || undefined,
+    },
+  });
 }
 
 async function fetchJson(baseUrl, routePath, { method = 'GET', token = '', body } = {}) {
@@ -515,6 +585,7 @@ async function resolveToken({
   tenantId = '',
   mfaCode = '',
   mfaSecret = '',
+  mfaRecoveryCode = '',
   authStorePath = './data/auth.json',
 }) {
   const loginResponse = await fetchJson(baseUrl, '/api/v1/auth/login', {
@@ -537,31 +608,59 @@ async function resolveToken({
   let authStep = loginResponse;
   if (authStep?.requiresMfa === true) {
     const providedCode = String(mfaCode || '').trim();
-    let resolvedMfaSecret = String(mfaSecret || '').trim();
-    if (!providedCode && !resolvedMfaSecret) {
-      resolvedMfaSecret = await readMfaSecretFromStore({
-        email,
-        authStorePath,
-      });
+    const providedRecoveryCode = String(mfaRecoveryCode || '').trim();
+    const setupSecret = String(authStep?.mfa?.secret || '').trim();
+    const setupRecoveryCodes = Array.isArray(authStep?.mfa?.recoveryCodes)
+      ? authStep.mfa.recoveryCodes.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const providedSecret = String(mfaSecret || '').trim();
+    const storeSecret = await readMfaSecretFromStore({
+      email,
+      authStorePath,
+    });
+
+    const attempts = [];
+    if (providedCode) attempts.push(providedCode);
+    if (providedRecoveryCode) attempts.push(providedRecoveryCode);
+    for (const code of generateTotpCodes(setupSecret)) attempts.push(code);
+    for (const code of generateTotpCodes(providedSecret)) attempts.push(code);
+    for (const code of generateTotpCodes(storeSecret)) attempts.push(code);
+    if (setupRecoveryCodes.length > 0) attempts.push(setupRecoveryCodes[0]);
+
+    const uniqueAttempts = [];
+    for (const attempt of attempts) {
+      const normalized = String(attempt || '').trim();
+      if (!normalized) continue;
+      if (!uniqueAttempts.includes(normalized)) uniqueAttempts.push(normalized);
     }
-    const generatedCode = providedCode || generateTotpCode(resolvedMfaSecret);
-    if (!generatedCode) {
+    const attemptsLimited = uniqueAttempts.slice(0, 9);
+    if (attemptsLimited.length === 0) {
       throw new Error(
-        'MFA krävs men saknar kod. Sätt --mfa-code eller --mfa-secret / ARCANA_OWNER_MFA_CODE (eller AUTH_STORE_PATH med lokal mfaSecret). Om recovery saknas helt: gör kontrollerad reset med ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true och deploy.'
+        'MFA krävs men saknar kod. Sätt --mfa-code, --mfa-secret eller --mfa-recovery-code (eller motsvarande ARCANA_OWNER_MFA_* env / AUTH_STORE_PATH med lokal mfaSecret). Om recovery saknas helt: gör kontrollerad reset med ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true och deploy.'
       );
     }
     const mfaTicket = String(authStep?.mfaTicket || '').trim();
     if (!mfaTicket) {
       throw new Error('MFA krävs men mfaTicket saknas i login-svaret.');
     }
-    authStep = await fetchJson(baseUrl, '/api/v1/auth/mfa/verify', {
-      method: 'POST',
-      body: {
-        mfaTicket,
-        code: generatedCode,
-        tenantId: tenantId || undefined,
-      },
-    });
+    let lastMfaError = null;
+    for (const code of attemptsLimited) {
+      try {
+        authStep = await verifyMfaStep({
+          baseUrl,
+          mfaTicket,
+          code,
+          tenantId,
+        });
+        break;
+      } catch (error) {
+        lastMfaError = error;
+        if (!isMfaCodeError(error)) throw error;
+      }
+    }
+    if (!authStep?.token && authStep?.requiresTenantSelection !== true) {
+      throw lastMfaError || new Error('MFA verifiering misslyckades.');
+    }
   }
 
   if (authStep?.token) {
@@ -795,6 +894,7 @@ async function main() {
     tenantId,
     mfaCode: args.mfaCode,
     mfaSecret: args.mfaSecret,
+    mfaRecoveryCode: args.mfaRecoveryCode,
     authStorePath: args.authStorePath,
   });
 
@@ -860,6 +960,16 @@ async function main() {
   const readinessHistory = await fetchJson(baseUrl, '/api/v1/monitor/readiness/history?limit=14', {
     token: auth.token,
   });
+  let releaseGovernance = null;
+  try {
+    releaseGovernance = await fetchJson(baseUrl, '/api/v1/ops/release/status', {
+      token: auth.token,
+    });
+  } catch (error) {
+    releaseGovernance = {
+      error: normalizeText(error?.message || 'release_status_unavailable') || 'release_status_unavailable',
+    };
+  }
   let corsRuntimeProbe = null;
   const readinessNoGoTriggers = Array.isArray(readiness?.noGoTriggers) ? readiness.noGoTriggers : [];
   const triggeredNoGo = readinessNoGoTriggers
@@ -1123,6 +1233,7 @@ async function main() {
         latest: Array.isArray(readinessHistory?.entries) ? readinessHistory.entries[0] || null : null,
         entries: Array.isArray(readinessHistory?.entries) ? readinessHistory.entries : [],
       },
+      releaseGovernance,
       slo: {
         generatedAt: slo?.generatedAt || null,
         summary: slo?.summary || {},
@@ -1170,6 +1281,35 @@ async function main() {
   const historyLatestTs = Array.isArray(readinessHistory?.entries)
     ? String(readinessHistory.entries?.[0]?.ts || '-')
     : '-';
+  const releaseCycleId = normalizeText(releaseGovernance?.cycle?.id) || '-';
+  const releaseCycleStatus = normalizeText(releaseGovernance?.cycle?.status) || '-';
+  const releaseGatePassed = releaseGovernance?.evaluation?.releaseGatePassed === true;
+  const releaseBlockers = Number(releaseGovernance?.evaluation?.blockers?.length || 0);
+  const releasePostLaunchReviewHealthy =
+    releaseGovernance?.evaluation?.postLaunchReview?.healthy !== false;
+  const releasePostLaunchStabilization =
+    releaseGovernance?.evaluation?.postLaunchStabilization &&
+    typeof releaseGovernance.evaluation.postLaunchStabilization === 'object'
+      ? releaseGovernance.evaluation.postLaunchStabilization
+      : null;
+  const releasePostLaunchStabilizationCompleted =
+    releasePostLaunchStabilization?.completed === true;
+  const releaseStabilizationEnforced =
+    releasePostLaunchStabilization?.enforced === true;
+  const releasePostLaunchStabilizationHealthy =
+    releasePostLaunchStabilization?.healthy !== false;
+  const releaseRealityAuditHealthy =
+    releaseGovernance?.evaluation?.realityAudit?.healthy !== false;
+  const releaseFinalLiveSignoff =
+    releaseGovernance?.evaluation?.finalLiveSignoff &&
+    typeof releaseGovernance.evaluation.finalLiveSignoff === 'object'
+      ? releaseGovernance.evaluation.finalLiveSignoff
+      : null;
+  const releaseFinalLiveSignoffLocked = releaseFinalLiveSignoff?.locked === true;
+  const releaseFinalLiveSignoffLockedAt = normalizeText(releaseFinalLiveSignoff?.lockedAt) || '-';
+  const releaseRequireFinalLiveSignoff =
+    releaseGovernance?.thresholds?.requireFinalLiveSignoff === true;
+  const releaseGovernanceError = normalizeText(releaseGovernance?.error) || '';
   const remediationTotal = Number(readiness?.remediation?.summary?.total || 0);
   const remediationP0 = Number(readiness?.remediation?.summary?.byPriority?.P0 || 0);
   const remediationTopLabel =
@@ -1238,6 +1378,47 @@ async function main() {
   }
   if (monitorStatus?.gates?.pilotReport?.noGo === true) strictFailures.push('pilot report gate is no-go');
   if (monitorStatus?.gates?.restoreDrill?.noGo === true) strictFailures.push('restore drill gate is no-go');
+  if (monitorStatus?.gates?.restoreDrillFull?.noGo === true) {
+    strictFailures.push('restore full drill gate is no-go');
+  }
+  if (monitorStatus?.gates?.auditIntegrityDaily?.noGo === true) {
+    strictFailures.push('audit integrity daily gate is no-go');
+  }
+  if (monitorStatus?.gates?.secretRotationDaily?.noGo === true) {
+    strictFailures.push('secret rotation daily gate is no-go');
+  }
+  if (
+    !releaseGovernanceError &&
+    releaseCycleId !== '-' &&
+    (releaseCycleStatus === 'launch_ready' || releaseCycleStatus === 'launched') &&
+    !releaseGatePassed
+  ) {
+    strictFailures.push('release governance gate is not passed for launch_ready/launched cycle');
+  }
+  if (!releaseGovernanceError && releaseCycleStatus === 'launched' && !releasePostLaunchReviewHealthy) {
+    strictFailures.push('release governance post-launch daily review is not healthy');
+  }
+  if (!releaseGovernanceError && releaseCycleStatus === 'launched' && !releaseRealityAuditHealthy) {
+    strictFailures.push('release governance reality-audit is overdue');
+  }
+  if (
+    !releaseGovernanceError &&
+    releaseCycleStatus === 'launched' &&
+    releaseStabilizationEnforced &&
+    !releasePostLaunchStabilizationHealthy
+  ) {
+    strictFailures.push('release governance post-launch stabilization window is not healthy');
+  }
+  if (
+    !releaseGovernanceError &&
+    releaseCycleStatus === 'launched' &&
+    releaseGatePassed &&
+    releasePostLaunchStabilizationCompleted &&
+    !releaseFinalLiveSignoffLocked &&
+    releaseRequireFinalLiveSignoff
+  ) {
+    strictFailures.push('release governance final live sign-off is required but not locked');
+  }
   if (observabilityOverall === 'red' || observabilityAlertsCount > 0) {
     const alertSuffix =
       observabilityTriggeredAlertIds.length > 0
@@ -1310,6 +1491,22 @@ async function main() {
   }
   if (!observabilityHasTraffic) {
     advisories.push('observability has no sampled traffic in current metrics window');
+  }
+  if (releaseGovernanceError) {
+    advisories.push(`release governance status unavailable (${releaseGovernanceError})`);
+  } else if (releaseCycleId !== '-' && releaseBlockers > 0) {
+    advisories.push(`release governance blockers=${releaseBlockers} (cycle=${releaseCycleId})`);
+  } else if (releaseCycleId === '-') {
+    advisories.push('release governance cycle saknas; starta /ops/release/cycles före go-live');
+  } else if (
+    releaseCycleStatus === 'launched' &&
+    releaseGatePassed &&
+    releasePostLaunchStabilizationCompleted &&
+    !releaseFinalLiveSignoffLocked
+  ) {
+    advisories.push(
+      `release governance final live sign-off missing; run npm run release:cycle:final-lock (cycle=${releaseCycleId})`
+    );
   }
   if (!corsRuntimeProbeEnabled) {
     advisories.push(
@@ -1484,6 +1681,9 @@ async function main() {
   );
   process.stdout.write(
     `   observability: status=${observabilityOverall} alerts=${observabilityAlertsCount} hasTraffic=${observabilityHasTraffic ? 'yes' : 'no'} sampled=${observabilitySampledRequests} errorRatePct=${observabilityErrorRatePct} p95Ms=${observabilityP95Ms} slowRequests=${observabilitySlowRequests}\n`
+  );
+  process.stdout.write(
+    `   releaseGovernance: cycle=${releaseCycleId} status=${releaseCycleStatus} gatePassed=${releaseGatePassed ? 'yes' : 'no'} blockers=${releaseBlockers} postLaunchReviewHealthy=${releasePostLaunchReviewHealthy ? 'yes' : 'no'} postLaunchStabilizationHealthy=${releasePostLaunchStabilizationHealthy ? 'yes' : 'no'} stabilizationEnforced=${releaseStabilizationEnforced ? 'yes' : 'no'} finalLiveSignoffLocked=${releaseFinalLiveSignoffLocked ? 'yes' : 'no'} finalLiveSignoffLockedAt=${releaseFinalLiveSignoffLockedAt} realityAuditHealthy=${releaseRealityAuditHealthy ? 'yes' : 'no'}\n`
   );
   if (observabilityTriggeredAlertIds.length > 0) {
     process.stdout.write(`   observabilityAlerts: ${observabilityTriggeredAlertIds.join(', ')}\n`);

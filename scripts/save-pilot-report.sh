@@ -12,6 +12,7 @@ DAYS="${ARCANA_PILOT_REPORT_DAYS:-14}"
 OUT_FILE="${ARCANA_PILOT_REPORT_OUT:-}"
 MFA_CODE="${ARCANA_OWNER_MFA_CODE:-}"
 MFA_SECRET="${ARCANA_OWNER_MFA_SECRET:-}"
+MFA_RECOVERY_CODE="${ARCANA_OWNER_MFA_RECOVERY_CODE:-}"
 READINESS_MODE="${ARCANA_PILOT_REPORT_READINESS_MODE:-full}"
 
 while [[ $# -gt 0 ]]; do
@@ -48,13 +49,17 @@ while [[ $# -gt 0 ]]; do
       MFA_SECRET="${2:-}"
       shift 2
       ;;
+    --mfa-recovery-code)
+      MFA_RECOVERY_CODE="${2:-}"
+      shift 2
+      ;;
     --readiness-mode)
       READINESS_MODE="${2:-}"
       shift 2
       ;;
     *)
       echo "Okänd flagga: $1"
-      echo "Använd: [--base-url URL] [--email EMAIL] [--password PASSWORD] [--tenant TENANT] [--days 14] [--out FIL] [--mfa-code 123456] [--mfa-secret BASE32] [--readiness-mode compact|full]"
+      echo "Använd: [--base-url URL] [--email EMAIL] [--password PASSWORD] [--tenant TENANT] [--days 14] [--out FIL] [--mfa-code 123456] [--mfa-secret BASE32] [--mfa-recovery-code XXXX-XXXX-XXXX-XXXX] [--readiness-mode compact|full]"
       exit 1
       ;;
   esac
@@ -91,6 +96,28 @@ for (const lineRaw of raw.split(/\\r?\\n/)) {
 process.exit(1);
 " "$key" 2>/dev/null || true
 }
+
+if [[ -z "$EMAIL" ]]; then
+  EMAIL="$(dotenv_get ARCANA_OWNER_EMAIL || true)"
+fi
+if [[ -z "$PASSWORD" ]]; then
+  PASSWORD="$(dotenv_get ARCANA_OWNER_PASSWORD || true)"
+fi
+if [[ -z "${ARCANA_DEFAULT_TENANT:-}" ]]; then
+  DOTENV_TENANT="$(dotenv_get ARCANA_DEFAULT_TENANT || true)"
+  if [[ -n "$DOTENV_TENANT" ]]; then
+    TENANT_ID="$DOTENV_TENANT"
+  fi
+fi
+if [[ -z "$MFA_CODE" ]]; then
+  MFA_CODE="$(dotenv_get ARCANA_OWNER_MFA_CODE || true)"
+fi
+if [[ -z "$MFA_SECRET" ]]; then
+  MFA_SECRET="$(dotenv_get ARCANA_OWNER_MFA_SECRET || true)"
+fi
+if [[ -z "$MFA_RECOVERY_CODE" ]]; then
+  MFA_RECOVERY_CODE="$(dotenv_get ARCANA_OWNER_MFA_RECOVERY_CODE || true)"
+fi
 
 json_get() {
   local path="$1"
@@ -173,6 +200,7 @@ complete_login_with_optional_mfa() {
   local email="$3"
   local mfa_code_override="$4"
   local mfa_secret_override="$5"
+  local mfa_recovery_code_override="$6"
 
   local token=""
   token="$(printf '%s' "$login_response" | json_get token 2>/dev/null || true)"
@@ -196,6 +224,7 @@ complete_login_with_optional_mfa() {
   fi
 
   local mfa_code="$mfa_code_override"
+  local mfa_recovery_code="$mfa_recovery_code_override"
   if [[ -z "$mfa_code" ]]; then
     local mfa_secret="$mfa_secret_override"
     if [[ -z "$mfa_secret" ]]; then
@@ -209,7 +238,12 @@ complete_login_with_optional_mfa() {
     fi
   fi
 
-  if [[ -z "$mfa_code" ]]; then
+  local verify_code="$mfa_code"
+  if [[ -z "$verify_code" ]]; then
+    verify_code="$mfa_recovery_code"
+  fi
+
+  if [[ -z "$verify_code" ]]; then
     printf '%s' "$login_response"
     return 0
   fi
@@ -217,7 +251,7 @@ complete_login_with_optional_mfa() {
   local mfa_verify_response=""
   mfa_verify_response="$(curl -sS -X POST "$BASE_URL/api/v1/auth/mfa/verify" \
     -H "Content-Type: application/json" \
-    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$mfa_code\",\"tenantId\":\"$requested_tenant_id\"}")"
+    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$verify_code\",\"tenantId\":\"$requested_tenant_id\"}")"
 
   local mfa_token=""
   mfa_token="$(printf '%s' "$mfa_verify_response" | json_get token 2>/dev/null || true)"
@@ -295,11 +329,11 @@ LOGIN_PAYLOAD="$(node -e 'const [email,password,tenant]=process.argv.slice(1); p
 LOGIN_RESPONSE="$(curl -sS -X POST "$BASE_URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   --data-raw "$LOGIN_PAYLOAD")"
-LOGIN_RESPONSE_FINAL="$(complete_login_with_optional_mfa "$LOGIN_RESPONSE" "$TENANT_ID" "$EMAIL" "$MFA_CODE" "$MFA_SECRET")"
+LOGIN_RESPONSE_FINAL="$(complete_login_with_optional_mfa "$LOGIN_RESPONSE" "$TENANT_ID" "$EMAIL" "$MFA_CODE" "$MFA_SECRET" "$MFA_RECOVERY_CODE")"
 TOKEN="$(printf '%s' "$LOGIN_RESPONSE_FINAL" | json_get token || true)"
 
 if [[ -z "$TOKEN" ]]; then
-  echo "❌ Login misslyckades (kontrollera lösenord + MFA-kod/secret)."
+  echo "❌ Login misslyckades (kontrollera lösenord + MFA-kod/secret/recovery)."
   echo "   Saknas MFA-kod/secret/recovery helt: kör kontrollerad reset med ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true i runtime env, deploya en gång, slutför owner:mfa:setup och sätt sedan tillbaka till false."
   printf '%s\n' "$LOGIN_RESPONSE_FINAL"
   exit 1

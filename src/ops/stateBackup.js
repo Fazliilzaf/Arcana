@@ -56,6 +56,9 @@ function getStateFileMap(config) {
     tenantConfig: config.tenantConfigStorePath,
     memory: config.memoryStorePath,
     secretRotation: config.secretRotationStorePath,
+    patientSignals: config.patientSignalStorePath,
+    sloTickets: config.sloTicketStorePath,
+    releaseGovernance: config.releaseGovernanceStorePath,
   };
 }
 

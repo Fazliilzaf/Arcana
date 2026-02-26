@@ -7,6 +7,7 @@ PASSWORD="${ARCANA_OWNER_PASSWORD:-}"
 TENANT_ID="${ARCANA_DEFAULT_TENANT:-hair-tp-clinic}"
 MFA_CODE="${ARCANA_OWNER_MFA_CODE:-}"
 MFA_SECRET="${ARCANA_OWNER_MFA_SECRET:-}"
+MFA_RECOVERY_CODE="${ARCANA_OWNER_MFA_RECOVERY_CODE:-}"
 AUTH_STORE_PATH="${AUTH_STORE_PATH:-./data/auth.json}"
 SKIP_AUTH_RAW="${ARCANA_SMOKE_SKIP_AUTH:-false}"
 
@@ -77,6 +78,9 @@ if [[ -z "$MFA_CODE" ]]; then
 fi
 if [[ -z "$MFA_SECRET" ]]; then
   MFA_SECRET="$(dotenv_get ARCANA_OWNER_MFA_SECRET || true)"
+fi
+if [[ -z "$MFA_RECOVERY_CODE" ]]; then
+  MFA_RECOVERY_CODE="$(dotenv_get ARCANA_OWNER_MFA_RECOVERY_CODE || true)"
 fi
 if [[ "${AUTH_STORE_PATH}" == "./data/auth.json" ]]; then
   DOTENV_AUTH_STORE_PATH="$(dotenv_get AUTH_STORE_PATH || true)"
@@ -190,6 +194,7 @@ complete_login_with_optional_mfa() {
   fi
 
   local resolved_mfa_code="$MFA_CODE"
+  local resolved_mfa_recovery_code="$MFA_RECOVERY_CODE"
   if [[ -z "$resolved_mfa_code" ]]; then
     local resolved_mfa_secret="$MFA_SECRET"
     if [[ -z "$resolved_mfa_secret" ]]; then
@@ -203,7 +208,12 @@ complete_login_with_optional_mfa() {
     fi
   fi
 
-  if [[ -z "$resolved_mfa_code" ]]; then
+  local verify_code="$resolved_mfa_code"
+  if [[ -z "$verify_code" ]]; then
+    verify_code="$resolved_mfa_recovery_code"
+  fi
+
+  if [[ -z "$verify_code" ]]; then
     printf '%s' "$login_response"
     return 0
   fi
@@ -211,7 +221,7 @@ complete_login_with_optional_mfa() {
   local mfa_verify_response=""
   mfa_verify_response="$(curl -sS -X POST "$BASE_URL/api/v1/auth/mfa/verify" \
     -H "Content-Type: application/json" \
-    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$resolved_mfa_code\",\"tenantId\":\"$requested_tenant_id\"}")"
+    -d "{\"mfaTicket\":\"$mfa_ticket\",\"code\":\"$verify_code\",\"tenantId\":\"$requested_tenant_id\"}")"
 
   local mfa_token=""
   mfa_token="$(printf '%s' "$mfa_verify_response" | json_get token 2>/dev/null || true)"
@@ -296,7 +306,7 @@ if [[ -z "$TOKEN" ]]; then
   echo
   echo "Åtgärd:"
   echo "- Verifiera att ARCANA_OWNER_EMAIL/ARCANA_OWNER_PASSWORD i Render är korrekt satta."
-  echo "- Om MFA är aktivt: sätt ARCANA_OWNER_MFA_CODE eller ARCANA_OWNER_MFA_SECRET."
+  echo "- Om MFA är aktivt: sätt ARCANA_OWNER_MFA_CODE, ARCANA_OWNER_MFA_SECRET eller ARCANA_OWNER_MFA_RECOVERY_CODE."
   echo "- Om du saknar MFA-kod/secret/recovery: sätt ARCANA_BOOTSTRAP_RESET_OWNER_MFA=true i Render, deploya en gång, kör owner:mfa:setup och sätt sedan tillbaka till false."
   echo "- För setup av OWNER MFA med samma credentials:"
   echo "  BASE_URL=$BASE_URL ARCANA_OWNER_EMAIL=<email> ARCANA_OWNER_PASSWORD=<password> npm run owner:mfa:setup"
