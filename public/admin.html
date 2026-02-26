@@ -114,6 +114,14 @@
       0%, 100% { background-position: 0% 0%, 0% 0%, 0% 0%; }
       50% { background-position: 6% 4%, 8% 4%, 4% 3%; }
     }
+    @keyframes btnShadowPulse {
+      0%, 100% { opacity: 0.48; transform: translateY(0); }
+      50% { opacity: 0.66; transform: translateY(-1px); }
+    }
+    @keyframes btnSheenPulse {
+      0%, 100% { opacity: 0.82; }
+      50% { opacity: 1; }
+    }
     .container { width: min(1200px, 94vw); margin: 24px auto 64px; }
     .row { display: grid; gap: 14px; }
     .row.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -356,6 +364,7 @@
       background: radial-gradient(60% 100% at 50% 0%, rgba(0, 0, 0, 0.26), rgba(0, 0, 0, 0));
       opacity: 0.58;
       z-index: 0;
+      animation: btnShadowPulse 6.8s ease-in-out infinite;
     }
     .btn::after {
       content: "";
@@ -369,6 +378,7 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.06) 44%, rgba(255,255,255,0));
       opacity: .9;
       z-index: 1;
+      animation: btnSheenPulse 6.8s ease-in-out infinite;
     }
     .btn:hover {
       background: var(--glass-bg-strong);
@@ -1516,10 +1526,10 @@
     .section-nav .btn.active {
       color: var(--text);
       background:
-        linear-gradient(145deg, rgba(255,255,255,0.34), rgba(255,255,255,0.09) 38%, rgba(255,255,255,0)),
-        linear-gradient(155deg, rgba(214, 173, 132, 0.88), rgba(214, 173, 132, 0.56));
-      border-color: rgba(214, 173, 132, 0.94);
-      box-shadow: 0 0 0 1px rgba(214, 173, 132, 0.5), 0 0 30px rgba(235, 201, 165, 0.3), 0 16px 28px rgba(0, 0, 0, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        linear-gradient(145deg, rgba(255,255,255,0.28), rgba(255,255,255,0.07) 38%, rgba(255,255,255,0)),
+        linear-gradient(155deg, rgba(103, 88, 75, 0.9), rgba(70, 59, 51, 0.82));
+      border-color: rgba(245, 226, 208, 0.82);
+      box-shadow: 0 0 0 1px rgba(245, 226, 208, 0.3), 0 0 22px rgba(255, 241, 224, 0.14), 0 16px 28px rgba(0, 0, 0, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
     [data-section-group].hidden {
       display: none !important;
