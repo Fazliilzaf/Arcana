@@ -1287,6 +1287,17 @@
     .overview-card .list li {
       padding: 8px 10px;
     }
+    .overview-card.overview-card--daily-brief {
+      border-color: rgba(255, 241, 224, 0.6);
+      background:
+        linear-gradient(160deg, rgba(255, 241, 224, 0.2), rgba(255, 227, 198, 0.1)),
+        radial-gradient(130% 100% at 10% -12%, rgba(255, 230, 205, 0.36) 0%, transparent 70%);
+      box-shadow: 0 16px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    }
+    .overview-card.overview-card--daily-brief .code-block {
+      border-color: rgba(255, 230, 201, 0.42);
+      background: linear-gradient(160deg, rgba(255, 246, 235, 0.15), rgba(255, 238, 217, 0.07));
+    }
     .risk-trend-list {
       display: flex;
       flex-direction: column;
@@ -2171,6 +2182,45 @@
         <section class="panel">
           <h2 data-i18n="overview_insights">Översiktsinsikter</h2>
           <div class="overview-grid" style="margin-top:10px">
+            <article class="overview-card overview-card--daily-brief">
+              <h3>Arcana Daily Brief</h3>
+              <div class="seg" style="margin-top:10px;align-items:center;flex-wrap:wrap">
+                <label class="mini" for="dailyBriefTimeframeDays" style="margin:0;display:flex;align-items:center;gap:8px">
+                  Tidsfönster:
+                  <input id="dailyBriefTimeframeDays" type="number" value="14" min="1" max="90" style="width:88px" />
+                </label>
+                <label class="mini" for="dailyBriefMaxTasks" style="margin:0;display:flex;align-items:center;gap:8px">
+                  Max tasks:
+                  <input id="dailyBriefMaxTasks" type="number" value="5" min="1" max="5" style="width:68px" />
+                </label>
+                <label class="mini" for="dailyBriefIncludeClosed" style="margin:0;display:flex;align-items:center;gap:6px">
+                  <input id="dailyBriefIncludeClosed" type="checkbox" />
+                  Inkludera stängda
+                </label>
+                <button id="runDailyBriefBtn" class="btn primary">Kör COO Daily Brief</button>
+              </div>
+              <div id="dailyBriefStatus" class="status-line"></div>
+              <div class="grid" style="margin-top:10px">
+                <div>
+                  <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Prioritetsnivå</h3>
+                  <div id="dailyBriefPriority" class="code-block">-</div>
+                </div>
+                <div>
+                  <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Severity breakdown</h3>
+                  <div id="dailyBriefSeverity" class="code-block">L3=0, L4=0, L5=0</div>
+                </div>
+              </div>
+              <div style="margin-top:10px">
+                <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Executive summary</h3>
+                <div id="dailyBriefSummary" class="code-block">Ingen daily brief än.</div>
+              </div>
+              <div style="margin-top:10px">
+                <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Topp-rekommendationer</h3>
+                <ul id="dailyBriefRecommendations" class="list">
+                  <li class="muted mini">Inga rekommendationer än.</li>
+                </ul>
+              </div>
+            </article>
             <article class="overview-card">
               <h3 data-i18n="latest_activity">Senaste aktivitet</h3>
               <ul id="latestActivityList" class="list">
@@ -2705,46 +2755,6 @@
             <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Rekommenderade åtgärder</h3>
             <ul id="incidentIntelligenceRecommendations" class="list">
               <li class="muted mini">Inga rekommendationer ännu.</li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2>Arcana Daily Brief</h2>
-          <div class="seg" style="margin-top:10px;align-items:center;flex-wrap:wrap">
-            <label class="mini" for="dailyBriefTimeframeDays" style="margin:0;display:flex;align-items:center;gap:8px">
-              Tidsfonster (dagar):
-              <input id="dailyBriefTimeframeDays" type="number" value="14" min="1" max="90" style="width:96px" />
-            </label>
-            <label class="mini" for="dailyBriefMaxTasks" style="margin:0;display:flex;align-items:center;gap:8px">
-              Max tasks:
-              <input id="dailyBriefMaxTasks" type="number" value="5" min="1" max="5" style="width:72px" />
-            </label>
-            <label class="mini" for="dailyBriefIncludeClosed" style="margin:0;display:flex;align-items:center;gap:6px">
-              <input id="dailyBriefIncludeClosed" type="checkbox" />
-              Inkludera stangda incidenter
-            </label>
-            <button id="runDailyBriefBtn" class="btn primary">Kora COO Daily Brief</button>
-          </div>
-          <div id="dailyBriefStatus" class="status-line"></div>
-          <div class="grid" style="margin-top:10px">
-            <div>
-              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Prioritetsniva</h3>
-              <div id="dailyBriefPriority" class="code-block">-</div>
-            </div>
-            <div>
-              <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Severity breakdown</h3>
-              <div id="dailyBriefSeverity" class="code-block">L3=0, L4=0, L5=0</div>
-            </div>
-          </div>
-          <div style="margin-top:10px">
-            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Executive summary</h3>
-            <div id="dailyBriefSummary" class="code-block">Ingen daily brief an.</div>
-          </div>
-          <div style="margin-top:10px">
-            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Topp-rekommendationer</h3>
-            <ul id="dailyBriefRecommendations" class="list">
-              <li class="muted mini">Inga rekommendationer an.</li>
             </ul>
           </div>
         </section>
