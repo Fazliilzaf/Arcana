@@ -9,6 +9,11 @@ Arkitekturkontrakt:
 - `docs/architecture/execution-gateway-contract.md`
 - `docs/architecture/capability-framework-contract-v1.md`
 - `docs/architecture/capability-base-class-contract-v1.md`
+- `docs/architecture/analyze-inbox-snapshot-contract-v1.md`
+- `docs/ops/chatgpt-codex-handoff.md` (praktisk handoff mellan Codex och ChatGPT)
+- `docs/ops/coo-snapshot-debug.md` (Snapshot Hardening: COO debug keys/counts/freshness)
+- `docs/ops/cco-analyze-inbox-draft-prep-2026-02-26.md` (CCO Block 1.1 evidence)
+- `docs/ops/microsoft-graph-readonly-prep-2026-02-26.md` (CCO Block 1.2 prep)
 
 ## Kom igång
 1) Skapa `.env` (utgå från `.env.example`)
@@ -86,6 +91,14 @@ ARCANA_REDIS_KEY_PREFIX=arcana
 ARCANA_GATEWAY_QUEUE_LOCK_TTL_MS=30000
 ARCANA_GATEWAY_QUEUE_ACQUIRE_TIMEOUT_MS=10000
 ARCANA_GATEWAY_QUEUE_POLL_INTERVAL_MS=80
+ARCANA_GRAPH_READ_ENABLED=false
+ARCANA_GRAPH_TENANT_ID=
+ARCANA_GRAPH_CLIENT_ID=
+ARCANA_GRAPH_CLIENT_SECRET=
+ARCANA_GRAPH_USER_ID=
+ARCANA_GRAPH_WINDOW_DAYS=14
+ARCANA_GRAPH_MAX_MESSAGES=100
+ARCANA_GRAPH_INCLUDE_READ=false
 ARCANA_API_RATE_LIMIT_WINDOW_SEC=60
 ARCANA_API_RATE_LIMIT_READ_MAX=300
 ARCANA_API_RATE_LIMIT_WRITE_MAX=120
@@ -124,6 +137,10 @@ ARCANA_PATIENT_SIGNAL_FRESHNESS_HOURS=72
 - `ARCANA_PUBLIC_CHAT_RATE_LIMIT_MAX`: dedikerad limiter för `POST /chat`
 - `ARCANA_DISTRIBUTED_BACKEND=redis`: aktiverar distribuerad rate-limit + gateway-runtime (tenant lock + idempotency) via Redis
 - `ARCANA_REDIS_REQUIRED=true`: fail-fast i startup om Redis inte kan ansluta
+- `ARCANA_GRAPH_READ_ENABLED=true`: aktiverar Graph read-only ingest för `AnalyzeInbox` när snapshot saknas i request
+- `ARCANA_GRAPH_TENANT_ID|ARCANA_GRAPH_CLIENT_ID|ARCANA_GRAPH_CLIENT_SECRET|ARCANA_GRAPH_USER_ID`: krävs när Graph read är aktiverad (fail-fast annars)
+- `ARCANA_GRAPH_WINDOW_DAYS` och `ARCANA_GRAPH_MAX_MESSAGES`: styr mailbox read-fönster (default 14 dagar, 100 meddelanden)
+- `ARCANA_GRAPH_INCLUDE_READ=true`: inkluderar även lästa inbox-meddelanden i Graph snapshot
 - `ARCANA_SEMANTIC_MODEL_MODE`: `heuristic|linear|hybrid` för semantisk risk scoring (versionsloggas i varje evaluering)
 - `ARCANA_PUBLIC_CHAT_BETA_*`: valfri beta-gate för `POST /chat` (header key + host allowlist)
 - `ARCANA_PUBLIC_CHAT_KILL_SWITCH`: stoppknapp för patientchat (blockerar alla publika chat-svar)
