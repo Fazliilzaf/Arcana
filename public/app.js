@@ -31,7 +31,7 @@ function getSourceUrl() {
 
 const publicConfigPromise = loadPublicConfig();
 const clientoState = { loading: false, loaded: false };
-const BRAND_LOGO_PATH = '/assets/major-arcana-mark-img0182-clean-v3.png';
+const BRAND_LOGO_PATH = '/assets/hair-tp-clinic/hairtpclinic-mark.svg';
 
 function brandLabel() {
   const brand = publicConfig?.brand;
