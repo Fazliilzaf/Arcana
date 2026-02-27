@@ -1,0 +1,95 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const os = require('node:os');
+const path = require('node:path');
+const fs = require('node:fs/promises');
+const http = require('node:http');
+const express = require('express');
+
+const { createAuthStore } = require('../../src/security/authStore');
+const { createAuthRouter } = require('../../src/routes/auth');
+
+async function withServer(app, run) {
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}/api/v1`;
+  try {
+    await run(baseUrl);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+}
+
+test('owner login bypasses MFA only on configured staging host', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-auth-mfa-bypass-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+
+  await authStore.bootstrapOwner({
+    tenantId: 'tenant-a',
+    email: 'owner@example.com',
+    password: 'secret12345',
+    forcePasswordReset: true,
+    forceMfaReset: true,
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1',
+    createAuthRouter({
+      authStore,
+      requireAuth: (_req, _res, next) => next(),
+      requireRole: () => (_req, _res, next) => next(),
+      requireTenantScope: () => (_req, _res, next) => next(),
+      ownerMfaBypassHosts: ['arcana-staging.onrender.com'],
+      loginSessionRotationScope: 'none',
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const stagingResponse = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana-staging.onrender.com',
+      },
+      body: JSON.stringify({
+        email: 'owner@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(stagingResponse.status, 200);
+    const stagingPayload = await stagingResponse.json();
+    assert.equal(typeof stagingPayload.token, 'string');
+    assert.equal(stagingPayload.requiresMfa, undefined);
+
+    const prodResponse = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+      },
+      body: JSON.stringify({
+        email: 'owner@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(prodResponse.status, 200);
+    const prodPayload = await prodResponse.json();
+    assert.equal(prodPayload.requiresMfa, true);
+    assert.equal(typeof prodPayload.mfaTicket, 'string');
+    assert.equal(prodPayload.mfaTicket.length > 0, true);
+  });
+});

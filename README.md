@@ -82,6 +82,7 @@ Default-värden för hardening:
 ```env
 AUTH_SESSION_TTL_HOURS=12
 AUTH_SESSION_IDLE_MINUTES=180
+ARCANA_AUTH_OWNER_MFA_BYPASS_HOSTS=
 AUTH_LOGIN_SESSION_ROTATION=tenant
 ARCANA_DISTRIBUTED_BACKEND=memory
 ARCANA_REDIS_URL=
@@ -128,6 +129,7 @@ ARCANA_PATIENT_SIGNAL_FRESHNESS_HOURS=72
 ```
 
 - `AUTH_SESSION_IDLE_MINUTES`: invalidates session efter inaktivitet (revoke reason: `idle_timeout`)
+- `ARCANA_AUTH_OWNER_MFA_BYPASS_HOSTS`: host allowlist som bypassar OWNER-MFA i `/auth/login` (använd för staging; lämna tom i production)
 - `AUTH_LOGIN_SESSION_ROTATION`: `none|tenant|user` (default `tenant`) roterar bort äldre sessioner vid login/select-tenant
 - `ARCANA_API_RATE_LIMIT_READ_MAX`: max read-anrop per IP inom fönstret
 - `ARCANA_API_RATE_LIMIT_WRITE_MAX`: max write-anrop per IP inom fönstret
