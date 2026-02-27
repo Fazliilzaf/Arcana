@@ -350,7 +350,7 @@ class AnalyzeInboxCapability extends BaseCapability {
               additionalProperties: false,
               properties: {
                 conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-                messageId: { type: 'string', minLength: 1, maxLength: 120 },
+                messageId: { type: 'string', minLength: 1, maxLength: 512 },
                 subject: { type: 'string', minLength: 1, maxLength: 200 },
                 reason: { type: 'string', minLength: 1, maxLength: 120 },
                 hoursSinceInbound: { type: 'number', minimum: 0 },
@@ -366,7 +366,7 @@ class AnalyzeInboxCapability extends BaseCapability {
               additionalProperties: false,
               properties: {
                 conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-                messageId: { type: 'string', minLength: 1, maxLength: 120 },
+                messageId: { type: 'string', minLength: 1, maxLength: 512 },
                 subject: { type: 'string', minLength: 1, maxLength: 200 },
                 hoursSinceInbound: { type: 'number', minimum: 0 },
                 dueBy: { type: 'string', maxLength: 50 },
@@ -382,7 +382,7 @@ class AnalyzeInboxCapability extends BaseCapability {
               additionalProperties: false,
               properties: {
                 conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-                messageId: { type: 'string', minLength: 1, maxLength: 120 },
+                messageId: { type: 'string', minLength: 1, maxLength: 512 },
                 subject: { type: 'string', minLength: 1, maxLength: 200 },
                 slaDeadlineAt: { type: 'string', minLength: 1, maxLength: 50 },
                 overdueMinutes: { type: 'number', minimum: 0 },
@@ -398,7 +398,7 @@ class AnalyzeInboxCapability extends BaseCapability {
               additionalProperties: false,
               properties: {
                 conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-                messageId: { type: 'string', minLength: 1, maxLength: 120 },
+                messageId: { type: 'string', minLength: 1, maxLength: 512 },
                 flagCode: { type: 'string', minLength: 1, maxLength: 80 },
                 severity: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] },
                 reason: { type: 'string', minLength: 1, maxLength: 180 },
@@ -420,7 +420,7 @@ class AnalyzeInboxCapability extends BaseCapability {
               additionalProperties: false,
               properties: {
                 conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-                messageId: { type: 'string', minLength: 1, maxLength: 120 },
+                messageId: { type: 'string', minLength: 1, maxLength: 512 },
                 subject: { type: 'string', minLength: 1, maxLength: 200 },
                 proposedReply: { type: 'string', minLength: 1, maxLength: 3000 },
                 confidenceLevel: { type: 'string', enum: ['Low', 'Medium', 'High'] },
