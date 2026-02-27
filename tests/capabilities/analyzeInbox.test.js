@@ -348,3 +348,46 @@ test('AnalyzeInbox omits empty optional metadata fields', async () => {
   assert.equal('requestId' in output.metadata, false);
   assert.equal('correlationId' in output.metadata, false);
 });
+
+test('AnalyzeInbox accepts long provider message ids in output schema', async () => {
+  const longMessageId = `graph-${'x'.repeat(260)}`;
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-a',
+    actor: { id: 'owner-a', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-inbox-long-id',
+    correlationId: 'corr-inbox-long-id',
+    input: {
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-long-id',
+          subject: 'Uppfoljning',
+          status: 'open',
+          messages: [
+            {
+              messageId: longMessageId,
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+              bodyPreview: 'Kan ni aterkomma med status?',
+            },
+          ],
+        },
+      ],
+      timestamps: {
+        capturedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const validation = validateJsonSchema({
+    schema: analyzeInboxCapability.outputSchema,
+    value: output,
+    rootPath: 'capability.output',
+  });
+  assert.equal(validation.ok, true, `schema validation errors: ${JSON.stringify(validation.errors)}`);
+  const first = output.data.suggestedDrafts[0] || {};
+  assert.equal(String(first.messageId).length > 120, true);
+});
