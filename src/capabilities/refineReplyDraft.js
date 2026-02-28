@@ -69,9 +69,9 @@ class RefineReplyDraftCapability extends BaseCapability {
     additionalProperties: false,
     required: ['conversationId', 'messageId', 'subject', 'draft', 'instruction'],
     properties: {
-      conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-      messageId: { type: 'string', minLength: 1, maxLength: 120 },
-      mailboxId: { type: 'string', minLength: 1, maxLength: 160 },
+      conversationId: { type: 'string', minLength: 1, maxLength: 1024 },
+      messageId: { type: 'string', minLength: 1, maxLength: 1024 },
+      mailboxId: { type: 'string', minLength: 1, maxLength: 320 },
       subject: { type: 'string', minLength: 1, maxLength: 220 },
       draft: { type: 'string', minLength: 1, maxLength: 3000 },
       instruction: {
@@ -99,9 +99,9 @@ class RefineReplyDraftCapability extends BaseCapability {
           'appliedAt',
         ],
         properties: {
-          conversationId: { type: 'string', minLength: 1, maxLength: 120 },
-          messageId: { type: 'string', minLength: 1, maxLength: 120 },
-          mailboxId: { type: 'string', minLength: 1, maxLength: 160 },
+          conversationId: { type: 'string', minLength: 1, maxLength: 1024 },
+          messageId: { type: 'string', minLength: 1, maxLength: 1024 },
+          mailboxId: { type: 'string', minLength: 1, maxLength: 320 },
           subject: { type: 'string', minLength: 1, maxLength: 220 },
           instruction: { type: 'string', enum: ['improve', 'shorten', 'professional'] },
           refinedReply: { type: 'string', minLength: 1, maxLength: 3200 },
