@@ -81,9 +81,11 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
   });
 
   let sendCalls = 0;
+  let lastSendArgs = null;
   const graphSendConnector = {
     async sendReply({ mailboxId, replyToMessageId, body, subject, to }) {
       sendCalls += 1;
+      lastSendArgs = { mailboxId, replyToMessageId, body, subject, to };
       return {
         provider: 'microsoft_graph',
         mailboxId,
@@ -119,10 +121,15 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
     })
   );
 
+  const longReplyToMessageId =
+    'AAMkAGI2YzgzYTM1LTY3MjctNDE3Ny05MjI4LWFlY2Y4YjYzM2Y4YQBGAAAAAAAL1mSz9YxqQ7gkW6Hf4nV3BwD7z3U2F2F6R5Q8dWQ3n8fFAAAAgEMAAA' +
+    'D7z3U2F2F6R5Q8dWQ3n8fFAAAAgENAAD__' +
+    'x'.repeat(360);
+
   const payload = {
     channel: 'admin',
     mailboxId: 'owner@hairtpclinic.se',
-    replyToMessageId: 'msg-1',
+    replyToMessageId: longReplyToMessageId,
     conversationId: 'conv-1',
     to: ['patient@example.com'],
     subject: 'Uppfoljning',
@@ -158,6 +165,7 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
   });
 
   assert.equal(sendCalls, 1);
+  assert.equal(lastSendArgs.replyToMessageId, longReplyToMessageId);
 
   const entries = await analysisStore.list({
     tenantId: 'tenant-a',
