@@ -43,3 +43,47 @@ test('Customer temperature engine marks cool for low engagement dormant profile'
 
   assert.equal(result.temperature, 'cool');
 });
+
+test('Customer temperature engine applies relationship boost for loyal over new', () => {
+  const loyal = evaluateCustomerTemperature({
+    lifecycleStatus: 'loyal',
+    toneHistory: ['neutral'],
+    slaStatus: 'safe',
+    complaintCount: 0,
+    engagementScore: 0.4,
+    recencyDays: 5,
+  });
+  const newcomer = evaluateCustomerTemperature({
+    lifecycleStatus: 'new',
+    toneHistory: ['neutral'],
+    slaStatus: 'safe',
+    complaintCount: 0,
+    engagementScore: 0.4,
+    recencyDays: 5,
+  });
+
+  assert.equal(loyal.score > newcomer.score, true);
+  assert.equal(loyal.drivers.includes('relationship_boost'), true);
+});
+
+test('Customer temperature engine applies cooling for dormant compared to returning', () => {
+  const dormant = evaluateCustomerTemperature({
+    lifecycleStatus: 'dormant',
+    toneHistory: ['neutral'],
+    slaStatus: 'safe',
+    complaintCount: 0,
+    engagementScore: 0.5,
+    recencyDays: 20,
+  });
+  const returning = evaluateCustomerTemperature({
+    lifecycleStatus: 'returning',
+    toneHistory: ['neutral'],
+    slaStatus: 'safe',
+    complaintCount: 0,
+    engagementScore: 0.5,
+    recencyDays: 20,
+  });
+
+  assert.equal(dormant.score < returning.score, true);
+  assert.equal(dormant.drivers.includes('relationship_cooling'), true);
+});

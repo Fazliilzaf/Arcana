@@ -27,6 +27,23 @@ function normalizeToneList(value = []) {
     .slice(0, 20);
 }
 
+const RELATIONSHIP_WARMTH_WEIGHTS = Object.freeze({
+  new: 0,
+  new_lead: 0,
+  active: 0.05,
+  active_dialogue: 0.06,
+  returning: 0.05,
+  loyal: 0.08,
+  pre_treatment: 0.04,
+  post_treatment: 0.03,
+  dormant: -0.05,
+  risk: -0.02,
+});
+
+function normalizeLifecycleStatus(value = '') {
+  return normalizeText(value).toLowerCase();
+}
+
 function mapTemperature(score = 0) {
   const normalizedScore = clamp(score, 0, 1, 0);
   if (normalizedScore >= 0.8) return 'at_risk';
@@ -42,9 +59,17 @@ function evaluateCustomerTemperature(input = {}) {
   const drivers = [];
   let score = 0;
 
-  const lifecycleStatus = normalizeText(safeInput.lifecycleStatus).toLowerCase();
-  if (lifecycleStatus === 'returning' || lifecycleStatus === 'active_dialogue') {
-    score += 0.08;
+  const lifecycleStatus = normalizeLifecycleStatus(safeInput.lifecycleStatus);
+  const relationshipWeight = toNumber(RELATIONSHIP_WARMTH_WEIGHTS[lifecycleStatus], 0);
+  if (relationshipWeight !== 0) {
+    score += relationshipWeight;
+    if (relationshipWeight > 0) {
+      drivers.push('relationship_boost');
+    } else {
+      drivers.push('relationship_cooling');
+    }
+  }
+  if (lifecycleStatus === 'returning' || lifecycleStatus === 'active_dialogue' || lifecycleStatus === 'loyal') {
     drivers.push('returning_customer');
   }
 

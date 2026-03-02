@@ -146,10 +146,64 @@ function toReferenceIds(rawValue = '') {
     .slice(0, 30);
 }
 
-function inferCounterpartyEmail({ direction = 'inbound', senderEmail = '', recipients = [] } = {}) {
-  if (direction === 'inbound') return normalizeText(senderEmail).toLowerCase() || '';
+function normalizeEmailAddress(value = '') {
+  const raw = normalizeText(value);
+  if (!raw) return '';
+  const bracketMatch = raw.match(/<([^>]+)>/);
+  const candidate = normalizeText((bracketMatch ? bracketMatch[1] : raw).replace(/^mailto:/i, ''));
+  if (!candidate) return '';
+  const parts = candidate.split('@');
+  if (parts.length !== 2) return '';
+  const localPart = normalizeText(parts[0]).toLowerCase();
+  const domainPart = normalizeText(parts[1]).toLowerCase();
+  if (!localPart || !domainPart) return '';
+  return `${localPart}@${domainPart}`;
+}
+
+function toEmailAliases(value = '') {
+  const normalized = normalizeEmailAddress(value);
+  if (!normalized) return [];
+  const [localPart = '', domainPart = ''] = normalized.split('@');
+  const aliases = new Set([normalized]);
+  const plusNormalized = localPart.replace(/\+.*/, '');
+  if (plusNormalized && plusNormalized !== localPart) {
+    aliases.add(`${plusNormalized}@${domainPart}`);
+  }
+  if (domainPart === 'gmail.com' || domainPart === 'googlemail.com') {
+    const dotless = plusNormalized.replace(/\./g, '');
+    if (dotless) aliases.add(`${dotless}@${domainPart}`);
+  }
+  return Array.from(aliases);
+}
+
+function extractEmailsFromHeaderValue(value = '') {
+  const source = normalizeText(value);
+  if (!source) return [];
+  const matches = source.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  return matches.map((item) => normalizeEmailAddress(item)).filter(Boolean);
+}
+
+function toReplyToList(value = [], internetHeaders = []) {
+  const fromField = toRecipientList(value).map((item) => normalizeEmailAddress(item)).filter(Boolean);
+  const fromHeader = extractEmailsFromHeaderValue(toHeaderValue(internetHeaders, 'reply-to'));
+  return Array.from(new Set([...fromField, ...fromHeader])).slice(0, 20);
+}
+
+function inferCounterpartyEmails({
+  direction = 'inbound',
+  senderEmail = '',
+  recipients = [],
+  replyTo = [],
+} = {}) {
   const safeRecipients = Array.isArray(recipients) ? recipients : [];
-  return normalizeText(safeRecipients[0]).toLowerCase() || '';
+  const safeReplyTo = Array.isArray(replyTo) ? replyTo : [];
+  const candidates =
+    direction === 'inbound' ? [senderEmail, ...safeReplyTo] : [...safeReplyTo, ...safeRecipients];
+  const aliases = new Set();
+  for (const candidate of candidates) {
+    for (const alias of toEmailAliases(candidate)) aliases.add(alias);
+  }
+  return Array.from(aliases).slice(0, 20);
 }
 
 function requiredConfig(name, value) {
@@ -329,6 +383,7 @@ function toNormalizedMessage(
   const senderName = normalizeText(raw?.from?.emailAddress?.name);
   const recipients = toRecipientList(raw?.toRecipients);
   const internetHeaders = Array.isArray(raw?.internetMessageHeaders) ? raw.internetMessageHeaders : [];
+  const replyTo = toReplyToList(raw?.replyTo, internetHeaders);
   const inReplyTo =
     normalizeHeaderMessageId(raw?.inReplyTo) ||
     normalizeHeaderMessageId(toHeaderValue(internetHeaders, 'in-reply-to')) ||
@@ -341,11 +396,13 @@ function toNormalizedMessage(
   const internetMessageId = normalizeHeaderMessageId(raw?.internetMessageId) || null;
   const riskWords = extractRiskWords(`${subject}\n${bodyPreview}`);
   const normalizedSubject = normalizeSubjectForCorrelation(subject);
-  const counterpartyEmail = inferCounterpartyEmail({
+  const counterpartyEmails = inferCounterpartyEmails({
     direction: normalizedDirection,
     senderEmail,
     recipients,
+    replyTo,
   });
+  const counterpartyEmail = counterpartyEmails[0] || '';
 
   return {
     messageId,
@@ -358,7 +415,9 @@ function toNormalizedMessage(
     senderEmail: senderEmail || null,
     senderName: senderName || null,
     recipients,
+    replyTo,
     counterpartyEmail: counterpartyEmail || null,
+    counterpartyEmails,
     internetMessageId,
     inReplyTo,
     references: dedupedReferences,
@@ -376,12 +435,36 @@ function toConversationSnapshots(messages = []) {
   const fallbackAlias = new Map();
   let syntheticCounter = 0;
 
-  const resolveFallbackKey = (message = {}) => {
+  const selectPrimaryCustomerEmail = (values = []) => {
+    const candidates = asArray(values)
+      .map((item) => normalizeEmailAddress(item))
+      .filter(Boolean);
+    if (candidates.length === 0) return null;
+    candidates.sort((left, right) => {
+      const leftLocalPart = left.split('@')[0] || '';
+      const rightLocalPart = right.split('@')[0] || '';
+      const leftHasPlus = leftLocalPart.includes('+');
+      const rightHasPlus = rightLocalPart.includes('+');
+      if (leftHasPlus !== rightHasPlus) return leftHasPlus ? 1 : -1;
+      if (left.length !== right.length) return left.length - right.length;
+      return left.localeCompare(right);
+    });
+    return candidates[0];
+  };
+
+  const resolveFallbackKeys = (message = {}) => {
     const subject = normalizeText(message.normalizedSubject);
-    const counterpartyEmail = normalizeText(message.counterpartyEmail).toLowerCase();
     const mailbox = normalizeText(message.mailboxId).toLowerCase();
-    if (!subject || !counterpartyEmail || !mailbox) return '';
-    return `${mailbox}|${counterpartyEmail}|${subject}`;
+    if (!subject || !mailbox) return [];
+    const emailCandidates = [
+      ...asArray(message.counterpartyEmails),
+      normalizeText(message.counterpartyEmail),
+    ]
+      .flatMap((item) => toEmailAliases(item))
+      .filter(Boolean);
+    const uniqueEmails = Array.from(new Set(emailCandidates));
+    if (uniqueEmails.length === 0) return [];
+    return uniqueEmails.map((email) => `${mailbox}|${email}|${subject}`);
   };
 
   const sortedMessages = asArray(messages)
@@ -391,7 +474,7 @@ function toConversationSnapshots(messages = []) {
   for (const message of sortedMessages) {
     if (!message) continue;
     const rawConversationId = normalizeText(message.conversationId);
-    const fallbackKey = resolveFallbackKey(message);
+    const fallbackKeys = resolveFallbackKeys(message);
     const linkedMessageIds = [
       normalizeHeaderMessageId(message.inReplyTo),
       ...asArray(message.references).map((item) => normalizeHeaderMessageId(item)),
@@ -405,8 +488,9 @@ function toConversationSnapshots(messages = []) {
       const matchedLinked = linkedMessageIds.find((id) => messageIdAlias.has(id));
       if (matchedLinked) clusterId = messageIdAlias.get(matchedLinked);
     }
-    if (!clusterId && fallbackKey && fallbackAlias.has(fallbackKey)) {
-      clusterId = fallbackAlias.get(fallbackKey);
+    if (!clusterId && fallbackKeys.length > 0) {
+      const matchedFallback = fallbackKeys.find((key) => fallbackAlias.has(key));
+      if (matchedFallback) clusterId = fallbackAlias.get(matchedFallback);
     }
     if (!clusterId && rawConversationId) {
       clusterId = rawConversationId;
@@ -439,7 +523,9 @@ function toConversationSnapshots(messages = []) {
       conversationAlias.set(rawConversationId, clusterId);
       if (!entry.primaryConversationId) entry.primaryConversationId = rawConversationId;
     }
-    if (fallbackKey) fallbackAlias.set(fallbackKey, clusterId);
+    for (const fallbackKey of fallbackKeys) {
+      fallbackAlias.set(fallbackKey, clusterId);
+    }
     if (message.internetMessageId) {
       messageIdAlias.set(message.internetMessageId, clusterId);
     }
@@ -456,6 +542,7 @@ function toConversationSnapshots(messages = []) {
       senderEmail: normalizeText(message.senderEmail).toLowerCase() || null,
       senderName: normalizeText(message.senderName) || null,
       recipients: asArray(message.recipients).slice(0, 20),
+      replyTo: asArray(message.replyTo).slice(0, 20),
       internetMessageId: normalizeHeaderMessageId(message.internetMessageId) || null,
       inReplyTo: normalizeHeaderMessageId(message.inReplyTo) || null,
       references: asArray(message.references).map((item) => normalizeHeaderMessageId(item)).filter(Boolean),
@@ -464,18 +551,21 @@ function toConversationSnapshots(messages = []) {
       if (message.sentAt && compareIsoDesc(entry.lastInboundAt, message.sentAt) > 0) {
         entry.lastInboundAt = message.sentAt;
       }
-      if (normalizeText(message.senderEmail)) {
-        entry.customerEmails.add(normalizeText(message.senderEmail).toLowerCase());
+      for (const alias of toEmailAliases(message.senderEmail)) entry.customerEmails.add(alias);
+      for (const replyToAddress of asArray(message.replyTo)) {
+        for (const alias of toEmailAliases(replyToAddress)) entry.customerEmails.add(alias);
       }
     } else {
       if (message.sentAt && compareIsoDesc(entry.lastOutboundAt, message.sentAt) > 0) {
         entry.lastOutboundAt = message.sentAt;
       }
       const recipients = asArray(message.recipients)
-        .map((item) => normalizeText(item).toLowerCase())
-        .filter(Boolean);
+        .flatMap((item) => toEmailAliases(item));
       for (const recipient of recipients) {
         entry.customerEmails.add(recipient);
+      }
+      for (const replyToAddress of asArray(message.replyTo)) {
+        for (const alias of toEmailAliases(replyToAddress)) entry.customerEmails.add(alias);
       }
     }
     if (
@@ -496,10 +586,7 @@ function toConversationSnapshots(messages = []) {
       Array.from(conversation.conversationIds.values())[0] ||
       normalizeText(conversation.clusterId);
     conversation.conversationId = preferredConversationId || `conversation:${crypto.randomUUID()}`;
-    conversation.customerEmail =
-      Array.from(conversation.customerEmails.values())
-        .map((item) => normalizeText(item).toLowerCase())
-        .find(Boolean) || null;
+    conversation.customerEmail = selectPrimaryCustomerEmail(Array.from(conversation.customerEmails.values()));
     delete conversation.clusterId;
     delete conversation.primaryConversationId;
     delete conversation.conversationIds;
@@ -570,6 +657,9 @@ function toInboxMessagesUrl({
       'isRead',
       'from',
       'toRecipients',
+      'replyTo',
+      'inReplyTo',
+      'references',
       'internetMessageId',
       'internetMessageHeaders',
     ].join(',')
@@ -597,6 +687,9 @@ function toSentMessagesUrl({ graphBaseUrl, userId, maxMessages, sentSinceIso }) 
       'sentDateTime',
       'from',
       'toRecipients',
+      'replyTo',
+      'inReplyTo',
+      'references',
       'internetMessageId',
       'internetMessageHeaders',
     ].join(',')

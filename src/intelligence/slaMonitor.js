@@ -42,6 +42,7 @@ const DEFAULT_UNANSWERED_THRESHOLDS_HOURS = Object.freeze({
 
 const DEFAULT_OPENING_HOURS = Object.freeze({
   timezone: 'Europe/Stockholm',
+  holidays: Object.freeze([]),
   windows: Object.freeze({
     0: null,
     1: Object.freeze({ startMinutes: 8 * 60, endMinutes: 20 * 60 }),
@@ -90,6 +91,18 @@ function dayWindowOrNull(value = null) {
   };
 }
 
+function normalizeHolidayDateKey(value = '') {
+  const raw = normalizeText(value);
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function normalizeOpeningHours(value = null) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const timezone =
@@ -133,9 +146,27 @@ function normalizeOpeningHours(value = null) {
     };
   }
 
+  const holidaysSource = Array.isArray(source.holidays)
+    ? source.holidays
+    : Array.isArray(source.closedDates)
+      ? source.closedDates
+      : [];
+  const holidays = holidaysSource
+    .map((item) => {
+      if (typeof item === 'string') return normalizeHolidayDateKey(item);
+      if (item && typeof item === 'object') {
+        return normalizeHolidayDateKey(item.date || item.day || '');
+      }
+      return '';
+    })
+    .filter(Boolean);
+  const uniqueHolidays = Array.from(new Set(holidays));
+
   return {
     timezone,
     windows,
+    holidays: uniqueHolidays,
+    holidaySet: new Set(uniqueHolidays),
   };
 }
 
@@ -170,6 +201,23 @@ function startOfUtcDayMs(timestampMs) {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
+function toUtcDateKeyFromDayStart(dayStartMs) {
+  if (!Number.isFinite(dayStartMs)) return '';
+  const date = new Date(dayStartMs);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isHolidayDay(dayStartMs, openingHours) {
+  const safeOpeningHours = normalizeOpeningHours(openingHours);
+  if (!safeOpeningHours.holidaySet || safeOpeningHours.holidaySet.size === 0) return false;
+  const dateKey = toUtcDateKeyFromDayStart(dayStartMs);
+  if (!dateKey) return false;
+  return safeOpeningHours.holidaySet.has(dateKey);
+}
+
 function computeOpenDurationMsBetween(startMs, endMs, openingHours) {
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return 0;
   const safeOpeningHours = normalizeOpeningHours(openingHours);
@@ -184,7 +232,7 @@ function computeOpenDurationMsBetween(startMs, endMs, openingHours) {
     if (intervalEnd > intervalStart) {
       const dayIndex = new Date(dayCursorMs).getUTCDay();
       const window = safeOpeningHours.windows[dayIndex];
-      if (window) {
+      if (window && !isHolidayDay(dayCursorMs, safeOpeningHours)) {
         const windowStartMs = dayCursorMs + window.startMinutes * 60 * 1000;
         const windowEndMs = dayCursorMs + window.endMinutes * 60 * 1000;
         const openStart = Math.max(intervalStart, windowStartMs);
@@ -207,6 +255,8 @@ function isWithinOpeningHoursAt(timestampMs, openingHours) {
   const dayIndex = date.getUTCDay();
   const window = safeOpeningHours.windows[dayIndex];
   if (!window) return false;
+  const dayStartMs = startOfUtcDayMs(timestampMs);
+  if (isHolidayDay(dayStartMs, safeOpeningHours)) return false;
   const minutes = date.getUTCHours() * 60 + date.getUTCMinutes();
   return minutes >= window.startMinutes && minutes < window.endMinutes;
 }

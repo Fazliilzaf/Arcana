@@ -42,6 +42,37 @@ test('SLA monitor pauses Saturday after 18:00 and skips Sunday entirely', () => 
   assert.equal(result.slaStatus, 'safe');
 });
 
+test('SLA monitor skips configured holidays during business-hour calculation', () => {
+  const result = evaluateSlaMonitor({
+    priorityLevel: 'High',
+    lastInboundAt: '2026-03-02T09:00:00.000Z',
+    lastOutboundAt: null,
+    nowMs: Date.parse('2026-03-03T10:00:00.000Z'),
+    openingHours: {
+      holidays: ['2026-03-02'],
+    },
+  });
+
+  assert.equal(result.hoursSinceInbound, 2);
+  assert.equal(result.slaStatus, 'safe');
+  assert.equal(result.withinOpeningHours, true);
+});
+
+test('SLA monitor treats holiday as closed even inside weekday window', () => {
+  const result = evaluateSlaMonitor({
+    priorityLevel: 'High',
+    lastInboundAt: '2026-03-02T08:00:00.000Z',
+    lastOutboundAt: null,
+    nowMs: Date.parse('2026-03-02T10:00:00.000Z'),
+    openingHours: {
+      holidays: ['2026-03-02'],
+    },
+  });
+
+  assert.equal(result.withinOpeningHours, false);
+  assert.equal(result.hoursSinceInbound, 0);
+});
+
 test('SLA monitor marks High 9h as warning', () => {
   const result = evaluateSlaMonitor({
     priorityLevel: 'High',
