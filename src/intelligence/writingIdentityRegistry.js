@@ -84,6 +84,17 @@ const KNOWN_WRITING_PROFILES = Object.freeze({
       warmthIndex: 4,
     })
   ),
+  'marknad@hairtpclinic.com': Object.freeze(
+    toWritingProfile({
+      greetingStyle: 'Hej,',
+      closingStyle: 'Vänliga hälsningar',
+      formalityLevel: 7,
+      ctaStyle: 'calm-guiding',
+      sentenceLength: 'medium',
+      emojiUsage: false,
+      warmthIndex: 6,
+    })
+  ),
 });
 
 function deriveTenantToneStyleProfile(tenantToneStyle = '') {

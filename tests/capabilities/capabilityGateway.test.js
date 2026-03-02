@@ -1207,6 +1207,7 @@ test('AnalyzeInbox uses locked default Graph read allowlist when ARCANA_MAILBOX_
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
     assert.deepEqual(graphCalls[0].mailboxIds, [
       'egzona@hairtpclinic.com',
@@ -1214,6 +1215,7 @@ test('AnalyzeInbox uses locked default Graph read allowlist when ARCANA_MAILBOX_
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
     assert.deepEqual(graphCalls[0].mailboxIndexes, []);
 
@@ -1230,6 +1232,7 @@ test('AnalyzeInbox uses locked default Graph read allowlist when ARCANA_MAILBOX_
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
   } finally {
     Object.entries(previousEnv).forEach(([key, value]) => {
@@ -1336,6 +1339,7 @@ test('AnalyzeInbox still uses locked default Graph read allowlist when send allo
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
     assert.deepEqual(graphCalls[0].mailboxIds, [
       'egzona@hairtpclinic.com',
@@ -1343,6 +1347,7 @@ test('AnalyzeInbox still uses locked default Graph read allowlist when send allo
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
   } finally {
     Object.entries(previousEnv).forEach(([key, value]) => {
@@ -1449,6 +1454,7 @@ test('AnalyzeInbox ignores ARCANA_GRAPH_MAILBOX_IDS outside locked allowlist', a
       'fazli@hairtpclinic.com',
       'info@hairtpclinic.com',
       'kons@hairtpclinic.com',
+      'marknad@hairtpclinic.com',
     ]);
     assert.equal(graphCalls[0].mailboxIds.includes('arya@hairtpclinic.com'), false);
     assert.equal(graphCalls[0].mailboxIds.includes('clara@hairtpclinic.com'), false);

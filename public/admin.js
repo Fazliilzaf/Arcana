@@ -261,6 +261,7 @@
     'fazli@hairtpclinic.com',
     'info@hairtpclinic.com',
     'kons@hairtpclinic.com',
+    'marknad@hairtpclinic.com',
   ]);
   const CCO_LOCKED_MAILBOX_ALLOWLIST_SET = new Set(
     CCO_LOCKED_MAILBOX_ALLOWLIST.map((item) => String(item || '').trim().toLowerCase()).filter(Boolean)
@@ -7754,6 +7755,7 @@
     if (!set.size) {
       set.add(CCO_DEFAULT_SENDER_MAILBOX);
       set.add('kons@hairtpclinic.com');
+      set.add('marknad@hairtpclinic.com');
       set.add('egzona@hairtpclinic.com');
       set.add('fazli@hairtpclinic.com');
     }
