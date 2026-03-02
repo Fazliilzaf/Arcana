@@ -584,6 +584,7 @@ function toInboxMessagesUrl({
       'isRead',
       'from',
       'toRecipients',
+      'replyTo',
       'internetMessageId',
       'internetMessageHeaders',
     ].join(',')
@@ -611,6 +612,7 @@ function toSentMessagesUrl({ graphBaseUrl, userId, maxMessages, sentSinceIso }) 
       'sentDateTime',
       'from',
       'toRecipients',
+      'replyTo',
       'internetMessageId',
       'internetMessageHeaders',
     ].join(',')
