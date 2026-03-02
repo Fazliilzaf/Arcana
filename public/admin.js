@@ -10263,7 +10263,7 @@
       hideCcoSoftBreakPanel();
     }
 
-    renderCcoMailboxFilterRow(sortedRows);
+    renderCcoMailboxFilterRow(openRows);
     renderCcoSlaFilterRow();
     renderCcoLifecycleFilterRow();
     renderCcoDensityFilterRow();

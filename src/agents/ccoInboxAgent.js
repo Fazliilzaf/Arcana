@@ -78,6 +78,83 @@ function normalizeSlaStatus(value = '') {
   return 'safe';
 }
 
+function normalizeTempoProfile(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['responsive', 'reflective', 'hesitant', 'low_engagement'].includes(normalized)) {
+    return normalized;
+  }
+  return 'reflective';
+}
+
+function normalizeCtaIntensity(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['soft', 'normal', 'direct'].includes(normalized)) return normalized;
+  return 'normal';
+}
+
+function normalizeFollowUpUrgencyLevel(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['low', 'normal', 'high'].includes(normalized)) return normalized;
+  return 'normal';
+}
+
+function normalizeOptionalNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return parsed;
+}
+
+function normalizeWorkloadBreakdown(value = null) {
+  const safe = asObject(value);
+  if (!Object.keys(safe).length) {
+    return {
+      base: 0,
+      toneAdjustment: 0,
+      priorityAdjustment: 0,
+      warmthAdjustment: 0,
+      lengthAdjustment: 0,
+    };
+  }
+  return {
+    base: normalizeOptionalNumber(safe.base, 0),
+    toneAdjustment: normalizeOptionalNumber(safe.toneAdjustment, 0),
+    priorityAdjustment: normalizeOptionalNumber(safe.priorityAdjustment, 0),
+    warmthAdjustment: normalizeOptionalNumber(safe.warmthAdjustment, 0),
+    lengthAdjustment: normalizeOptionalNumber(safe.lengthAdjustment, 0),
+  };
+}
+
+function normalizeCustomerSummary(value = null, fallbackCustomerKey = '') {
+  const safe = asObject(value);
+  const timeline = asArray(safe.timeline)
+    .map((item) => asObject(item))
+    .map((item) => ({
+      conversationId: normalizeText(item.conversationId) || 'okand',
+      subject: normalizeText(item.subject) || '(utan ämne)',
+      status: normalizeText(item.status) || 'open',
+      occurredAt: normalizeText(item.occurredAt) || null,
+    }))
+    .slice(0, 6);
+  return {
+    customerKey: normalizeText(safe.customerKey) || normalizeText(fallbackCustomerKey) || 'okand-kund',
+    customerName: normalizeText(safe.customerName) || 'Okänd kund',
+    lifecycleStatus: normalizeText(safe.lifecycleStatus) || 'NEW',
+    lifecycleSource: normalizeText(safe.lifecycleSource) || 'auto',
+    interactionCount: toNonNegativeNumber(safe.interactionCount, 0),
+    caseCount: toNonNegativeNumber(safe.caseCount, 0),
+    lastInteractionAt: normalizeText(safe.lastInteractionAt) || null,
+    daysSinceLastInteraction: Number.isFinite(Number(safe.daysSinceLastInteraction))
+      ? Number(safe.daysSinceLastInteraction)
+      : null,
+    engagementScore: toIntentConfidence(safe.engagementScore, 0),
+    lastCaseSummary: normalizeText(safe.lastCaseSummary) || 'Ingen historik tillgänglig.',
+    daysSinceLastClosedCase: Number.isFinite(Number(safe.daysSinceLastClosedCase))
+      ? Number(safe.daysSinceLastClosedCase)
+      : null,
+    timeline,
+  };
+}
+
 function normalizePriorityReasons(value = []) {
   return asArray(value)
     .map((item) => normalizeText(item))
@@ -191,7 +268,7 @@ const ccoInboxAnalysisOutputSchema = Object.freeze({
 
 function normalizeConversationWorkItem(item = {}) {
   const safe = asObject(item);
-  return {
+  const normalized = {
     conversationId: normalizeText(safe.conversationId) || 'okand',
     messageId: normalizeText(safe.messageId) || 'okand',
     mailboxId: normalizeText(safe.mailboxId) || 'okand-postlada',
@@ -221,6 +298,102 @@ function normalizeConversationWorkItem(item = {}) {
     needsReplyStatus:
       normalizeText(safe.needsReplyStatus) === 'handled' ? 'handled' : 'needs_reply',
   };
+
+  const mailboxAddress = normalizeText(safe.mailboxAddress);
+  if (mailboxAddress) {
+    normalized.mailboxAddress = mailboxAddress;
+  } else if (safe.mailboxAddress === null) {
+    normalized.mailboxAddress = null;
+  }
+
+  const userPrincipalName = normalizeText(safe.userPrincipalName);
+  if (userPrincipalName) {
+    normalized.userPrincipalName = userPrincipalName;
+  } else if (safe.userPrincipalName === null) {
+    normalized.userPrincipalName = null;
+  }
+
+  const dueBy = normalizeText(safe.dueBy);
+  if (dueBy) {
+    normalized.dueBy = dueBy;
+  } else if (safe.dueBy === null) {
+    normalized.dueBy = null;
+  }
+
+  if (typeof safe.isUnanswered === 'boolean') {
+    normalized.isUnanswered = safe.isUnanswered;
+  }
+  if (Number.isFinite(Number(safe.unansweredThresholdHours))) {
+    normalized.unansweredThresholdHours = toNonNegativeNumber(safe.unansweredThresholdHours, 24);
+  }
+
+  const customerKey = normalizeText(safe.customerKey);
+  if (customerKey) {
+    normalized.customerKey = customerKey;
+  }
+
+  if (safe.customerSummary && typeof safe.customerSummary === 'object' && !Array.isArray(safe.customerSummary)) {
+    normalized.customerSummary = normalizeCustomerSummary(safe.customerSummary, customerKey);
+  }
+
+  if (safe.lifecycleStatus !== undefined) {
+    normalized.lifecycleStatus = normalizeText(safe.lifecycleStatus) || 'NEW';
+  }
+
+  if (safe.tempoProfile !== undefined) {
+    normalized.tempoProfile = normalizeTempoProfile(safe.tempoProfile);
+  }
+  if (safe.recommendedFollowUpDelayDays !== undefined) {
+    normalized.recommendedFollowUpDelayDays = toNonNegativeNumber(safe.recommendedFollowUpDelayDays, 0);
+  }
+  if (safe.ctaIntensity !== undefined) {
+    normalized.ctaIntensity = normalizeCtaIntensity(safe.ctaIntensity);
+  }
+
+  const followUpSuggestedAt = normalizeText(safe.followUpSuggestedAt);
+  if (followUpSuggestedAt) {
+    normalized.followUpSuggestedAt = followUpSuggestedAt;
+  } else if (safe.followUpSuggestedAt === null) {
+    normalized.followUpSuggestedAt = null;
+  }
+
+  const followUpTimingReason = asArray(safe.followUpTimingReason)
+    .map((item) => normalizeText(item))
+    .filter(Boolean)
+    .slice(0, 6);
+  if (followUpTimingReason.length) {
+    normalized.followUpTimingReason = followUpTimingReason;
+  } else if (Array.isArray(safe.followUpTimingReason)) {
+    normalized.followUpTimingReason = [];
+  }
+
+  if (safe.followUpUrgencyLevel !== undefined) {
+    normalized.followUpUrgencyLevel = normalizeFollowUpUrgencyLevel(safe.followUpUrgencyLevel);
+  }
+  if (typeof safe.followUpManualApprovalRequired === 'boolean') {
+    normalized.followUpManualApprovalRequired = safe.followUpManualApprovalRequired;
+  }
+  if (safe.estimatedWorkMinutes !== undefined) {
+    normalized.estimatedWorkMinutes = normalizeOptionalNumber(safe.estimatedWorkMinutes, 0);
+  }
+  if (safe.workloadBreakdown && typeof safe.workloadBreakdown === 'object' && !Array.isArray(safe.workloadBreakdown)) {
+    normalized.workloadBreakdown = normalizeWorkloadBreakdown(safe.workloadBreakdown);
+  }
+
+  const relationshipStatus = normalizeText(safe.relationshipStatus);
+  if (relationshipStatus) {
+    normalized.relationshipStatus = relationshipStatus;
+  }
+  const relationshipLabel = normalizeText(safe.relationshipLabel);
+  if (relationshipLabel) {
+    normalized.relationshipLabel = relationshipLabel;
+  }
+
+  if (typeof safe.isNewSinceLastVisit === 'boolean') {
+    normalized.isNewSinceLastVisit = safe.isNewSinceLastVisit;
+  }
+
+  return normalized;
 }
 
 function normalizeSuggestedDraft(draft = {}) {
