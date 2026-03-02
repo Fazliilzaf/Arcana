@@ -450,7 +450,7 @@ function parseMailboxIndexes(rawValue = '', maxItems = 200) {
 
 function parseMailboxIds(rawValue = '', maxItems = 200) {
   const tokens = String(rawValue || '')
-    .split(/[,\s]+/)
+    .split(/[,\s;]+/)
     .map((item) => normalizeText(item).toLowerCase())
     .filter(Boolean);
   const seen = new Set();
@@ -462,6 +462,13 @@ function parseMailboxIds(rawValue = '', maxItems = 200) {
     mailboxIds.push(token);
   }
   return mailboxIds;
+}
+
+function resolveGraphReadAllowlistMailboxIds(maxItems = 500) {
+  const explicitAllowlist = parseMailboxIds(process.env.ARCANA_MAILBOX_ALLOWLIST, maxItems);
+  if (explicitAllowlist.length > 0) return explicitAllowlist;
+  // Fallback: when read allowlist is not set, reuse Graph send allowlist as safe mailbox scope.
+  return parseMailboxIds(process.env.ARCANA_GRAPH_SEND_ALLOWLIST, maxItems);
 }
 
 function mergeUniqueMailboxIds(...collections) {
@@ -480,7 +487,7 @@ function mergeUniqueMailboxIds(...collections) {
 }
 
 function toGraphReadOptionsFromEnv() {
-  const allowlistMailboxIds = parseMailboxIds(process.env.ARCANA_MAILBOX_ALLOWLIST, 500);
+  const allowlistMailboxIds = resolveGraphReadAllowlistMailboxIds(500);
   const allowlistMode = allowlistMailboxIds.length > 0;
   const fullTenant = allowlistMode
     ? true
@@ -2537,7 +2544,7 @@ function createCapabilitiesRouter({
       buildVersion: process.env.npm_package_version || 'dev',
     });
   const shouldEnableGraphRead = toBoolean(process.env.ARCANA_GRAPH_READ_ENABLED, false);
-  const graphReadAllowlist = parseMailboxIds(process.env.ARCANA_MAILBOX_ALLOWLIST, 500);
+  const graphReadAllowlist = resolveGraphReadAllowlistMailboxIds(500);
   const graphReadAllowlistMode = graphReadAllowlist.length > 0;
   const graphReadFullTenant = graphReadAllowlistMode
     ? true

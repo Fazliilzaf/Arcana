@@ -1108,3 +1108,124 @@ test('capabilities router allows Graph full-tenant mode without ARCANA_GRAPH_USE
     });
   }
 });
+
+test('AnalyzeInbox uses ARCANA_GRAPH_SEND_ALLOWLIST as Graph read allowlist fallback', async () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+    ARCANA_GRAPH_FULL_TENANT: process.env.ARCANA_GRAPH_FULL_TENANT,
+    ARCANA_GRAPH_USER_SCOPE: process.env.ARCANA_GRAPH_USER_SCOPE,
+    ARCANA_GRAPH_MAILBOX_IDS: process.env.ARCANA_GRAPH_MAILBOX_IDS,
+    ARCANA_MAILBOX_ALLOWLIST: process.env.ARCANA_MAILBOX_ALLOWLIST,
+    ARCANA_GRAPH_SEND_ALLOWLIST: process.env.ARCANA_GRAPH_SEND_ALLOWLIST,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  process.env.ARCANA_GRAPH_FULL_TENANT = 'false';
+  process.env.ARCANA_GRAPH_USER_SCOPE = 'single';
+  delete process.env.ARCANA_GRAPH_MAILBOX_IDS;
+  delete process.env.ARCANA_MAILBOX_ALLOWLIST;
+  process.env.ARCANA_GRAPH_SEND_ALLOWLIST =
+    'contact@hairtpclinic.com; info@hairtpclinic.com';
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-allowlist-fallback-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+
+  const graphCalls = [];
+  const graphReadConnector = {
+    async fetchInboxSnapshot(options = {}) {
+      graphCalls.push({ ...options });
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-02T10:00:00.000Z',
+        },
+        conversations: [],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+    })
+  );
+
+  try {
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-correlation-id': 'corr-allowlist-fallback-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          input: {
+            maxDrafts: 1,
+          },
+        }),
+      });
+      assert.equal(response.status, 200);
+    });
+
+    assert.equal(graphCalls.length, 1);
+    assert.equal(graphCalls[0].allowlistMode, true);
+    assert.equal(graphCalls[0].fullTenant, true);
+    assert.equal(graphCalls[0].userScope, 'all');
+    assert.deepEqual(graphCalls[0].allowlistMailboxIds, [
+      'contact@hairtpclinic.com',
+      'info@hairtpclinic.com',
+    ]);
+    assert.deepEqual(graphCalls[0].mailboxIds, [
+      'contact@hairtpclinic.com',
+      'info@hairtpclinic.com',
+    ]);
+    assert.deepEqual(graphCalls[0].mailboxIndexes, []);
+
+    const audits = await authStore.listAuditEvents({
+      tenantId: 'tenant-a',
+      limit: 200,
+    });
+    const readStartEvent = audits.find((event) => event.action === 'mailbox.read.start');
+    assert.equal(Boolean(readStartEvent), true);
+    assert.equal(readStartEvent.metadata.allowlistMode, true);
+    assert.deepEqual(readStartEvent.metadata.allowlistMailboxIds, [
+      'contact@hairtpclinic.com',
+      'info@hairtpclinic.com',
+    ]);
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
