@@ -1229,3 +1229,104 @@ test('AnalyzeInbox uses ARCANA_GRAPH_SEND_ALLOWLIST as Graph read allowlist fall
     });
   }
 });
+
+test('AnalyzeInbox ignores wildcard-only ARCANA_GRAPH_SEND_ALLOWLIST for Graph read fallback', async () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+    ARCANA_GRAPH_FULL_TENANT: process.env.ARCANA_GRAPH_FULL_TENANT,
+    ARCANA_GRAPH_USER_SCOPE: process.env.ARCANA_GRAPH_USER_SCOPE,
+    ARCANA_GRAPH_MAILBOX_IDS: process.env.ARCANA_GRAPH_MAILBOX_IDS,
+    ARCANA_MAILBOX_ALLOWLIST: process.env.ARCANA_MAILBOX_ALLOWLIST,
+    ARCANA_GRAPH_SEND_ALLOWLIST: process.env.ARCANA_GRAPH_SEND_ALLOWLIST,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  process.env.ARCANA_GRAPH_FULL_TENANT = 'false';
+  process.env.ARCANA_GRAPH_USER_SCOPE = 'single';
+  delete process.env.ARCANA_GRAPH_MAILBOX_IDS;
+  delete process.env.ARCANA_MAILBOX_ALLOWLIST;
+  process.env.ARCANA_GRAPH_SEND_ALLOWLIST = '*';
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-allowlist-wildcard-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+
+  const graphCalls = [];
+  const graphReadConnector = {
+    async fetchInboxSnapshot(options = {}) {
+      graphCalls.push({ ...options });
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-02T10:00:00.000Z',
+        },
+        conversations: [],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+    })
+  );
+
+  try {
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-correlation-id': 'corr-allowlist-wildcard-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          input: {
+            maxDrafts: 1,
+          },
+        }),
+      });
+      assert.equal(response.status, 200);
+    });
+
+    assert.equal(graphCalls.length, 1);
+    assert.equal(graphCalls[0].allowlistMode, false);
+    assert.equal(graphCalls[0].fullTenant, false);
+    assert.equal(graphCalls[0].userScope, 'single');
+    assert.deepEqual(graphCalls[0].allowlistMailboxIds, []);
+    assert.deepEqual(graphCalls[0].mailboxIds, []);
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});

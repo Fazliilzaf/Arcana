@@ -468,7 +468,10 @@ function resolveGraphReadAllowlistMailboxIds(maxItems = 500) {
   const explicitAllowlist = parseMailboxIds(process.env.ARCANA_MAILBOX_ALLOWLIST, maxItems);
   if (explicitAllowlist.length > 0) return explicitAllowlist;
   // Fallback: when read allowlist is not set, reuse Graph send allowlist as safe mailbox scope.
-  return parseMailboxIds(process.env.ARCANA_GRAPH_SEND_ALLOWLIST, maxItems);
+  const sendAllowlist = parseMailboxIds(process.env.ARCANA_GRAPH_SEND_ALLOWLIST, maxItems).filter(
+    (mailboxId) => mailboxId.includes('@')
+  );
+  return sendAllowlist;
 }
 
 function mergeUniqueMailboxIds(...collections) {
