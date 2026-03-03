@@ -272,6 +272,21 @@
     return normalized.slice(0, 320);
   }
 
+  function sanitizeCcoSearchQuery(value = '') {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
+  }
+
+  function sanitizeCcoShowSystemMessages(value = false) {
+    if (value === true || value === 1) return true;
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+    return normalized === 'true' || normalized === '1';
+  }
+
   function sanitizeCcoViewMode(value = '') {
     void value;
     return 'all';
@@ -473,6 +488,10 @@
     ccoInboxSlaFilter: sanitizeCcoSlaFilter(initialCcoWorkspaceSession.slaFilter || 'all'),
     ccoInboxLifecycleFilter: sanitizeCcoLifecycleFilter(
       initialCcoWorkspaceSession.lifecycleFilter || 'all'
+    ),
+    ccoInboxSearchQuery: sanitizeCcoSearchQuery(initialCcoWorkspaceSession.searchQuery || ''),
+    ccoInboxShowSystemMessages: sanitizeCcoShowSystemMessages(
+      initialCcoWorkspaceSession.showSystemMessages
     ),
     ccoInboxDensityMode: sanitizeCcoDensityMode(
       initialCcoWorkspaceSession.densityMode || CCO_DEFAULT_DENSITY_MODE
@@ -765,6 +784,9 @@
     ccoInboxMailboxFilters: document.getElementById('ccoInboxMailboxFilters'),
     ccoInboxSlaFilters: document.getElementById('ccoInboxSlaFilters'),
     ccoInboxStateFilters: document.getElementById('ccoInboxStateFilters'),
+    ccoInboxSearchInput: document.getElementById('ccoInboxSearchInput'),
+    ccoInboxShowSystemToggle: document.getElementById('ccoInboxShowSystemToggle'),
+    ccoInboxSearchMeta: document.getElementById('ccoInboxSearchMeta'),
     ccoInboxDensityFilters: document.getElementById('ccoInboxDensityFilters'),
     ccoInboxWorklist: document.getElementById('ccoInboxWorklist'),
     ccoSoftBreakPanel: document.getElementById('ccoSoftBreakPanel'),
@@ -4616,6 +4638,8 @@
         mailboxFilter: sanitizeCcoMailboxFilter(state.ccoInboxMailboxFilter),
         slaFilter: sanitizeCcoSlaFilter(state.ccoInboxSlaFilter),
         lifecycleFilter: sanitizeCcoLifecycleFilter(state.ccoInboxLifecycleFilter),
+        searchQuery: sanitizeCcoSearchQuery(state.ccoInboxSearchQuery),
+        showSystemMessages: sanitizeCcoShowSystemMessages(state.ccoInboxShowSystemMessages),
         densityMode: sanitizeCcoDensityMode(state.ccoInboxDensityMode),
         sectionExpanded: sanitizeCcoSectionExpandedState(state.ccoInboxSectionExpanded),
         draftsByConversationId: sanitizeCcoDraftMap(state.ccoDraftOverrideByConversationId),
@@ -8601,18 +8625,18 @@
 
   function formatCcoRelationshipChip(status = 'new') {
     const normalized = String(status || '').trim().toLowerCase();
-    if (normalized === 'dormant') return '💤 Dormant';
-    if (normalized === 'loyal') return '⭐ Loyal';
-    if (normalized === 'returning') return '🔁 Returning';
-    return '🆕 New';
+    if (normalized === 'dormant') return '💤 Vilande';
+    if (normalized === 'loyal') return '⭐ Lojal';
+    if (normalized === 'returning') return '🔁 Återkommande';
+    return '🆕 Ny';
   }
 
   function formatCcoRelationshipShortLabel(status = 'new') {
     const normalized = String(status || '').trim().toLowerCase();
-    if (normalized === 'dormant') return 'Dormant';
-    if (normalized === 'loyal') return 'Loyal';
-    if (normalized === 'returning') return 'Returning';
-    return 'New';
+    if (normalized === 'dormant') return 'Vilande';
+    if (normalized === 'loyal') return 'Lojal';
+    if (normalized === 'returning') return 'Återkommande';
+    return 'Ny';
   }
 
   function getCcoSlaToneClass(row = null) {
@@ -8627,9 +8651,11 @@
     if (!text) return '';
     text = text
       .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
       .replace(/\.cco-[\w-]+\s*\{[^}]*\}/gi, ' ')
       .replace(/\.signature-[\w-]+\s*\{[^}]*\}/gi, ' ')
       .replace(/(^|\s)([.#][\w-]+)\s*\{[^}]*\}/g, ' ')
+      .replace(/[a-z0-9_.#:-]+\s*\{[^{}]*\}/gi, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();
     return text;
@@ -8676,13 +8702,23 @@
     };
   }
 
-  function getCcoFilteredConversations(rows = []) {
+  function getCcoFilteredConversations(rows = [], options = {}) {
     const source = Array.isArray(rows) ? rows : [];
+    const includeSystemMessages = sanitizeCcoShowSystemMessages(state.ccoInboxShowSystemMessages);
+    const searchQuery = sanitizeCcoSearchQuery(state.ccoInboxSearchQuery);
+    const withMeta = options && options.withMeta === true;
     let filtered = source
       .map((row) => enrichCcoConversationRow(row))
       .filter((row) => isCcoAllowedMailboxRow(row));
+    const totalAllowedRows = filtered.length;
+    let hiddenSystemRows = 0;
 
-    filtered = filtered.filter((row) => !isLikelyCcoSystemMessage(row));
+    if (!includeSystemMessages) {
+      const beforeSystemFilter = filtered.length;
+      filtered = filtered.filter((row) => !isLikelyCcoSystemMessage(row));
+      hiddenSystemRows = Math.max(0, beforeSystemFilter - filtered.length);
+    }
+    const totalAfterSystemFilter = filtered.length;
 
     const mailboxFilter = sanitizeCcoMailboxFilter(state.ccoInboxMailboxFilter);
     if (mailboxFilter !== 'all') {
@@ -8705,7 +8741,33 @@
       );
     }
 
-    return filtered;
+    const totalBeforeSearch = filtered.length;
+    if (searchQuery) {
+      const needle = searchQuery.toLowerCase();
+      filtered = filtered.filter((row) => {
+        const customerName = safeLower(row?.customerSummary?.customerName || '');
+        const sender = safeLower(row?.sender || '');
+        const subject = safeLower(row?.subject || '');
+        const preview = safeLower(row?.latestInboundPreview || '');
+        const mailbox = safeLower(row?.mailboxLabel || '');
+        return `${customerName} ${sender} ${subject} ${preview} ${mailbox}`.includes(needle);
+      });
+    }
+
+    if (!withMeta) return filtered;
+
+    return {
+      rows: filtered,
+      meta: {
+        includeSystemMessages,
+        hiddenSystemRows,
+        totalAllowedRows,
+        totalAfterSystemFilter,
+        totalBeforeSearch,
+        searchQuery,
+        matchedRows: filtered.length,
+      },
+    };
   }
 
   function normalizeCcoPriorityReasons(value = []) {
@@ -10251,14 +10313,53 @@
       .join('');
   }
 
+  function renderCcoSearchControls() {
+    if (els.ccoInboxSearchInput) {
+      const nextValue = sanitizeCcoSearchQuery(state.ccoInboxSearchQuery);
+      if (els.ccoInboxSearchInput.value !== nextValue) {
+        els.ccoInboxSearchInput.value = nextValue;
+      }
+    }
+    if (els.ccoInboxShowSystemToggle) {
+      els.ccoInboxShowSystemToggle.checked = sanitizeCcoShowSystemMessages(
+        state.ccoInboxShowSystemMessages
+      );
+    }
+  }
+
+  function renderCcoSearchMeta(meta = null) {
+    if (!els.ccoInboxSearchMeta) return;
+    const safeMeta = meta && typeof meta === 'object' ? meta : {};
+    const includeSystemMessages = safeMeta.includeSystemMessages === true;
+    const hiddenSystemRows = Number(safeMeta.hiddenSystemRows || 0);
+    const totalBeforeSearch = Number(safeMeta.totalBeforeSearch || 0);
+    const matchedRows = Number(safeMeta.matchedRows || 0);
+    const searchQuery = sanitizeCcoSearchQuery(safeMeta.searchQuery);
+    const parts = [];
+
+    if (searchQuery) {
+      parts.push(`Visar ${matchedRows} av ${totalBeforeSearch} efter sökning`);
+    } else {
+      parts.push(`Visar ${totalBeforeSearch} konversationer`);
+    }
+    if (searchQuery) {
+      parts.push(`Sök: "${searchQuery}"`);
+    }
+    if (!includeSystemMessages && hiddenSystemRows > 0) {
+      parts.push(`${hiddenSystemRows} systemmail dolda`);
+    }
+
+    els.ccoInboxSearchMeta.textContent = parts.join(' · ');
+  }
+
   function renderCcoSlaFilterRow() {
     if (!els.ccoInboxSlaFilters) return;
     const activeFilter = sanitizeCcoSlaFilter(state.ccoInboxSlaFilter);
     const options = [
       { value: 'all', label: 'Alla' },
-      { value: 'breach', label: '🔴 Breach' },
-      { value: 'warning', label: '🟡 Warning' },
-      { value: 'safe', label: '🟢 Safe' },
+      { value: 'breach', label: '🔴 SLA-brist' },
+      { value: 'warning', label: '🟡 Varning' },
+      { value: 'safe', label: '🟢 Säker' },
       { value: 'new', label: '🆕 Nya' },
     ];
     els.ccoInboxSlaFilters.innerHTML = options
@@ -10275,14 +10376,14 @@
     if (!els.ccoInboxStateFilters) return;
     const activeFilter = sanitizeCcoLifecycleFilter(state.ccoInboxLifecycleFilter);
     const options = [
-      { value: 'all', label: 'Alla states' },
-      { value: 'follow_up_pending', label: 'Follow-up pending' },
-      { value: 'active_dialogue', label: 'Active dialogue' },
-      { value: 'new', label: 'New' },
-      { value: 'awaiting_reply', label: 'Awaiting reply' },
-      { value: 'dormant', label: 'Dormant' },
-      { value: 'handled', label: 'Handled' },
-      { value: 'archived', label: 'Archived' },
+      { value: 'all', label: 'Alla statusar' },
+      { value: 'follow_up_pending', label: 'Uppföljning väntar' },
+      { value: 'active_dialogue', label: 'Aktiv dialog' },
+      { value: 'new', label: 'Ny' },
+      { value: 'awaiting_reply', label: 'Väntar svar' },
+      { value: 'dormant', label: 'Vilande' },
+      { value: 'handled', label: 'Hanterad' },
+      { value: 'archived', label: 'Arkiverad' },
     ];
     els.ccoInboxStateFilters.innerHTML = options
       .map((entry) => {
@@ -10472,7 +10573,8 @@
       (row) => String(row?.needsReplyStatus || '').trim().toLowerCase() !== 'handled'
     );
     const unansweredRows = openRows.filter((row) => row.isUnanswered === true);
-    const filteredRows = getCcoFilteredConversations(openRows);
+    const filteredResult = getCcoFilteredConversations(openRows, { withMeta: true });
+    const filteredRows = filteredResult.rows;
     const selectedId = String(state.ccoSelectedConversationId || '').trim();
     const debugMode = isCcoDebugMode();
     const densityMode = sanitizeCcoDensityMode(state.ccoInboxDensityMode);
@@ -10486,6 +10588,8 @@
     renderCcoMailboxFilterRow(openRows);
     renderCcoSlaFilterRow();
     renderCcoLifecycleFilterRow();
+    renderCcoSearchControls();
+    renderCcoSearchMeta(filteredResult.meta);
     renderCcoDensityFilterRow();
     renderCcoUnansweredPanel(unansweredRows);
 
@@ -13184,6 +13288,8 @@
     state.ccoInboxMailboxFilter = 'all';
     state.ccoInboxSlaFilter = 'all';
     state.ccoInboxLifecycleFilter = 'all';
+    state.ccoInboxSearchQuery = '';
+    state.ccoInboxShowSystemMessages = false;
     state.ccoSelectedConversationId = '';
     state.ccoDraftOverrideByConversationId = {};
     state.ccoDraftModeByConversationId = {};
@@ -13232,6 +13338,9 @@
     setStatus(els.profileStatus, '');
     if (els.staffSearchInput) els.staffSearchInput.value = '';
     if (els.staffStatusFilter) els.staffStatusFilter.value = '';
+    if (els.ccoInboxSearchInput) els.ccoInboxSearchInput.value = '';
+    if (els.ccoInboxShowSystemToggle) els.ccoInboxShowSystemToggle.checked = false;
+    if (els.ccoInboxSearchMeta) els.ccoInboxSearchMeta.textContent = '';
     setStatus(els.tenantOnboardStatus, '');
     if (els.riskLabResult) els.riskLabResult.textContent = 'Ingen förhandsgranskning körd ännu.';
     if (els.orchestratorResult) els.orchestratorResult.textContent = 'Ingen körning ännu.';
@@ -13767,6 +13876,18 @@
       button.getAttribute('data-cco-state-filter') || 'all'
     );
     state.ccoInboxLifecycleFilter = nextFilter;
+    persistCcoWorkspaceSessionState();
+    renderCcoInbox(state.ccoInboxData);
+  });
+  els.ccoInboxSearchInput?.addEventListener('input', () => {
+    state.ccoInboxSearchQuery = sanitizeCcoSearchQuery(els.ccoInboxSearchInput?.value || '');
+    persistCcoWorkspaceSessionState();
+    renderCcoInbox(state.ccoInboxData);
+  });
+  els.ccoInboxShowSystemToggle?.addEventListener('change', () => {
+    state.ccoInboxShowSystemMessages = sanitizeCcoShowSystemMessages(
+      els.ccoInboxShowSystemToggle?.checked
+    );
     persistCcoWorkspaceSessionState();
     renderCcoInbox(state.ccoInboxData);
   });
