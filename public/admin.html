@@ -1941,6 +1941,34 @@
       align-items: center;
       padding: 2px 0 0;
     }
+    .cco-filter-row-search {
+      margin-top: 2px;
+      gap: 8px;
+    }
+    .cco-search-input {
+      flex: 1 1 170px;
+      min-width: 170px;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
+    .cco-inline-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #6B625C;
+      white-space: nowrap;
+    }
+    .cco-inline-toggle input[type="checkbox"] {
+      margin: 0;
+    }
+    .cco-search-meta {
+      padding: 2px 2px 0;
+      font-size: 11px;
+      color: #7B716A;
+    }
     .cco-soft-break-panel {
       display: none;
       margin-top: 8px;
@@ -3606,25 +3634,39 @@
                 <strong id="ccoUnansweredMediumCount">0</strong>
               </button>
             </div>
+            <div id="ccoInboxSearchRow" class="cco-filter-row cco-filter-row-search">
+              <input
+                id="ccoInboxSearchInput"
+                class="cco-search-input"
+                type="search"
+                placeholder="Sök namn, e-post eller ämne"
+                autocomplete="off"
+              />
+              <label class="cco-inline-toggle">
+                <input id="ccoInboxShowSystemToggle" type="checkbox" />
+                Visa systemmail
+              </label>
+            </div>
+            <div id="ccoInboxSearchMeta" class="cco-search-meta mini muted"></div>
             <div id="ccoInboxMailboxFilters" class="cco-filter-row cco-filter-row-mailbox">
               <button type="button" class="cco-filter-btn is-active" data-cco-mailbox-filter="all">Alla</button>
             </div>
             <div id="ccoInboxSlaFilters" class="cco-filter-row cco-filter-row-sla">
               <button type="button" class="cco-filter-btn is-active" data-cco-sla-filter="all">Alla</button>
-              <button type="button" class="cco-filter-btn" data-cco-sla-filter="breach">🔴 Breach</button>
-              <button type="button" class="cco-filter-btn" data-cco-sla-filter="warning">🟡 Warning</button>
-              <button type="button" class="cco-filter-btn" data-cco-sla-filter="safe">🟢 Safe</button>
+              <button type="button" class="cco-filter-btn" data-cco-sla-filter="breach">🔴 SLA-brist</button>
+              <button type="button" class="cco-filter-btn" data-cco-sla-filter="warning">🟡 Varning</button>
+              <button type="button" class="cco-filter-btn" data-cco-sla-filter="safe">🟢 Säker</button>
               <button type="button" class="cco-filter-btn" data-cco-sla-filter="new">🆕 Nya</button>
             </div>
             <div id="ccoInboxStateFilters" class="cco-filter-row">
-              <button type="button" class="cco-filter-btn is-active" data-cco-state-filter="all">Alla states</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="follow_up_pending">Follow-up pending</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="active_dialogue">Active dialogue</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="new">New</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="awaiting_reply">Awaiting reply</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="dormant">Dormant</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="handled">Handled</button>
-              <button type="button" class="cco-filter-btn" data-cco-state-filter="archived">Archived</button>
+              <button type="button" class="cco-filter-btn is-active" data-cco-state-filter="all">Alla statusar</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="follow_up_pending">Uppföljning väntar</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="active_dialogue">Aktiv dialog</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="new">Ny</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="awaiting_reply">Väntar svar</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="dormant">Vilande</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="handled">Hanterad</button>
+              <button type="button" class="cco-filter-btn" data-cco-state-filter="archived">Arkiverad</button>
             </div>
             <div id="ccoInboxDensityFilters" class="cco-filter-row">
               <button type="button" class="cco-filter-btn" data-cco-density-mode="focus">Fokus</button>
@@ -3632,7 +3674,7 @@
               <button type="button" class="cco-filter-btn" data-cco-density-mode="overview">Översikt</button>
             </div>
             <div id="ccoSoftBreakPanel" class="cco-soft-break-panel">
-              <div class="cco-soft-break-title">Du lämnar Sprint Mode</div>
+              <div class="cco-soft-break-title">Du lämnar sprintläge</div>
               <div class="cco-soft-break-text">Välj hur sprinten ska hanteras innan du öppnar tråden.</div>
               <div class="cco-soft-break-actions">
                 <button type="button" class="cco-filter-btn" data-cco-soft-break-action="pause">Pausa sprinten</button>
@@ -3645,7 +3687,7 @@
               <details id="ccoInboxGroupSprint" data-cco-section="sprint" class="cco-inbox-group section-acute" open>
                 <summary>
                   <span class="cco-group-title-wrap">
-                    <span>SPRINT</span>
+                    <span>FOKUS</span>
                     <span id="ccoInboxGroupAcuteMeta" class="cco-group-meta"></span>
                   </span>
                   <span id="ccoInboxGroupAcuteCount" class="cco-group-count">0</span>
