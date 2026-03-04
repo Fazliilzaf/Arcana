@@ -362,6 +362,16 @@
     return true;
   }
 
+  function sanitizeCcoMailboxFiltersExpanded(value = true) {
+    if (value === false || value === 0) return false;
+    if (value === true || value === 1) return true;
+    const normalized = String(value || '')
+      .trim()
+      .toLowerCase();
+    if (normalized === 'false' || normalized === '0') return false;
+    return true;
+  }
+
   const CCO_LOCKED_MAILBOX_ALLOWLIST = Object.freeze([
     'egzona@hairtpclinic.com',
     'contact@hairtpclinic.com',
@@ -622,6 +632,9 @@
     ),
     ccoInboxDensityMode: sanitizeCcoDensityMode(
       initialCcoWorkspaceSession.densityMode || CCO_DEFAULT_DENSITY_MODE
+    ),
+    ccoMailboxFiltersExpanded: sanitizeCcoMailboxFiltersExpanded(
+      initialCcoWorkspaceSession.mailboxFiltersExpanded
     ),
     ccoColumnLayout: sanitizeCcoColumnLayout(initialCcoWorkspaceSession.columnLayout),
     ccoInboxSectionExpanded: sanitizeCcoSectionExpandedState(
@@ -937,6 +950,9 @@
     ccoInboxSearchInput: document.getElementById('ccoInboxSearchInput'),
     ccoInboxShowSystemToggle: document.getElementById('ccoInboxShowSystemToggle'),
     ccoInboxSearchMeta: document.getElementById('ccoInboxSearchMeta'),
+    ccoMailboxFiltersBlock: document.getElementById('ccoMailboxFiltersBlock'),
+    ccoMailboxFiltersToggleBtn: document.getElementById('ccoMailboxFiltersToggleBtn'),
+    ccoMailboxFiltersChevron: document.getElementById('ccoMailboxFiltersChevron'),
     ccoInboxDensityFilters: document.getElementById('ccoInboxDensityFilters'),
     ccoInboxWorklist: document.getElementById('ccoInboxWorklist'),
     ccoSoftBreakPanel: document.getElementById('ccoSoftBreakPanel'),
@@ -995,6 +1011,7 @@
     ccoDraftRiskIndicator: document.getElementById('ccoDraftRiskIndicator'),
     ccoDraftPolicyIndicator: document.getElementById('ccoDraftPolicyIndicator'),
     ccoDraftConfidence: document.getElementById('ccoDraftConfidence'),
+    ccoDraftRecommendedActionRow: document.getElementById('ccoDraftRecommendedActionRow'),
     ccoDraftRecommendedAction: document.getElementById('ccoDraftRecommendedAction'),
     ccoDraftModeHint: document.getElementById('ccoDraftModeHint'),
     ccoDraftModeShortBtn: document.getElementById('ccoDraftModeShortBtn'),
@@ -1012,8 +1029,11 @@
     ccoSnoozeBtn: document.getElementById('ccoSnoozeBtn'),
     ccoRefineImproveBtn: document.getElementById('ccoRefineImproveBtn'),
     ccoRefineShortenBtn: document.getElementById('ccoRefineShortenBtn'),
+    ccoRefineSofterBtn: document.getElementById('ccoRefineSofterBtn'),
     ccoRefineProfessionalBtn: document.getElementById('ccoRefineProfessionalBtn'),
     ccoSendBtn: document.getElementById('ccoSendBtn'),
+    ccoStickySnoozeBtn: document.getElementById('ccoStickySnoozeBtn'),
+    ccoStickyDeleteBtn: document.getElementById('ccoStickyDeleteBtn'),
     ccoSendStatus: document.getElementById('ccoSendStatus'),
     ccoInboxNeedsReplyList: document.getElementById('ccoInboxNeedsReplyList'),
     ccoInboxDraftsList: document.getElementById('ccoInboxDraftsList'),
@@ -4812,6 +4832,7 @@
         searchQuery: sanitizeCcoSearchQuery(state.ccoInboxSearchQuery),
         showSystemMessages: sanitizeCcoShowSystemMessages(state.ccoInboxShowSystemMessages),
         densityMode: sanitizeCcoDensityMode(state.ccoInboxDensityMode),
+        mailboxFiltersExpanded: sanitizeCcoMailboxFiltersExpanded(state.ccoMailboxFiltersExpanded),
         columnLayout: sanitizeCcoColumnLayout(state.ccoColumnLayout),
         sectionExpanded: sanitizeCcoSectionExpandedState(state.ccoInboxSectionExpanded),
         includeSignature: sanitizeCcoIncludeSignature(state.ccoIncludeSignature),
@@ -8375,7 +8396,9 @@
     }
     const expanded = sanitizeCcoSignaturePreviewExpanded(state.ccoSignaturePreviewExpanded);
     if (els.ccoToggleSignaturePreviewBtn) {
-      els.ccoToggleSignaturePreviewBtn.textContent = expanded ? 'Dölj' : 'Visa';
+      els.ccoToggleSignaturePreviewBtn.textContent = expanded
+        ? 'Dölj signaturförhandsvisning'
+        : 'Förhandsvisa med signatur';
       els.ccoToggleSignaturePreviewBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     }
     els.ccoSignaturePreview.classList.toggle('is-collapsed', !expanded);
@@ -8995,7 +9018,7 @@
     if (!mailbox) return '';
     const localPart = mailbox.includes('@') ? mailbox.split('@')[0] : mailbox;
     if (!localPart) return mailbox;
-    return `${localPart} — Hair TP Clinic`;
+    return localPart;
   }
 
   function isCcoAllowedMailboxRow(row = null) {
@@ -10844,6 +10867,20 @@
     }
   }
 
+  function renderCcoMailboxFiltersVisibility() {
+    const expanded = sanitizeCcoMailboxFiltersExpanded(state.ccoMailboxFiltersExpanded);
+    state.ccoMailboxFiltersExpanded = expanded;
+    if (els.ccoMailboxFiltersBlock) {
+      els.ccoMailboxFiltersBlock.classList.toggle('is-collapsed', !expanded);
+    }
+    if (els.ccoMailboxFiltersToggleBtn) {
+      els.ccoMailboxFiltersToggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+    if (els.ccoMailboxFiltersChevron) {
+      els.ccoMailboxFiltersChevron.textContent = expanded ? '▾' : '▸';
+    }
+  }
+
   function renderCcoSearchMeta(meta = null) {
     if (!els.ccoInboxSearchMeta) return;
     const safeMeta = meta && typeof meta === 'object' ? meta : {};
@@ -11117,6 +11154,7 @@
     }
 
     renderCcoMailboxFilterRow(openRows);
+    renderCcoMailboxFiltersVisibility();
     renderCcoSlaFilterRow();
     renderCcoLifecycleFilterRow();
     renderCcoSearchControls();
@@ -11520,6 +11558,7 @@
         els.ccoHidePatternBtn.disabled = true;
         els.ccoHidePatternBtn.title = 'Välj en konversation först.';
       }
+      applyCcoSnoozeButtonState();
       applyCcoDeleteButtonState();
       return;
     }
@@ -11545,26 +11584,47 @@
       els.ccoHidePatternBtn.disabled = false;
       els.ccoHidePatternBtn.title = 'Dölj avsändare eller ämnesmönster från fokusköer.';
     }
+    applyCcoSnoozeButtonState();
     applyCcoDeleteButtonState();
   }
 
+  function applyCcoSnoozeButtonState() {
+    const hasConversation = !!getCcoSelectedConversation();
+    const buttons = [els.ccoSnoozeBtn, els.ccoStickySnoozeBtn].filter(Boolean);
+    for (const button of buttons) {
+      button.disabled = !hasConversation;
+      button.title = hasConversation
+        ? 'Skapar en påminnelse för vald konversation.'
+        : 'Välj en konversation först.';
+    }
+  }
+
   function applyCcoDeleteButtonState() {
-    if (!els.ccoDeleteMailBtn) return;
+    const buttons = [els.ccoDeleteMailBtn, els.ccoStickyDeleteBtn].filter(Boolean);
+    if (!buttons.length) return;
     const capability = sanitizeCcoDeleteCapabilityStatus(state.ccoDeleteCapability);
     const hasConversation = !!getCcoSelectedConversation();
     const enabledByBackend = capability.deleteEnabled === true;
     const disabled = !hasConversation || !enabledByBackend;
-    els.ccoDeleteMailBtn.disabled = disabled;
+    for (const button of buttons) {
+      button.disabled = disabled;
+    }
     if (!enabledByBackend) {
-      els.ccoDeleteMailBtn.title =
-        capability.reason || 'Radera mail är inte aktiverat i denna miljö.';
+      const reason = capability.reason || 'Radera mail är inte aktiverat i denna miljö.';
+      for (const button of buttons) {
+        button.title = reason;
+      }
       return;
     }
     if (!hasConversation) {
-      els.ccoDeleteMailBtn.title = 'Välj en konversation först.';
+      for (const button of buttons) {
+        button.title = 'Välj en konversation först.';
+      }
       return;
     }
-    els.ccoDeleteMailBtn.title = 'Flyttar valt mail till papperskorg (Deleted Items).';
+    for (const button of buttons) {
+      button.title = 'Flyttar valt mail till papperskorg (Deleted Items).';
+    }
   }
 
   function setCcoReplyEmptyState(isEmpty = false, { emptyMessage = '' } = {}) {
@@ -11582,6 +11642,10 @@
     }
     if (els.ccoDraftBodyInput) {
       els.ccoDraftBodyInput.disabled = isEmpty === true;
+    }
+    if (isEmpty === true) {
+      applyCcoSnoozeButtonState();
+      applyCcoDeleteButtonState();
     }
   }
 
@@ -11661,6 +11725,9 @@
       if (els.ccoDraftRiskIndicator) els.ccoDraftRiskIndicator.textContent = '-';
       if (els.ccoDraftPolicyIndicator) els.ccoDraftPolicyIndicator.textContent = '-';
       if (els.ccoDraftConfidence) els.ccoDraftConfidence.textContent = '-';
+      if (els.ccoDraftRecommendedActionRow) {
+        els.ccoDraftRecommendedActionRow.textContent = '🎯 Rekommenderad åtgärd: -';
+      }
       if (els.ccoDraftRecommendedAction) els.ccoDraftRecommendedAction.textContent = '-';
       if (els.ccoDraftBodyInput) els.ccoDraftBodyInput.value = '';
       renderCcoDraftModeControls(null);
@@ -11678,6 +11745,7 @@
       renderCcoSignaturePreview();
       renderCcoCustomerSummary(null);
       renderCcoReplyContext(null);
+      applyCcoSnoozeButtonState();
       return;
     }
 
@@ -11749,6 +11817,11 @@
     }
     if (els.ccoDraftRecommendedAction) {
       els.ccoDraftRecommendedAction.textContent = `${formatCcoRecommendedAction(conversation.recommendedAction)}${previewText ? ' · Förhandsvisning maskerad' : ''}`;
+    }
+    if (els.ccoDraftRecommendedActionRow) {
+      els.ccoDraftRecommendedActionRow.textContent = `🎯 Rekommenderad åtgärd: ${formatCcoRecommendedAction(
+        conversation.recommendedAction
+      )}`;
     }
     renderCcoDraftModeControls(conversation);
     syncCcoSignatureSelectors();
@@ -11910,12 +11983,6 @@
         'Inga konversationer i kö.'
       );
       renderIncidentIntelligenceList(els.ccoInboxDraftsList, [], 'Inga utkast än.');
-      if (els.ccoDraftBodyInput) {
-        els.ccoDraftBodyInput.value = buildCcoSignatureBlock({
-          profile: getCcoSelectedSignatureProfile(),
-          senderMailboxId: state.ccoSenderMailboxId,
-        });
-      }
       return;
     }
 
@@ -12096,6 +12163,7 @@
       }
     }
     applyCcoDeleteButtonState();
+    applyCcoSnoozeButtonState();
   }
 
   async function runCcoInboxBrief() {
@@ -14194,6 +14262,7 @@
     state.ccoInboxLifecycleFilter = 'all';
     state.ccoInboxSearchQuery = '';
     state.ccoInboxShowSystemMessages = false;
+    state.ccoMailboxFiltersExpanded = true;
     state.ccoSelectedConversationId = '';
     state.ccoDraftOverrideByConversationId = {};
     state.ccoDraftModeByConversationId = {};
@@ -14786,6 +14855,11 @@
     persistCcoWorkspaceSessionState();
     renderCcoInbox(state.ccoInboxData);
   });
+  els.ccoMailboxFiltersToggleBtn?.addEventListener('click', () => {
+    state.ccoMailboxFiltersExpanded = !sanitizeCcoMailboxFiltersExpanded(state.ccoMailboxFiltersExpanded);
+    persistCcoWorkspaceSessionState();
+    renderCcoMailboxFiltersVisibility();
+  });
   els.ccoInboxSlaFilters?.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-cco-sla-filter]');
     if (!button) return;
@@ -14970,7 +15044,17 @@
       setStatus(els.ccoSendStatus, error.message || 'Kunde inte radera mail.', true);
     });
   });
+  els.ccoStickyDeleteBtn?.addEventListener('click', () => {
+    deleteSelectedCcoConversation().catch((error) => {
+      setStatus(els.ccoSendStatus, error.message || 'Kunde inte radera mail.', true);
+    });
+  });
   els.ccoSnoozeBtn?.addEventListener('click', () => {
+    snoozeSelectedCcoConversation().catch((error) => {
+      setStatus(els.ccoSendStatus, error.message || 'Kunde inte sätta påminnelse.', true);
+    });
+  });
+  els.ccoStickySnoozeBtn?.addEventListener('click', () => {
     snoozeSelectedCcoConversation().catch((error) => {
       setStatus(els.ccoSendStatus, error.message || 'Kunde inte sätta påminnelse.', true);
     });
@@ -14984,6 +15068,15 @@
     runCcoRefineDraft('shorten').catch((error) => {
       setStatus(els.ccoSendStatus, error.message || 'Kunde inte förkorta svaret.', true);
     });
+  });
+  els.ccoRefineSofterBtn?.addEventListener('click', () => {
+    const conversation = getCcoSelectedConversation();
+    if (!conversation) {
+      setStatus(els.ccoSendStatus, 'Välj en konversation först.');
+      return;
+    }
+    applyCcoDraftModeSelection('warm');
+    setStatus(els.ccoSendStatus, 'Svarsläge satt till varm ton.');
   });
   els.ccoRefineProfessionalBtn?.addEventListener('click', () => {
     runCcoRefineDraft('professional').catch((error) => {
