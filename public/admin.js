@@ -11,6 +11,9 @@
   const DASHBOARD_STREAM_RETRY_MIN_MS = 1500;
   const DASHBOARD_STREAM_RETRY_MAX_MS = 15000;
   const DASHBOARD_STREAM_REFRESH_DEBOUNCE_MS = 1200;
+  const CCO_AUTO_REFRESH_BOOT_MS = 1200;
+  const CCO_AUTO_REFRESH_INTERVAL_MS = 45000;
+  const CCO_AUTO_REFRESH_RETRY_MS = 12000;
   const BRAND_PRIMARY_COLORS = Object.freeze(['#d8b38f', '#e6c6a5', '#c89f79', '#b78761']);
   const BRAND_ACCENT_COLORS = Object.freeze(['#2e2016', '#3a2a1e', '#4c3a2c', '#6b5747']);
   const DEFAULT_BRAND_PRIMARY_COLOR = '#d8b38f';
@@ -719,6 +722,9 @@
     dashboardStreamActiveKey: '',
     dashboardStreamRunId: 0,
     dashboardRealtimeRefreshTimer: null,
+    ccoAutoRefreshTimer: null,
+    ccoAutoRefreshInFlight: false,
+    ccoInboxBriefRunInFlight: false,
     monitorDetailsVisible: false,
   };
 
@@ -2879,6 +2885,7 @@
     }
     if (!isLoggedIn) {
       syncWorkspaceTheme('');
+      clearCcoAutoRefreshTimer();
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       if (els.tenantSelectionSelect) els.tenantSelectionSelect.innerHTML = '';
       state.pendingLoginTicket = '';
@@ -3325,6 +3332,74 @@
         // Ignore transient refresh errors from live stream.
       }
     }, DASHBOARD_STREAM_REFRESH_DEBOUNCE_MS);
+  }
+
+  function isCcoWorkspaceActive() {
+    return String(state.activeSectionGroup || '').trim() === 'ccoWorkspaceSection';
+  }
+
+  function shouldRunCcoAutoRefresh() {
+    if (!state.token) return false;
+    if (!isCcoWorkspaceActive()) return false;
+    if (document.visibilityState === 'hidden') return false;
+    return true;
+  }
+
+  function clearCcoAutoRefreshTimer() {
+    if (state.ccoAutoRefreshTimer) {
+      clearTimeout(state.ccoAutoRefreshTimer);
+      state.ccoAutoRefreshTimer = null;
+    }
+  }
+
+  async function runCcoAutoRefreshTick() {
+    if (!shouldRunCcoAutoRefresh()) {
+      clearCcoAutoRefreshTimer();
+      return;
+    }
+    if (state.ccoAutoRefreshInFlight || state.ccoInboxBriefRunInFlight) {
+      scheduleCcoAutoRefresh({ delayMs: CCO_AUTO_REFRESH_RETRY_MS });
+      return;
+    }
+    state.ccoAutoRefreshInFlight = true;
+    try {
+      if (canTemplateWrite()) {
+        await runCcoInboxBrief({ quiet: true });
+      } else {
+        await loadCcoInboxBrief({ quiet: true });
+      }
+    } finally {
+      state.ccoAutoRefreshInFlight = false;
+      scheduleCcoAutoRefresh({ delayMs: CCO_AUTO_REFRESH_INTERVAL_MS });
+    }
+  }
+
+  function scheduleCcoAutoRefresh({ delayMs = CCO_AUTO_REFRESH_INTERVAL_MS, immediate = false } = {}) {
+    clearCcoAutoRefreshTimer();
+    if (!shouldRunCcoAutoRefresh()) return;
+    const rawDelay = Number(delayMs);
+    const safeDelay = immediate
+      ? CCO_AUTO_REFRESH_BOOT_MS
+      : Number.isFinite(rawDelay)
+      ? Math.max(3000, rawDelay)
+      : CCO_AUTO_REFRESH_INTERVAL_MS;
+    state.ccoAutoRefreshTimer = setTimeout(() => {
+      state.ccoAutoRefreshTimer = null;
+      runCcoAutoRefreshTick().catch(() => {
+        scheduleCcoAutoRefresh({ delayMs: CCO_AUTO_REFRESH_RETRY_MS });
+      });
+    }, safeDelay);
+  }
+
+  function syncCcoAutoRefresh({ immediate = false } = {}) {
+    if (!shouldRunCcoAutoRefresh()) {
+      clearCcoAutoRefreshTimer();
+      return;
+    }
+    scheduleCcoAutoRefresh({
+      immediate: immediate === true,
+      delayMs: immediate === true ? CCO_AUTO_REFRESH_BOOT_MS : CCO_AUTO_REFRESH_INTERVAL_MS,
+    });
   }
 
   function currentDashboardStreamKey() {
@@ -5230,6 +5305,8 @@
       persistCcoLastSeenAtMs(state.ccoLastSeenAtMs);
       persistCcoWorkspaceSessionState();
     }
+    const shouldImmediateCcoRefresh = isCcoWorkspaceActive() && (enteringCco || !state.ccoInboxData);
+    syncCcoAutoRefresh({ immediate: shouldImmediateCcoRefresh });
   }
 
   function scrollToSection(sectionEl) {
@@ -12166,12 +12243,21 @@
     applyCcoSnoozeButtonState();
   }
 
-  async function runCcoInboxBrief() {
+  async function runCcoInboxBrief({ quiet = false } = {}) {
+    if (state.ccoInboxBriefRunInFlight) {
+      if (!quiet) {
+        setStatus(els.ccoInboxStatus, 'CCO inkorgsbrief körs redan.');
+      }
+      return;
+    }
+    state.ccoInboxBriefRunInFlight = true;
     try {
       if (!canTemplateWrite()) throw new Error('Du saknar behorighet.');
       await loadCcoDeleteCapabilityStatus({ quiet: true });
       const input = readCcoInboxOptions();
-      setStatus(els.ccoInboxStatus, 'Kör CCO inkorgsbrief...');
+      if (!quiet) {
+        setStatus(els.ccoInboxStatus, 'Kör CCO inkorgsbrief...');
+      }
       const response = await api('/agents/CCO/run', {
         method: 'POST',
         body: {
@@ -12183,14 +12269,23 @@
       await loadCcoMetrics({ since: '7d' });
       renderCcoInbox(state.ccoInboxData);
       const generatedAt = String(response?.output?.data?.generatedAt || '').trim();
-      setStatus(
-        els.ccoInboxStatus,
-        generatedAt
-          ? `CCO inkorgsbrief uppdaterad (${generatedAt}).`
-          : 'CCO inkorgsbrief uppdaterad.'
-      );
+      if (!quiet) {
+        setStatus(
+          els.ccoInboxStatus,
+          generatedAt
+            ? `CCO inkorgsbrief uppdaterad (${generatedAt}).`
+            : 'CCO inkorgsbrief uppdaterad.'
+        );
+      }
     } catch (error) {
-      setStatus(els.ccoInboxStatus, error.message || 'Kunde inte köra CCO inkorgsbrief.', true);
+      if (!quiet) {
+        setStatus(els.ccoInboxStatus, error.message || 'Kunde inte köra CCO inkorgsbrief.', true);
+      }
+    } finally {
+      state.ccoInboxBriefRunInFlight = false;
+      if (!state.ccoAutoRefreshInFlight) {
+        syncCcoAutoRefresh({ immediate: false });
+      }
     }
   }
 
@@ -14234,6 +14329,7 @@
 
   function logout() {
     stopDashboardStream();
+    clearCcoAutoRefreshTimer();
     state.ccoLastSeenAtMs = Date.now();
     persistCcoLastSeenAtMs(state.ccoLastSeenAtMs);
     localStorage.removeItem(TOKEN_KEY);
@@ -15322,6 +15418,14 @@
       persistCcoLastSeenAtMs(state.ccoLastSeenAtMs);
     }
     stopDashboardStream({ resetRetry: false });
+    clearCcoAutoRefreshTimer();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      clearCcoAutoRefreshTimer();
+      return;
+    }
+    syncCcoAutoRefresh({ immediate: isCcoWorkspaceActive() });
   });
   window.addEventListener('resize', () => {
     updateWorkspaceViewportMetrics();
