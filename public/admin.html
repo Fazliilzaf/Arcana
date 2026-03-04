@@ -1970,6 +1970,7 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+      box-shadow: 0 2px 7px rgba(0, 0, 0, 0.03);
     }
     .cco-reply-empty-state {
       border: 1px solid #E8DDD5;
@@ -2006,6 +2007,31 @@
       padding: 9px 11px;
       font-size: 12px;
       line-height: 1.4;
+    }
+    .cco-compose-header-block {
+      gap: 8px;
+    }
+    .cco-compose-header-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px 10px;
+      align-items: end;
+    }
+    .cco-compose-header-grid > div {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .cco-compose-header-grid label {
+      font-size: 11px;
+      color: #6B625C;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+    .cco-editor-block {
+      min-height: 300px;
+      gap: 10px;
     }
     .cco-column-title {
       display: flex;
@@ -2088,6 +2114,32 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
       display: grid;
       gap: 6px;
+    }
+    .cco-filter-block-toggle {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: #5F5550;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2px 4px;
+      cursor: pointer;
+    }
+    .cco-filter-block-toggle:hover {
+      color: #473d37;
+    }
+    #ccoMailboxFiltersChevron {
+      font-size: 12px;
+      line-height: 1;
+      color: #7B716A;
+    }
+    .cco-filter-block.is-collapsed #ccoInboxMailboxFilters {
+      display: none;
     }
     .cco-filter-block-title {
       font-size: 11px;
@@ -2723,6 +2775,20 @@
       min-height: 18px;
       color: var(--cco-muted);
     }
+    .cco-actions-block {
+      gap: 8px;
+    }
+    .cco-actions-toolbar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .cco-actions-toolbar .btn {
+      justify-content: center;
+      min-height: 34px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
     .cco-send {
       background: #1A1411 !important;
       color: #fff !important;
@@ -2796,6 +2862,56 @@
     .cco-actions-more > summary::-webkit-details-marker {
       display: none;
     }
+    .cco-safety-block {
+      gap: 8px;
+    }
+    .cco-recommended-row {
+      border: 1px solid #E7D9CF;
+      border-radius: 10px;
+      background: #F8F1EC;
+      padding: 8px 10px;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #4C413A;
+      font-weight: 600;
+    }
+    .cco-safety-details {
+      border: 1px dashed #DCCFC7;
+      border-radius: 10px;
+      background: #FBF7F4;
+      padding: 8px;
+    }
+    .cco-safety-details > summary {
+      list-style: none;
+      cursor: pointer;
+      font-size: 12px;
+      color: #5F5550;
+      font-weight: 600;
+    }
+    .cco-safety-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .cco-safety-chip-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .cco-safety-chip {
+      border: 1px solid #E7DDD6;
+      border-radius: 10px;
+      background: #FFF;
+      padding: 8px;
+      display: grid;
+      gap: 4px;
+    }
+    .cco-safety-chip-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #7B716A;
+      font-weight: 700;
+    }
     .cco-send-sticky-bar {
       position: sticky;
       bottom: -1px;
@@ -2803,6 +2919,15 @@
       padding-top: 6px;
       border-top: 1px solid #EFE4DD;
       z-index: 3;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .cco-send-sticky-bar #ccoSendStatus {
+      grid-column: 1 / -1;
+      font-size: 11px;
+      line-height: 1.3;
     }
     .cco-actions-single {
       grid-template-columns: 1fr;
@@ -2894,6 +3019,12 @@
       .cco-layout {
         grid-template-columns: minmax(210px, 0.76fr) minmax(360px, 1.2fr) minmax(280px, 0.9fr);
       }
+      .cco-compose-header-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .cco-actions-toolbar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     @media (max-width: 1220px) {
       .cco-layout {
@@ -2944,7 +3075,10 @@
         grid-column: auto;
       }
       .cco-actions,
-      .cco-reply-meta-grid {
+      .cco-reply-meta-grid,
+      .cco-compose-header-grid,
+      .cco-actions-toolbar,
+      .cco-safety-chip-row {
         grid-template-columns: 1fr;
       }
       .cco-send {
@@ -3968,8 +4102,11 @@
               </label>
             </div>
             <div id="ccoInboxSearchMeta" class="cco-search-meta mini muted"></div>
-            <section class="cco-filter-block">
-              <div class="cco-filter-block-title">Mailboxar</div>
+            <section id="ccoMailboxFiltersBlock" class="cco-filter-block">
+              <button id="ccoMailboxFiltersToggleBtn" class="cco-filter-block-toggle" type="button" aria-expanded="true">
+                <span>Mailboxar</span>
+                <span id="ccoMailboxFiltersChevron" aria-hidden="true">▾</span>
+              </button>
               <div id="ccoInboxMailboxFilters" class="cco-filter-row cco-filter-row-mailbox">
                 <button type="button" class="cco-filter-btn is-active" data-cco-mailbox-filter="all">Alla</button>
               </div>
@@ -4166,12 +4303,12 @@
               </div>
             </section>
             <div id="ccoReplyMainBlocks">
-            <section class="cco-reply-block">
+            <section class="cco-reply-block cco-compose-header-block">
               <div id="ccoReplyContextStrip" class="cco-reply-context-strip">Ingen konversation vald.</div>
               <div id="ccoReplyingToContext" class="mini muted">Välj ett meddelande i historiken för att svara med kontext.</div>
             </section>
-            <section class="cco-reply-block">
-              <div class="grid" style="gap:8px">
+            <section class="cco-reply-block cco-compose-header-block">
+              <div class="cco-compose-header-grid">
                 <div>
                   <label for="ccoDraftSubjectInput">Ämne</label>
                   <input id="ccoDraftSubjectInput" type="text" readonly />
@@ -4197,8 +4334,6 @@
                     <option value="egzona">Egzona Krasniqi</option>
                     <option value="fazli">Fazli Krasniqi</option>
                   </select>
-                </div>
-                <div>
                   <label class="cco-inline-toggle" for="ccoInsertSignatureToggle" style="margin-top:22px">
                     <input id="ccoInsertSignatureToggle" type="checkbox" checked />
                     Infoga signatur vid skick
@@ -4206,7 +4341,7 @@
                 </div>
               </div>
             </section>
-            <section class="cco-reply-block">
+            <section class="cco-reply-block cco-editor-block">
               <div class="cco-draft-modes">
                 <div class="mini muted">Svarsläge</div>
                 <div class="cco-draft-mode-buttons">
@@ -4222,61 +4357,58 @@
               </div>
               <div class="cco-signature-preview-toggle">
                 <div id="ccoSignaturePreviewLabel" class="mini muted">Signatur: -</div>
-                <button id="ccoToggleSignaturePreviewBtn" class="btn small" type="button" aria-expanded="false">Visa</button>
+                <button id="ccoToggleSignaturePreviewBtn" class="btn small" type="button" aria-expanded="false">Förhandsvisa med signatur</button>
               </div>
               <div id="ccoSignaturePreview" class="cco-signature-preview mini is-collapsed"></div>
             </section>
-            <section class="cco-reply-block">
-              <div class="cco-action-group">
-                <h4>Arbete</h4>
-                <div class="cco-actions">
-                  <button id="ccoRefineImproveBtn" class="btn small">Förbättra svaret</button>
-                  <button id="ccoRefineShortenBtn" class="btn small">Förkorta</button>
-                  <button id="ccoMarkHandledBtn" class="btn small">Markera hanterad</button>
-                  <button id="ccoSnoozeBtn" class="btn small">Återkom senare</button>
-                  <button id="ccoDeleteMailBtn" class="btn small">Radera mail</button>
-                </div>
+            <section class="cco-reply-block cco-actions-block">
+              <div class="mini muted">Åtgärder</div>
+              <div class="cco-actions-toolbar">
+                <button id="ccoRefineImproveBtn" class="btn small">Förbättra</button>
+                <button id="ccoRefineShortenBtn" class="btn small">Förkorta</button>
+                <button id="ccoRefineSofterBtn" class="btn small">Mjukare ton</button>
+                <button id="ccoRefineProfessionalBtn" class="btn small">Mer professionell ton</button>
+              </div>
+              <div class="cco-actions-toolbar">
+                <button id="ccoMarkHandledBtn" class="btn small">Markera hanterad</button>
+                <button id="ccoFlagCriticalBtn" class="btn small">Flagga kritisk</button>
+                <button id="ccoSnoozeBtn" class="btn small">Återkom senare</button>
+                <button id="ccoDeleteMailBtn" class="btn small">Radera</button>
               </div>
               <details class="cco-actions-more">
                 <summary>Fler åtgärder</summary>
-                <div class="cco-actions" style="margin-top:8px">
+                <div class="cco-actions cco-actions-single" style="margin-top:8px">
                   <button id="ccoCopyReplyBtn" class="btn small">Kopiera svar</button>
-                  <button id="ccoRefineProfessionalBtn" class="btn small">Mer professionell ton</button>
-                  <button id="ccoFlagCriticalBtn" class="btn small">Flagga kritisk</button>
                   <button id="ccoMarkSystemMailBtn" class="btn small">Markera som systemmail</button>
                   <button id="ccoHidePatternBtn" class="btn small">Dölj avsändare/mönster</button>
                 </div>
               </details>
+            </section>
+            <section class="cco-reply-block cco-safety-block">
+              <div id="ccoDraftRecommendedActionRow" class="cco-recommended-row">🎯 Rekommenderad åtgärd: -</div>
+              <details class="cco-safety-details">
+                <summary>Visa risk, policy och konfidens</summary>
+                <div class="cco-safety-chip-row">
+                  <span class="cco-safety-chip">
+                    <span class="cco-safety-chip-label">Risk</span>
+                    <span id="ccoDraftRiskIndicator" class="cco-risk-indicator">-</span>
+                  </span>
+                  <span class="cco-safety-chip">
+                    <span class="cco-safety-chip-label">Policy</span>
+                    <span id="ccoDraftPolicyIndicator" class="cco-risk-indicator">-</span>
+                  </span>
+                  <span class="cco-safety-chip">
+                    <span class="cco-safety-chip-label">Konfidens</span>
+                    <span id="ccoDraftConfidence" class="cco-risk-indicator">-</span>
+                  </span>
+                </div>
+              </details>
               <div class="cco-send-sticky-bar">
                 <button id="ccoSendBtn" class="btn primary cco-send">Skicka</button>
+                <button id="ccoStickySnoozeBtn" class="btn small">Återkom senare</button>
+                <button id="ccoStickyDeleteBtn" class="btn small">Radera</button>
                 <div id="ccoSendStatus" class="status-line"></div>
               </div>
-            </section>
-            <section class="cco-reply-block">
-              <div class="cco-reply-meta-grid">
-                <div>
-                  <h3 style="margin:0 0 6px 0">Riskbedömning</h3>
-                  <div id="ccoDraftRiskIndicator" class="cco-risk-indicator">-</div>
-                </div>
-                <div>
-                  <h3 style="margin:0 0 6px 0">Policykontroll</h3>
-                  <div id="ccoDraftPolicyIndicator" class="cco-risk-indicator">-</div>
-                </div>
-                <div>
-                  <h3 style="margin:0 0 6px 0">Konfidens</h3>
-                  <div id="ccoDraftConfidence" class="cco-risk-indicator">-</div>
-                </div>
-                <div>
-                  <h3 style="margin:0 0 6px 0">Rekommenderad åtgärd</h3>
-                  <div id="ccoDraftRecommendedAction" class="cco-risk-indicator">-</div>
-                </div>
-              </div>
-            </section>
-            <section class="cco-reply-block">
-              <h3 style="margin:0 0 6px 0">Föreslagna utkast</h3>
-              <ul id="ccoInboxDraftsList" class="cco-mini-list">
-                <li class="muted mini">Inga utkast än.</li>
-              </ul>
             </section>
             </div>
           </section>
