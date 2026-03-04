@@ -278,8 +278,17 @@ async function writeJsonAtomic(filePath, data) {
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
   const tmpPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
-  await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
-  await fs.rename(tmpPath, filePath);
+  try {
+    await fs.writeFile(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+    await fs.rename(tmpPath, filePath);
+  } catch (error) {
+    try {
+      await fs.unlink(tmpPath);
+    } catch {
+      // Ignore cleanup errors; tmp may not exist if write failed early.
+    }
+    throw error;
+  }
 }
 
 function toSafeUser(user) {
@@ -483,6 +492,7 @@ async function createAuthStore({
   }
 
   function prune() {
+    let changed = false;
     const now = Date.now();
 
     for (const [id, session] of Object.entries(state.sessions)) {
@@ -490,10 +500,12 @@ async function createAuthStore({
       const revokedAt = Date.parse(session.revokedAt || '');
       if (timing.expired) {
         delete state.sessions[id];
+        changed = true;
         continue;
       }
       if (Number.isFinite(revokedAt) && revokedAt + 24 * 60 * 60 * 1000 <= now) {
         delete state.sessions[id];
+        changed = true;
       }
     }
 
@@ -501,6 +513,7 @@ async function createAuthStore({
       const expiresAt = Date.parse(pending.expiresAt || '');
       if (!Number.isFinite(expiresAt) || expiresAt <= now) {
         delete state.pendingLogins[ticket];
+        changed = true;
       }
     }
 
@@ -508,12 +521,15 @@ async function createAuthStore({
       const expiresAt = Date.parse(challenge.expiresAt || '');
       if (!Number.isFinite(expiresAt) || expiresAt <= now) {
         delete state.pendingMfaChallenges[ticket];
+        changed = true;
       }
     }
 
     if (!auditAppendOnly && auditMaxEntries > 0 && state.auditEvents.length > auditMaxEntries) {
       state.auditEvents = state.auditEvents.slice(-auditMaxEntries);
+      changed = true;
     }
+    return changed;
   }
 
   async function save() {
@@ -1433,8 +1449,10 @@ async function createAuthStore({
     };
   }
 
-  prune();
-  await save();
+  const startupPruned = prune();
+  if (startupPruned) {
+    await save();
+  }
 
   return {
     filePath,

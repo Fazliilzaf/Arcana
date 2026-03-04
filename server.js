@@ -96,6 +96,7 @@ const { createCapabilitiesRouter } = require('./src/routes/capabilities');
 const { createPublicClinicRouter } = require('./src/routes/publicClinic');
 const { createScheduler } = require('./src/ops/scheduler');
 const { createAlertNotifier } = require('./src/ops/alertNotifier');
+const { runStartupDiskGuard } = require('./src/ops/startupDiskGuard');
 const { createSecretRotationStore } = require('./src/ops/secretRotationStore');
 const { createRuntimeMetricsStore } = require('./src/ops/runtimeMetrics');
 const { createPatientConversionStore } = require('./src/ops/patientConversionStore');
@@ -165,6 +166,15 @@ app.get('/readyz', (req, res) => {
 app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
 
 (async () => {
+  const diskGuardSummary = await runStartupDiskGuard({ config, logger: console });
+  runtimeState.startupDiskGuard = {
+    reclaimedBytes: Number(diskGuardSummary?.reclaimedBytes || 0),
+    backupDeletedCount: Number(diskGuardSummary?.backupPrune?.deletedCount || 0),
+    reportDeletedCount: Number(diskGuardSummary?.reportPrune?.deletedCount || 0),
+    tempDeletedCount: Number(diskGuardSummary?.tempFiles?.deletedCount || 0),
+    errors: Array.isArray(diskGuardSummary?.errors) ? diskGuardSummary.errors : [],
+  };
+
   const authStore = await createAuthStore({
     filePath: config.authStorePath,
     sessionTtlMs: config.authSessionTtlHours * 60 * 60 * 1000,
