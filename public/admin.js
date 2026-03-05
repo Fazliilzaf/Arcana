@@ -15606,7 +15606,7 @@
         if (!state.pendingMfaTicket) {
           throw new Error('mfaTicket saknas för MFA-verifiering.');
         }
-        setStatus(els.loginStatus, 'MFA krävs. Ange kod för att fortsätta.');
+        setStatus(els.loginStatus, 'MFA krävs. Ange 6-siffrig kod för att fortsätta.');
         updateLifecyclePermissions();
         return;
       }
