@@ -193,7 +193,7 @@ LOGIN_RESPONSE_RAW="$(curl -s -X POST "$BASE_URL/api/v1/auth/login" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"tenantId\":\"$TENANT_ID\"}")"
 LOGIN_RESPONSE="$(complete_login_with_optional_mfa "$LOGIN_RESPONSE_RAW" "$TENANT_ID" "$EMAIL")"
 
-TOKEN="$(printf '%s' "$LOGIN_RESPONSE" | json_get token)"
+TOKEN="$(printf '%s' "$LOGIN_RESPONSE" | json_get token 2>/dev/null || true)"
 if [[ -z "$TOKEN" ]]; then
   echo "❌ Inloggning misslyckades."
   printf '%s\n' "$LOGIN_RESPONSE"
