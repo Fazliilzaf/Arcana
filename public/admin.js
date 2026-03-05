@@ -3156,19 +3156,19 @@
 
     state.pendingMfaTicket = mfaTicket;
     const setupRequired = Boolean(payload?.mfa?.setupRequired);
-    const setupSecret = String(payload?.mfa?.secret || '').trim();
-    const setupOtpAuth = String(payload?.mfa?.otpauthUrl || '').trim();
-    const recoveryCodes = Array.isArray(payload?.mfa?.recoveryCodes) ? payload.mfa.recoveryCodes : [];
 
     if (els.mfaPanel) els.mfaPanel.classList.remove('hidden');
     if (els.mfaSetupHint) els.mfaSetupHint.classList.toggle('hidden', !setupRequired);
-    if (els.mfaSetupSecretWrap) els.mfaSetupSecretWrap.classList.toggle('hidden', !setupSecret);
-    if (els.mfaSetupSecret) els.mfaSetupSecret.textContent = setupSecret;
-    if (els.mfaSetupOtpAuthWrap) els.mfaSetupOtpAuthWrap.classList.toggle('hidden', !setupOtpAuth);
-    if (els.mfaSetupOtpAuth) els.mfaSetupOtpAuth.textContent = setupOtpAuth;
-    if (els.mfaRecoveryCodesWrap) els.mfaRecoveryCodesWrap.classList.toggle('hidden', !recoveryCodes.length);
-    if (els.mfaRecoveryCodes) {
-      els.mfaRecoveryCodes.textContent = recoveryCodes.join('\n');
+    if (els.mfaSetupSecretWrap) els.mfaSetupSecretWrap.classList.add('hidden');
+    if (els.mfaSetupOtpAuthWrap) els.mfaSetupOtpAuthWrap.classList.add('hidden');
+    if (els.mfaRecoveryCodesWrap) els.mfaRecoveryCodesWrap.classList.add('hidden');
+    if (els.mfaSetupSecret) els.mfaSetupSecret.textContent = '';
+    if (els.mfaSetupOtpAuth) els.mfaSetupOtpAuth.textContent = '';
+    if (els.mfaRecoveryCodes) els.mfaRecoveryCodes.textContent = '';
+    if (els.mfaCodeInput) {
+      els.mfaCodeInput.value = '';
+      els.mfaCodeInput.setAttribute('autocomplete', 'off');
+      els.mfaCodeInput.focus({ preventScroll: true });
     }
   }
 
@@ -15677,6 +15677,10 @@
       setAuthVisible(true);
       await refreshAll({ scope: resolveRefreshScope() });
     } catch (error) {
+      if (els.mfaCodeInput) {
+        els.mfaCodeInput.value = '';
+        els.mfaCodeInput.focus({ preventScroll: true });
+      }
       setStatus(els.loginStatus, error.message || 'MFA-verifiering misslyckades.', true);
     }
   }
