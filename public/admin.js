@@ -14978,7 +14978,11 @@
     await loadSessionProfile();
     await loadTenants();
     if (normalizedScope === 'cco') {
-      await loadCcoInboxBrief({ quiet: true });
+      if (canTemplateWrite()) {
+        await runCcoInboxBrief({ quiet: true });
+      } else {
+        await loadCcoInboxBrief({ quiet: true });
+      }
       return;
     }
     await loadDashboard();
