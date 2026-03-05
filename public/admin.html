@@ -1386,9 +1386,13 @@
       --cco-medium: #B8A56A;
       --cco-low: #866D5F;
       --cco-chip-bg: #EFE4DA;
-      background: linear-gradient(180deg, rgba(214, 194, 178, 0.34) 0%, rgba(196, 174, 156, 0.25) 100%);
-      border: 1px solid var(--cco-border);
-      box-shadow: none;
+      --cco-page-shadow: 0 12px 28px rgba(62, 46, 41, 0.12);
+      --cco-panel-shadow: 0 8px 20px rgba(82, 61, 47, 0.08);
+      --cco-card-shadow: 0 4px 12px rgba(82, 61, 47, 0.06);
+      --cco-chip-shadow: 0 1px 3px rgba(82, 61, 47, 0.12);
+      background: linear-gradient(180deg, rgba(214, 194, 178, 0.34) 0%, rgba(196, 174, 156, 0.23) 100%);
+      border: 1px solid rgba(196, 174, 156, 0.72);
+      box-shadow: var(--cco-page-shadow);
       color: var(--cco-text);
       animation: none;
       filter: none;
@@ -1396,13 +1400,13 @@
       -webkit-backdrop-filter: none;
     }
     .cco-layout-root {
-      min-height: calc(100vh - var(--headerHeight, 220px));
-      height: calc(100vh - var(--headerHeight, 220px));
+      min-height: calc(100vh - var(--headerHeight, 176px));
+      height: calc(100vh - var(--headerHeight, 176px));
       margin-bottom: 0;
       border: 0;
       border-radius: 0;
       padding: 0;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.08));
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.08));
       box-shadow: none;
       overflow: visible;
     }
@@ -1440,7 +1444,7 @@
     }
     body.cco-light-mode .container {
       width: min(1760px, 98vw);
-      margin: 16px auto 24px;
+      margin: 8px auto 14px;
     }
     body.cco-light-mode .header .admin-brand-mark {
       filter: brightness(0.95) saturate(0.95);
@@ -1500,9 +1504,13 @@
       border: 1px solid var(--cco-border);
       background: #F0E6E0;
       color: var(--cco-text);
-      box-shadow: none;
+      box-shadow: var(--cco-chip-shadow);
       text-shadow: none;
       animation: none;
+      padding: 6px 10px;
+      min-height: 30px;
+      font-size: 11px;
+      line-height: 1.1;
     }
     .cco-workspace .btn:hover {
       border-color: #d4c4b8;
@@ -1538,11 +1546,11 @@
     .cco-workspace .cco-toolbar {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 0;
-      padding: 5px 10px;
+      padding: 4px 8px;
       border-bottom: 1px solid var(--cco-border);
       background: var(--cco-surface);
     }
@@ -1554,7 +1562,7 @@
     }
     .cco-workspace .cco-toolbar-left h2 {
       margin: 0;
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.2;
     }
     .cco-workspace .cco-toolbar-right {
@@ -1566,19 +1574,20 @@
     .cco-view-mode-toggle {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      padding: 3px;
+      gap: 3px;
+      padding: 2px;
       border: 1px solid #E3D8D1;
       border-radius: 999px;
       background: #F8F2EE;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-view-mode-btn {
       border: 1px solid transparent;
       background: transparent;
       color: #6B625C;
       border-radius: 999px;
-      padding: 5px 10px;
-      font-size: 11px;
+      padding: 4px 9px;
+      font-size: 10px;
       font-weight: 600;
       cursor: pointer;
       line-height: 1;
@@ -1613,7 +1622,7 @@
       color: var(--cco-text);
     }
     .cco-status-metrics {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--cco-muted);
       white-space: nowrap;
     }
@@ -1626,14 +1635,21 @@
     #ccoInboxStatus:empty {
       display: none;
     }
+    #ccoInboxStatus {
+      min-height: 18px;
+      padding: 2px 8px 0;
+      font-size: 11px;
+      line-height: 1.2;
+      border-bottom: 1px solid rgba(196, 174, 156, 0.38);
+    }
     .cco-sprint-shell {
       margin-top: 0;
       border-bottom: 1px solid var(--cco-border);
       background: var(--cco-surface);
-      padding: 4px 12px 6px;
+      padding: 3px 8px 5px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
     .cco-sprint-shell.is-collapsed {
       display: none;
@@ -1906,43 +1922,52 @@
     }
     .cco-layout {
       display: grid;
-      grid-template-columns: minmax(230px, 0.84fr) minmax(380px, 1.25fr) minmax(300px, 0.95fr);
+      grid-template-columns: minmax(220px, 0.72fr) minmax(440px, 1.38fr) minmax(320px, 0.98fr);
       grid-template-areas: "inbox center reply";
       gap: 0;
       position: relative;
-      border: 1px solid var(--cco-border);
-      border-radius: 0;
+      border: 1px solid rgba(196, 174, 156, 0.72);
+      border-radius: 10px;
       overflow: hidden;
-      min-height: 540px;
-      height: calc(100vh - var(--headerHeight, 164px));
+      min-height: 500px;
+      height: calc(100vh - var(--headerHeight, 142px));
       max-height: none;
       background: linear-gradient(180deg, #f6efea 0%, #f3ebe6 100%);
+      box-shadow: var(--cco-panel-shadow);
       transition: opacity 150ms ease;
     }
     .cco-inbox {
       grid-area: inbox;
       background: linear-gradient(180deg, #ffffff 0%, #fcf8f5 100%);
       border-right: 1px solid var(--cco-border);
-      box-shadow: inset -1px 0 0 rgba(226, 216, 209, 0.75);
+      box-shadow: inset -1px 0 0 rgba(226, 216, 209, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.6);
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      padding: 12px;
+      gap: 8px;
+      padding: 9px;
       min-width: 0;
     }
     .cco-inbox-controls {
-      min-width: 280px;
+      min-width: 248px;
+    }
+    .cco-inbox-controls .cco-column-title h3 {
+      font-size: 12px;
+    }
+    .cco-inbox-controls .mini {
+      font-size: 10px;
+      line-height: 1.3;
     }
     .cco-center {
       grid-area: center;
       background: linear-gradient(180deg, #fefcfa 0%, #fcf8f5 100%);
       border-right: 1px solid var(--cco-border);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.52);
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      padding: 12px;
+      gap: 9px;
+      padding: 9px;
       min-width: 0;
       min-height: 0;
     }
@@ -2034,26 +2059,26 @@
       grid-area: reply;
       background: linear-gradient(180deg, #fdf8f5 0%, #f8f2ee 100%);
       border-left: 1px solid var(--cco-border);
-      box-shadow: inset 1px 0 0 rgba(226, 216, 209, 0.7);
-      padding: 12px;
+      box-shadow: inset 1px 0 0 rgba(226, 216, 209, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.46);
+      padding: 9px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       min-width: 0;
     }
     .cco-nav-stack {
       display: grid;
-      gap: 6px;
+      gap: 5px;
     }
     .cco-nav-block {
       border: 1px solid #e7ddd6;
       border-radius: 12px;
       background: #fff;
-      padding: 9px;
-      box-shadow: 0 5px 14px rgba(76, 54, 36, 0.05);
+      padding: 7px;
+      box-shadow: var(--cco-card-shadow);
       display: grid;
-      gap: 7px;
+      gap: 6px;
     }
     .cco-nav-block-tools {
       gap: 8px;
@@ -2063,8 +2088,8 @@
       border: 1px solid #e7ddd6;
       border-radius: 12px;
       background: #fff;
-      box-shadow: 0 6px 16px rgba(76, 54, 36, 0.06);
-      padding: 12px;
+      box-shadow: var(--cco-card-shadow);
+      padding: 10px;
       min-height: 0;
     }
     .cco-center-block-worklist {
@@ -2124,11 +2149,11 @@
       border: 1px solid #E8DDD5;
       border-radius: 12px;
       background: #fff;
-      padding: 14px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+      gap: 9px;
+      box-shadow: var(--cco-card-shadow);
     }
     .cco-reply-empty-state {
       border: 1px solid #E8DDD5;
@@ -2162,8 +2187,8 @@
       border: 1px solid #E7D8CE;
       background: #F9F2ED;
       color: #493F38;
-      padding: 9px 11px;
-      font-size: 12px;
+      padding: 7px 9px;
+      font-size: 11px;
       line-height: 1.4;
     }
     .cco-compose-header-block {
@@ -2172,7 +2197,7 @@
     .cco-compose-header-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px 12px;
+      gap: 6px 9px;
       align-items: end;
     }
     .cco-compose-header-grid > div {
@@ -2187,19 +2212,26 @@
       letter-spacing: 0.04em;
       font-weight: 600;
     }
+    .cco-compose-header-grid input,
+    .cco-compose-header-grid select {
+      min-height: 30px;
+      padding: 4px 8px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
     .cco-editor-block {
-      min-height: 420px;
-      gap: 10px;
+      min-height: 450px;
+      gap: 8px;
     }
     .cco-column-title {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: 6px;
+      margin-bottom: 6px;
     }
     .cco-column-title h3 {
-      font-size: 14px;
+      font-size: 13px;
       letter-spacing: 0.02em;
       text-transform: uppercase;
       margin: 0;
@@ -2232,35 +2264,36 @@
     .cco-unanswered-panel {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 6px;
+      gap: 5px;
       padding: 2px 0 0;
     }
     .cco-unanswered-chip {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       border: 1px solid var(--cco-border);
       background: #F7F1EE;
       color: #3E352E;
-      border-radius: 10px;
-      padding: 7px 9px;
-      font-size: 11px;
+      border-radius: 999px;
+      padding: 6px 8px;
+      font-size: 10px;
       font-weight: 600;
       cursor: pointer;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-unanswered-chip:hover {
       border-color: #cdb8aa;
       background: #f3eae5;
     }
     .cco-unanswered-chip strong {
-      font-size: 13px;
+      font-size: 12px;
       color: #1A1411;
     }
     .cco-filter-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 5px;
       align-items: center;
       padding: 2px 0 0;
     }
@@ -2268,10 +2301,10 @@
       border: 1px solid #E8DDD5;
       border-radius: 12px;
       background: #FFF;
-      padding: 8px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+      padding: 6px;
+      box-shadow: var(--cco-card-shadow);
       display: grid;
-      gap: 6px;
+      gap: 5px;
     }
     .cco-filter-block-content {
       display: grid;
@@ -2347,8 +2380,8 @@
       margin-top: 2px;
     }
     .cco-mailbox-favorites .cco-filter-btn {
-      padding: 5px 9px;
-      font-size: 11px;
+      padding: 4px 8px;
+      font-size: 10px;
     }
     .cco-search-system-row {
       display: grid;
@@ -2479,28 +2512,30 @@
     }
     .cco-center-density-row {
       margin: 0 0 4px;
-      padding: 6px;
+      padding: 4px;
       border: 1px solid #eee3dc;
-      border-radius: 10px;
+      border-radius: 999px;
       background: #fdf9f6;
       position: sticky;
       top: 0;
       z-index: 4;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-center-density-row .cco-filter-btn {
-      font-size: 12px;
-      padding: 6px 12px;
+      font-size: 10px;
+      padding: 4px 9px;
     }
     .cco-filter-btn {
       border: 1px solid #E2D8D1;
       background: #FFFFFF;
       color: #6B625C;
       border-radius: 999px;
-      padding: 5px 10px;
-      font-size: 11px;
+      padding: 4px 9px;
+      font-size: 10px;
       font-weight: 600;
       cursor: pointer;
       line-height: 1;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-filter-btn:hover {
       background: #F6EDE9;
@@ -2554,20 +2589,21 @@
     }
     .cco-thread {
       border-bottom: 1px solid #EFE5DF;
-      padding: 9px 10px 8px;
+      padding: 7px 8px 6px;
       margin: 0;
       border-left: 4px solid transparent;
       transition: background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
       pointer-events: auto;
+      border-radius: 8px;
     }
     .cco-thread:hover {
       background: #F6EDE9;
-      box-shadow: inset 0 0 0 1px #e3d4c9;
+      box-shadow: inset 0 0 0 1px #e3d4c9, 0 2px 8px rgba(82, 61, 47, 0.12);
     }
     .cco-thread.active {
       background: #EFE5DF;
       border-left: 4px solid var(--cco-accent);
-      box-shadow: inset 0 0 0 1px #d7c3b5;
+      box-shadow: inset 0 0 0 1px #d7c3b5, 0 3px 10px rgba(82, 61, 47, 0.12);
     }
     .cco-thread.sla-tone-warning {
       background: #FFF8EC;
@@ -2625,7 +2661,7 @@
     }
     .cco-inbox-sections {
       display: grid;
-      gap: 10px;
+      gap: 8px;
       pointer-events: auto;
     }
     .cco-inbox-group {
@@ -2641,11 +2677,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 6px;
       cursor: pointer;
       margin: 0;
-      padding: 12px 12px 10px;
-      font-size: 12px;
+      padding: 9px 10px 8px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -2658,7 +2694,7 @@
       min-width: 0;
     }
     .cco-group-meta {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 500;
       letter-spacing: 0;
       text-transform: none;
@@ -2679,13 +2715,13 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 24px;
-      padding: 2px 8px;
+      min-width: 22px;
+      padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid rgba(194, 170, 156, 0.5);
       background: rgba(255, 255, 255, 0.65);
       color: #6B625C;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 0;
       text-transform: none;
@@ -2713,7 +2749,7 @@
       display: none;
     }
     .cco-thread-subject {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--cco-text);
       line-height: 1.35;
@@ -2727,7 +2763,7 @@
     .cco-thread-head {
       display: flex;
       align-items: flex-start;
-      gap: 8px;
+      gap: 6px;
       min-width: 0;
     }
     .cco-thread-indicator {
@@ -2800,7 +2836,7 @@
       background: #1f1814;
     }
     .cco-thread-meta {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--cco-muted);
       line-height: 1.35;
       word-break: break-word;
@@ -2811,7 +2847,7 @@
       text-overflow: ellipsis;
     }
     .cco-thread-preview {
-      font-size: 12px;
+      font-size: 11px;
       color: #5E5650;
       line-height: 1.35;
       word-break: break-word;
@@ -2822,7 +2858,7 @@
       text-overflow: ellipsis;
     }
     .cco-thread-action {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 600;
       line-height: 1.35;
       color: #6A4F40;
@@ -2849,11 +2885,12 @@
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
-      padding: 3px 8px;
-      font-size: 10px;
+      padding: 3px 7px;
+      font-size: 9px;
       font-weight: 600;
       line-height: 1;
       border: 1px solid transparent;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-thread-chip {
       background: #eee4de;
@@ -3019,13 +3056,13 @@
       flex: 1;
       border: 1px solid #D8CDC6;
       border-radius: 14px;
-      padding: 16px;
-      font-size: 15px;
-      line-height: 1.6;
-      min-height: 300px;
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 360px;
       resize: vertical;
       font-family: "Jost", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(82, 61, 47, 0.06);
     }
     .cco-signature-preview {
       border: 1px solid var(--cco-border);
@@ -3120,7 +3157,7 @@
     .cco-draft-mode-buttons {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      gap: 6px;
     }
     .cco-draft-mode-btn {
       justify-content: center;
@@ -3154,19 +3191,20 @@
     .cco-actions-toolbar {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 8px;
+      gap: 6px;
     }
     .cco-actions-toolbar .btn {
       justify-content: center;
-      min-height: 34px;
-      padding: 8px 10px;
-      font-size: 12px;
+      min-height: 30px;
+      padding: 6px 8px;
+      font-size: 11px;
+      box-shadow: var(--cco-chip-shadow);
     }
     .cco-send {
       background: #1A1411 !important;
       color: #fff !important;
       border-color: #1A1411 !important;
-      padding: 14px 20px !important;
+      padding: 10px 14px !important;
       border-radius: 10px !important;
       font-weight: 600 !important;
       width: 100%;
@@ -3242,8 +3280,8 @@
       border: 1px solid #E7D9CF;
       border-radius: 10px;
       background: #F8F1EC;
-      padding: 8px 10px;
-      font-size: 12px;
+      padding: 6px 9px;
+      font-size: 11px;
       line-height: 1.4;
       color: #4C413A;
       font-weight: 600;
@@ -3274,9 +3312,9 @@
       border: 1px solid #E7DDD6;
       border-radius: 10px;
       background: #FFF;
-      padding: 8px;
+      padding: 6px;
       display: grid;
-      gap: 4px;
+      gap: 3px;
     }
     .cco-safety-chip-label {
       font-size: 10px;
@@ -3289,12 +3327,12 @@
       position: sticky;
       bottom: -1px;
       background: linear-gradient(180deg, rgba(255,255,255,0.95), #fff 35%);
-      padding-top: 6px;
+      padding-top: 4px;
       border-top: 1px solid #EFE4DD;
       z-index: 3;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
     }
     .cco-send-sticky-bar #ccoSendStatus {
@@ -3527,7 +3565,7 @@
     }
     @media (max-width: 1650px) {
       .cco-layout {
-        grid-template-columns: minmax(210px, 0.76fr) minmax(360px, 1.2fr) minmax(280px, 0.9fr);
+        grid-template-columns: minmax(210px, 0.7fr) minmax(360px, 1.25fr) minmax(280px, 0.95fr);
       }
       .cco-compose-header-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
