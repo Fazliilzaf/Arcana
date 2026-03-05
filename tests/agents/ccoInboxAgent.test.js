@@ -70,6 +70,12 @@ function makeDraft(index) {
     riskStackExplanation: 'Kundtonen är anxious och kräver anpassat bemötande.',
     recommendedAction: 'Be om mer info',
     escalationRequired: false,
+    messageClassification: 'customer_message',
+    systemMailClassification: {
+      classification: 'customer_message',
+      confidence: 0.02,
+      reason: 'Manual class.',
+    },
     draftModes: {
       short: `Kort ${index}`,
       warm: `Varm ${index}`,
@@ -153,6 +159,11 @@ test('CCO inbox analysis compose returns schema-valid output', () => {
   assert.equal(typeof output.data.suggestedDrafts?.[0]?.customerSummary?.customerName, 'string');
   assert.equal(output.data.suggestedDrafts?.[0]?.tempoProfile, 'responsive');
   assert.equal(output.data.suggestedDrafts?.[0]?.dominantRisk, 'tone');
+  assert.equal(output.data.conversationWorklist?.[0]?.messageClassification, 'customer_message');
+  assert.equal(
+    output.data.conversationWorklist?.[0]?.systemMailClassification?.classification,
+    'customer_message'
+  );
   assert.equal(Array.isArray(output.data.inboundFeed), true);
   assert.equal(Array.isArray(output.data.outboundFeed), true);
   assert.equal(output.data.inboundFeed[0]?.direction, 'inbound');

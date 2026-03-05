@@ -106,6 +106,13 @@ function normalizeDominantRisk(value = '') {
   return 'neutral';
 }
 
+function normalizeMessageClassification(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === 'system_mail') return 'system_mail';
+  if (normalized === 'customer_message') return 'customer_message';
+  return '';
+}
+
 function normalizeOptionalNumber(value, fallback = 0) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -331,6 +338,23 @@ function normalizeConversationWorkItem(item = {}) {
     needsReplyStatus:
       normalizeText(safe.needsReplyStatus) === 'handled' ? 'handled' : 'needs_reply',
   };
+
+  const messageClassification = normalizeMessageClassification(safe.messageClassification);
+  if (messageClassification) {
+    normalized.messageClassification = messageClassification;
+  }
+
+  const systemMailClassification = asObject(safe.systemMailClassification);
+  if (Object.keys(systemMailClassification).length > 0) {
+    const classification = normalizeMessageClassification(systemMailClassification.classification);
+    const confidence = toIntentConfidence(systemMailClassification.confidence, 0);
+    const reason = normalizeText(systemMailClassification.reason) || '';
+    normalized.systemMailClassification = {
+      classification: classification || 'customer_message',
+      confidence,
+      reason,
+    };
+  }
 
   const mailboxAddress = normalizeText(safe.mailboxAddress);
   if (mailboxAddress) {
