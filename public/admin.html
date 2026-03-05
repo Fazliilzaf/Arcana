@@ -6033,34 +6033,7 @@
         <button id="loginBtn" class="btn primary" data-i18n="login_title">Logga in</button>
       </div>
       <div id="loginStatus" class="status-line"></div>
-      <div id="mfaPanel" class="hidden" style="margin-top:10px">
-        <div class="mini muted">MFA krävs för OWNER-inloggning. Ange 6-siffrig kod.</div>
-        <div id="mfaSetupHint" class="mini muted hidden" style="margin-top:6px">
-          MFA-setup krävs. Säkerhetskoder visas inte i den här vyn.
-        </div>
-        <div id="mfaSetupSecretWrap" class="hidden mini" style="margin-top:6px">
-          <strong>Secret:</strong> <code id="mfaSetupSecret"></code>
-        </div>
-        <div id="mfaSetupOtpAuthWrap" class="hidden mini" style="margin-top:4px">
-          <strong>OTP URL:</strong> <code id="mfaSetupOtpAuth"></code>
-        </div>
-        <div id="mfaRecoveryCodesWrap" class="hidden mini" style="margin-top:6px">
-          <strong>Recovery-koder:</strong>
-          <pre id="mfaRecoveryCodes" class="code" style="margin-top:6px;white-space:pre-wrap"></pre>
-        </div>
-        <div class="seg" style="margin-top:8px">
-          <input
-            id="mfaCodeInput"
-            type="password"
-            placeholder="Ange 6-siffrig MFA-kod"
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck="false"
-            inputmode="text"
-          />
-          <button id="mfaVerifyBtn" class="btn primary">Verifiera MFA</button>
-        </div>
-      </div>
+      <!-- MFA-panel borttagen: MFA-kod efterfrågas via prompt i loginflödet -->
       <div id="tenantSelectionPanel" class="hidden" style="margin-top:10px">
         <label for="tenantSelectionSelect" data-i18n="label_multi_tenant">Flera kliniker hittades. Välj klinik:</label>
         <div class="seg">
