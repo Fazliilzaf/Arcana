@@ -15602,11 +15602,17 @@
       });
 
       if (response?.requiresMfa) {
-        renderPendingMfa(response);
-        if (!state.pendingMfaTicket) {
+        const mfaTicket = String(response?.mfaTicket || '').trim();
+        if (!mfaTicket) {
           throw new Error('mfaTicket saknas för MFA-verifiering.');
         }
-        setStatus(els.loginStatus, 'MFA krävs. Ange 6-siffrig kod för att fortsätta.');
+        state.pendingMfaTicket = mfaTicket;
+        const promptedCode = window.prompt('MFA krävs. Ange 6-siffrig kod för att fortsätta.', '');
+        const normalizedCode = String(promptedCode || '').trim();
+        if (!normalizedCode) {
+          throw new Error('MFA-kod krävs för att fortsätta.');
+        }
+        await verifyMfa(normalizedCode);
         updateLifecyclePermissions();
         return;
       }
@@ -15636,10 +15642,10 @@
     }
   }
 
-  async function verifyMfa() {
+  async function verifyMfa(codeOverride = '') {
     try {
       const mfaTicket = String(state.pendingMfaTicket || '').trim();
-      const code = String(els.mfaCodeInput?.value || '').trim();
+      const code = String(codeOverride || els.mfaCodeInput?.value || '').trim();
       if (!mfaTicket || !code) {
         throw new Error('Ange MFA-kod först.');
       }
