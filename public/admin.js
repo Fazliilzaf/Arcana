@@ -11164,7 +11164,9 @@
       )}" data-cco-indicator-state="${escapeHtml(indicator.state)}" data-cco-indicator-overridden="${
         indicator.isOverridden ? 'true' : 'false'
       }">
-        <button class="cco-thread-btn ccoConversationSelectBtn" data-conversation-id="${escapeHtml(conversationId)}">
+        <button type="button" class="cco-thread-btn ccoConversationSelectBtn" data-conversation-id="${escapeHtml(
+          conversationId
+        )}">
           <span class="cco-thread-head">${indicatorMarkup}<span class="cco-thread-subject">${escapeHtml(
       row.subject
     )}</span></span>
@@ -11644,7 +11646,10 @@
     const source = sourceFromData.length
       ? sourceFromData
       : buildCcoFallbackFeedEntries(sortedRows, normalizedDirection);
-    const includeSystemMessages = sanitizeCcoShowSystemMessages(state.ccoInboxShowSystemMessages);
+    const readOnlyMailView = isCcoReadOnlyMailViewMode();
+    const includeSystemMessages = readOnlyMailView
+      ? true
+      : sanitizeCcoShowSystemMessages(state.ccoInboxShowSystemMessages);
     const searchQuery = sanitizeCcoSearchQuery(state.ccoInboxSearchQuery).toLowerCase();
     const mailboxFilter = sanitizeCcoMailboxFilter(state.ccoInboxMailboxFilter);
     const lifecycleFilter = sanitizeCcoLifecycleFilter(state.ccoInboxLifecycleFilter);
@@ -11673,10 +11678,12 @@
       })
       .filter((entry) => (includeSystemMessages ? true : entry.isSystemMessage !== true))
       .filter((entry) => {
+        if (readOnlyMailView) return true;
         if (lifecycleFilter !== 'all') return entry.lifecycleStatus === lifecycleFilter;
         return true;
       })
       .filter((entry) => {
+        if (readOnlyMailView) return true;
         if (slaFilter === 'all') return true;
         if (slaFilter === 'new') return entry.isNewSinceLastVisit === true;
         return entry.slaStatus === slaFilter;
@@ -11882,6 +11889,30 @@
     const openRows = sortedRows.filter(
       (row) => String(row?.needsReplyStatus || '').trim().toLowerCase() !== 'handled'
     );
+    if (state.ccoSprintActive === true) {
+      const validOpenConversationIds = new Set(
+        openRows.map((row) => String(row?.conversationId || '').trim()).filter(Boolean)
+      );
+      const safeSprintQueueIds = (Array.isArray(state.ccoSprintQueueIds) ? state.ccoSprintQueueIds : [])
+        .map((value) => String(value || '').trim())
+        .filter((value) => validOpenConversationIds.has(value));
+      const queueChanged =
+        safeSprintQueueIds.length !==
+        (Array.isArray(state.ccoSprintQueueIds) ? state.ccoSprintQueueIds : []).length;
+      if (!safeSprintQueueIds.length) {
+        state.ccoSprintActive = false;
+        state.ccoSprintQueueIds = [];
+        state.ccoSprintCompletedIds = [];
+        state.ccoSprintLabelByConversationId = {};
+        state.ccoSprintInitialTotal = 0;
+        state.ccoSprintId = '';
+        state.ccoSprintStartedAtMs = 0;
+        state.ccoSprintLatestFeedback = null;
+        hideCcoSoftBreakPanel();
+      } else if (queueChanged) {
+        state.ccoSprintQueueIds = safeSprintQueueIds;
+      }
+    }
     if (!openRows.length && state.ccoWorkspaceCompact !== true) {
       state.ccoWorkspaceCompact = true;
     }
@@ -16059,9 +16090,16 @@
   });
   els.ccoInboxWorklist?.addEventListener('click', (event) => {
     const button = closestFromEventTarget(event, '.ccoConversationSelectBtn');
-    const rowScope = button ? null : closestFromEventTarget(event, '[data-cco-conversation-id]');
+    const rowScope = button
+      ? null
+      : closestFromEventTarget(event, '.cco-thread[data-cco-conversation-id]') ||
+        closestFromEventTarget(event, '[data-cco-conversation-id]');
+    const rowButton = rowScope?.querySelector?.('.ccoConversationSelectBtn') || null;
     const conversationId = String(
-      button?.getAttribute('data-conversation-id') || rowScope?.getAttribute('data-cco-conversation-id') || ''
+      button?.getAttribute('data-conversation-id') ||
+        rowButton?.getAttribute?.('data-conversation-id') ||
+        rowScope?.getAttribute('data-cco-conversation-id') ||
+        ''
     ).trim();
     const clickedEl = getEventTargetElement(event);
     const topElementAtPoint =

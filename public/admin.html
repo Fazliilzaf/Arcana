@@ -1941,6 +1941,9 @@
       overflow-y: auto;
       min-height: 0;
       padding-right: 2px;
+      position: relative;
+      z-index: 2;
+      pointer-events: auto;
     }
     .cco-conversation {
       background: #fff;
@@ -2538,6 +2541,7 @@
       margin: 0;
       border-left: 4px solid transparent;
       transition: background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      pointer-events: auto;
     }
     .cco-thread:hover {
       background: #F6EDE9;
@@ -2595,6 +2599,7 @@
       flex-direction: column;
       gap: 4px;
       cursor: pointer;
+      pointer-events: auto;
     }
     .cco-thread-btn:hover {
       background: transparent;
@@ -2604,6 +2609,7 @@
     .cco-inbox-sections {
       display: grid;
       gap: 10px;
+      pointer-events: auto;
     }
     .cco-inbox-group {
       border: 1px solid var(--cco-border);
@@ -3393,6 +3399,7 @@
       cursor: pointer;
       display: grid;
       gap: 4px;
+      pointer-events: auto;
     }
     .cco-feed-item-btn:hover {
       background: #F7F0EB;
