@@ -420,14 +420,14 @@
     return true;
   }
 
-  function sanitizeCcoMailboxFiltersExpanded(value = true) {
-    if (value === false || value === 0) return false;
+  function sanitizeCcoMailboxFiltersExpanded(value = false) {
     if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
     const normalized = String(value || '')
       .trim()
       .toLowerCase();
-    if (normalized === 'false' || normalized === '0') return false;
-    return true;
+    if (normalized === 'true' || normalized === '1') return true;
+    return false;
   }
 
   function sanitizeCcoExtraFiltersExpanded(value = false) {
@@ -11917,7 +11917,7 @@
     els.ccoSoftBreakPanel.classList.remove('visible');
   }
 
-  function getCcoDensityVisibility(mode = CCO_DEFAULT_DENSITY_MODE) {
+  function getCcoDensityVisibility(mode = CCO_DEFAULT_DENSITY_MODE, sectionTotals = {}) {
     const normalized = sanitizeCcoDensityMode(mode);
     if (normalized === 'focus') {
       return { sprint: true, high: false, needs: false, rest: false };
@@ -11925,7 +11925,24 @@
     if (normalized === 'overview') {
       return { sprint: true, high: true, needs: true, rest: true };
     }
-    return { sprint: true, high: true, needs: false, rest: false };
+    const safeTotals = {
+      sprint: Math.max(0, Number(sectionTotals?.sprint || 0)),
+      high: Math.max(0, Number(sectionTotals?.high || 0)),
+      needs: Math.max(0, Number(sectionTotals?.needs || 0)),
+      rest: Math.max(0, Number(sectionTotals?.rest || 0)),
+    };
+    const visibility = { sprint: true, high: true, needs: false, rest: false };
+    const primaryRows = safeTotals.sprint + safeTotals.high;
+    // Keep Arbete as a focused view, but avoid dead-looking queues when the
+    // focused sections are nearly empty and remaining rows exist downstream.
+    if (primaryRows < 2 && safeTotals.needs > 0) {
+      visibility.needs = true;
+    }
+    const visibleSoFar = primaryRows + (visibility.needs ? safeTotals.needs : 0);
+    if (visibleSoFar < 2 && safeTotals.rest > 0) {
+      visibility.rest = true;
+    }
+    return visibility;
   }
 
   function getCcoSectionRenderOrder(sectionTotals = {}) {
@@ -12289,7 +12306,7 @@
       hideCcoSoftBreakPanel();
     }
 
-    const densityVisibility = getCcoDensityVisibility(densityMode);
+    const densityVisibility = getCcoDensityVisibility(densityMode, sectionTotals);
     const sectionInputs = {
       sprint: sprintRows,
       high: highRows,
