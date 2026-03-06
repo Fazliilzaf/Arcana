@@ -2,7 +2,7 @@ services:
   - type: web
     name: arcana
     runtime: node
-    plan: starter
+    plan: pro
     disk:
       name: arcana-state
       mountPath: /var/data
@@ -15,7 +15,7 @@ services:
       - key: NODE_VERSION
         value: 20
       - key: NODE_OPTIONS
-        value: --max-old-space-size=384
+        value: --max-old-space-size=768
       - key: ARCANA_AI_PROVIDER
         value: openai
       - key: OPENAI_API_KEY
