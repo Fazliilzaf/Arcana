@@ -9399,6 +9399,17 @@
     body.cco-compact-header #ccoWorkspaceSection #ccoComposeStudio {
       grid-template-rows: auto minmax(260px, 1fr) auto auto !important;
     }
+    body.cco-compact-header #ccoWorkspaceSection .cco-compose-header-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 6px 8px !important;
+    }
+    body.cco-compact-header #ccoWorkspaceSection #ccoConversationColumn,
+    body.cco-compact-header #ccoWorkspaceSection #ccoComposeStudio {
+      border-color: rgba(78, 61, 53, 0.16) !important;
+      box-shadow:
+        0 8px 16px rgba(62, 46, 41, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.62) !important;
+    }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation: none !important;
