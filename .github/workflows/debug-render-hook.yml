@@ -11,37 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-      STAGING_SERVICE_ID: srv-d6gd8i94tr6s73dbb2ug
+      RENDER_STAGING_DEPLOY_HOOK_URL: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
+      ARCANA_STAGING_DEPLOY_HOOK_URL: ${{ secrets.ARCANA_STAGING_DEPLOY_HOOK_URL }}
+      RENDER_DEPLOY_HOOK_URL_STAGING: ${{ secrets.RENDER_DEPLOY_HOOK_URL_STAGING }}
+      STAGING_RENDER_DEPLOY_HOOK_URL: ${{ secrets.STAGING_RENDER_DEPLOY_HOOK_URL }}
     steps:
-      - name: Parse hook target safely
+      - name: Probe hook secrets safely
         run: |
           python - <<'PY'
           import os, re
-          url = os.environ.get('RENDER_DEPLOY_HOOK_URL','')
-          print('hook_present=' + ('yes' if url else 'no'))
-          service = None
-          m = re.search(r'(srv-[A-Za-z0-9]+)', url)
-          if m:
-              service = m.group(1)
-          print('service_id=' + (service or 'unknown'))
-          if url:
-              safe_host = url.split('/')[2] if '://' in url else 'unknown'
-              print('hook_host=' + safe_host)
+          keys = [
+            'RENDER_DEPLOY_HOOK_URL',
+            'RENDER_STAGING_DEPLOY_HOOK_URL',
+            'ARCANA_STAGING_DEPLOY_HOOK_URL',
+            'RENDER_DEPLOY_HOOK_URL_STAGING',
+            'STAGING_RENDER_DEPLOY_HOOK_URL',
+          ]
+          for key in keys:
+              url = os.environ.get(key, '')
+              present = 'yes' if url else 'no'
+              m = re.search(r'(srv-[A-Za-z0-9]+)', url)
+              service = m.group(1) if m else 'unknown'
+              print(f'{key}:present={present}:service={service}')
           PY
-      - name: Try staging hook by service-id swap
-        run: |
-          python - <<'PY' > /tmp/staging_hook_url.txt
-          import os, re
-          url = os.environ['RENDER_DEPLOY_HOOK_URL']
-          staging = os.environ['STAGING_SERVICE_ID']
-          swapped = re.sub(r'srv-[A-Za-z0-9]+', staging, url, count=1)
-          print(swapped)
-          PY
-          STAGING_HOOK_URL="$(cat /tmp/staging_hook_url.txt)"
-          status="$(curl -s -o /tmp/staging_hook_response.txt -w '%{http_code}' -X POST "$STAGING_HOOK_URL")"
-          echo "staging_hook_http_status=${status}"
-          if [[ -s /tmp/staging_hook_response.txt ]]; then
-            echo "staging_hook_response_present=yes"
-          else
-            echo "staging_hook_response_present=no"
-          fi
