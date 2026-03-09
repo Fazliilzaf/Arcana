@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      STAGING_SERVICE_ID: srv-d6gd8i94tr6s73dbb2ug
     steps:
       - name: Parse hook target safely
         run: |
@@ -27,3 +28,20 @@ jobs:
               safe_host = url.split('/')[2] if '://' in url else 'unknown'
               print('hook_host=' + safe_host)
           PY
+      - name: Try staging hook by service-id swap
+        run: |
+          python - <<'PY' > /tmp/staging_hook_url.txt
+          import os, re
+          url = os.environ['RENDER_DEPLOY_HOOK_URL']
+          staging = os.environ['STAGING_SERVICE_ID']
+          swapped = re.sub(r'srv-[A-Za-z0-9]+', staging, url, count=1)
+          print(swapped)
+          PY
+          STAGING_HOOK_URL="$(cat /tmp/staging_hook_url.txt)"
+          status="$(curl -s -o /tmp/staging_hook_response.txt -w '%{http_code}' -X POST "$STAGING_HOOK_URL")"
+          echo "staging_hook_http_status=${status}"
+          if [[ -s /tmp/staging_hook_response.txt ]]; then
+            echo "staging_hook_response_present=yes"
+          else
+            echo "staging_hook_response_present=no"
+          fi
