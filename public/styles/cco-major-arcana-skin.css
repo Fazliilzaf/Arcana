@@ -350,12 +350,35 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoWorks
   display: grid;
   width: 100%;
   grid-template-columns: minmax(0, var(--cco-vnext-left-region)) minmax(0, var(--cco-vnext-right-region)) !important;
+  grid-template-areas: "center reply" !important;
+  grid-auto-columns: 0 !important;
   gap: var(--cco-vnext-main-gap) !important;
   align-items: start;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoWorkspaceLayout.cco-layout-vnext:has(#ccoReplyColumn.is-readonly) {
   grid-template-columns: minmax(0, var(--cco-vnext-left-region-read)) minmax(0, var(--cco-vnext-right-region-read)) !important;
+  grid-template-areas: "center reply" !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn {
+  grid-area: center !important;
+  grid-column: auto !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn {
+  grid-area: reply !important;
+  grid-column: auto !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoIndicatorContextMenu {
+  position: fixed !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  grid-area: auto !important;
+  grid-column: auto !important;
+  z-index: 999 !important;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-vnext-region {

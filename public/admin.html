@@ -6166,6 +6166,8 @@
     }
     body.cco-light-mode #ccoWorkspaceSection #ccoWorkspaceLayout.cco-layout {
       grid-template-columns: minmax(0, 46%) minmax(0, 54%);
+      grid-template-areas: "center reply";
+      grid-auto-columns: 0;
       gap: 12px;
       border: 0;
       border-radius: 0;
@@ -6175,6 +6177,23 @@
       height: auto;
       margin-top: 6px !important;
       overflow: visible;
+    }
+    body.cco-light-mode #ccoWorkspaceSection #ccoCenterColumn {
+      grid-area: center;
+      grid-column: auto;
+    }
+    body.cco-light-mode #ccoWorkspaceSection #ccoReplyColumn {
+      grid-area: reply;
+      grid-column: auto;
+    }
+    body.cco-light-mode #ccoWorkspaceSection #ccoIndicatorContextMenu {
+      position: fixed;
+      inset: auto;
+      width: auto;
+      height: auto;
+      grid-area: auto;
+      grid-column: auto;
+      z-index: 999;
     }
     body.cco-light-mode #ccoWorkspaceSection .cco-center,
     body.cco-light-mode #ccoWorkspaceSection .cco-reply {
