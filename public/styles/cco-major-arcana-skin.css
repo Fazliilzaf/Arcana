@@ -400,6 +400,11 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCente
   gap: 0;
 }
 
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn > .cco-center-block-worklist {
+  display: grid;
+  gap: 0;
+}
+
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-center-block,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-reply-block,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoStatusSummaryCard {
@@ -417,7 +422,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-repl
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--ma-space-12);
-  margin-bottom: var(--ma-space-14, 14px);
+  margin-bottom: 10px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-column-title h3,
@@ -436,12 +441,12 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-read
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px;
+  padding: 3px;
   border-radius: 16px;
   border: 1px solid var(--cco-vnext-divider);
   background: rgba(255, 255, 255, 0.56);
   box-shadow: var(--ma-shadow-panel-inner);
-  margin-bottom: var(--ma-space-12);
+  margin-bottom: 10px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-view-mode-btn,
@@ -486,8 +491,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-indi
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-center-density-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ma-space-8);
-  margin-bottom: var(--ma-space-12);
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-indicator-filter-btn {
@@ -529,7 +534,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbo
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbox-group {
   border-top: 1px solid var(--cco-vnext-divider);
-  padding-top: var(--ma-space-12);
+  padding-top: 10px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbox-group:first-child {
@@ -544,7 +549,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbo
   justify-content: space-between;
   gap: var(--ma-space-12);
   cursor: pointer;
-  padding: 0 0 var(--ma-space-8);
+  padding: 0 0 6px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbox-group summary::-webkit-details-marker {
@@ -572,8 +577,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-grou
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 28px;
+  min-width: 26px;
+  height: 26px;
   padding: 0 8px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
@@ -599,7 +604,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread + .cco-thread,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item + .cco-feed-item {
-  margin-top: 6px;
+  margin-top: 3px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread-btn,
@@ -607,22 +612,22 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   min-height: var(--cco-vnext-list-row-height);
-  padding: 8px 12px;
+  padding: 7px 10px;
   text-align: left;
-  border-radius: 12px;
-  border: 1px solid rgba(81, 61, 52, 0.06);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(248, 242, 237, 0.62));
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.34);
+  border-radius: 10px;
+  border: 1px solid rgba(81, 61, 52, 0.05);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(248, 242, 237, 0.44));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28);
   transition: box-shadow 140ms ease, transform 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread-btn:hover,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(62, 46, 41, 0.10), inset 0 1px 0 rgba(255,255,255,0.38);
+  box-shadow: 0 4px 10px rgba(62, 46, 41, 0.08), inset 0 1px 0 rgba(255,255,255,0.32);
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread.active .cco-thread-btn,
@@ -645,7 +650,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread-mail,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item-mail {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -653,7 +658,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thre
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item-subject-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -663,7 +668,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 650;
   color: currentColor;
 }
@@ -676,7 +681,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-list-row-chip,
@@ -684,13 +689,13 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-prio
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 30px;
-  padding: 0 12px;
+  height: 28px;
+  padding: 0 11px;
   border-radius: 999px;
   border: 1px solid rgba(81, 61, 52, 0.12);
   background: rgba(255,255,255,0.76);
   color: var(--cco-vnext-text-strong);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -726,7 +731,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoConversationColumn {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   width: min(100%, var(--cco-vnext-readable-max));
   padding-top: 0;
   border-top: 0;
@@ -741,27 +746,28 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoConversationColumn {
   padding-right: 0;
-  padding-bottom: 8px;
+  padding-bottom: 6px;
   margin-bottom: 0;
   border-right: 0;
   border-bottom: 0;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio {
-  padding-top: 0;
-  border-top: 0;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--cco-vnext-divider);
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoStatusSummaryCard {
   grid-column: auto;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--cco-vnext-divider);
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyReadOnlyBanner {
-  margin-bottom: var(--ma-space-12);
-  padding: 10px 12px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
   border-radius: 12px;
   border: 1px solid rgba(81, 61, 52, 0.10);
   background: rgba(255,255,255,0.6);
@@ -772,14 +778,14 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoConversationMeta,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyingToContext {
-  font-size: 12px;
-  line-height: 1.3;
+  font-size: 11px;
+  line-height: 1.25;
   color: var(--cco-vnext-text-muted);
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoConversationColumn .cco-column-title,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-header-block .mini.muted:first-child {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoConversationColumn .cco-column-title h3,
@@ -793,19 +799,19 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-subs
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoConversationPreview {
   width: min(100%, var(--cco-vnext-readable-tight));
-  min-height: 136px;
-  padding: 14px 16px;
+  min-height: 124px;
+  padding: 12px 14px;
   font-size: 15px;
   line-height: 1.5;
   color: var(--cco-vnext-text-strong);
-  margin-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-conversation-history-wrap,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-read-secondary,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-customer-summary {
   width: min(100%, var(--cco-vnext-readable-tight));
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-conversation-history-list {
@@ -815,7 +821,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-conv
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-history-item,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-mini-list > li {
-  padding: 10px 0;
+  padding: 8px 0;
   border-radius: 0;
   border: 0;
   border-top: 1px solid var(--cco-vnext-divider);
@@ -831,14 +837,14 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-mini
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-studio {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   max-width: none;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-reply-context-strip {
-  margin-bottom: 2px;
-  padding: 0 0 6px;
+  margin-bottom: 0;
+  padding: 0 0 5px;
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid var(--cco-vnext-divider);
@@ -851,14 +857,14 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-repl
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-header-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 5px 10px;
   width: min(100%, var(--cco-vnext-readable-max));
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-header-grid label,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-studio label {
   display: block;
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   font-size: 11px;
   line-height: 1.2;
   font-weight: 750;
@@ -869,7 +875,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-comp
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-studio input,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-compose-studio select {
-  height: 36px;
+  height: 34px;
   padding: 0 12px;
   font-size: 14px;
   color: var(--cco-vnext-text-strong);
@@ -877,7 +883,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-comp
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inline-toggle-stack {
-  margin-top: 6px;
+  margin-top: 4px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -887,8 +893,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inli
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-draft-modes {
   display: grid;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 3px;
+  margin-bottom: 4px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-draft-mode-buttons,
@@ -907,7 +913,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-edit
   min-height: var(--cco-vnext-editor-height);
   width: min(100%, var(--cco-vnext-readable-tight));
   max-width: none;
-  padding: 16px;
+  padding: 14px;
   resize: vertical;
   font-family: var(--ma-font-sans);
   font-size: 15px;
@@ -925,7 +931,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-sign
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-signature-preview {
-  margin-top: 8px;
+  margin-top: 6px;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid var(--cco-vnext-divider);
@@ -940,25 +946,25 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoStatu
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoComposeStudio > .cco-reply-block + .cco-reply-block {
-  padding-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid var(--cco-vnext-divider);
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-actions-block .mini.muted,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-safety-block .mini.muted {
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-actions-toolbar .btn,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-draft-mode-buttons .btn {
-  height: 32px;
-  padding: 0 11px;
+  height: 30px;
+  padding: 0 10px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-actions-more {
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-actions-more > summary {
@@ -977,10 +983,10 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-acti
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-recommended-row,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-safety-details > summary {
   width: min(100%, var(--cco-vnext-readable-max));
-  padding: 7px 10px;
+  padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid rgba(81, 61, 52, 0.10);
-  background: rgba(255,255,255,0.50);
+  background: rgba(255,255,255,0.28);
   color: var(--cco-vnext-text-strong);
   font-size: 13px;
   font-weight: 650;
@@ -1000,8 +1006,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-safe
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 7px 10px;
+  min-height: 34px;
+  padding: 5px 8px;
   border: 0;
   border-left: 1px solid var(--cco-vnext-divider);
   border-radius: 0;
@@ -1042,7 +1048,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-stat
   width: min(100%, var(--cco-vnext-readable-max));
   max-width: none;
   border: 1px solid var(--cco-vnext-divider);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   background: rgba(255,255,255,0.38);
 }
@@ -1052,8 +1058,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-stat
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
+  min-height: 38px;
+  padding: 6px 9px;
   border-left: 1px solid var(--cco-vnext-divider);
   border-radius: 0;
   background: transparent;
@@ -1074,7 +1080,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-stat
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-status-summary-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1082,7 +1088,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-stat
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-status-summary-meta {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
   color: var(--cco-vnext-text-strong);
 }
@@ -1094,6 +1100,35 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoStatu
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoStatusSummaryCard {
   padding-top: 8px;
   border-top: 1px solid var(--cco-vnext-divider);
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoConversationColumn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoStatusSummaryCard {
+  width: min(100%, var(--cco-vnext-readable-max));
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio {
+  display: grid;
+  gap: 6px;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-reply-read-zone,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-actions-block,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-safety-block {
+  position: relative;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-reply-read-zone::after,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-actions-block::after,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose .cco-safety-block::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(120, 105, 90, 0.08), rgba(120, 105, 90, 0.16) 18%, rgba(120, 105, 90, 0.16) 82%, rgba(120, 105, 90, 0.08));
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-empty-state-title {
