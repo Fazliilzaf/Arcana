@@ -20,8 +20,6 @@ jobs:
       BASE_URL_SECRET: ${{ secrets.ARCANA_PUBLIC_BASE_URL }}
       ARCANA_OWNER_EMAIL: ${{ secrets.ARCANA_OWNER_EMAIL }}
       ARCANA_OWNER_PASSWORD: ${{ secrets.ARCANA_OWNER_PASSWORD }}
-      ARCANA_OWNER_MFA_SECRET: ${{ secrets.ARCANA_OWNER_MFA_SECRET }}
-      ARCANA_OWNER_MFA_RECOVERY_CODE: ${{ secrets.ARCANA_OWNER_MFA_RECOVERY_CODE }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,6 +67,7 @@ jobs:
           BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
         run: |
           OUT_FILE="$RUNNER_TEMP/owner-mfa-setup.txt"
+          unset ARCANA_OWNER_MFA_CODE ARCANA_OWNER_MFA_SECRET ARCANA_OWNER_MFA_RECOVERY_CODE
           set +e
           npm run owner:mfa:setup -- \
             --base-url "$BASE_URL" \
