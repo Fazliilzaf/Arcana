@@ -6165,41 +6165,32 @@
       font-size: 11px;
     }
     body.cco-light-mode #ccoWorkspaceSection #ccoWorkspaceLayout.cco-layout {
-      grid-template-columns: 260px minmax(520px, 1fr) clamp(380px, 28vw, 460px);
-      gap: 14px;
+      grid-template-columns: minmax(0, 46%) minmax(0, 54%);
+      gap: 12px;
       border: 0;
       border-radius: 0;
       background: transparent;
       box-shadow: none;
       min-height: 0;
-      height: calc(100vh - var(--headerHeight, 110px) - 52px);
+      height: auto;
       margin-top: 6px !important;
       overflow: visible;
     }
-    body.cco-light-mode #ccoWorkspaceSection .cco-inbox,
     body.cco-light-mode #ccoWorkspaceSection .cco-center,
     body.cco-light-mode #ccoWorkspaceSection .cco-reply {
-      border: 1px solid rgba(78, 61, 53, 0.2);
-      border-radius: 14px;
-      background:
-        linear-gradient(170deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.2)),
-        linear-gradient(145deg, rgba(195, 175, 158, 0.5), rgba(163, 143, 130, 0.26));
-      box-shadow: var(--cco-panel-shadow);
-      backdrop-filter: blur(14px) saturate(122%);
-      -webkit-backdrop-filter: blur(14px) saturate(122%);
-      padding: 10px;
-      gap: 8px;
-    }
-    body.cco-light-mode #ccoWorkspaceSection .cco-inbox {
-      border-right: 1px solid rgba(78, 61, 53, 0.2);
-      min-width: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      padding: 0;
+      gap: 0;
     }
     body.cco-light-mode #ccoWorkspaceSection .cco-center {
-      border-right: 1px solid rgba(78, 61, 53, 0.2);
       min-width: 0;
     }
     body.cco-light-mode #ccoWorkspaceSection .cco-reply {
-      border-left: 1px solid rgba(78, 61, 53, 0.2);
       min-width: 0;
     }
     body.cco-light-mode #ccoWorkspaceSection .cco-nav-stack {
