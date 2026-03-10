@@ -2916,7 +2916,8 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread.active .cco-thread-btn,
-body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.active .cco-feed-item-btn {
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.active .cco-feed-item-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.is-selected .cco-feed-item-btn {
   min-height: var(--cco-pixel-row-height-selected) !important;
 }
 
@@ -3125,4 +3126,103 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread.active .cco-thread-btn,
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.active .cco-feed-item-btn {
   min-height: 68px !important;
+}
+
+/* Pixel-lock authority III: preserve compact top budget without crushing the worklist */
+body.cco-light-mode #dashboardPanel {
+  margin-top: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoWorkspaceLayout.cco-layout-vnext {
+  margin-top: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn > .cco-center-block-worklist {
+  grid-template-columns: auto auto minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "title modes filters density"
+    "meta meta meta meta"
+    "worklist worklist worklist worklist" !important;
+  row-gap: var(--cco-pixel-row-gap) !important;
+  column-gap: 12px !important;
+  align-items: center !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-center-title {
+  min-height: var(--cco-pixel-worklist-title-height) !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxModeToggle {
+  grid-area: modes !important;
+  margin: 0 !important;
+  justify-self: start !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxModeToggle .cco-view-mode-btn {
+  min-height: var(--cco-pixel-mode-height) !important;
+  height: var(--cco-pixel-mode-height) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoIndicatorFilterRow {
+  grid-area: filters !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  gap: var(--cco-pixel-row-gap) !important;
+  margin: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoIndicatorFilterRow .cco-indicator-filter-btn {
+  min-height: var(--cco-pixel-chip-height) !important;
+  height: var(--cco-pixel-chip-height) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxModeMeta {
+  grid-area: meta !important;
+  display: block !important;
+  min-height: var(--cco-pixel-mode-meta-height) !important;
+  max-height: var(--cco-pixel-mode-meta-height) !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxDensityFilters {
+  grid-area: density !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-self: end !important;
+  gap: var(--cco-pixel-row-gap) !important;
+  margin: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxDensityFilters .cco-filter-btn {
+  min-height: var(--cco-pixel-density-height) !important;
+  height: var(--cco-pixel-density-height) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbox-group + .cco-inbox-group {
+  margin-top: var(--cco-pixel-group-gap) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inbox-group > summary {
+  min-height: var(--cco-pixel-group-summary-height) !important;
+  padding: 4px 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item-btn {
+  min-height: var(--cco-pixel-row-height) !important;
+  padding: var(--cco-pixel-row-padding-y) var(--cco-pixel-row-padding-x) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread.active .cco-thread-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.active .cco-feed-item-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.is-selected .cco-feed-item-btn {
+  min-height: var(--cco-pixel-row-height-selected) !important;
 }

@@ -184,6 +184,7 @@
   --cco-pixel-mode-height: 36px;
   --cco-pixel-chip-height: 32px;
   --cco-pixel-density-height: 32px;
+  --cco-pixel-mode-meta-height: 16px;
   --cco-pixel-section-height: 28px;
   --cco-pixel-row-height: 64px;
   --cco-pixel-row-height-selected: 72px;
@@ -204,7 +205,8 @@
   --cco-pixel-delete-width: 104px;
   --cco-pixel-column-padding: 12px;
   --cco-pixel-worklist-title-height: 28px;
-  --cco-pixel-group-summary-height: 24px;
+  --cco-pixel-group-summary-height: 28px;
+  --cco-pixel-group-gap: 12px;
   --cco-pixel-history-preview-height-1536: 120px;
   --cco-pixel-history-preview-height-1440: 96px;
   --cco-pixel-history-list-max-1536: 144px;

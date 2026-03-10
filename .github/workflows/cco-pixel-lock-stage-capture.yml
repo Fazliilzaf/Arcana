@@ -1,0 +1,143 @@
+name: cco-pixel-lock-stage-capture
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Stage URL to capture"
+        required: false
+        default: "https://arcana-staging.onrender.com"
+        type: string
+      expected_build_id:
+        description: "Optional X-Arcana-UI-Build to wait for before capture"
+        required: false
+        type: string
+      tenant_id:
+        description: "Tenant ID for auth and capture"
+        required: false
+        default: "hair-tp-clinic"
+        type: string
+      wait_minutes:
+        description: "Max minutes to wait for expected build header"
+        required: false
+        default: "20"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      BASE_URL_INPUT: ${{ inputs.base_url }}
+      EXPECTED_BUILD_ID: ${{ inputs.expected_build_id }}
+      WAIT_MINUTES_RAW: ${{ inputs.wait_minutes }}
+      ARCANA_OWNER_EMAIL: ${{ secrets.ARCANA_OWNER_EMAIL }}
+      ARCANA_OWNER_PASSWORD: ${{ secrets.ARCANA_OWNER_PASSWORD }}
+      ARCANA_OWNER_MFA_SECRET: ${{ secrets.ARCANA_OWNER_MFA_SECRET }}
+      ARCANA_OWNER_MFA_RECOVERY_CODE: ${{ secrets.ARCANA_OWNER_MFA_RECOVERY_CODE }}
+      ARCANA_DEFAULT_TENANT: ${{ inputs.tenant_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install app dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.52.0
+          npx playwright install --with-deps chromium
+
+      - name: Resolve base URL
+        id: resolve_base_url
+        run: |
+          BASE_URL="${BASE_URL_INPUT:-https://arcana-staging.onrender.com}"
+          BASE_URL="${BASE_URL%/}"
+          if [[ ! "${BASE_URL}" =~ ^https?:// ]]; then
+            echo "::error::Invalid base URL: ${BASE_URL}"
+            exit 1
+          fi
+          echo "base_url=${BASE_URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate auth secrets
+        run: |
+          missing=0
+          for name in ARCANA_OWNER_EMAIL ARCANA_OWNER_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          if [[ -z "${ARCANA_OWNER_MFA_SECRET:-}" && -z "${ARCANA_OWNER_MFA_RECOVERY_CODE:-}" ]]; then
+            echo "::error::Set ARCANA_OWNER_MFA_SECRET or ARCANA_OWNER_MFA_RECOVERY_CODE."
+            missing=1
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Wait for expected build header
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+        run: |
+          expected="${EXPECTED_BUILD_ID:-}"
+          if [[ -z "$expected" ]]; then
+            echo "No expected build id provided. Continuing immediately."
+            exit 0
+          fi
+
+          wait_minutes="${WAIT_MINUTES_RAW:-20}"
+          if [[ ! "${wait_minutes}" =~ ^[0-9]+$ ]] || [[ "${wait_minutes}" -lt 1 ]]; then
+            wait_minutes=20
+          fi
+          if [[ "${wait_minutes}" -gt 45 ]]; then
+            wait_minutes=45
+          fi
+
+          interval_seconds=15
+          attempts=$(( (wait_minutes * 60) / interval_seconds ))
+          if [[ "${attempts}" -lt 1 ]]; then
+            attempts=1
+          fi
+
+          for attempt in $(seq 1 "${attempts}"); do
+            current="$(
+              curl -fsSI "${BASE_URL}/cco" \
+                | tr -d '\r' \
+                | awk 'tolower($1) == "x-arcana-ui-build:" { print $2 }' \
+                | tail -n 1
+            )"
+            echo "Attempt ${attempt}/${attempts}: build=${current:-missing}"
+            if [[ "${current}" == "${expected}" ]]; then
+              echo "Matched expected build ${expected}."
+              exit 0
+            fi
+            sleep "${interval_seconds}"
+          done
+
+          echo "::error::Timed out waiting for build ${expected} on ${BASE_URL}/cco"
+          exit 1
+
+      - name: Capture screenshots and metrics
+        env:
+          BASE_URL: ${{ steps.resolve_base_url.outputs.base_url }}
+          OUTPUT_DIR: ./artifacts/cco-pixel-lock-${{ github.run_id }}
+        run: node ./scripts/capture-cco-stage-pixel-lock.js
+
+      - name: Upload capture artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cco-pixel-lock-${{ github.run_id }}
+          path: ./artifacts/cco-pixel-lock-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 14
