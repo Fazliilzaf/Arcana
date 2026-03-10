@@ -169,4 +169,37 @@
   --ma-minimal-selected-fill: rgba(255, 255, 255, 0.72);
   --ma-minimal-soft-shadow: 0 10px 26px rgba(62, 46, 41, 0.08);
   --ma-minimal-control-shadow: 0 4px 12px rgba(62, 46, 41, 0.08);
+
+  --cco-pixel-shell-margin: 16px;
+  --cco-pixel-top-nav-height: 44px;
+  --cco-pixel-utility-height: 44px;
+  --cco-pixel-top-gap: 8px;
+  --cco-pixel-main-gap: 16px;
+  --cco-pixel-left-region: 54%;
+  --cco-pixel-right-region: 46%;
+  --cco-pixel-history-expanded: 320px;
+  --cco-pixel-history-min: 260px;
+  --cco-pixel-history-collapsed: 44px;
+  --cco-pixel-history-gap: 12px;
+  --cco-pixel-mode-height: 36px;
+  --cco-pixel-chip-height: 32px;
+  --cco-pixel-density-height: 32px;
+  --cco-pixel-section-height: 28px;
+  --cco-pixel-row-height: 64px;
+  --cco-pixel-row-height-selected: 72px;
+  --cco-pixel-row-gap: 8px;
+  --cco-pixel-row-padding-y: 12px;
+  --cco-pixel-row-padding-x: 16px;
+  --cco-pixel-context-height: 40px;
+  --cco-pixel-input-height: 36px;
+  --cco-pixel-mode-button-min: 92px;
+  --cco-pixel-mode-button-max: 108px;
+  --cco-pixel-editor-height-1536: 260px;
+  --cco-pixel-editor-height-1440: 220px;
+  --cco-pixel-action-height: 34px;
+  --cco-pixel-summary-height: 44px;
+  --cco-pixel-sendbar-height: 52px;
+  --cco-pixel-send-width: 148px;
+  --cco-pixel-snooze-width: 132px;
+  --cco-pixel-delete-width: 104px;
 }

@@ -755,6 +755,7 @@
     ccoSignaturePreviewExpanded: sanitizeCcoSignaturePreviewExpanded(
       initialCcoWorkspaceSession.signaturePreviewExpanded
     ),
+    ccoHistoryPanelCollapsed: initialCcoWorkspaceSession.historyPanelCollapsed === true,
     ccoConversationScrollTopByConversationId: sanitizeCcoScrollMap(
       initialCcoWorkspaceSession.scrollTopByConversationId
     ),
@@ -1069,6 +1070,7 @@
     ccoConversationMeta: document.getElementById('ccoConversationMeta'),
     ccoConversationPreview: document.getElementById('ccoConversationPreview'),
     ccoConversationHistoryList: document.getElementById('ccoConversationHistoryList'),
+    ccoHistoryCollapseBtn: document.getElementById('ccoHistoryCollapseBtn'),
     ccoCenterTabConversationBtn: document.getElementById('ccoCenterTabConversationBtn'),
     ccoCenterTabCustomerBtn: document.getElementById('ccoCenterTabCustomerBtn'),
     ccoReadTabConversation: document.getElementById('ccoReadTabConversation'),
@@ -4973,6 +4975,7 @@
         signaturePreviewExpanded: sanitizeCcoSignaturePreviewExpanded(
           state.ccoSignaturePreviewExpanded
         ),
+        historyPanelCollapsed: state.ccoHistoryPanelCollapsed === true,
         draftsByConversationId: sanitizeCcoDraftMap(state.ccoDraftOverrideByConversationId),
         draftModeByConversationId: sanitizeCcoDraftModeMap(state.ccoDraftModeByConversationId),
         systemMessageByConversationId: sanitizeCcoSystemFlagMap(
@@ -12555,6 +12558,20 @@
       els.ccoReplyReadOnlyBanner.hidden = !readOnlyMode;
       els.ccoReplyReadOnlyBanner.textContent = 'Skrivskyddad vy. Byt till Arbetskö för att svara.';
     }
+    applyCcoHistoryPanelState({ readOnlyMode });
+  }
+
+  function applyCcoHistoryPanelState({ readOnlyMode = isCcoReadOnlyMailViewMode() } = {}) {
+    const collapsed = readOnlyMode ? false : state.ccoHistoryPanelCollapsed === true;
+    if (els.ccoReplyColumn) {
+      els.ccoReplyColumn.classList.toggle('is-history-collapsed', collapsed);
+    }
+    if (els.ccoHistoryCollapseBtn) {
+      els.ccoHistoryCollapseBtn.hidden = readOnlyMode;
+      els.ccoHistoryCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      els.ccoHistoryCollapseBtn.textContent = collapsed ? 'Visa' : 'Dölj';
+      els.ccoHistoryCollapseBtn.title = collapsed ? 'Visa historik' : 'Fäll ihop historik';
+    }
   }
 
   function getCcoReplyEmptyMessage({ readOnlyMode = false } = {}) {
@@ -16155,6 +16172,12 @@
       },
     };
     renderCcoDetail(state.ccoInboxData?.data || null);
+  });
+  els.ccoHistoryCollapseBtn?.addEventListener('click', () => {
+    if (isCcoReadOnlyMailViewMode()) return;
+    state.ccoHistoryPanelCollapsed = !(state.ccoHistoryPanelCollapsed === true);
+    applyCcoHistoryPanelState({ readOnlyMode: false });
+    persistCcoWorkspaceSessionState();
   });
   els.ccoCenterTabConversationBtn?.addEventListener('click', () => {
     setCcoCenterReadTab('conversation');
