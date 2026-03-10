@@ -2967,6 +2967,9 @@
   function setAuthVisible(isLoggedIn) {
     els.loginPanel.classList.toggle('hidden', isLoggedIn);
     els.dashboardPanel.classList.toggle('hidden', !isLoggedIn);
+    if (els.sectionNav) {
+      els.sectionNav.hidden = !isLoggedIn;
+    }
     if (isLoggedIn) {
       if (els.tenantSelectionPanel) els.tenantSelectionPanel.classList.add('hidden');
       if (els.tenantSelectionSelect) els.tenantSelectionSelect.innerHTML = '';
@@ -2985,6 +2988,23 @@
       state.pendingLoginTicket = '';
       clearPendingMfa();
     }
+  }
+
+  function mountCcoHeaderNav() {
+    if (!els.adminHeader || !els.sectionNav) return;
+    const controls = els.adminHeader.querySelector('.admin-header-controls');
+    const navShell = els.sectionNav.closest('.cco-top-tabs-shell');
+    if (navShell) {
+      navShell.classList.add('is-relocated');
+      navShell.setAttribute('aria-hidden', 'true');
+    }
+    if (controls && els.sectionNav.parentElement !== els.adminHeader) {
+      els.adminHeader.insertBefore(els.sectionNav, controls);
+    } else if (els.sectionNav.parentElement !== els.adminHeader) {
+      els.adminHeader.appendChild(els.sectionNav);
+    }
+    els.adminHeader.setAttribute('data-cco-header-mounted', 'true');
+    els.sectionNav.hidden = !state.token;
   }
 
   function setSessionMeta() {
@@ -4866,6 +4886,7 @@
       search: String(els.riskSearchFilter?.value || '').trim(),
     };
     persistRiskFilters();
+    mountCcoHeaderNav();
     syncRiskFilterInputs();
     return state.riskFilters;
   }
