@@ -3743,6 +3743,89 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
   }
 }
 
+/* Density rebuild authority Absolute Final: fix details flow, row visibility, and editor floor */
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  overflow: auto !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group + .cco-inbox-group {
+  margin-top: 6px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group > summary {
+  min-height: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  align-items: center !important;
+  border-bottom: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-list,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxFeedList {
+  margin-top: 6px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item-btn {
+  color: rgba(57, 45, 38, 0.94) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(120, 105, 90, 0.16) !important;
+  box-shadow: none !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-thread.active .cco-thread-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.is-selected .cco-feed-item-btn,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-feed-item.active .cco-feed-item-btn {
+  color: rgba(49, 38, 31, 0.96) !important;
+  background: rgba(247, 239, 233, 0.96) !important;
+  border-color: rgba(120, 105, 90, 0.22) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoStatusSummaryCard {
+  display: grid !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block {
+  grid-template-rows: 34px minmax(220px, 1fr) 24px 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block > div:nth-child(2) {
+  grid-template-rows: 14px 220px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block > div:nth-child(2) > #ccoDraftBodyInput {
+  min-height: 220px !important;
+  height: 220px !important;
+  max-height: none !important;
+  align-self: stretch !important;
+}
+
+@media (min-height: 940px) {
+  body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block {
+    grid-template-rows: 34px minmax(var(--cco-pixel-editor-height-1536), 1fr) 24px 0 !important;
+  }
+
+  body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block > div:nth-child(2) {
+    grid-template-rows: 14px var(--cco-pixel-editor-height-1536) !important;
+  }
+
+  body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn.is-compose #ccoComposeStudio .cco-editor-block > div:nth-child(2) > #ccoDraftBodyInput {
+    min-height: var(--cco-pixel-editor-height-1536) !important;
+    height: var(--cco-pixel-editor-height-1536) !important;
+  }
+}
+
 /* Density rebuild authority Sigma: hard mail-client density, queue budget, and unified reply room */
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn > .cco-center-block-worklist {
   display: grid !important;
