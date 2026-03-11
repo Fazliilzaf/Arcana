@@ -211,6 +211,16 @@
   --cco-pixel-history-preview-height-1440: 96px;
   --cco-pixel-history-list-max-1536: 144px;
   --cco-pixel-history-list-max-1440: 112px;
+  --cco-pixel-inbox-width-1440: 560px;
+  --cco-pixel-history-width-1440: 280px;
+  --cco-pixel-reply-min-width-1440: 460px;
+  --cco-pixel-inbox-width-1536: 620px;
+  --cco-pixel-history-width-1536: 300px;
+  --cco-pixel-reply-min-width-1536: 500px;
+  --cco-pixel-inbox-width-1728: 680px;
+  --cco-pixel-history-width-1728: 320px;
+  --cco-pixel-reply-min-width-1728: 520px;
+  --cco-pixel-reply-max-width-1728: 680px;
   --cco-shell-row-a-height: 44px;
   --cco-shell-row-b-height: 32px;
   --cco-shell-utility-height: 36px;
