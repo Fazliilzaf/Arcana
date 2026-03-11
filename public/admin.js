@@ -1105,6 +1105,7 @@
     ccoReplyEmptyState: document.getElementById('ccoReplyEmptyState'),
     ccoReplyMainBlocks: document.getElementById('ccoReplyMainBlocks'),
     ccoComposeStudio: document.getElementById('ccoComposeStudio'),
+    ccoStatusSummaryCard: document.getElementById('ccoStatusSummaryCard'),
     ccoStatusSummaryRows: document.getElementById('ccoStatusSummaryRows'),
     ccoReplyRefreshBtn: document.getElementById('ccoReplyRefreshBtn'),
     ccoDraftRiskIndicator: document.getElementById('ccoDraftRiskIndicator'),
@@ -11351,9 +11352,11 @@
     }
     if (els.ccoReadTabConversation) {
       els.ccoReadTabConversation.classList.toggle('is-active', isConversationTab);
+      els.ccoReadTabConversation.hidden = !isConversationTab;
     }
     if (els.ccoReadTabCustomer) {
       els.ccoReadTabCustomer.classList.toggle('is-active', !isConversationTab);
+      els.ccoReadTabCustomer.hidden = isConversationTab;
     }
   }
 
@@ -11984,7 +11987,7 @@
       );
     }
     if (els.ccoInboxDensityFilters) {
-      els.ccoInboxDensityFilters.style.display = mailViewMode === 'queue' ? '' : 'none';
+      els.ccoInboxDensityFilters.hidden = mailViewMode !== 'queue';
     }
     if (els.ccoIndicatorFilterRow) {
       els.ccoIndicatorFilterRow.hidden = mailViewMode !== 'queue';
@@ -11993,7 +11996,7 @@
       els.ccoInboxFeedView.hidden = mailViewMode === 'queue';
     }
     if (els.ccoInboxWorklist) {
-      els.ccoInboxWorklist.style.display = mailViewMode === 'queue' ? '' : 'none';
+      els.ccoInboxWorklist.hidden = mailViewMode !== 'queue';
     }
     if (els.ccoSwitchInboundBtn && mailViewMode !== 'queue') {
       els.ccoSwitchInboundBtn.hidden = true;
@@ -12681,6 +12684,27 @@
     applyCcoHistoryPanelState({ readOnlyMode });
   }
 
+  function syncCcoReplyBranchVisibility({ isEmpty = false, readOnlyMode = isCcoReadOnlyMailViewMode() } = {}) {
+    if (els.ccoReplyEmptyState) {
+      els.ccoReplyEmptyState.hidden = isEmpty !== true;
+    }
+    if (els.ccoReplyMainBlocks) {
+      els.ccoReplyMainBlocks.hidden = isEmpty === true;
+    }
+    if (els.ccoConversationColumn) {
+      els.ccoConversationColumn.hidden = isEmpty === true;
+    }
+    if (els.ccoComposeStudio) {
+      els.ccoComposeStudio.hidden = isEmpty === true || readOnlyMode === true;
+    }
+    if (els.ccoStatusSummaryCard) {
+      els.ccoStatusSummaryCard.hidden = isEmpty === true;
+    }
+    if (els.ccoReplyReadOnlyBanner) {
+      els.ccoReplyReadOnlyBanner.hidden = isEmpty === true || readOnlyMode !== true;
+    }
+  }
+
   function applyCcoHistoryPanelState({ readOnlyMode = isCcoReadOnlyMailViewMode() } = {}) {
     const collapsed = readOnlyMode ? false : state.ccoHistoryPanelCollapsed === true;
     if (els.ccoReplyColumn) {
@@ -12712,6 +12736,7 @@
     if (els.ccoReplyColumn) {
       els.ccoReplyColumn.classList.toggle('is-empty', isEmpty === true);
     }
+    syncCcoReplyBranchVisibility({ isEmpty, readOnlyMode });
     if (els.ccoReplyEmptyState) {
       const detailEl = els.ccoReplyEmptyState.querySelector('.mini.muted');
       if (detailEl) {
