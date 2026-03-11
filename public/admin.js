@@ -11986,6 +11986,9 @@
     if (els.ccoInboxDensityFilters) {
       els.ccoInboxDensityFilters.style.display = mailViewMode === 'queue' ? '' : 'none';
     }
+    if (els.ccoIndicatorFilterRow) {
+      els.ccoIndicatorFilterRow.hidden = mailViewMode !== 'queue';
+    }
     if (els.ccoInboxFeedView) {
       els.ccoInboxFeedView.hidden = mailViewMode === 'queue';
     }
