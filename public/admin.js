@@ -539,9 +539,9 @@
   const CCO_DEFAULT_DENSITY_MODE = 'work';
   const CCO_VISUAL_LIMITS = Object.freeze({
     sprint: 3,
-    high: 7,
+    high: 12,
     needs: 12,
-    maxVisibleRows: 15,
+    maxVisibleRows: 18,
   });
 
   function sanitizeCcoDensityMode(value = '') {
