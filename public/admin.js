@@ -1105,6 +1105,7 @@
     ccoReplyEmptyState: document.getElementById('ccoReplyEmptyState'),
     ccoReplyMainBlocks: document.getElementById('ccoReplyMainBlocks'),
     ccoComposeStudio: document.getElementById('ccoComposeStudio'),
+    ccoStatusSummaryCard: document.getElementById('ccoStatusSummaryCard'),
     ccoStatusSummaryRows: document.getElementById('ccoStatusSummaryRows'),
     ccoReplyRefreshBtn: document.getElementById('ccoReplyRefreshBtn'),
     ccoDraftRiskIndicator: document.getElementById('ccoDraftRiskIndicator'),
@@ -12664,18 +12665,47 @@
 
   function renderCcoReplyModeState() {
     const readOnlyMode = isCcoReadOnlyMailViewMode();
+    const isEmpty = els.ccoReplyColumn?.classList.contains('is-empty') === true;
     if (els.ccoReplyColumn) {
       els.ccoReplyColumn.classList.toggle('is-readonly', readOnlyMode);
       els.ccoReplyColumn.classList.toggle('is-compose', !readOnlyMode);
+      els.ccoReplyColumn.dataset.ccoReplyState = isEmpty ? 'empty' : readOnlyMode ? 'readonly' : 'compose';
     }
     if (els.ccoReplyColumnTitle) {
       els.ccoReplyColumnTitle.textContent = readOnlyMode ? 'Läspanel' : 'Svarsstudio';
     }
     if (els.ccoReplyReadOnlyBanner) {
-      els.ccoReplyReadOnlyBanner.hidden = !readOnlyMode;
       els.ccoReplyReadOnlyBanner.textContent = 'Skrivskyddad vy. Byt till Arbetskö för att svara.';
     }
+    syncCcoReplyStateVisibility({ isEmpty, readOnlyMode });
     applyCcoHistoryPanelState({ readOnlyMode });
+  }
+
+  function syncCcoReplyStateVisibility({
+    isEmpty = false,
+    readOnlyMode = isCcoReadOnlyMailViewMode(),
+  } = {}) {
+    if (els.ccoReplyColumn) {
+      els.ccoReplyColumn.dataset.ccoReplyState = isEmpty ? 'empty' : readOnlyMode ? 'readonly' : 'compose';
+    }
+    if (els.ccoReplyEmptyState) {
+      els.ccoReplyEmptyState.hidden = !isEmpty;
+    }
+    if (els.ccoReplyMainBlocks) {
+      els.ccoReplyMainBlocks.hidden = isEmpty;
+    }
+    if (els.ccoConversationColumn) {
+      els.ccoConversationColumn.hidden = isEmpty;
+    }
+    if (els.ccoComposeStudio) {
+      els.ccoComposeStudio.hidden = isEmpty || readOnlyMode;
+    }
+    if (els.ccoStatusSummaryCard) {
+      els.ccoStatusSummaryCard.hidden = isEmpty;
+    }
+    if (els.ccoReplyReadOnlyBanner) {
+      els.ccoReplyReadOnlyBanner.hidden = isEmpty || !readOnlyMode;
+    }
   }
 
   function applyCcoHistoryPanelState({ readOnlyMode = isCcoReadOnlyMailViewMode() } = {}) {
@@ -12708,6 +12738,7 @@
     renderCcoReplyModeState();
     if (els.ccoReplyColumn) {
       els.ccoReplyColumn.classList.toggle('is-empty', isEmpty === true);
+      els.ccoReplyColumn.dataset.ccoReplyState = isEmpty === true ? 'empty' : readOnlyMode ? 'readonly' : 'compose';
     }
     if (els.ccoReplyEmptyState) {
       const detailEl = els.ccoReplyEmptyState.querySelector('.mini.muted');
@@ -12718,9 +12749,7 @@
     if (els.ccoDraftBodyInput) {
       els.ccoDraftBodyInput.disabled = isEmpty === true;
     }
-    if (els.ccoReplyReadOnlyBanner && isEmpty === true) {
-      els.ccoReplyReadOnlyBanner.hidden = true;
-    }
+    syncCcoReplyStateVisibility({ isEmpty: isEmpty === true, readOnlyMode });
     if (isEmpty === true) {
       applyCcoSnoozeButtonState();
       applyCcoDeleteButtonState();
