@@ -2161,7 +2161,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
 }
 
 /* PASS 1: header + navigation + filter rail stabilization only */
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] {
   display: grid !important;
   grid-template-columns: var(--cco-shell-brand-width) minmax(0, 1fr) auto !important;
   grid-template-areas:
@@ -2169,24 +2169,27 @@ body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] {
     "tabs tabs tabs" !important;
   grid-template-rows: var(--cco-shell-row-a-height) 32px !important;
   min-height: 72px !important;
+  max-height: 72px !important;
   height: 72px !important;
   padding: 0 var(--cco-pixel-shell-margin) !important;
   gap: 0 !important;
   margin-bottom: 0 !important;
   overflow: visible !important;
   border-top: 0 !important;
+  box-sizing: border-box !important;
+  align-content: start !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .brand-stack,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .admin-header-controls,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .header-menu-row,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .lang-wrap {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .brand-stack,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .admin-header-controls,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .header-menu-row,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .lang-wrap {
   min-height: var(--cco-shell-row-a-height) !important;
   height: var(--cco-shell-row-a-height) !important;
   align-items: center !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .brand-stack {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .brand-stack {
   grid-area: brand !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2195,7 +2198,7 @@ body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .brand-stack {
   min-width: var(--cco-shell-brand-width) !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .admin-header-controls {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .admin-header-controls {
   grid-area: controls !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -2204,12 +2207,12 @@ body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .admin-header-c
   min-width: 0 !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .lang-wrap label,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #sessionMeta {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .lang-wrap label,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #sessionMeta {
   display: none !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .header-menu-row {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .header-menu-row {
   display: inline-flex !important;
   align-items: center !important;
   flex-wrap: nowrap !important;
@@ -2217,59 +2220,61 @@ body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] .header-menu-ro
   min-width: 0 !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #languageSelect,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #densityToggleBtn,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #tenantSwitchSelect,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #switchTenantBtn,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #refreshBtn,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #logoutBtn {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #languageSelect,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #densityToggleBtn,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #tenantSwitchSelect,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #switchTenantBtn,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #refreshBtn,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #logoutBtn {
   min-height: var(--cco-shell-row-a-height) !important;
   max-height: var(--cco-shell-row-a-height) !important;
   height: var(--cco-shell-row-a-height) !important;
   white-space: nowrap !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #languageSelect {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #languageSelect {
   width: var(--cco-shell-language-width) !important;
   min-width: var(--cco-shell-language-width) !important;
   max-width: var(--cco-shell-language-width) !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #densityToggleBtn {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #densityToggleBtn {
   width: var(--cco-shell-density-width) !important;
   min-width: var(--cco-shell-density-width) !important;
   max-width: var(--cco-shell-density-width) !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #tenantSwitchSelect {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #tenantSwitchSelect {
   width: var(--cco-shell-clinic-width) !important;
   min-width: var(--cco-shell-clinic-width) !important;
   max-width: var(--cco-shell-clinic-width) !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #switchTenantBtn,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #refreshBtn,
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #logoutBtn {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #switchTenantBtn,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #refreshBtn,
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #logoutBtn {
   width: var(--cco-shell-action-width) !important;
   min-width: var(--cco-shell-action-width) !important;
   max-width: var(--cco-shell-action-width) !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #sectionNav.panel {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #sectionNav#sectionNav.panel {
   grid-area: tabs !important;
   display: flex !important;
   align-items: center !important;
   flex-wrap: nowrap !important;
   min-height: 32px !important;
+  max-height: 32px !important;
   height: 32px !important;
   padding: 0 8px !important;
   margin: 0 !important;
   gap: 8px !important;
   overflow: hidden !important;
   border-top: 0 !important;
+  align-self: end !important;
 }
 
-body.cco-light-mode #adminHeader[data-cco-header-mounted="true"] #sectionNav .sectionNavBtn {
+body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #sectionNav .sectionNavBtn {
   flex: 0 0 auto !important;
   min-height: var(--cco-shell-row-b-height) !important;
   max-height: var(--cco-shell-row-b-height) !important;
