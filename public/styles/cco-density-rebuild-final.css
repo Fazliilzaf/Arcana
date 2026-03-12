@@ -2130,6 +2130,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn#ccoReplyColumn.is-compose .cco-actions-toolbar {
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 8px !important;
 }
@@ -2139,10 +2140,18 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReply
   text-overflow: ellipsis !important;
 }
 
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn#ccoReplyColumn.is-compose .cco-actions-more:not([open]) > div {
+  display: none !important;
+}
+
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn#ccoReplyColumn.is-compose .cco-safety-block {
   grid-template-rows: auto !important;
   gap: 8px !important;
   align-content: start !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn#ccoReplyColumn.is-compose .cco-safety-details:not([open]) .cco-safety-chip-row {
+  display: none !important;
 }
 
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoReplyColumn#ccoReplyColumn.is-compose .cco-send-sticky-bar {
