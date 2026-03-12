@@ -2171,10 +2171,10 @@ body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] {
   grid-template-areas:
     "brand spacer controls"
     "tabs tabs tabs" !important;
-  grid-template-rows: var(--cco-shell-row-a-height) 32px !important;
-  min-height: 72px !important;
-  max-height: 72px !important;
-  height: 72px !important;
+  grid-template-rows: var(--cco-shell-row-a-height) var(--cco-shell-row-b-height) !important;
+  min-height: 70px !important;
+  max-height: 70px !important;
+  height: 70px !important;
   padding: 0 var(--cco-pixel-shell-margin) !important;
   gap: 0 !important;
   margin-bottom: 0 !important;
@@ -2197,7 +2197,7 @@ body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .br
   grid-area: brand !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 12px !important;
+  gap: 8px !important;
   width: var(--cco-shell-brand-width) !important;
   min-width: var(--cco-shell-brand-width) !important;
 }
@@ -2207,7 +2207,7 @@ body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] .ad
   display: inline-flex !important;
   align-items: center !important;
   justify-content: flex-end !important;
-  gap: 12px !important;
+  gap: 8px !important;
   min-width: 0 !important;
 }
 
@@ -2267,15 +2267,19 @@ body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #se
   display: flex !important;
   align-items: center !important;
   flex-wrap: nowrap !important;
-  min-height: 32px !important;
-  max-height: 32px !important;
-  height: 32px !important;
-  padding: 0 8px !important;
+  min-height: var(--cco-shell-row-b-height) !important;
+  max-height: var(--cco-shell-row-b-height) !important;
+  height: var(--cco-shell-row-b-height) !important;
+  padding: 0 4px !important;
   margin: 0 !important;
   gap: 8px !important;
   overflow: hidden !important;
   border-top: 0 !important;
   align-self: end !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #sectionNav .sectionNavBtn {
@@ -2283,7 +2287,7 @@ body.cco-light-mode #adminHeader#adminHeader[data-cco-header-mounted="true"] #se
   min-height: var(--cco-shell-row-b-height) !important;
   max-height: var(--cco-shell-row-b-height) !important;
   height: var(--cco-shell-row-b-height) !important;
-  padding: 0 14px !important;
+  padding: 0 12px !important;
   font-size: 15px !important;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -2316,10 +2320,10 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-util
   min-height: var(--cco-shell-utility-height) !important;
   max-height: var(--cco-shell-utility-height) !important;
   height: var(--cco-shell-utility-height) !important;
-  padding: 0 12px !important;
+  padding: 0 10px !important;
   margin: 0 !important;
   gap: 8px !important;
-  border-radius: 14px !important;
+  border-radius: 12px !important;
   overflow: hidden !important;
 }
 
@@ -2338,7 +2342,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-inli
   min-height: var(--cco-shell-utility-height) !important;
   max-height: var(--cco-shell-utility-height) !important;
   height: var(--cco-shell-utility-height) !important;
-  padding: 0 12px !important;
+  padding: 0 10px !important;
   white-space: nowrap !important;
 }
 
@@ -2346,7 +2350,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] .cco-util
   grid-area: summary !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 12px !important;
+  gap: 8px !important;
   min-width: 0 !important;
   max-width: 100% !important;
   overflow: hidden !important;
@@ -2386,7 +2390,7 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInbox
   min-height: var(--cco-shell-row-b-height) !important;
   max-height: var(--cco-shell-row-b-height) !important;
   height: var(--cco-shell-row-b-height) !important;
-  padding: 0 14px !important;
+  padding: 0 12px !important;
   white-space: nowrap !important;
 }
 
