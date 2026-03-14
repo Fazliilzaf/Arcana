@@ -30,6 +30,22 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInbox
   overflow: auto !important;
 }
 
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="queue"] #ccoInboxFeedView {
+  display: none !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="inbound"] #ccoInboxFeedView,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="sent"] #ccoInboxFeedView {
+  display: grid !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="inbound"] #ccoInboxWorklist,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="sent"] #ccoInboxWorklist,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="inbound"] #ccoInboxWorklist .cco-inbox-group,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn[data-cco-mail-view="sent"] #ccoInboxWorklist .cco-inbox-group {
+  display: none !important;
+}
+
 body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group {
   display: block !important;
   margin: 0 !important;
