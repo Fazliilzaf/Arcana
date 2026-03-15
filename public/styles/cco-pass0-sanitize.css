@@ -520,3 +520,136 @@ body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInbox
     min-height: calc(100vh - 92px) !important;
   }
 }
+
+/* PASS 3: left column density only; header, filter rail, and reply flow remain untouched. */
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoCenterColumn > .cco-center-block-worklist {
+  padding-bottom: 6px !important;
+  box-shadow: 0 1px 3px rgba(70, 50, 30, 0.04) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist {
+  padding: 0 0 8px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group + .cco-inbox-group {
+  margin-top: 6px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-inbox-group > summary {
+  min-height: 24px !important;
+  height: 24px !important;
+  padding: 2px 0 !important;
+  border-bottom: 1px solid rgba(81, 61, 52, 0.08) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-group-title-wrap {
+  gap: 6px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-group-title-wrap > span:first-child {
+  font-size: 18px !important;
+  line-height: 1.1 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-group-meta {
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-group-count {
+  min-width: 21px !important;
+  width: 21px !important;
+  height: 21px !important;
+  min-height: 21px !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+  line-height: 21px !important;
+  box-shadow: 0 1px 2px rgba(70, 50, 30, 0.08) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-list {
+  gap: 2px !important;
+  margin-top: 2px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread {
+  min-height: 0 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-btn {
+  grid-template-columns: minmax(0, 1fr) 12px !important;
+  gap: 6px !important;
+  min-height: 42px !important;
+  height: 42px !important;
+  max-height: 42px !important;
+  padding: 6px 10px 6px 12px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(120, 105, 90, 0.12) !important;
+  box-shadow: none !important;
+  background: rgba(252, 248, 244, 0.88) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread.active .cco-thread-btn {
+  min-height: 46px !important;
+  height: 46px !important;
+  max-height: 46px !important;
+  box-shadow: 0 2px 6px rgba(35, 22, 15, 0.08) !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-btn::before {
+  top: 6px !important;
+  bottom: 6px !important;
+  width: 5px !important;
+  box-shadow: none !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-mail,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-list-row-body {
+  grid-template-rows: auto auto !important;
+  row-gap: 1px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread.active .cco-list-row-body {
+  grid-template-rows: auto auto !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-subject-row {
+  gap: 6px !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-subject {
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-meta-row {
+  gap: 2px 6px !important;
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-thread-preview {
+  display: none !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-list-row-chip,
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-priority-badge {
+  min-height: 19px !important;
+  height: 19px !important;
+  padding: 0 7px !important;
+  font-size: 10.5px !important;
+  line-height: 19px !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+
+body.cco-light-mode #ccoWorkspaceSection[data-cco-skin="major-arcana"] #ccoInboxWorklist .cco-list-row-tail {
+  width: 12px !important;
+  min-width: 12px !important;
+  font-size: 14px !important;
+}
