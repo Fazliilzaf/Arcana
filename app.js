@@ -2239,29 +2239,28 @@
 
     savedSheetsPanel.hidden = false;
     savedSheetsPanel.innerHTML = `
-      <div class="saved-sheets-head">
-        <p>Saved sheets</p>
-        <span>${state.savedSheets.length} saved</span>
-      </div>
-      <div class="saved-sheets-list">
-        ${state.savedSheets
-          .map((sheet, index) => {
-            const isActive = sheet.id === state.currentSheetId;
-            const bottleCount = Array.isArray(sheet.bottles) ? sheet.bottles.length : 0;
-            const ownedCount = Array.isArray(sheet.customerLibrary) ? sheet.customerLibrary.length : 0;
-            const layerCount = Array.isArray(sheet.layers) ? sheet.layers.length : 0;
-            const summary = ownedCount > 0
-              ? `${ownedCount} owned · ${layerCount} ${layerCount === 1 ? "layer" : "layers"}`
-              : `${bottleCount} ${bottleCount === 1 ? "bottle" : "bottles"}`;
+      <div class="saved-sheets-utility">
+        <p>Open saved</p>
+        <div class="saved-sheets-list">
+          ${state.savedSheets
+            .map((sheet, index) => {
+              const isActive = sheet.id === state.currentSheetId;
+              const ownedCount = Array.isArray(sheet.customerLibrary) ? sheet.customerLibrary.length : 0;
+              const layerCount = Array.isArray(sheet.layers) ? sheet.layers.length : 0;
+              const summary = ownedCount > 0
+                ? `${ownedCount} owned · ${layerCount} ${layerCount === 1 ? "layer" : "layers"}`
+                : `${getSheetLabel(sheet, index)}`;
 
-            return `
-              <button class="saved-sheet-pill${isActive ? " is-active" : ""}" type="button" data-load-sheet="${escapeHtml(sheet.id)}">
-                <strong>${escapeHtml(getSheetLabel(sheet, index))}</strong>
-                <span>${escapeHtml(summary)}</span>
-              </button>
-            `;
-          })
-          .join("")}
+              return `
+                <button class="saved-sheet-pill${isActive ? " is-active" : ""}" type="button" data-load-sheet="${escapeHtml(sheet.id)}">
+                  <strong>${escapeHtml(getSheetLabel(sheet, index))}</strong>
+                  <span>${escapeHtml(summary)}</span>
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+        <span class="saved-sheets-count">${state.savedSheets.length} saved</span>
       </div>
     `;
 

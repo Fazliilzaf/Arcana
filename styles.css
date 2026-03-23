@@ -54,14 +54,14 @@ input {
 .sheet-app {
   width: min(calc(100% - 48px), var(--max-width));
   margin: 0 auto;
-  padding: 14px 0 48px;
+  padding: 10px 0 40px;
 }
 
 .brand-strip {
   display: flex;
   align-items: flex-start;
   gap: 20px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line-soft);
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.72);
 }
@@ -137,9 +137,9 @@ input {
 .sheet-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(140px, 250px)) minmax(0, 1fr);
-  gap: 8px 24px;
+  gap: 6px 22px;
   align-items: end;
-  padding: 10px 0 8px;
+  padding: 8px 0 4px;
 }
 
 .sheet-actions {
@@ -202,24 +202,31 @@ input {
 }
 
 .saved-sheets {
-  display: grid;
-  gap: 12px;
-  padding: 0 0 14px;
+  display: block;
+  padding: 0 0 10px;
 }
 
 .composition-strip {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 18px;
-  padding: 0 0 18px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 0 0 12px;
 }
 
-.layers-panel,
-.customer-library {
+.customer-library,
+.layers-panel {
   border: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 12px 28px rgba(75, 53, 37, 0.04);
-  padding: 16px 18px;
+  padding: 14px 16px;
+}
+
+.customer-library {
+  order: 1;
+}
+
+.layers-panel {
+  order: 2;
 }
 
 .panel-intro {
@@ -247,7 +254,7 @@ input {
   margin: 4px 0 0;
   color: var(--ink);
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.8rem;
+  font-size: 1.52rem;
   line-height: 0.94;
   font-weight: 600;
 }
@@ -277,19 +284,21 @@ input {
 
 .layers-stack {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  padding-top: 14px;
+  padding-top: 12px;
 }
 
 .layer-chip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 10px 14px;
+  gap: 8px;
   width: 100%;
   border: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.82);
-  padding: 12px 14px;
+  min-height: 104px;
+  padding: 10px 12px;
   box-shadow: 0 8px 18px rgba(75, 53, 37, 0.03);
 }
 
@@ -330,10 +339,10 @@ input {
 .layer-chip-tools {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
   flex-wrap: wrap;
-  padding-top: 1px;
+  padding-top: 0;
 }
 
 .panel-mini-action {
@@ -370,12 +379,12 @@ input {
 }
 
 .library-owned-grid {
-  display: flex;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 138px));
+  justify-content: flex-start;
   gap: 12px;
-  overflow-x: auto;
-  padding-top: 14px;
-  scrollbar-width: thin;
+  overflow: visible;
+  padding-top: 12px;
 }
 
 .owned-card,
@@ -388,12 +397,14 @@ input {
 
 .owned-card {
   display: grid;
-  flex: 0 0 138px;
+  width: 138px;
+  max-width: 138px;
   position: relative;
   align-content: start;
   gap: 10px;
   padding: 12px;
   text-align: left;
+  overflow: hidden;
 }
 
 .owned-card-select {
@@ -405,6 +416,10 @@ input {
   padding: 10px 0 0;
   border: 0;
   background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  box-shadow: none;
+  outline: none;
   color: inherit;
   text-align: left;
   cursor: grab;
@@ -457,44 +472,55 @@ input {
 }
 
 .saved-sheets-head p,
-.saved-sheets-head span {
+.saved-sheets-head span,
+.saved-sheets-utility p,
+.saved-sheets-count {
   margin: 0;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   font-weight: 700;
 }
 
+.saved-sheets-utility {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+
 .saved-sheets-list {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .saved-sheet-pill {
   display: grid;
   gap: 2px;
-  min-width: 132px;
+  min-width: 116px;
   border: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.76);
-  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.62);
+  padding: 7px 10px;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(75, 53, 37, 0.03);
+  box-shadow: 0 6px 14px rgba(75, 53, 37, 0.02);
 }
 
 .saved-sheet-pill strong {
   color: var(--ink);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   line-height: 1.2;
   font-weight: 600;
 }
 
 .saved-sheet-pill span {
   color: var(--muted);
-  font-size: 0.63rem;
+  font-size: 0.56rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1476,6 +1502,10 @@ input {
     grid-template-columns: 1fr;
   }
 
+  .layers-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .zone-editor-head {
     align-items: start;
     display: grid;
@@ -1528,6 +1558,15 @@ input {
     gap: 8px;
   }
 
+  .saved-sheets-utility {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .layers-stack {
+    grid-template-columns: 1fr;
+  }
+
   .sheet-actions {
     grid-column: auto;
     display: flex;
@@ -1546,6 +1585,7 @@ input {
   }
 
   .library-owned-grid {
+    grid-template-columns: repeat(auto-fit, minmax(126px, 126px));
     gap: 10px;
   }
 }
