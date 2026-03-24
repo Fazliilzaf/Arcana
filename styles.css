@@ -1000,6 +1000,7 @@ input {
 
 .mini-bottle,
 .product-bottle,
+.library-owned-bottle,
 .zone-editor-bottle,
 .zone-bottle {
   --collection-tint: rgba(143, 117, 97, 0.4);
@@ -1038,6 +1039,7 @@ input {
 
 .mini-bottle::before,
 .product-bottle::before,
+.library-owned-bottle::before,
 .zone-editor-bottle::before,
 .zone-bottle::before {
   content: "";
@@ -1049,6 +1051,7 @@ input {
 
 .mini-bottle.type-perfume::before,
 .product-bottle.type-perfume::before,
+.library-owned-bottle.type-perfume::before,
 .zone-editor-bottle.type-perfume::before,
 .zone-bottle.type-perfume::before {
   top: -7px;
@@ -1059,6 +1062,7 @@ input {
 
 .mini-bottle.type-oil,
 .product-bottle.type-oil,
+.library-owned-bottle.type-oil,
 .zone-editor-bottle.type-oil,
 .zone-bottle.type-oil {
   width: 28px;
@@ -1067,6 +1071,7 @@ input {
 
 .mini-bottle.type-oil::before,
 .product-bottle.type-oil::before,
+.library-owned-bottle.type-oil::before,
 .zone-editor-bottle.type-oil::before,
 .zone-bottle.type-oil::before {
   top: -8px;
@@ -1077,6 +1082,7 @@ input {
 
 .mini-bottle.type-body-lotion,
 .product-bottle.type-body-lotion,
+.library-owned-bottle.type-body-lotion,
 .zone-editor-bottle.type-body-lotion,
 .zone-bottle.type-body-lotion {
   border-radius: 9px 9px 12px 12px;
@@ -1084,6 +1090,7 @@ input {
 
 .mini-bottle.type-body-lotion::before,
 .product-bottle.type-body-lotion::before,
+.library-owned-bottle.type-body-lotion::before,
 .zone-editor-bottle.type-body-lotion::before,
 .zone-bottle.type-body-lotion::before {
   top: -8px;
@@ -1095,6 +1102,7 @@ input {
 
 .mini-bottle::after,
 .product-bottle::after,
+.library-owned-bottle::after,
 .zone-editor-bottle::after,
 .zone-bottle::after {
   content: "";
@@ -1111,6 +1119,7 @@ input {
 
 .mini-bottle.type-oil::after,
 .product-bottle.type-oil::after,
+.library-owned-bottle.type-oil::after,
 .zone-editor-bottle.type-oil::after,
 .zone-bottle.type-oil::after {
   width: 64%;
@@ -1120,6 +1129,7 @@ input {
 
 .mini-bottle.type-body-lotion::after,
 .product-bottle.type-body-lotion::after,
+.library-owned-bottle.type-body-lotion::after,
 .zone-editor-bottle.type-body-lotion::after,
 .zone-bottle.type-body-lotion::after {
   width: 48%;
@@ -1130,6 +1140,7 @@ input {
 
 .mini-bottle img,
 .product-bottle img,
+.library-owned-bottle img,
 .zone-editor-bottle img,
 .zone-bottle img {
   width: 100%;
@@ -1141,6 +1152,7 @@ input {
 
 .mini-bottle.has-image,
 .product-bottle.has-image,
+.library-owned-bottle.has-image,
 .zone-editor-bottle.has-image,
 .zone-bottle.has-image {
   border: 0;
@@ -1152,6 +1164,8 @@ input {
 .mini-bottle.has-image::after,
 .product-bottle.has-image::before,
 .product-bottle.has-image::after,
+.library-owned-bottle.has-image::before,
+.library-owned-bottle.has-image::after,
 .zone-editor-bottle.has-image::before,
 .zone-editor-bottle.has-image::after,
 .zone-bottle.has-image::before,
@@ -1160,6 +1174,11 @@ input {
 }
 
 .product-bottle.has-image {
+  width: 50px;
+  height: 72px;
+}
+
+.library-owned-bottle.has-image {
   width: 50px;
   height: 72px;
 }
@@ -1205,6 +1224,7 @@ input {
 
 .mini-bottle.has-image .bottle-collection-mark,
 .product-bottle.has-image .bottle-collection-mark,
+.library-owned-bottle.has-image .bottle-collection-mark,
 .zone-editor-bottle.has-image .bottle-collection-mark,
 .zone-bottle.has-image .bottle-collection-mark {
   right: 2px;
