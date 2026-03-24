@@ -870,6 +870,7 @@
     lastName: "",
     search: "",
     customerLibrary: [],
+    productLevelSelections: {},
     layers: [],
     activeLayerId: null,
     bottles: [],
@@ -1070,6 +1071,18 @@
     return LEVEL_LABELS[level] || LEVEL_LABELS.middle;
   }
 
+  function getLevelOrder(level) {
+    switch (level) {
+      case "high":
+        return 0;
+      case "middle":
+        return 1;
+      case "low":
+      default:
+        return 2;
+    }
+  }
+
   function getLevelBounds(level) {
     switch (level) {
       case "high":
@@ -1108,21 +1121,79 @@
     return product.type === "Perfume" ? "middle" : "low";
   }
 
-  function isLevelAllowedForProduct(product, level) {
-    return getProductPrimaryLevel(product) === level;
+  function getDefaultAllowedLevels(product) {
+    return [getProductPrimaryLevel(product)];
   }
 
-  function clampPositionToLevel(position, level) {
+  function sanitizeAllowedLevels(levels, product) {
+    const fallback = getDefaultAllowedLevels(product);
+    const unique = Array.from(new Set((Array.isArray(levels) ? levels : []).filter((level) => ["high", "middle", "low"].includes(level))));
+    return (unique.length ? unique : fallback).sort((left, right) => getLevelOrder(left) - getLevelOrder(right));
+  }
+
+  function getProductAllowedLevels(product, catalogId) {
+    if (!product) {
+      return ["middle"];
+    }
+
+    const explicitCatalogId = catalogId || product.id;
+    const selection = explicitCatalogId ? state.productLevelSelections[explicitCatalogId] : null;
+    return sanitizeAllowedLevels(selection || product.allowedLevels, product);
+  }
+
+  function getLevelDescription(levels) {
+    return sanitizeAllowedLevels(levels, null).map(getLevelLabel).join(" + ");
+  }
+
+  function isLevelAllowedForProduct(product, level, catalogId) {
+    return getProductAllowedLevels(product, catalogId).includes(level);
+  }
+
+  function resolveLevelForPosition(yValue, allowedLevels, fallbackLevel) {
+    const levels = sanitizeAllowedLevels(allowedLevels, null);
+    const rawLevel = getLevelFromY(yValue);
+
+    if (levels.includes(rawLevel)) {
+      return rawLevel;
+    }
+
+    if (fallbackLevel && levels.includes(fallbackLevel)) {
+      return fallbackLevel;
+    }
+
+    const levelCenters = {
+      high: 16.666,
+      middle: 50,
+      low: 83.333,
+    };
+
+    return levels.reduce((closestLevel, level) => {
+      if (!closestLevel) {
+        return level;
+      }
+
+      const currentDistance = Math.abs(levelCenters[level] - yValue);
+      const closestDistance = Math.abs(levelCenters[closestLevel] - yValue);
+      return currentDistance < closestDistance ? level : closestLevel;
+    }, levels[0]);
+  }
+
+  function clampPositionToAllowedLevels(position, allowedLevels, fallbackLevel) {
     if (!position) {
       return null;
     }
 
-    const bounds = getLevelBounds(level);
+    const levels = sanitizeAllowedLevels(allowedLevels, null);
+    const minBound = levels.reduce((minValue, level) => Math.min(minValue, getLevelBounds(level).minY), freePositionLimits.maxY);
+    const maxBound = levels.reduce((maxValue, level) => Math.max(maxValue, getLevelBounds(level).maxY), freePositionLimits.minY);
+    const rawY = clamp(position.y, minBound, maxBound);
+    const resolvedLevel = resolveLevelForPosition(rawY, levels, fallbackLevel || levels[0]);
+    const bounds = getLevelBounds(resolvedLevel);
 
     return {
       x: clamp(position.x, freePositionLimits.minX, freePositionLimits.maxX),
-      y: clamp(position.y, bounds.minY, bounds.maxY),
-      level: level,
+      y: clamp(rawY, bounds.minY, bounds.maxY),
+      level: resolvedLevel,
     };
   }
 
@@ -1248,16 +1319,17 @@
 
   function normalizeBottlePosition(bottle, offsetIndex) {
     const product = getCatalogItem(bottle.catalogId);
-    const forcedLevel = product ? getProductPrimaryLevel(product) : (bottle.level || "middle");
-    const fallback = getDefaultBottlePosition(forcedLevel, product ? product.type : "Perfume", offsetIndex);
+    const allowedLevels = getProductAllowedLevels(product, bottle.catalogId);
+    const fallbackLevel = allowedLevels.includes(bottle.level) ? bottle.level : allowedLevels[0];
+    const fallback = getDefaultBottlePosition(fallbackLevel, product ? product.type : "Perfume", offsetIndex);
     const x = Number.isFinite(Number(bottle.x)) ? Number(bottle.x) : fallback.x;
     const y = Number.isFinite(Number(bottle.y)) ? Number(bottle.y) : fallback.y;
-    const constrained = clampPositionToLevel({ x, y }, forcedLevel);
+    const constrained = clampPositionToAllowedLevels({ x, y }, allowedLevels, fallbackLevel);
 
     return {
       x: constrained.x,
       y: constrained.y,
-      level: forcedLevel,
+      level: constrained.level,
     };
   }
 
@@ -1353,6 +1425,21 @@
     return ordered;
   }
 
+  function normalizeProductLevelSelections(selections, customerLibrary, layers) {
+    const normalizedLibrary = normalizeCustomerLibrary(customerLibrary, layers);
+    const source = selections && typeof selections === "object" ? selections : {};
+
+    return normalizedLibrary.reduce((accumulator, catalogId) => {
+      const product = getCatalogItem(catalogId);
+      if (!product) {
+        return accumulator;
+      }
+
+      accumulator[catalogId] = sanitizeAllowedLevels(source[catalogId], product);
+      return accumulator;
+    }, {});
+  }
+
   function resolveSnapshotLayers(snapshot) {
     const legacyOffsets = getSnapshotZoneLabelOffsets(snapshot);
     const hasLayers = snapshot && Array.isArray(snapshot.layers) && snapshot.layers.length > 0;
@@ -1387,6 +1474,7 @@
     activeLayer.bottles = cloneBottles(state.bottles);
     activeLayer.zoneLabelOffsets = cloneZoneLabelOffsets(state.zoneLabelOffsets);
     state.customerLibrary = normalizeCustomerLibrary(state.customerLibrary, state.layers);
+    state.productLevelSelections = normalizeProductLevelSelections(state.productLevelSelections, state.customerLibrary, state.layers);
   }
 
   function addCatalogToLibrary(catalogId) {
@@ -1395,6 +1483,7 @@
     }
 
     state.customerLibrary = normalizeCustomerLibrary(state.customerLibrary.concat(catalogId), state.layers);
+    state.productLevelSelections = normalizeProductLevelSelections(state.productLevelSelections, state.customerLibrary, state.layers);
   }
 
   function getSnapshotZoneLabelOffsets(snapshot) {
@@ -1440,6 +1529,7 @@
       lastName: state.lastName,
       search: state.search,
       customerLibrary: state.customerLibrary.slice(),
+      productLevelSelections: { ...state.productLevelSelections },
       layers: cloneLayers(state.layers),
       activeLayerId: state.activeLayerId,
       bottles: cloneBottles(state.bottles),
@@ -1464,6 +1554,7 @@
     state.lastName = snapshot.lastName || "";
     state.search = snapshot.search || "";
     state.customerLibrary = normalizeCustomerLibrary(snapshot.customerLibrary, nextLayers);
+    state.productLevelSelections = normalizeProductLevelSelections(snapshot.productLevelSelections, state.customerLibrary, nextLayers);
     state.layers = nextLayers;
     state.activeLayerId = activeLayer.id;
     state.bottles = cloneBottles(activeLayer.bottles);
@@ -1489,6 +1580,7 @@
       firstName: state.firstName.trim(),
       lastName: state.lastName.trim(),
       customerLibrary: state.customerLibrary.slice(),
+      productLevelSelections: { ...state.productLevelSelections },
       layers: cloneLayers(state.layers),
       activeLayerId: state.activeLayerId,
       bottles: cloneBottles(state.bottles),
@@ -1542,6 +1634,7 @@
             firstName: String(sheet.firstName || ""),
             lastName: String(sheet.lastName || ""),
             customerLibrary: normalizeCustomerLibrary(sheet.customerLibrary, nextLayers),
+            productLevelSelections: normalizeProductLevelSelections(sheet.productLevelSelections, sheet.customerLibrary, nextLayers),
             layers: nextLayers,
             activeLayerId: activeLayerId,
             bottles: cloneBottles(activeLayer.bottles),
@@ -1583,6 +1676,7 @@
       lastName: snapshot.lastName,
       search: "",
       customerLibrary: snapshot.customerLibrary,
+      productLevelSelections: snapshot.productLevelSelections,
       layers: snapshot.layers,
       activeLayerId: snapshot.activeLayerId,
       bottles: snapshot.bottles,
@@ -1601,6 +1695,7 @@
       lastName: "",
       search: "",
       customerLibrary: [],
+      productLevelSelections: {},
       layers: buildDefaultLayers(),
       activeLayerId: null,
       bottles: [],
@@ -1620,17 +1715,18 @@
     }
 
     addCatalogToLibrary(catalogId);
-    const primaryLevel = getProductPrimaryLevel(product);
+    const allowedLevels = getProductAllowedLevels(product, catalogId);
+    const chosenLevel = allowedLevels.includes(level) ? level : allowedLevels[0];
 
     bottleSeed += 1;
     const placementType = getPlacementType(product.type);
     const offsetIndex = state.bottles.filter((item) => {
       const itemProduct = getCatalogItem(item.catalogId);
-      return item.level === primaryLevel && itemProduct && getPlacementType(itemProduct.type) === placementType;
+      return item.level === chosenLevel && itemProduct && getPlacementType(itemProduct.type) === placementType;
     }).length;
     const bottlePosition = position
-      ? clampPositionToLevel(position, primaryLevel)
-      : getDefaultBottlePosition(primaryLevel, product.type, offsetIndex);
+      ? clampPositionToAllowedLevels(position, allowedLevels, chosenLevel)
+      : getDefaultBottlePosition(chosenLevel, product.type, offsetIndex);
 
     return {
       id: `bottle-${bottleSeed}`,
@@ -1671,14 +1767,19 @@
   }
 
   function renderProductLevelBadge(product, baseClass) {
-    const level = getProductPrimaryLevel(product);
+    return renderProductLevelBadges(product, product ? product.id : "", baseClass);
+  }
+
+  function renderProductLevelBadges(product, catalogId, baseClass) {
     const modifierBase = String(baseClass || "product-level-badge").split(/\s+/)[0];
 
-    return `
-      <span class="${escapeHtml(baseClass)} ${escapeHtml(`${modifierBase}--${level}`)}">
-        ${escapeHtml(`${getLevelLabel(level)} only`)}
-      </span>
-    `;
+    return getProductAllowedLevels(product, catalogId)
+      .map((level) => `
+        <span class="${escapeHtml(baseClass)} ${escapeHtml(`${modifierBase}--${level}`)}">
+          ${escapeHtml(getLevelLabel(level))}
+        </span>
+      `)
+      .join("");
   }
 
   function setPendingCatalog(catalogId) {
@@ -1819,6 +1920,7 @@
 
     const activeLayer = state.layers.find((entry) => entry.id === state.activeLayerId) || state.layers[0] || null;
     state.customerLibrary = state.customerLibrary.filter((entry) => entry !== catalogId);
+    delete state.productLevelSelections[catalogId];
     state.pendingCatalogId = state.pendingCatalogId === catalogId ? null : state.pendingCatalogId;
 
     if (activeLayer) {
@@ -1838,19 +1940,68 @@
     render();
   }
 
+  function setProductAllowedLevels(catalogId, nextLevels) {
+    const product = getCatalogItem(catalogId);
+    if (!product) {
+      return;
+    }
+
+    syncActiveLayerSnapshot();
+
+    state.productLevelSelections[catalogId] = sanitizeAllowedLevels(nextLevels, product);
+    state.productLevelSelections = normalizeProductLevelSelections(state.productLevelSelections, state.customerLibrary, state.layers);
+    state.layers = cloneLayers(state.layers);
+
+    const activeLayer = state.layers.find((entry) => entry.id === state.activeLayerId) || state.layers[0] || null;
+    if (activeLayer) {
+      state.activeLayerId = activeLayer.id;
+      state.bottles = cloneBottles(activeLayer.bottles);
+      state.zoneLabelOffsets = cloneZoneLabelOffsets(activeLayer.zoneLabelOffsets);
+    } else {
+      state.bottles = [];
+      state.zoneLabelOffsets = cloneZoneLabelOffsets({});
+    }
+
+    if (!state.bottles.some((bottle) => bottle.id === state.selectedBottleId)) {
+      state.selectedBottleId = null;
+    }
+
+    syncBottleSeed();
+    render();
+  }
+
+  function toggleProductAllowedLevel(catalogId, level) {
+    const product = getCatalogItem(catalogId);
+    if (!product) {
+      return;
+    }
+
+    const currentLevels = getProductAllowedLevels(product, catalogId);
+    const nextLevels = currentLevels.includes(level)
+      ? currentLevels.filter((entry) => entry !== level)
+      : currentLevels.concat(level);
+
+    if (nextLevels.length === 0) {
+      return;
+    }
+
+    setProductAllowedLevels(catalogId, nextLevels);
+  }
+
   function updateBottlePosition(bottle, position, fallbackLevel) {
     if (!bottle) {
       return;
     }
 
     const product = getCatalogItem(bottle.catalogId);
-    const forcedLevel = product ? getProductPrimaryLevel(product) : (fallbackLevel || bottle.level || "middle");
+    const allowedLevels = getProductAllowedLevels(product, bottle.catalogId);
+    const forcedLevel = allowedLevels.includes(fallbackLevel) ? fallbackLevel : (allowedLevels.includes(bottle.level) ? bottle.level : allowedLevels[0]);
 
     if (position) {
-      const nextPosition = clampPositionToLevel(position, forcedLevel);
+      const nextPosition = clampPositionToAllowedLevels(position, allowedLevels, forcedLevel);
       bottle.x = nextPosition.x;
       bottle.y = nextPosition.y;
-      bottle.level = forcedLevel;
+      bottle.level = nextPosition.level;
       return;
     }
 
@@ -1922,6 +2073,7 @@
     const selectedBottle = getSelectedBottle();
     const hasAction = Boolean(state.pendingCatalogId || selectedBottle);
     const hasDropAction = Boolean(dragCatalogId);
+    const activeCatalogId = dragCatalogId || state.pendingCatalogId || (selectedBottle ? selectedBottle.catalogId : "");
     const activeProduct = dragCatalogId
       ? getCatalogItem(dragCatalogId)
       : state.pendingCatalogId
@@ -1929,7 +2081,7 @@
         : selectedBottle
           ? getCatalogItem(selectedBottle.catalogId)
           : null;
-    const allowedLevel = activeProduct ? getProductPrimaryLevel(activeProduct) : null;
+    const allowedLevels = activeProduct ? getProductAllowedLevels(activeProduct, activeCatalogId) : [];
 
     documentStage.classList.toggle("is-actionable", hasAction);
     documentStage.classList.toggle("is-dragging-catalog", hasDropAction);
@@ -1937,13 +2089,13 @@
     levelRows.forEach((row) => {
       const rowLevel = row.getAttribute("data-level-row");
       row.classList.toggle("is-selected-level", Boolean(selectedBottle && rowLevel === selectedBottle.level));
-      row.classList.toggle("is-allowed-level", Boolean(activeProduct && rowLevel === allowedLevel));
-      row.classList.toggle("is-blocked-level", Boolean(activeProduct && rowLevel !== allowedLevel));
+      row.classList.toggle("is-allowed-level", Boolean(activeProduct && allowedLevels.includes(rowLevel)));
+      row.classList.toggle("is-blocked-level", Boolean(activeProduct && !allowedLevels.includes(rowLevel)));
     });
 
     placementTargets.forEach((button) => {
       const rowLevel = button.getAttribute("data-place-level");
-      const isAllowed = !activeProduct || rowLevel === allowedLevel;
+      const isAllowed = !activeProduct || allowedLevels.includes(rowLevel);
 
       if (!hasDropAction) {
         button.classList.remove("is-drop-target");
@@ -2020,15 +2172,15 @@
     }
 
     const product = getCatalogItem(bottle.catalogId);
-    const forcedLevel = getProductPrimaryLevel(product);
-    const constrained = clampPositionToLevel({
+    const allowedLevels = getProductAllowedLevels(product, bottle.catalogId);
+    const constrained = clampPositionToAllowedLevels({
       x: activeBottleDrag.startX + deltaX,
       y: activeBottleDrag.startY + deltaY,
-    }, forcedLevel);
+    }, allowedLevels, bottle.level);
 
     bottle.x = constrained.x;
     bottle.y = constrained.y;
-    bottle.level = forcedLevel;
+    bottle.level = constrained.level;
 
     if (event.currentTarget) {
       event.currentTarget.style.left = `${bottle.x}%`;
@@ -2310,8 +2462,8 @@
     const activeLayerLabel = activeLayer ? activeLayer.name : "Current layer";
 
     if (pendingProduct) {
-      const levelLabel = getLevelLabel(getProductPrimaryLevel(pendingProduct));
-      sheetStatus.textContent = `${pendingProduct.name} is in the customer library. It belongs to ${levelLabel} only, so place it in ${levelLabel} inside ${activeLayerLabel}.`;
+      const levelLabel = getLevelDescription(getProductAllowedLevels(pendingProduct, pendingProduct.id));
+      sheetStatus.textContent = `${pendingProduct.name} is in the customer library. It can be placed in ${levelLabel}, so choose one of those levels inside ${activeLayerLabel}.`;
       if (adjustLabelsButton) {
         adjustLabelsButton.hidden = true;
       }
@@ -2322,11 +2474,11 @@
     if (selectedBottle) {
       const product = getCatalogItem(selectedBottle.catalogId);
       const zoneNames = getBottleZoneNames(selectedBottle);
-      const levelLabel = getLevelLabel(getProductPrimaryLevel(product));
+      const levelLabel = getLevelDescription(getProductAllowedLevels(product, selectedBottle.catalogId));
 
       sheetStatus.textContent = zoneNames.length > 0
-        ? `${activeLayerLabel} · ${product.name} · ${levelLabel} only · Zones: ${zoneNames.join(", ")}. Drag it within ${levelLabel} and adjust the zone names if needed.`
-        : `${activeLayerLabel} · ${product.name} selected. This product belongs to ${levelLabel} only. Drag it within ${levelLabel}, then choose one or more spray zones.`;
+        ? `${activeLayerLabel} · ${product.name} · ${levelLabel} · Zones: ${zoneNames.join(", ")}. Drag it within the allowed levels and adjust the zone names if needed.`
+        : `${activeLayerLabel} · ${product.name} selected. This product can be used in ${levelLabel}. Drag it within the allowed levels, then choose one or more spray zones.`;
       if (adjustLabelsButton) {
         adjustLabelsButton.hidden = true;
         adjustLabelsButton.classList.remove("is-active");
@@ -2335,7 +2487,7 @@
       return;
     }
 
-    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library. Each product is marked for Head, Heart, or Base and can only be placed in that level.`;
+    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library. Products can be marked for one or several levels, such as Head + Heart.`;
     if (adjustLabelsButton) {
       adjustLabelsButton.hidden = true;
       adjustLabelsButton.classList.remove("is-active");
@@ -2488,16 +2640,35 @@
           : `
             <div class="library-owned-grid">
               ${ownedItems
-                .map((item) => `
+                .map((item) => {
+                  const allowedLevels = getProductAllowedLevels(item, item.id);
+
+                  return `
                   <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}">
                     <button class="panel-mini-action panel-mini-action-danger owned-card-remove" type="button" data-remove-library-product="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.name)} from customer library">Remove</button>
                     <button class="owned-card-select" type="button" draggable="true" data-library-product-id="${escapeHtml(item.id)}">
                       ${renderBottleVisual(item, "library-owned-bottle")}
                       <strong>${escapeHtml(item.name)}</strong>
-                      ${renderProductLevelBadge(item, "product-level-badge product-level-badge-library")}
+                      <span class="product-level-badges product-level-badges-library">
+                        ${renderProductLevelBadges(item, item.id, "product-level-badge product-level-badge-library")}
+                      </span>
                     </button>
+                    <div class="library-level-picker" aria-label="Allowed levels for ${escapeHtml(item.name)}">
+                      ${["high", "middle", "low"]
+                        .map((level) => `
+                          <button
+                            class="library-level-chip${allowedLevels.includes(level) ? " is-active" : ""}"
+                            type="button"
+                            data-toggle-level="${escapeHtml(item.id)}::${escapeHtml(level)}"
+                          >
+                            ${escapeHtml(getLevelLabel(level))}
+                          </button>
+                        `)
+                        .join("")}
+                    </div>
                   </article>
-                `)
+                `;
+                })
                 .join("")}
             </div>
           `
@@ -2512,9 +2683,7 @@
       button.addEventListener("dragstart", function (event) {
         dragCatalogId = button.getAttribute("data-library-product-id");
         documentStage.classList.add("is-dragging-catalog");
-        placementTargets.forEach((target) => {
-          target.disabled = false;
-        });
+        renderStageState();
 
         if (event.dataTransfer) {
           event.dataTransfer.effectAllowed = "copy";
@@ -2532,6 +2701,20 @@
     customerLibraryPanel.querySelectorAll("[data-remove-library-product]").forEach((button) => {
       button.addEventListener("click", function () {
         removeCatalogFromLibrary(button.getAttribute("data-remove-library-product"));
+      });
+    });
+
+    customerLibraryPanel.querySelectorAll("[data-toggle-level]").forEach((button) => {
+      button.addEventListener("click", function () {
+        const raw = button.getAttribute("data-toggle-level") || "";
+        const splitIndex = raw.lastIndexOf("::");
+        if (splitIndex <= 0) {
+          return;
+        }
+
+        const catalogId = raw.slice(0, splitIndex);
+        const level = raw.slice(splitIndex + 2);
+        toggleProductAllowedLevel(catalogId, level);
       });
     });
   }
@@ -2563,7 +2746,9 @@
               <strong>${escapeHtml(item.name)}</strong>
               <p>${renderProductMeta(item, "product-meta product-meta-card")}</p>
               <span class="product-card-flags">
-                ${renderProductLevelBadge(item, "product-level-badge")}
+                <span class="product-level-badges">
+                  ${renderProductLevelBadges(item, item.id, "product-level-badge")}
+                </span>
                 ${owned ? '<span class="product-owned-badge">In library</span>' : ""}
               </span>
             </span>
@@ -2582,9 +2767,7 @@
       button.addEventListener("dragstart", function (event) {
         dragCatalogId = button.getAttribute("data-product-id");
         documentStage.classList.add("is-dragging-catalog");
-        placementTargets.forEach((target) => {
-          target.disabled = false;
-        });
+        renderStageState();
 
         if (event.dataTransfer) {
           event.dataTransfer.effectAllowed = "copy";
@@ -2626,6 +2809,7 @@
       lastName: sheet.lastName || "",
       search: "",
       customerLibrary: normalizeCustomerLibrary(sheet.customerLibrary, nextLayers),
+      productLevelSelections: normalizeProductLevelSelections(sheet.productLevelSelections, sheet.customerLibrary, nextLayers),
       layers: nextLayers,
       activeLayerId: activeLayerId,
       bottles: cloneBottles(activeLayer.bottles),

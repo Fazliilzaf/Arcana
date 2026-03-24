@@ -428,7 +428,7 @@ input {
 
 .owned-card,
 .owned-empty {
-  min-height: 118px;
+  min-height: 154px;
   border: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 10px 24px rgba(75, 53, 37, 0.04);
@@ -482,8 +482,39 @@ input {
   text-wrap: balance;
 }
 
-.owned-card-select .product-level-badge {
+.owned-card-select .product-level-badges {
   margin-top: -2px;
+}
+
+.library-level-picker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
+.library-level-chip {
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.library-level-chip.is-active {
+  border-color: rgba(67, 50, 39, 0.18);
+  background: rgba(255, 252, 246, 0.94);
+  color: var(--ink);
+  box-shadow: 0 4px 10px rgba(75, 53, 37, 0.04);
 }
 
 .owned-card-remove {
@@ -1563,6 +1594,13 @@ input {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+.product-level-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .product-level-badge {
