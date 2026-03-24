@@ -2817,12 +2817,12 @@
                         data-open-level-picker="${escapeHtml(item.id)}"
                         aria-expanded="${isPopoverOpen ? "true" : "false"}"
                       >
-                        <span class="library-level-trigger-meta">Placement</span>
+                        <span class="library-level-trigger-meta">Layering levels</span>
                         <span class="library-level-trigger-value">${escapeHtml(getLevelDescription(allowedLevels))}</span>
                       </button>
                       ${isPopoverOpen ? `
                         <div class="library-level-popover" role="dialog" aria-label="Choose levels for ${escapeHtml(item.name)}">
-                          <p class="library-level-popover-title">Use this product in</p>
+                          <p class="library-level-popover-title">Choose Head, Heart, or Base</p>
                           <div class="library-level-picker">
                             ${["high", "middle", "low"]
                               .map((level) => `
