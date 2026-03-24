@@ -2629,16 +2629,12 @@
     const plannerContext = getPlannerContext();
     const activeProduct = plannerContext.product;
     const activeBottle = plannerContext.bottle;
-
-    if (!activeProduct) {
-      selectedBottlePanel.hidden = true;
-      selectedBottlePanel.innerHTML = "";
-      return;
-    }
-
+    const hasPlannerProduct = Boolean(activeProduct);
     const zoneGroups = getPlannerZoneGroups();
-    const allowedLevels = getProductAllowedLevels(activeProduct, activeBottle ? activeBottle.catalogId : activeProduct.id);
-    const plannerType = getPlacementType(activeProduct.type);
+    const allowedLevels = hasPlannerProduct
+      ? getProductAllowedLevels(activeProduct, activeBottle ? activeBottle.catalogId : activeProduct.id)
+      : [];
+    const plannerType = hasPlannerProduct ? getPlacementType(activeProduct.type) : "Perfume";
     const plannerTypeKey = plannerType === "Perfume" ? "perfume" : plannerType === "Oil" ? "oil" : "cream";
     const plannerTypeColumns = [
       {
@@ -2706,14 +2702,14 @@
                           return `
                             <div class="zone-planner-row zone-planner-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
                               <span class="zone-planner-area">${escapeHtml(zone.label)}:</span>
-                              <span class="zone-planner-product">${isAllowed ? escapeHtml(activeProduct.name) : ""}</span>
+                              <span class="zone-planner-product">${hasPlannerProduct && isAllowed ? escapeHtml(activeProduct.name) : ""}</span>
                               ${plannerTypeColumns
                                 .map((column) => {
                                   if (column.key !== plannerTypeKey) {
                                     return `<span class="zone-planner-cell zone-planner-cell-empty" aria-hidden="true"></span>`;
                                   }
 
-                                  if (!isAllowed) {
+                                  if (!hasPlannerProduct || !isAllowed) {
                                     return `
                                       <span class="zone-planner-cell zone-planner-cell-disabled" aria-hidden="true">
                                         <span class="zone-planner-check-box"></span>
@@ -3103,9 +3099,8 @@
 
   function render() {
     syncActiveLayerSnapshot();
-    const plannerContext = getPlannerContext();
     if (sheetApp) {
-      sheetApp.classList.toggle("is-reference-planner-active", Boolean(plannerContext.product));
+      sheetApp.classList.add("is-reference-planner-active");
     }
     renderStageState();
     renderBottles();
