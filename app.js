@@ -2812,7 +2812,7 @@
                   const isPopoverOpen = state.openLibraryLevelPickerId === item.id;
 
                   return `
-                  <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}">
+                  <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}${isPopoverOpen ? " is-level-open" : ""}">
                     <button class="panel-mini-action panel-mini-action-danger owned-card-remove" type="button" data-remove-library-product="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.name)} from customer library">Remove</button>
                     <button class="owned-card-select" type="button" draggable="true" data-library-product-id="${escapeHtml(item.id)}">
                       ${renderBottleVisual(item, "library-owned-bottle")}
