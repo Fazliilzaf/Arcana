@@ -582,11 +582,42 @@ input {
   text-align: center;
 }
 
+.library-level-chip--high {
+  border-color: rgba(204, 183, 88, 0.28);
+  background: rgba(248, 238, 170, 0.34);
+  color: rgba(92, 72, 33, 0.88);
+}
+
+.library-level-chip--middle {
+  border-color: rgba(203, 144, 112, 0.26);
+  background: rgba(248, 212, 190, 0.34);
+  color: rgba(104, 58, 39, 0.88);
+}
+
+.library-level-chip--low {
+  border-color: rgba(170, 156, 201, 0.28);
+  background: rgba(224, 217, 239, 0.38);
+  color: rgba(77, 62, 102, 0.88);
+}
+
 .library-level-chip.is-active {
-  border-color: rgba(67, 50, 39, 0.18);
-  background: rgba(255, 252, 246, 0.94);
   color: var(--ink);
   box-shadow: 0 6px 14px rgba(75, 53, 37, 0.08);
+}
+
+.library-level-chip--high.is-active {
+  border-color: rgba(198, 171, 58, 0.4);
+  background: rgba(247, 232, 120, 0.78);
+}
+
+.library-level-chip--middle.is-active {
+  border-color: rgba(198, 126, 87, 0.34);
+  background: rgba(245, 197, 171, 0.82);
+}
+
+.library-level-chip--low.is-active {
+  border-color: rgba(145, 126, 188, 0.34);
+  background: rgba(214, 205, 236, 0.84);
 }
 
 .owned-card-remove {

@@ -2830,11 +2830,11 @@
                         <div class="library-level-picker">
                           ${["high", "middle", "low"]
                             .map((level) => `
-                              <button
-                                class="library-level-chip${allowedLevels.includes(level) ? " is-active" : ""}"
-                                type="button"
-                                data-toggle-level="${escapeHtml(item.id)}::${escapeHtml(level)}"
-                              >
+                                <button
+                                  class="library-level-chip library-level-chip--${escapeHtml(level)}${allowedLevels.includes(level) ? " is-active" : ""}"
+                                  type="button"
+                                  data-toggle-level="${escapeHtml(item.id)}::${escapeHtml(level)}"
+                                >
                                 ${escapeHtml(getLevelLabel(level))}
                               </button>
                             `)
