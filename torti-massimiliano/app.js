@@ -7,6 +7,19 @@
     height: 1170,
   };
 
+  const LEVEL_LABELS = {
+    high: "Head",
+    middle: "Heart",
+    low: "Base",
+  };
+
+  const COLLECTION_PRIMARY_LEVELS = {
+    bianca: "high",
+    amber: "middle",
+    raw: "low",
+    skin: "low",
+  };
+
   const zones = [
     { id: "hair", label: "Spray Behind Neck and Hair", imageX: 80, imageY: 248, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -22, markerDy: -14 },
     { id: "neck", label: "Spray Shoulders", imageX: 58, imageY: 338, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -10 },
@@ -1053,6 +1066,66 @@
     return Math.min(maxValue, Math.max(minValue, value));
   }
 
+  function getLevelLabel(level) {
+    return LEVEL_LABELS[level] || LEVEL_LABELS.middle;
+  }
+
+  function getLevelBounds(level) {
+    switch (level) {
+      case "high":
+        return {
+          minY: freePositionLimits.minY,
+          maxY: 33.333,
+        };
+      case "middle":
+        return {
+          minY: 33.333,
+          maxY: 66.666,
+        };
+      case "low":
+      default:
+        return {
+          minY: 66.666,
+          maxY: freePositionLimits.maxY,
+        };
+    }
+  }
+
+  function getProductPrimaryLevel(product) {
+    if (!product) {
+      return "middle";
+    }
+
+    if (["high", "middle", "low"].includes(product.primaryLevel)) {
+      return product.primaryLevel;
+    }
+
+    const collectionKey = String(product.collection || "").trim().toLowerCase();
+    if (COLLECTION_PRIMARY_LEVELS[collectionKey]) {
+      return COLLECTION_PRIMARY_LEVELS[collectionKey];
+    }
+
+    return product.type === "Perfume" ? "middle" : "low";
+  }
+
+  function isLevelAllowedForProduct(product, level) {
+    return getProductPrimaryLevel(product) === level;
+  }
+
+  function clampPositionToLevel(position, level) {
+    if (!position) {
+      return null;
+    }
+
+    const bounds = getLevelBounds(level);
+
+    return {
+      x: clamp(position.x, freePositionLimits.minX, freePositionLimits.maxX),
+      y: clamp(position.y, bounds.minY, bounds.maxY),
+      level: level,
+    };
+  }
+
   function getLevelFromY(yValue) {
     if (yValue < 33.333) {
       return "high";
@@ -1175,14 +1248,16 @@
 
   function normalizeBottlePosition(bottle, offsetIndex) {
     const product = getCatalogItem(bottle.catalogId);
-    const fallback = getDefaultBottlePosition(bottle.level || "middle", product ? product.type : "Perfume", offsetIndex);
+    const forcedLevel = product ? getProductPrimaryLevel(product) : (bottle.level || "middle");
+    const fallback = getDefaultBottlePosition(forcedLevel, product ? product.type : "Perfume", offsetIndex);
     const x = Number.isFinite(Number(bottle.x)) ? Number(bottle.x) : fallback.x;
     const y = Number.isFinite(Number(bottle.y)) ? Number(bottle.y) : fallback.y;
+    const constrained = clampPositionToLevel({ x, y }, forcedLevel);
 
     return {
-      x: clamp(x, freePositionLimits.minX, freePositionLimits.maxX),
-      y: clamp(y, freePositionLimits.minY, freePositionLimits.maxY),
-      level: getLevelFromY(Number.isFinite(Number(bottle.y)) ? Number(bottle.y) : fallback.y),
+      x: constrained.x,
+      y: constrained.y,
+      level: forcedLevel,
     };
   }
 
@@ -1545,14 +1620,17 @@
     }
 
     addCatalogToLibrary(catalogId);
+    const primaryLevel = getProductPrimaryLevel(product);
 
     bottleSeed += 1;
     const placementType = getPlacementType(product.type);
     const offsetIndex = state.bottles.filter((item) => {
       const itemProduct = getCatalogItem(item.catalogId);
-      return item.level === level && itemProduct && getPlacementType(itemProduct.type) === placementType;
+      return item.level === primaryLevel && itemProduct && getPlacementType(itemProduct.type) === placementType;
     }).length;
-    const bottlePosition = position || getDefaultBottlePosition(level, product.type, offsetIndex);
+    const bottlePosition = position
+      ? clampPositionToLevel(position, primaryLevel)
+      : getDefaultBottlePosition(primaryLevel, product.type, offsetIndex);
 
     return {
       id: `bottle-${bottleSeed}`,
@@ -1588,6 +1666,17 @@
       <span class="${escapeHtml(baseClass)}">
         <span class="collection-mark ${escapeHtml(collectionClass)}" aria-hidden="true"></span>
         <span>${escapeHtml(product.type)}</span>
+      </span>
+    `;
+  }
+
+  function renderProductLevelBadge(product, baseClass) {
+    const level = getProductPrimaryLevel(product);
+    const modifierBase = String(baseClass || "product-level-badge").split(/\s+/)[0];
+
+    return `
+      <span class="${escapeHtml(baseClass)} ${escapeHtml(`${modifierBase}--${level}`)}">
+        ${escapeHtml(`${getLevelLabel(level)} only`)}
       </span>
     `;
   }
@@ -1754,18 +1843,21 @@
       return;
     }
 
+    const product = getCatalogItem(bottle.catalogId);
+    const forcedLevel = product ? getProductPrimaryLevel(product) : (fallbackLevel || bottle.level || "middle");
+
     if (position) {
-      bottle.x = clamp(position.x, freePositionLimits.minX, freePositionLimits.maxX);
-      bottle.y = clamp(position.y, freePositionLimits.minY, freePositionLimits.maxY);
-      bottle.level = getLevelFromY(bottle.y);
+      const nextPosition = clampPositionToLevel(position, forcedLevel);
+      bottle.x = nextPosition.x;
+      bottle.y = nextPosition.y;
+      bottle.level = forcedLevel;
       return;
     }
 
-    const product = getCatalogItem(bottle.catalogId);
-    const defaults = getDefaultBottlePosition(fallbackLevel || bottle.level || "middle", product ? product.type : "Perfume", 0);
+    const defaults = getDefaultBottlePosition(forcedLevel, product ? product.type : "Perfume", 0);
     bottle.x = Number.isFinite(Number(bottle.x)) ? Number(bottle.x) : defaults.x;
     bottle.y = defaults.y;
-    bottle.level = defaults.level;
+    bottle.level = forcedLevel;
   }
 
   function placeBottle(level, position) {
@@ -1830,19 +1922,35 @@
     const selectedBottle = getSelectedBottle();
     const hasAction = Boolean(state.pendingCatalogId || selectedBottle);
     const hasDropAction = Boolean(dragCatalogId);
+    const activeProduct = dragCatalogId
+      ? getCatalogItem(dragCatalogId)
+      : state.pendingCatalogId
+        ? getCatalogItem(state.pendingCatalogId)
+        : selectedBottle
+          ? getCatalogItem(selectedBottle.catalogId)
+          : null;
+    const allowedLevel = activeProduct ? getProductPrimaryLevel(activeProduct) : null;
 
     documentStage.classList.toggle("is-actionable", hasAction);
     documentStage.classList.toggle("is-dragging-catalog", hasDropAction);
 
     levelRows.forEach((row) => {
-      row.classList.toggle("is-selected-level", Boolean(selectedBottle && row.getAttribute("data-level-row") === selectedBottle.level));
+      const rowLevel = row.getAttribute("data-level-row");
+      row.classList.toggle("is-selected-level", Boolean(selectedBottle && rowLevel === selectedBottle.level));
+      row.classList.toggle("is-allowed-level", Boolean(activeProduct && rowLevel === allowedLevel));
+      row.classList.toggle("is-blocked-level", Boolean(activeProduct && rowLevel !== allowedLevel));
     });
 
     placementTargets.forEach((button) => {
+      const rowLevel = button.getAttribute("data-place-level");
+      const isAllowed = !activeProduct || rowLevel === allowedLevel;
+
       if (!hasDropAction) {
         button.classList.remove("is-drop-target");
       }
-      button.disabled = !(hasAction || hasDropAction);
+      button.classList.toggle("is-level-allowed", Boolean(activeProduct && isAllowed));
+      button.classList.toggle("is-level-blocked", Boolean(activeProduct && !isAllowed));
+      button.disabled = !(hasAction || hasDropAction) || !isAllowed;
     });
   }
 
@@ -1911,9 +2019,16 @@
       renderZoneLayer();
     }
 
-    bottle.x = clamp(activeBottleDrag.startX + deltaX, freePositionLimits.minX, freePositionLimits.maxX);
-    bottle.y = clamp(activeBottleDrag.startY + deltaY, freePositionLimits.minY, freePositionLimits.maxY);
-    bottle.level = getLevelFromY(bottle.y);
+    const product = getCatalogItem(bottle.catalogId);
+    const forcedLevel = getProductPrimaryLevel(product);
+    const constrained = clampPositionToLevel({
+      x: activeBottleDrag.startX + deltaX,
+      y: activeBottleDrag.startY + deltaY,
+    }, forcedLevel);
+
+    bottle.x = constrained.x;
+    bottle.y = constrained.y;
+    bottle.level = forcedLevel;
 
     if (event.currentTarget) {
       event.currentTarget.style.left = `${bottle.x}%`;
@@ -2195,7 +2310,8 @@
     const activeLayerLabel = activeLayer ? activeLayer.name : "Current layer";
 
     if (pendingProduct) {
-      sheetStatus.textContent = `${pendingProduct.name} is in the customer library. Click or drag it into ${activeLayerLabel}, then place it in Head, Heart, or Base on the sheet.`;
+      const levelLabel = getLevelLabel(getProductPrimaryLevel(pendingProduct));
+      sheetStatus.textContent = `${pendingProduct.name} is in the customer library. It belongs to ${levelLabel} only, so place it in ${levelLabel} inside ${activeLayerLabel}.`;
       if (adjustLabelsButton) {
         adjustLabelsButton.hidden = true;
       }
@@ -2206,10 +2322,11 @@
     if (selectedBottle) {
       const product = getCatalogItem(selectedBottle.catalogId);
       const zoneNames = getBottleZoneNames(selectedBottle);
+      const levelLabel = getLevelLabel(getProductPrimaryLevel(product));
 
       sheetStatus.textContent = zoneNames.length > 0
-        ? `${activeLayerLabel} · ${product.name} · Zones: ${zoneNames.join(", ")}. Drag the bottle anywhere on the sheet. You can also drag the zone names directly.`
-        : `${activeLayerLabel} · ${product.name} selected. Drag the bottle around the sheet, choose one or more spray zones, then drag the zone names if you want to reposition them.`;
+        ? `${activeLayerLabel} · ${product.name} · ${levelLabel} only · Zones: ${zoneNames.join(", ")}. Drag it within ${levelLabel} and adjust the zone names if needed.`
+        : `${activeLayerLabel} · ${product.name} selected. This product belongs to ${levelLabel} only. Drag it within ${levelLabel}, then choose one or more spray zones.`;
       if (adjustLabelsButton) {
         adjustLabelsButton.hidden = true;
         adjustLabelsButton.classList.remove("is-active");
@@ -2218,7 +2335,7 @@
       return;
     }
 
-    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library, then place it in Head, Heart, or Base and move it freely on the sheet.`;
+    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library. Each product is marked for Head, Heart, or Base and can only be placed in that level.`;
     if (adjustLabelsButton) {
       adjustLabelsButton.hidden = true;
       adjustLabelsButton.classList.remove("is-active");
@@ -2377,6 +2494,7 @@
                     <button class="owned-card-select" type="button" draggable="true" data-library-product-id="${escapeHtml(item.id)}">
                       ${renderBottleVisual(item, "library-owned-bottle")}
                       <strong>${escapeHtml(item.name)}</strong>
+                      ${renderProductLevelBadge(item, "product-level-badge product-level-badge-library")}
                     </button>
                   </article>
                 `)
@@ -2444,7 +2562,10 @@
             <span class="product-copy">
               <strong>${escapeHtml(item.name)}</strong>
               <p>${renderProductMeta(item, "product-meta product-meta-card")}</p>
-              ${owned ? '<span class="product-owned-badge">In library</span>' : ""}
+              <span class="product-card-flags">
+                ${renderProductLevelBadge(item, "product-level-badge")}
+                ${owned ? '<span class="product-owned-badge">In library</span>' : ""}
+              </span>
             </span>
           </button>
         `;
@@ -2687,17 +2808,23 @@
     });
   }
 
-  saveSheetButton.addEventListener("click", function () {
-    saveCurrentSheet();
-  });
+  if (saveSheetButton) {
+    saveSheetButton.addEventListener("click", function () {
+      saveCurrentSheet();
+    });
+  }
 
-  newSheetButton.addEventListener("click", function () {
-    createNewSheet();
-  });
+  if (newSheetButton) {
+    newSheetButton.addEventListener("click", function () {
+      createNewSheet();
+    });
+  }
 
-  downloadSavedButton.addEventListener("click", function () {
-    exportSavedSheets(downloadSavedButton);
-  });
+  if (downloadSavedButton) {
+    downloadSavedButton.addEventListener("click", function () {
+      exportSavedSheets(downloadSavedButton);
+    });
+  }
 
   placementTargets.forEach((button) => {
     button.addEventListener("click", function (event) {
