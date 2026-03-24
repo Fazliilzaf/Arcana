@@ -147,15 +147,15 @@
   };
 
   const zones = [
-    { id: "hair", label: "Spray Behind Neck and Hair", imageX: 80, imageY: 248, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -22, markerDy: -14 },
-    { id: "neck", label: "Spray Shoulders", imageX: 58, imageY: 338, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -10 },
-    { id: "shoulders", label: "Spray Chest", imageX: 77, imageY: 472, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -10 },
-    { id: "chest", label: "Spray Abdomen", imageX: 77, imageY: 574, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -8 },
-    { id: "solar", label: "Spray Arms/Elbows", imageX: 52, imageY: 646, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -6 },
-    { id: "arm", label: "Spray Hips", imageX: 77, imageY: 726, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -6 },
-    { id: "lower_back", label: "Spray Laps", imageX: 77, imageY: 838, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -6 },
-    { id: "root", label: "Spray Behind your Knees", imageX: 73, imageY: 965, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -4 },
-    { id: "ankles", label: "Spray Behind your Calfs", imageX: 82, imageY: 1060, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -4 },
+    { id: "hair", label: "Spray Behind Neck and Hair", level: "high", imageX: 80, imageY: 248, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -22, markerDy: -14 },
+    { id: "neck", label: "Spray Shoulders", level: "high", imageX: 58, imageY: 338, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -10 },
+    { id: "shoulders", label: "Spray Chest", level: "high", imageX: 77, imageY: 472, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -10 },
+    { id: "chest", label: "Spray Abdomen", level: "middle", imageX: 77, imageY: 574, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -8 },
+    { id: "solar", label: "Spray Arms/Elbows", level: "middle", imageX: 52, imageY: 646, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -6 },
+    { id: "arm", label: "Spray Hips", level: "low", imageX: 77, imageY: 726, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -6 },
+    { id: "lower_back", label: "Spray Laps", level: "low", imageX: 77, imageY: 838, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -6 },
+    { id: "root", label: "Spray Behind your Knees", level: "low", imageX: 73, imageY: 965, labelDx: 0, labelDy: 0, labelAnchor: "end", markerDx: 20, markerDy: -4 },
+    { id: "ankles", label: "Spray Behind your Calfs", level: "low", imageX: 82, imageY: 1060, labelDx: 0, labelDy: 0, labelAnchor: "start", markerDx: -20, markerDy: -4 },
   ];
 
   const catalog = [
@@ -1427,6 +1427,30 @@
       .filter(Boolean);
   }
 
+  function getVisibleZoneGroups(product, bottle) {
+    const allowedLevels = sanitizeAllowedLevels(
+      getProductAllowedLevels(product, bottle ? bottle.catalogId : product ? product.id : ""),
+      product
+    );
+    const selectedLevels = bottle && Array.isArray(bottle.zones)
+      ? bottle.zones
+          .map((zoneId) => getZone(zoneId))
+          .filter(Boolean)
+          .map((zone) => zone.level)
+      : [];
+    const visibleLevels = Array.from(new Set(allowedLevels.concat(selectedLevels)))
+      .filter((level) => ["high", "middle", "low"].includes(level))
+      .sort((left, right) => getLevelOrder(left) - getLevelOrder(right));
+
+    return visibleLevels
+      .map((level) => ({
+        level,
+        label: getLevelLabel(level),
+        zones: zones.filter((zone) => zone.level === level),
+      }))
+      .filter((group) => group.zones.length > 0);
+  }
+
   function getCompactZoneLabel(label) {
     return String(label || "").replace(/^Spray\s+/i, "").trim();
   }
@@ -2572,6 +2596,7 @@
 
     const product = getCatalogItem(selectedBottle.catalogId);
     const zoneNames = getBottleZoneNames(selectedBottle);
+    const zoneGroups = getVisibleZoneGroups(product, selectedBottle);
 
     selectedBottlePanel.hidden = false;
     selectedBottlePanel.innerHTML = `
@@ -2584,21 +2609,36 @@
               <h3>${escapeHtml(product.name)}</h3>
             </div>
           </div>
-          <p class="zone-editor-note">Drag the bottle anywhere on the sheet, then choose one or more spray zones. The body map updates automatically.</p>
+          <p class="zone-editor-note">Choose the exact spray areas inside the allowed layering sections. The body map updates automatically.</p>
         </div>
-        <div class="zone-editor-grid">
-          ${zones
-            .map((zone) => {
-              const selected = selectedBottle.zones.includes(zone.id);
+        <div class="zone-plan-groups">
+          ${zoneGroups
+            .map((group) => `
+              <section class="zone-plan-group zone-plan-group--${escapeHtml(group.level)}">
+                <div class="zone-plan-group-head">
+                  <span class="zone-plan-level">${escapeHtml(group.label)}</span>
+                  <span class="zone-plan-count">${escapeHtml(`${group.zones.length} areas`)}</span>
+                </div>
+                <div class="zone-plan-rows">
+                  ${group.zones
+                    .map((zone) => {
+                      const selected = selectedBottle.zones.includes(zone.id);
 
-              return `
-                <label class="zone-check-item${selected ? " is-selected" : ""}">
-                  <input class="zone-check-input" type="checkbox" data-zone-check="${escapeHtml(zone.id)}" ${selected ? "checked" : ""} />
-                  <span class="zone-check-box" aria-hidden="true"></span>
-                  <span class="zone-check-label">${escapeHtml(zone.label)}</span>
-                </label>
-              `;
-            })
+                      return `
+                        <label class="zone-plan-row${selected ? " is-selected" : ""}">
+                          <span class="zone-plan-row-label">${escapeHtml(zone.label)}</span>
+                          <span class="zone-plan-row-product">${escapeHtml(product.name)}</span>
+                          <span class="zone-plan-row-check">
+                            <input class="zone-check-input" type="checkbox" data-zone-check="${escapeHtml(zone.id)}" ${selected ? "checked" : ""} />
+                            <span class="zone-check-box" aria-hidden="true"></span>
+                          </span>
+                        </label>
+                      `;
+                    })
+                    .join("")}
+                </div>
+              </section>
+            `)
             .join("")}
         </div>
         <p class="zone-editor-summary">

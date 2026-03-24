@@ -1556,30 +1556,85 @@ input {
   line-height: 1.5;
 }
 
-.zone-editor-grid {
+.zone-plan-groups {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px 12px;
-  margin-top: 14px;
+  gap: 14px;
+  margin-top: 16px;
 }
 
-.zone-check-item {
-  position: relative;
+.zone-plan-group {
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 10px 24px rgba(75, 53, 37, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.zone-plan-group--high {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 241, 0.96), rgba(247, 238, 186, 0.32));
+}
+
+.zone-plan-group--middle {
+  background:
+    linear-gradient(180deg, rgba(255, 249, 244, 0.96), rgba(244, 210, 192, 0.34));
+}
+
+.zone-plan-group--low {
+  background:
+    linear-gradient(180deg, rgba(251, 247, 252, 0.96), rgba(228, 220, 232, 0.38));
+}
+
+.zone-plan-group-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  border: 1px solid var(--line-soft);
-  background: rgba(255, 255, 255, 0.74);
-  padding: 0 12px;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(75, 53, 37, 0.03);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(88, 63, 46, 0.08);
 }
 
-.zone-check-item.is-selected {
-  border-color: rgba(67, 50, 39, 0.28);
-  background: rgba(255, 252, 246, 0.96);
-  box-shadow: 0 12px 22px rgba(75, 53, 37, 0.05);
+.zone-plan-level {
+  color: var(--ink);
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.zone-plan-count {
+  color: var(--muted);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.zone-plan-rows {
+  display: grid;
+}
+
+.zone-plan-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(108px, 0.9fr) 54px;
+  align-items: center;
+  gap: 14px;
+  min-height: 66px;
+  padding: 0 16px;
+  border-top: 1px solid rgba(88, 63, 46, 0.08);
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.44);
+}
+
+.zone-plan-row:first-child {
+  border-top: 0;
+}
+
+.zone-plan-row.is-selected {
+  background: rgba(255, 252, 246, 0.72);
 }
 
 .zone-check-input {
@@ -1589,23 +1644,45 @@ input {
   cursor: pointer;
 }
 
+.zone-plan-row-label {
+  color: var(--ink);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.zone-plan-row-product {
+  color: var(--text);
+  font-size: 0.66rem;
+  line-height: 1.25;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-align: center;
+}
+
+.zone-plan-row-check {
+  justify-self: end;
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+}
+
 .zone-check-box {
-  width: 13px;
-  height: 13px;
+  width: 28px;
+  height: 28px;
   border: 1px solid rgba(74, 56, 44, 0.48);
   background: rgba(255, 252, 247, 0.96);
   flex-shrink: 0;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 2px 6px rgba(75, 53, 37, 0.05);
 }
 
-.zone-check-item.is-selected .zone-check-box {
+.zone-plan-row.is-selected .zone-check-box {
   background: rgba(46, 33, 25, 0.9);
   box-shadow: inset 0 0 0 2px rgba(255, 252, 247, 0.7);
-}
-
-.zone-check-label {
-  color: var(--ink);
-  font-size: 0.8rem;
-  line-height: 1.25;
 }
 
 .zone-editor-summary {
@@ -1788,8 +1865,11 @@ input {
     gap: 12px;
   }
 
-  .zone-editor-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .zone-plan-row {
+    grid-template-columns: minmax(0, 1fr) 94px 46px;
+    gap: 10px;
+    min-height: 58px;
+    padding: 0 14px;
   }
 
   .sheet-actions {
@@ -1841,6 +1921,22 @@ input {
 
   .layers-stack {
     grid-template-columns: 1fr;
+  }
+
+  .zone-plan-group-head {
+    padding: 12px 14px 10px;
+  }
+
+  .zone-plan-row {
+    grid-template-columns: minmax(0, 1fr) 82px 42px;
+    gap: 8px;
+    min-height: 54px;
+    padding: 0 12px;
+  }
+
+  .zone-plan-row-product {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
   }
 
   .sheet-actions {
