@@ -14,7 +14,7 @@
     href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@400;500;600;700&display=swap"
     rel="stylesheet"
   />
-  <link rel="stylesheet" href="./styles.css?v=20260324-zone-planner-groups" />
+  <link rel="stylesheet" href="./styles.css?v=20260324-zone-planner-near-library" />
 </head>
 <body>
   <main class="sheet-app" data-export-root>
@@ -49,8 +49,9 @@
     </section>
 
     <section class="composition-strip" data-pdf-exclude>
-      <section class="layers-panel" data-layers-panel></section>
       <section class="customer-library" data-customer-library></section>
+      <section class="zone-editor" data-selected-bottle-panel data-pdf-exclude hidden></section>
+      <section class="layers-panel" data-layers-panel></section>
     </section>
 
     <section class="sheet-document">
@@ -114,8 +115,6 @@
       </div>
     </section>
 
-    <section class="zone-editor" data-selected-bottle-panel data-pdf-exclude hidden></section>
-
     <section class="library-strip" data-pdf-exclude>
       <div class="library-head">
         <div class="library-copy">
@@ -139,6 +138,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
-  <script src="./app.js?v=20260324-zone-planner-groups"></script>
+  <script src="./app.js?v=20260324-zone-planner-near-library"></script>
 </body>
 </html>

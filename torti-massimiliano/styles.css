@@ -214,7 +214,8 @@ input {
 }
 
 .customer-library,
-.layers-panel {
+.layers-panel,
+.zone-editor {
   border: 1px solid var(--line-soft);
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 12px 28px rgba(75, 53, 37, 0.04);
@@ -225,8 +226,13 @@ input {
   order: 1;
 }
 
-.layers-panel {
+.zone-editor {
   order: 2;
+  margin-top: 0;
+}
+
+.layers-panel {
+  order: 3;
 }
 
 .layers-panel {
@@ -1508,13 +1514,9 @@ input {
   line-height: 1.55;
 }
 
-.zone-editor {
-  margin-top: 16px;
-}
-
 .zone-editor-card {
-  border-top: 1px solid var(--line-soft);
-  padding-top: 16px;
+  border-top: 0;
+  padding-top: 0;
 }
 
 .zone-editor-head {
