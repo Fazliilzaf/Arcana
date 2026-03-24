@@ -1016,6 +1016,7 @@
   let suppressBottleClickId = null;
 
   const exportRoot = document.querySelector("[data-export-root]");
+  const sheetApp = document.querySelector(".sheet-app");
   const sheetDocument = document.querySelector(".sheet-document");
   const firstNameInput = document.querySelector("[data-first-name]");
   const lastNameInput = document.querySelector("[data-last-name]");
@@ -1399,6 +1400,29 @@
     return getBottle(state.selectedBottleId);
   }
 
+  function getPlannerContext() {
+    const selectedBottle = getSelectedBottle();
+    if (selectedBottle) {
+      return {
+        product: getCatalogItem(selectedBottle.catalogId),
+        bottle: selectedBottle,
+      };
+    }
+
+    const libraryCatalogId = state.pendingCatalogId || state.openLibraryLevelPickerId || state.customerLibrary[0] || "";
+    if (!libraryCatalogId) {
+      return {
+        product: null,
+        bottle: null,
+      };
+    }
+
+    return {
+      product: getCatalogItem(libraryCatalogId),
+      bottle: state.bottles.find((entry) => entry.catalogId === libraryCatalogId) || null,
+    };
+  }
+
   function getZone(zoneId) {
     return zones.find((zone) => zone.id === zoneId);
   }
@@ -1427,22 +1451,8 @@
       .filter(Boolean);
   }
 
-  function getVisibleZoneGroups(product, bottle) {
-    const allowedLevels = sanitizeAllowedLevels(
-      getProductAllowedLevels(product, bottle ? bottle.catalogId : product ? product.id : ""),
-      product
-    );
-    const selectedLevels = bottle && Array.isArray(bottle.zones)
-      ? bottle.zones
-          .map((zoneId) => getZone(zoneId))
-          .filter(Boolean)
-          .map((zone) => zone.level)
-      : [];
-    const visibleLevels = Array.from(new Set(allowedLevels.concat(selectedLevels)))
-      .filter((level) => ["high", "middle", "low"].includes(level))
-      .sort((left, right) => getLevelOrder(left) - getLevelOrder(right));
-
-    return visibleLevels
+  function getPlannerZoneGroups() {
+    return ["high", "middle", "low"]
       .map((level) => ({
         level,
         label: getLevelLabel(level),
@@ -2242,7 +2252,37 @@
   }
 
   function toggleZone(zoneId) {
-    const bottle = getSelectedBottle();
+    let bottle = getSelectedBottle();
+    const zone = getZone(zoneId);
+    const plannerContext = getPlannerContext();
+    const fallbackCatalogId = state.pendingCatalogId || (plannerContext.product ? plannerContext.product.id : "");
+
+    if (!bottle && fallbackCatalogId && zone) {
+      const pendingProduct = getCatalogItem(fallbackCatalogId);
+      const allowedLevels = getProductAllowedLevels(pendingProduct, fallbackCatalogId);
+      const fallbackLevel = allowedLevels.includes(zone.level) ? zone.level : allowedLevels[0];
+      const existingBottle = state.bottles.find((entry) => {
+        if (entry.catalogId !== fallbackCatalogId) {
+          return false;
+        }
+
+        const entryProduct = getCatalogItem(entry.catalogId);
+        return isLevelAllowedForProduct(entryProduct, zone.level, entry.catalogId);
+      });
+
+      bottle = existingBottle || createBottle(fallbackCatalogId, fallbackLevel);
+      if (!bottle) {
+        return;
+      }
+
+      if (!existingBottle) {
+        state.bottles.push(bottle);
+      }
+
+      state.pendingCatalogId = null;
+      state.selectedBottleId = bottle.id;
+    }
+
     if (!bottle) {
       return;
     }
@@ -2586,18 +2626,19 @@
       return;
     }
 
-    const selectedBottle = getSelectedBottle();
+    const plannerContext = getPlannerContext();
+    const activeProduct = plannerContext.product;
+    const activeBottle = plannerContext.bottle;
 
-    if (!selectedBottle) {
+    if (!activeProduct) {
       selectedBottlePanel.hidden = true;
       selectedBottlePanel.innerHTML = "";
       return;
     }
 
-    const product = getCatalogItem(selectedBottle.catalogId);
-    const zoneNames = getBottleZoneNames(selectedBottle);
-    const zoneGroups = getVisibleZoneGroups(product, selectedBottle);
-    const plannerType = getPlacementType(product.type);
+    const zoneGroups = getPlannerZoneGroups();
+    const allowedLevels = getProductAllowedLevels(activeProduct, activeBottle ? activeBottle.catalogId : activeProduct.id);
+    const plannerType = getPlacementType(activeProduct.type);
     const plannerTypeKey = plannerType === "Perfume" ? "perfume" : plannerType === "Oil" ? "oil" : "cream";
     const plannerTypeColumns = [
       {
@@ -2659,16 +2700,25 @@
                     <section class="zone-planner-group zone-planner-group--${escapeHtml(group.level)}" data-zone-group="${escapeHtml(group.level)}">
                       ${group.zones
                         .map((zone) => {
-                          const selected = selectedBottle.zones.includes(zone.id);
+                          const selected = Boolean(activeBottle && activeBottle.zones.includes(zone.id));
+                          const isAllowed = allowedLevels.includes(group.level);
 
                           return `
-                            <div class="zone-planner-row zone-planner-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}">
+                            <div class="zone-planner-row zone-planner-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
                               <span class="zone-planner-area">${escapeHtml(zone.label)}:</span>
-                              <span class="zone-planner-product">${escapeHtml(product.name)}</span>
+                              <span class="zone-planner-product">${isAllowed ? escapeHtml(activeProduct.name) : ""}</span>
                               ${plannerTypeColumns
                                 .map((column) => {
                                   if (column.key !== plannerTypeKey) {
                                     return `<span class="zone-planner-cell zone-planner-cell-empty" aria-hidden="true"></span>`;
+                                  }
+
+                                  if (!isAllowed) {
+                                    return `
+                                      <span class="zone-planner-cell zone-planner-cell-disabled" aria-hidden="true">
+                                        <span class="zone-planner-check-box"></span>
+                                      </span>
+                                    `;
                                   }
 
                                   return `
@@ -2689,30 +2739,14 @@
               </div>
             </section>
             <aside class="zone-planner-notes">
-              ${zoneGroups
-                .map((group) => `
-                  <section class="zone-planner-note zone-planner-note--${escapeHtml(group.level)}" style="--planner-group-rows:${escapeHtml(String(group.zones.length))}">
-                    <p>${escapeHtml(plannerNarratives[group.level] || "")}</p>
-                  </section>
-                `)
+                ${zoneGroups
+                  .map((group) => `
+                    <section class="zone-planner-note zone-planner-note--${escapeHtml(group.level)}" style="--planner-group-rows:${escapeHtml(String(group.zones.length))}">
+                      <p>${escapeHtml(plannerNarratives[group.level] || "")}</p>
+                    </section>
+                  `)
                 .join("")}
             </aside>
-          </div>
-          <div class="zone-planner-footer">
-            <div class="zone-planner-current-product">
-              ${renderBottleVisual(product, "zone-planner-current-bottle")}
-              <div class="zone-planner-current-copy">
-                <span>Current product</span>
-                <strong>${escapeHtml(product.name)}</strong>
-              </div>
-            </div>
-            <p class="zone-editor-summary">
-              ${
-                zoneNames.length > 0
-                  ? `Spray zones: ${escapeHtml(zoneNames.join(", "))}`
-                  : "No spray zones selected yet."
-              }
-            </p>
           </div>
           <div class="zone-planner-rail zone-planner-rail--bottom" aria-hidden="true"></div>
         </div>
@@ -2727,8 +2761,9 @@
   }
 
   function renderStatus() {
-    const pendingProduct = getCatalogItem(state.pendingCatalogId);
-    const selectedBottle = getSelectedBottle();
+    const plannerContext = getPlannerContext();
+    const pendingProduct = state.pendingCatalogId ? getCatalogItem(state.pendingCatalogId) : null;
+    const selectedBottle = plannerContext.bottle;
     const activeLayer = getActiveLayer();
     const activeLayerLabel = activeLayer ? activeLayer.name : "Current layer";
 
@@ -3068,6 +3103,10 @@
 
   function render() {
     syncActiveLayerSnapshot();
+    const plannerContext = getPlannerContext();
+    if (sheetApp) {
+      sheetApp.classList.toggle("is-reference-planner-active", Boolean(plannerContext.product));
+    }
     renderStageState();
     renderBottles();
     renderZoneLayer();
