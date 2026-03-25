@@ -1471,11 +1471,20 @@
     return PLANNER_TYPE_COLUMNS
       .map((column) => `
         <span class="zone-planner-col-type zone-planner-col-type--${escapeHtml(column.iconClass)}">
-          <span class="zone-planner-type-bottle ${escapeHtml(column.iconClass)}" aria-hidden="true"></span>
+          ${renderPlannerTypeHeaderVisual(column.key, column.iconClass)}
           <span class="zone-planner-col-type-label">${escapeHtml(column.label)}</span>
         </span>
       `)
       .join("");
+  }
+
+  function renderPlannerTypeHeaderVisual(typeKey, fallbackIconClass) {
+    const sampleProduct = catalog.find((item) => getPlacementType(item.type) === typeKey && item.image);
+    if (sampleProduct) {
+      return renderBottleVisual(sampleProduct, "zone-planner-type-bottle");
+    }
+
+    return `<span class="zone-planner-type-bottle ${escapeHtml(fallbackIconClass)}" aria-hidden="true"></span>`;
   }
 
   function getCompactZoneLabel(label) {
