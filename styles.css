@@ -1631,17 +1631,18 @@ input {
 
 .zone-planner-overlay-rows {
   position: absolute;
-  left: 41.4%;
-  top: 38.1%;
-  width: 49.2%;
-  height: 59.9%;
+  left: 39.2%;
+  top: 37.9%;
+  width: 43.5%;
+  height: 60.1%;
   display: grid;
   grid-template-rows: repeat(9, 1fr);
+  gap: 0;
 }
 
 .zone-planner-overlay-row {
   display: grid;
-  grid-template-columns: 58% 14% 14% 14%;
+  grid-template-columns: 36% 28% 12% 12% 12%;
   align-items: center;
 }
 
@@ -1649,6 +1650,7 @@ input {
   opacity: 0.84;
 }
 
+.zone-planner-area,
 .zone-planner-overlay-product {
   display: flex;
   align-items: center;
@@ -1660,11 +1662,10 @@ input {
   background: rgba(251, 249, 244, 0.995);
   color: rgba(52, 38, 30, 0.96);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.2px, 0.74cqi, 7.2px);
+  font-size: clamp(3.9px, 0.68cqi, 6.5px);
   line-height: 1.05;
   font-weight: 600;
   letter-spacing: 0.045em;
-  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1673,6 +1674,12 @@ input {
     0 0 3px rgba(251, 249, 244, 0.98),
     0 0 6px rgba(251, 249, 244, 0.98);
   box-shadow: 0 0 0 0.32cqi rgba(251, 249, 244, 0.995);
+}
+
+.zone-planner-area {
+  font-size: clamp(3.7px, 0.63cqi, 5.8px);
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .zone-planner-overlay-product.is-empty {
@@ -1705,6 +1712,38 @@ input {
 .zone-planner-overlay-cell--mask,
 .zone-planner-overlay-cell--disabled {
   pointer-events: none;
+}
+
+.zone-planner-overlay-notes {
+  position: absolute;
+  left: 82.8%;
+  top: 37.8%;
+  width: 14.2%;
+  height: 60.2%;
+  display: grid;
+  grid-template-rows: 3fr 2fr 4fr;
+  gap: 0;
+}
+
+.zone-planner-overlay-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5%;
+}
+
+.zone-planner-overlay-note p {
+  margin: 0;
+  padding: 0.55cqi 0.7cqi;
+  background: rgba(251, 249, 244, 0.995);
+  box-shadow: 0 0 0 0.28cqi rgba(251, 249, 244, 0.995);
+  color: rgba(52, 38, 30, 0.95);
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(3.8px, 0.62cqi, 5.8px);
+  line-height: 1.15;
+  font-weight: 500;
+  text-align: center;
+  text-wrap: balance;
 }
 
 .zone-planner-overlay-checkbox {
