@@ -1581,43 +1581,47 @@ input {
   display: none;
 }
 
+.sheet-app.is-reference-planner-active {
+  width: min(calc(100% - 32px), 1480px);
+}
+
 .zone-editor-card {
   position: relative;
   overflow: hidden;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 28px;
   border: 0;
-  background: #fffdf9;
-  box-shadow: 0 18px 42px rgba(72, 52, 34, 0.05);
+  background: #692517;
+  box-shadow: 0 24px 52px rgba(72, 52, 34, 0.12);
+}
+
+.zone-planner-frame {
+  padding: 34px 38px 38px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: #692517;
+  box-shadow: 0 24px 52px rgba(72, 52, 34, 0.12);
 }
 
 .zone-planner-sheet {
-  --planner-row-height: 72px;
+  --planner-row-height: 52px;
   position: relative;
   display: grid;
-  gap: 28px;
-  padding: 82px 36px 58px;
+  gap: 24px;
+  min-height: 760px;
+  padding: 40px 38px 32px;
+  background: #fffdf9;
 }
 
 .zone-planner-rail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 44px;
-  background:
-    linear-gradient(180deg, rgba(105, 35, 24, 0.98), rgba(88, 28, 18, 0.98));
-}
-
-.zone-planner-rail--top {
-  top: 0;
-}
-
-.zone-planner-rail--bottom {
-  bottom: 0;
+  display: none;
 }
 
 .zone-planner-brand {
   display: grid;
-  gap: 12px;
-  padding-left: 40px;
+  justify-items: center;
+  text-align: center;
+  gap: 4px;
 }
 
 .zone-planner-brand h3,
@@ -1629,93 +1633,167 @@ input {
 }
 
 .zone-planner-brand h3 {
-  font-size: clamp(2.4rem, 3.2vw, 3.2rem);
+  font-size: clamp(2.18rem, 2.5vw, 2.62rem);
   line-height: 0.92;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .zone-planner-brand p {
-  font-size: clamp(1.32rem, 1.9vw, 1.7rem);
+  font-size: clamp(1.1rem, 1.35vw, 1.36rem);
   line-height: 1;
   letter-spacing: 0.02em;
 }
 
 .zone-planner-layout {
   display: grid;
-  grid-template-columns: 174px minmax(0, 1fr) 280px;
-  gap: 22px;
+  grid-template-columns: 332px minmax(0, 628px) minmax(220px, 244px);
+  justify-content: center;
+  gap: 18px;
   align-items: start;
 }
 
 .zone-planner-figure {
   position: relative;
-  min-height: 760px;
-  overflow: hidden;
-  border-right: 0;
+  min-height: 618px;
+  overflow: visible;
+}
+
+.zone-planner-figure::before {
+  content: "";
+  position: absolute;
+  left: 206px;
+  top: 164px;
+  width: 2px;
+  height: 470px;
+  background: rgba(58, 43, 33, 0.74);
+  transform: rotate(28deg);
+  transform-origin: top center;
+  z-index: 3;
 }
 
 .zone-planner-figure::after {
   content: "";
   position: absolute;
-  inset: 72px 0 0;
+  left: 138px;
+  top: 170px;
+  width: 186px;
+  height: 470px;
   background:
     repeating-linear-gradient(
       to bottom,
       transparent 0 calc(var(--planner-row-height) - 1px),
-      rgba(88, 63, 46, 0.16) calc(var(--planner-row-height) - 1px) var(--planner-row-height)
+      rgba(88, 63, 46, 0.34) calc(var(--planner-row-height) - 1px) var(--planner-row-height)
     );
+  clip-path: polygon(28% 0, 100% 0, 100% 100%, 0 100%);
   pointer-events: none;
+  z-index: 2;
 }
 
 .zone-planner-figure-bands {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.zone-planner-figure-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.zone-planner-figure-label {
+  position: absolute;
   display: grid;
-  grid-template-rows: 1fr 1fr 1fr;
+  gap: 2px;
+  color: var(--ink);
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+  line-height: 0.92;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.zone-planner-figure-label small {
+  font-size: 1.18rem;
+  letter-spacing: 0.02em;
+}
+
+.zone-planner-figure-label span {
+  font-size: clamp(2.6rem, 3.2vw, 3.18rem);
 }
 
 .zone-planner-figure-band {
-  border-top: 1px solid rgba(88, 63, 46, 0.18);
-}
-
-.zone-planner-figure-band:first-child {
-  border-top: 0;
+  position: absolute;
+  box-shadow: inset 0 0 0 1px rgba(88, 63, 46, 0.05);
 }
 
 .zone-planner-figure-band--high {
-  background: linear-gradient(90deg, rgba(248, 239, 182, 0.86), rgba(248, 239, 182, 0.04));
+  top: 118px;
+  left: 96px;
+  width: 220px;
+  height: 162px;
+  background: linear-gradient(90deg, rgba(249, 240, 176, 0.88), rgba(249, 240, 176, 0.1));
 }
 
 .zone-planner-figure-band--middle {
-  background: linear-gradient(90deg, rgba(244, 210, 192, 0.82), rgba(244, 210, 192, 0.04));
+  top: 274px;
+  left: 34px;
+  width: 274px;
+  height: 188px;
+  background: linear-gradient(90deg, rgba(245, 208, 191, 0.84), rgba(245, 208, 191, 0.1));
 }
 
 .zone-planner-figure-band--low {
-  background: linear-gradient(90deg, rgba(228, 220, 232, 0.86), rgba(228, 220, 232, 0.05));
+  top: 436px;
+  left: 0;
+  width: 314px;
+  height: 178px;
+  background: linear-gradient(90deg, rgba(226, 219, 232, 0.86), rgba(226, 219, 232, 0.12));
+}
+
+.zone-planner-figure-label--high {
+  top: 168px;
+  left: 114px;
+}
+
+.zone-planner-figure-label--middle {
+  top: 334px;
+  left: 52px;
+}
+
+.zone-planner-figure-label--low {
+  top: 500px;
+  left: 18px;
 }
 
 .zone-planner-figure-image {
   position: absolute;
-  left: -18px;
-  bottom: -60px;
-  width: 170px;
-  height: auto;
+  left: 122px;
+  top: 96px;
+  height: 594px;
+  width: auto;
   display: block;
+  z-index: 5;
+  mix-blend-mode: multiply;
+  opacity: 0.98;
 }
 
 .zone-planner-table {
   display: grid;
   align-content: start;
+  width: 100%;
+  padding-top: 118px;
 }
 
 .zone-planner-table-head {
   display: grid;
-  grid-template-columns: minmax(180px, 1.15fr) minmax(132px, 0.95fr) 86px 86px 92px;
+  grid-template-columns: minmax(186px, 208px) minmax(128px, 152px) repeat(3, minmax(76px, 84px));
   align-items: end;
-  gap: 14px;
-  min-height: 88px;
+  gap: 12px;
+  min-height: 78px;
   padding: 0 0 10px;
-  border-bottom: 2px solid rgba(88, 63, 46, 0.28);
+  border-bottom: 1px solid rgba(88, 63, 46, 0.24);
 }
 
 .zone-planner-col-area {
@@ -1725,110 +1803,119 @@ input {
 .zone-planner-col-title {
   color: var(--ink);
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.26rem;
+  font-size: 1.34rem;
   line-height: 1;
   font-weight: 600;
   text-align: center;
 }
 
 .zone-planner-col-type {
-  display: grid;
+  display: grid !important;
   justify-items: center;
-  gap: 9px;
+  align-content: end;
+  gap: 8px;
+  min-height: 78px;
   color: var(--ink);
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.2rem;
-  line-height: 1;
-  font-weight: 600;
-  opacity: 0.72;
 }
 
-.zone-planner-col-type.is-current {
-  opacity: 1;
+.zone-planner-col-type-label {
+  font-family: "Cormorant Garamond", serif;
+  font-size: 1.04rem;
+  line-height: 1;
+  font-weight: 600;
+  text-align: center;
 }
 
 .zone-planner-table-body {
   display: grid;
-  border-bottom: 2px solid rgba(88, 63, 46, 0.22);
-  border-top: 0;
+  gap: 0;
 }
 
 .zone-planner-group {
   display: grid;
+  gap: 0;
 }
 
 .zone-planner-group + .zone-planner-group {
-  border-top: 2px solid rgba(88, 63, 46, 0.24);
+  margin-top: 0;
+}
+
+.zone-planner-group--middle,
+.zone-planner-group--low {
+  border-top: 1px solid rgba(88, 63, 46, 0.34);
 }
 
 .zone-planner-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.15fr) minmax(132px, 0.95fr) 86px 86px 92px;
+  grid-template-columns: minmax(186px, 208px) minmax(128px, 152px) repeat(3, minmax(76px, 84px));
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   min-height: var(--planner-row-height);
-  border-top: 1px solid rgba(88, 63, 46, 0.14);
-}
-
-.zone-planner-group .zone-planner-row:first-child {
-  border-top: 0;
+  border-bottom: 1px solid rgba(88, 63, 46, 0.12);
+  background: transparent;
 }
 
 .zone-planner-row.is-selected {
-  background: rgba(255, 252, 247, 0.66);
+  background: rgba(255, 252, 247, 0.68);
 }
 
 .zone-planner-row.is-disabled {
-  opacity: 0.34;
+  opacity: 0.38;
 }
 
 .zone-planner-area {
   color: var(--ink);
-  font-size: 0.76rem;
-  line-height: 1.34;
-  padding-right: 8px;
+  font-size: 0.74rem;
+  line-height: 1.18;
   text-align: left;
 }
 
 .zone-planner-product {
   color: var(--text);
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   line-height: 1.28;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 600;
   text-align: center;
 }
 
-.zone-planner-cell {
-  display: grid;
+.zone-planner-cell,
+.zone-planner-cell-empty,
+.zone-planner-cell-disabled,
+.zone-planner-cell-check {
+  display: grid !important;
   justify-items: center;
   align-items: center;
   min-height: 100%;
 }
 
-.zone-planner-cell-empty::before {
-  display: none;
-}
-
 .zone-planner-cell-check {
-  position: relative;
-  width: 58px;
-  height: 58px;
-  justify-self: center;
+  width: 100%;
+  min-height: var(--planner-row-height);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
-.zone-planner-cell-disabled {
-  opacity: 0.38;
+.zone-planner-cell-check:focus-visible {
+  outline: 1px solid rgba(88, 63, 46, 0.28);
+  outline-offset: -2px;
+}
+
+.zone-planner-cell-empty .zone-planner-check-box,
+.zone-planner-cell-disabled .zone-planner-check-box {
+  display: none;
 }
 
 .zone-planner-check-box {
   position: relative;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   border: 1px solid rgba(74, 56, 44, 0.42);
   background: rgba(255, 252, 247, 0.98);
-  border-radius: 10px;
+  border-radius: 9px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.72),
     0 3px 8px rgba(75, 53, 37, 0.04);
@@ -1857,24 +1944,31 @@ input {
 .zone-planner-notes {
   display: grid;
   gap: 0;
-  padding-top: 88px;
+  padding-top: 126px;
   align-content: start;
+  width: 100%;
 }
 
 .zone-planner-note {
   color: var(--text);
   font-family: "Cormorant Garamond", serif;
-  font-size: 1.06rem;
-  line-height: 1.34;
-  min-height: calc((var(--planner-row-height) * var(--planner-group-rows, 1)) + 2px);
+  font-size: 0.92rem;
+  line-height: 1.42;
+  min-height: calc((var(--planner-row-height) * var(--planner-group-rows, 1)) + 1px);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   text-align: center;
-  padding-top: 12px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.zone-planner-note + .zone-planner-note {
+  border-top: 1px solid rgba(88, 63, 46, 0.12);
 }
 
 .zone-planner-note p {
   margin: 0;
+  max-width: 224px;
 }
 
 .zone-plan-groups {
@@ -2189,8 +2283,12 @@ input {
   }
 
   .zone-planner-layout {
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: 250px minmax(0, 1fr);
     gap: 18px;
+  }
+
+  .zone-planner-figure-label {
+    width: auto;
   }
 
   .zone-planner-notes {
@@ -2206,7 +2304,7 @@ input {
 
   .zone-planner-table-head,
   .zone-planner-row {
-    grid-template-columns: minmax(146px, 1fr) minmax(110px, 0.82fr) 72px 72px 72px;
+    grid-template-columns: minmax(172px, 1fr) minmax(116px, 0.86fr) repeat(3, 72px);
   }
 
   .sheet-actions {
@@ -2265,15 +2363,17 @@ input {
   }
 
   .zone-planner-figure {
-    min-height: 270px;
-    border-right: 0;
-    border-bottom: 1px solid rgba(88, 63, 46, 0.12);
+    min-height: 310px;
+  }
+
+  .zone-planner-figure-label {
+    width: auto;
   }
 
   .zone-planner-figure-image {
-    left: 10px;
-    bottom: -54px;
-    width: 132px;
+    left: 112px;
+    top: 44px;
+    height: 286px;
   }
 
   .zone-planner-notes {
@@ -2282,7 +2382,7 @@ input {
   }
 
   .zone-planner-table-head {
-    grid-template-columns: minmax(112px, 1fr) 84px 56px 56px 56px;
+    grid-template-columns: minmax(114px, 1fr) minmax(92px, 108px) repeat(3, 64px);
     gap: 8px;
     min-height: 62px;
   }
@@ -2291,12 +2391,12 @@ input {
     font-size: 0.86rem;
   }
 
-  .zone-planner-col-type {
+  .zone-planner-col-type-label {
     font-size: 0.74rem;
   }
 
   .zone-planner-row {
-    grid-template-columns: minmax(112px, 1fr) 84px 56px 56px 56px;
+    grid-template-columns: minmax(114px, 1fr) minmax(92px, 108px) repeat(3, 64px);
     gap: 8px;
     min-height: 54px;
   }
