@@ -2684,9 +2684,9 @@
                   <div class="zone-planner-figure-band zone-planner-figure-band--low"></div>
                 </div>
                 <div class="zone-planner-figure-labels">
-                  <span class="zone-planner-figure-label zone-planner-figure-label--high"><small>01</small><span>Head</span></span>
-                  <span class="zone-planner-figure-label zone-planner-figure-label--middle"><small>02</small><span>Heart</span></span>
-                  <span class="zone-planner-figure-label zone-planner-figure-label--low"><small>03</small><span>Base</span></span>
+                  <span class="zone-planner-figure-label zone-planner-figure-label--high">Head</span>
+                  <span class="zone-planner-figure-label zone-planner-figure-label--middle">Heart</span>
+                  <span class="zone-planner-figure-label zone-planner-figure-label--low">Base</span>
                 </div>
                 <img class="zone-planner-figure-image" src="./assets/body-reference-clean.png" alt="" draggable="false" />
               </aside>
