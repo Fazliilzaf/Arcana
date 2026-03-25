@@ -2658,6 +2658,7 @@
     const hasPlannerProduct = Boolean(activeProduct);
     const zoneGroups = getPlannerZoneGroups();
     const activePlannerType = hasPlannerProduct ? getPlacementType(activeProduct.type) : "";
+    const activeTypeColumn = PLANNER_TYPE_COLUMNS.find((column) => column.key === activePlannerType) || PLANNER_TYPE_COLUMNS[0];
     const allowedLevels = hasPlannerProduct
       ? getProductAllowedLevels(activeProduct, activeBottle ? activeBottle.catalogId : activeProduct.id)
       : [];
@@ -2694,7 +2695,10 @@
                 <div class="zone-planner-table-head">
                   <span class="zone-planner-col-area"></span>
                   <span class="zone-planner-col-title">Product Title</span>
-                  ${getPlannerTypeColumnMarkup()}
+                  <span class="zone-planner-col-type zone-planner-col-type--active zone-planner-col-type--${escapeHtml(activeTypeColumn.iconClass)}">
+                    ${renderPlannerTypeHeaderVisual(activeTypeColumn.key, activeTypeColumn.iconClass)}
+                    <span class="zone-planner-col-type-label">${escapeHtml(activeTypeColumn.label)}</span>
+                  </span>
                 </div>
                 <div class="zone-planner-table-body">
                   ${zoneGroups
@@ -2708,34 +2712,27 @@
 
                             return `
                               <div class="zone-planner-row zone-planner-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
-                                <span class="zone-planner-area">${escapeHtml(zone.label)}:</span>
-                                <span class="zone-planner-product">${productName}</span>
-                                ${PLANNER_TYPE_COLUMNS
-                                  .map((column) => {
-                                    const isProductColumn = activePlannerType === column.key;
-                                    const canToggle = hasPlannerProduct && isAllowed && isProductColumn;
-
-                                    if (canToggle) {
-                                      return `
-                                        <button
-                                          type="button"
-                                          class="zone-planner-cell-check${selected ? " is-selected" : ""}"
-                                          data-zone-check-toggle="${escapeHtml(zone.id)}"
-                                          aria-pressed="${selected ? "true" : "false"}"
-                                          aria-label="${selected ? "Remove" : "Apply"} ${escapeHtml(zone.label)} for ${escapeHtml(activeProduct.name)}"
-                                        >
-                                          <span class="zone-planner-check-box" aria-hidden="true"></span>
-                                        </button>
-                                      `;
-                                    }
-
-                                    return `
-                                      <span class="zone-planner-cell${isAllowed && isProductColumn ? "" : " zone-planner-cell-empty"}${!isAllowed ? " zone-planner-cell-disabled" : ""}">
+                                <span class="zone-planner-area" title="${escapeHtml(zone.label)}">${escapeHtml(zone.label)}:</span>
+                                <span class="zone-planner-product" title="${productName}">${productName}</span>
+                                ${
+                                  hasPlannerProduct && isAllowed
+                                    ? `
+                                      <button
+                                        type="button"
+                                        class="zone-planner-cell-check${selected ? " is-selected" : ""}"
+                                        data-zone-check-toggle="${escapeHtml(zone.id)}"
+                                        aria-pressed="${selected ? "true" : "false"}"
+                                        aria-label="${selected ? "Remove" : "Apply"} ${escapeHtml(zone.label)} for ${escapeHtml(activeProduct.name)}"
+                                      >
+                                        <span class="zone-planner-check-box" aria-hidden="true"></span>
+                                      </button>
+                                    `
+                                    : `
+                                      <span class="zone-planner-cell zone-planner-cell-disabled">
                                         <span class="zone-planner-check-box" aria-hidden="true"></span>
                                       </span>
-                                    `;
-                                  })
-                                  .join("")}
+                                    `
+                                }
                               </div>
                             `;
                           })
