@@ -1631,10 +1631,10 @@ input {
 
 .zone-planner-overlay-rows {
   position: absolute;
-  left: 39.05%;
-  top: 37.45%;
-  width: 44.1%;
-  height: 60.8%;
+  left: 39.28%;
+  top: 37.42%;
+  width: 43.95%;
+  height: 60.55%;
   display: grid;
   grid-template-rows: repeat(9, 1fr);
   gap: 0;
@@ -1650,58 +1650,51 @@ input {
   opacity: 0.84;
 }
 
-.zone-planner-area,
+.zone-planner-overlay-area-gap {
+  display: block;
+}
+
 .zone-planner-overlay-product {
   display: flex;
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 73%;
-  margin: 0 3.5%;
-  padding: 0 0.7cqi;
-  background: rgba(251, 249, 244, 0.995);
-  color: rgba(52, 38, 30, 0.96);
+  min-height: 58%;
+  margin: 0 5.25%;
+  padding: 0 0.44cqi;
+  background: rgba(251, 249, 244, 0.998);
+  color: rgba(44, 32, 24, 0.92);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.9px, 0.68cqi, 6.5px);
-  line-height: 1.05;
+  font-size: clamp(3.55px, 0.54cqi, 5.1px);
+  line-height: 1.08;
   font-weight: 600;
-  letter-spacing: 0.045em;
+  letter-spacing: 0.014em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow:
-    0 0 1px rgba(251, 249, 244, 0.98),
-    0 0 3px rgba(251, 249, 244, 0.98),
-    0 0 6px rgba(251, 249, 244, 0.98);
-  box-shadow: 0 0 0 0.32cqi rgba(251, 249, 244, 0.995);
-}
-
-.zone-planner-area {
-  font-size: clamp(3.7px, 0.63cqi, 5.8px);
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  box-shadow: 0 0 0 0.18cqi rgba(251, 249, 244, 0.998);
 }
 
 .zone-planner-overlay-product.is-empty {
   color: transparent;
-  box-shadow: none;
 }
 
 .zone-planner-overlay-cell {
   display: grid;
   place-items: center;
   justify-self: stretch;
-  min-height: 73%;
-  margin: 0 5.8%;
+  min-height: 100%;
+  margin: 0;
   padding: 0;
   border: 0;
-  background: rgba(251, 249, 244, 0.995);
-  box-shadow: 0 0 0 0.28cqi rgba(251, 249, 244, 0.995);
+  background: transparent;
+  box-shadow: none;
 }
 
 .zone-planner-overlay-cell--button {
   cursor: pointer;
   pointer-events: auto;
+  background: transparent;
 }
 
 .zone-planner-overlay-cell--button:focus-visible {
@@ -1714,65 +1707,30 @@ input {
   pointer-events: none;
 }
 
-.zone-planner-overlay-notes {
-  position: absolute;
-  left: 82.55%;
-  top: 37.4%;
-  width: 14.9%;
-  height: 60.8%;
-  display: grid;
-  grid-template-rows: 3fr 2fr 4fr;
-  gap: 0;
-}
-
-.zone-planner-overlay-note {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5%;
-}
-
-.zone-planner-overlay-note p {
-  margin: 0;
-  padding: 0.48cqi 0.62cqi;
-  background: rgba(251, 249, 244, 0.995);
-  box-shadow: 0 0 0 0.28cqi rgba(251, 249, 244, 0.995);
-  color: rgba(52, 38, 30, 0.95);
-  font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.75px, 0.6cqi, 5.55px);
-  line-height: 1.1;
-  font-weight: 500;
-  text-align: center;
-  text-wrap: balance;
-}
-
 .zone-planner-overlay-checkbox {
   position: relative;
-  width: clamp(20px, 3.95cqi, 33px);
-  height: clamp(20px, 3.95cqi, 33px);
-  border-radius: clamp(4px, 0.6cqi, 7px);
-  border: 1px solid rgba(74, 56, 44, 0.44);
-  background: rgba(255, 253, 249, 0.98);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 2px rgba(75, 53, 37, 0.05);
+  width: clamp(12px, 1.75cqi, 17px);
+  height: clamp(9px, 1.2cqi, 12px);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
 }
 
 .zone-planner-overlay-cell--button.is-selected .zone-planner-overlay-checkbox {
-  border-color: rgba(74, 56, 44, 0.58);
-  background: rgba(245, 240, 235, 0.98);
+  opacity: 1;
 }
 
 .zone-planner-overlay-cell--button.is-selected .zone-planner-overlay-checkbox::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: 47%;
-  width: clamp(7px, 1.45cqi, 12px);
-  height: clamp(4px, 0.9cqi, 7px);
-  border-left: 1.4px solid rgba(74, 56, 44, 0.86);
-  border-bottom: 1.4px solid rgba(74, 56, 44, 0.86);
-  transform: translate(-50%, -58%) rotate(-45deg);
+  left: 48%;
+  top: 44%;
+  width: 34%;
+  height: 64%;
+  border-right: 1.5px solid rgba(86, 63, 49, 0.92);
+  border-bottom: 1.5px solid rgba(86, 63, 49, 0.92);
+  transform: translate(-50%, -50%) rotate(42deg);
 }
 
 .zone-plan-groups {
@@ -2150,10 +2108,10 @@ input {
   }
 
   .zone-planner-overlay-rows {
-    left: 41.2%;
-    top: 37.9%;
-    width: 49.6%;
-    height: 60.1%;
+    left: 39.28%;
+    top: 37.42%;
+    width: 43.95%;
+    height: 60.55%;
   }
 
   .zone-editor-summary {

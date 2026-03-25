@@ -2661,18 +2661,6 @@
     const allowedLevels = hasPlannerProduct
       ? getProductAllowedLevels(activeProduct, activeBottle ? activeBottle.catalogId : activeProduct.id)
       : [];
-    const plannerNarratives = {
-      high: "Apply your perfume to the head zone — behind the neck, lightly through the hair, across the shoulders — allowing a soft aura to form around you. This is the first impression, the part of the scent that moves with air and light.",
-      middle: "Use the heart zone — the chest, arms, or abdomen — for the perfumes you want to live closest to you. Here, the fragrance warms with your own rhythm, unfolding slowly throughout the day and becoming part of your natural presence.",
-      low: "Reserve the base zone — hips, behind the knees, or calfs — for the perfumes you wish to release with subtle intention. These areas build warmth gradually, letting the scent rise in a quiet, continuous trail that feels personal, intimate, and entirely your own.",
-    };
-
-    const plannerNoteMarkup = zoneGroups.map((group) => `
-      <section class="zone-planner-overlay-note zone-planner-overlay-note--${escapeHtml(group.level)}" style="--planner-group-rows:${escapeHtml(String(group.zones.length))}">
-        <p>${escapeHtml(plannerNarratives[group.level] || "")}</p>
-      </section>
-    `).join("");
-
     const plannerRows = zoneGroups.flatMap((group) =>
       group.zones.map((zone) => {
         const selected = Boolean(activeBottle && activeBottle.zones.includes(zone.id));
@@ -2681,7 +2669,7 @@
 
         return `
           <div class="zone-planner-overlay-row zone-planner-overlay-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
-            <span class="zone-planner-area" title="${escapeHtml(zone.label)}">${escapeHtml(zone.label)}</span>
+            <span class="zone-planner-overlay-area-gap" aria-hidden="true"></span>
             <span class="zone-planner-overlay-product${productName ? "" : " is-empty"}" title="${productName}">${escapeHtml(productName)}</span>
             ${PLANNER_TYPE_COLUMNS.map((column) => {
               const isProductTypeColumn = hasPlannerProduct && activePlannerType === column.key;
@@ -2739,9 +2727,6 @@
             </div>
             <div class="zone-planner-overlay-rows">
               ${plannerRows.join("")}
-            </div>
-            <div class="zone-planner-overlay-notes" aria-hidden="true">
-              ${plannerNoteMarkup}
             </div>
           </div>
         </div>
