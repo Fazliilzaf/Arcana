@@ -1631,10 +1631,10 @@ input {
 
 .zone-planner-overlay-rows {
   position: absolute;
-  left: 39.2%;
-  top: 37.9%;
-  width: 43.5%;
-  height: 60.1%;
+  left: 39.05%;
+  top: 37.45%;
+  width: 44.1%;
+  height: 60.8%;
   display: grid;
   grid-template-rows: repeat(9, 1fr);
   gap: 0;
@@ -1642,7 +1642,7 @@ input {
 
 .zone-planner-overlay-row {
   display: grid;
-  grid-template-columns: 36% 28% 12% 12% 12%;
+  grid-template-columns: 35.5% 28.5% 12% 12% 12%;
   align-items: center;
 }
 
@@ -1656,8 +1656,8 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 70%;
-  margin: 0 4%;
+  min-height: 73%;
+  margin: 0 3.5%;
   padding: 0 0.7cqi;
   background: rgba(251, 249, 244, 0.995);
   color: rgba(52, 38, 30, 0.96);
@@ -1691,8 +1691,8 @@ input {
   display: grid;
   place-items: center;
   justify-self: stretch;
-  min-height: 70%;
-  margin: 0 7%;
+  min-height: 73%;
+  margin: 0 5.8%;
   padding: 0;
   border: 0;
   background: rgba(251, 249, 244, 0.995);
@@ -1716,10 +1716,10 @@ input {
 
 .zone-planner-overlay-notes {
   position: absolute;
-  left: 82.8%;
-  top: 37.8%;
-  width: 14.2%;
-  height: 60.2%;
+  left: 82.55%;
+  top: 37.4%;
+  width: 14.9%;
+  height: 60.8%;
   display: grid;
   grid-template-rows: 3fr 2fr 4fr;
   gap: 0;
@@ -1734,13 +1734,13 @@ input {
 
 .zone-planner-overlay-note p {
   margin: 0;
-  padding: 0.55cqi 0.7cqi;
+  padding: 0.48cqi 0.62cqi;
   background: rgba(251, 249, 244, 0.995);
   box-shadow: 0 0 0 0.28cqi rgba(251, 249, 244, 0.995);
   color: rgba(52, 38, 30, 0.95);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.8px, 0.62cqi, 5.8px);
-  line-height: 1.15;
+  font-size: clamp(3.75px, 0.6cqi, 5.55px);
+  line-height: 1.1;
   font-weight: 500;
   text-align: center;
   text-wrap: balance;
@@ -1748,8 +1748,8 @@ input {
 
 .zone-planner-overlay-checkbox {
   position: relative;
-  width: clamp(18px, 3.7cqi, 31px);
-  height: clamp(18px, 3.7cqi, 31px);
+  width: clamp(20px, 3.95cqi, 33px);
+  height: clamp(20px, 3.95cqi, 33px);
   border-radius: clamp(4px, 0.6cqi, 7px);
   border: 1px solid rgba(74, 56, 44, 0.44);
   background: rgba(255, 253, 249, 0.98);
