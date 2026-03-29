@@ -18,7 +18,7 @@ const { requestContextMiddleware } = require('./src/observability/requestContext
 const app = express();
 if (config.trustProxy) app.set('trust proxy', 1);
 app.use(cors(createCorsPolicy(config)));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const ADMIN_HTML_PATH = path.join(__dirname, 'public', 'admin.html');
 const CCO_NEXT_RELEASE_DIST_DIR = path.join(__dirname, 'public', 'cco-next-release');
@@ -325,15 +325,29 @@ const { createOpsRouter } = require('./src/routes/ops');
 const { createMailInsightsRouter } = require('./src/routes/mailInsights');
 const { createCapabilitiesRouter } = require('./src/routes/capabilities');
 const { createPublicClinicRouter } = require('./src/routes/publicClinic');
+const { createMicrosoftGraphReadConnector } = require('./src/infra/microsoftGraphReadConnector');
 const { createScheduler } = require('./src/ops/scheduler');
 const { createAlertNotifier } = require('./src/ops/alertNotifier');
 const { runStartupDiskGuard } = require('./src/ops/startupDiskGuard');
 const { createSecretRotationStore } = require('./src/ops/secretRotationStore');
 const { createRuntimeMetricsStore } = require('./src/ops/runtimeMetrics');
 const { createPatientConversionStore } = require('./src/ops/patientConversionStore');
+const { createCcoHistoryStore } = require('./src/ops/ccoHistoryStore');
+const { createCcoNoteStore } = require('./src/ops/ccoNoteStore');
+const { createCcoFollowUpStore } = require('./src/ops/ccoFollowUpStore');
+const { createCcoWorkspacePrefsStore } = require('./src/ops/ccoWorkspacePrefsStore');
+const { createCcoIntegrationStore } = require('./src/ops/ccoIntegrationStore');
+const { createCcoSettingsStore } = require('./src/ops/ccoSettingsStore');
+const { createCcoMacroStore } = require('./src/ops/ccoMacroStore');
+const { createCcoCustomerStore } = require('./src/ops/ccoCustomerStore');
 const { createCapabilityAnalysisStore } = require('./src/capabilities/analysisStore');
 const { createSloTicketStore } = require('./src/ops/sloTicketStore');
 const { createReleaseGovernanceStore } = require('./src/ops/releaseGovernanceStore');
+const { createCcoWorkspaceRouter } = require('./src/routes/ccoWorkspace');
+const { createCcoIntegrationsRouter } = require('./src/routes/ccoIntegrations');
+const { createCcoSettingsRouter } = require('./src/routes/ccoSettings');
+const { createCcoMacrosRouter } = require('./src/routes/ccoMacros');
+const { createCcoCustomersRouter } = require('./src/routes/ccoCustomers');
 const { createExecutionGateway } = require('./src/gateway/executionGateway');
 const { createRedisExecutionRuntimeBackend } = require('./src/gateway/redisRuntimeBackend');
 
@@ -346,6 +360,25 @@ const runtimeMetricsStore = createRuntimeMetricsStore({
   maxSamples: config.metricsMaxSamples,
   slowRequestMs: config.metricsSlowRequestMs,
 });
+
+function createRuntimeGraphReadConnector() {
+  const graphReadEnabled = String(process.env.ARCANA_GRAPH_READ_ENABLED || '')
+    .trim()
+    .toLowerCase();
+  if (!['1', 'true', 'yes', 'y', 'on'].includes(graphReadEnabled)) return null;
+
+  return createMicrosoftGraphReadConnector({
+    tenantId: String(process.env.ARCANA_GRAPH_TENANT_ID || '').trim(),
+    clientId: String(process.env.ARCANA_GRAPH_CLIENT_ID || '').trim(),
+    clientSecret: String(process.env.ARCANA_GRAPH_CLIENT_SECRET || '').trim(),
+    userId: String(process.env.ARCANA_GRAPH_USER_ID || '').trim(),
+    fullTenant: true,
+    userScope: 'all',
+    authorityHost: String(process.env.ARCANA_GRAPH_AUTHORITY_HOST || '').trim() || undefined,
+    graphBaseUrl: String(process.env.ARCANA_GRAPH_BASE_URL || '').trim() || undefined,
+    scope: String(process.env.ARCANA_GRAPH_SCOPE || '').trim() || undefined,
+  });
+}
 
 app.get("/", (req, res) => {
   res.sendFile("index.html", { root: __dirname + "/public" });
@@ -636,6 +669,31 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     filePath: config.capabilityAnalysisStorePath,
     maxEntries: config.capabilityAnalysisMaxEntries,
   });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: config.ccoHistoryStorePath,
+  });
+  const ccoNoteStore = await createCcoNoteStore({
+    filePath: config.ccoNoteStorePath,
+  });
+  const ccoFollowUpStore = await createCcoFollowUpStore({
+    filePath: config.ccoFollowUpStorePath,
+  });
+  const ccoWorkspacePrefsStore = await createCcoWorkspacePrefsStore({
+    filePath: config.ccoWorkspacePrefsStorePath,
+  });
+  const ccoIntegrationStore = await createCcoIntegrationStore({
+    filePath: config.ccoIntegrationStorePath,
+  });
+  const ccoSettingsStore = await createCcoSettingsStore({
+    filePath: config.ccoSettingsStorePath,
+  });
+  const ccoMacroStore = await createCcoMacroStore({
+    filePath: config.ccoMacroStorePath,
+  });
+  const ccoCustomerStore = await createCcoCustomerStore({
+    filePath: config.ccoCustomerStorePath,
+    historyStore: ccoHistoryStore,
+  });
 
   const tenantConfigStore = await createTenantConfigStore({
     filePath: config.tenantConfigStorePath,
@@ -653,6 +711,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     filePath: config.releaseGovernanceStorePath,
     maxCycles: config.releaseGovernanceMaxCycles,
   });
+  const graphReadConnector = createRuntimeGraphReadConnector();
 
   const scheduler = createScheduler({
     config,
@@ -660,6 +719,8 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     templateStore,
     capabilityAnalysisStore,
     runtimeMetricsStore,
+    ccoHistoryStore,
+    graphReadConnector,
     secretRotationStore,
     sloTicketStore,
     releaseGovernanceStore,
@@ -835,6 +896,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       requireTenantScope: auth.requireTenantScope,
       loginRateLimiter,
       selectTenantRateLimiter,
+      ownerMfaRequired: config.authOwnerMfaRequired,
       ownerMfaBypassHosts: config.authOwnerMfaBypassHosts,
       bootstrapOwnerEmail: config.bootstrapOwnerEmail,
       bootstrapOwnerPassword: config.bootstrapOwnerPassword,
@@ -930,6 +992,58 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
 
   app.use(
     '/api/v1',
+    createCcoWorkspaceRouter({
+      noteStore: ccoNoteStore,
+      followUpStore: ccoFollowUpStore,
+      workspacePrefsStore: ccoWorkspacePrefsStore,
+      authStore,
+      config,
+    })
+  );
+
+  app.use(
+    '/api/v1',
+    createCcoIntegrationsRouter({
+      integrationStore: ccoIntegrationStore,
+      authStore,
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      runtimeState,
+    })
+  );
+
+  app.use(
+    '/api/v1',
+    createCcoSettingsRouter({
+      settingsStore: ccoSettingsStore,
+      authStore,
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+    })
+  );
+
+  app.use(
+    '/api/v1',
+    createCcoMacrosRouter({
+      macroStore: ccoMacroStore,
+      authStore,
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+    })
+  );
+
+  app.use(
+    '/api/v1',
+    createCcoCustomersRouter({
+      customerStore: ccoCustomerStore,
+      authStore,
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+    })
+  );
+
+  app.use(
+    '/api/v1',
     createCapabilitiesRouter({
       authStore,
       tenantConfigStore,
@@ -938,6 +1052,9 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       requireRole: auth.requireRole,
       executionGateway,
       capabilityAnalysisStore,
+      ccoHistoryStore,
+      scheduler,
+      graphReadConnector,
     })
   );
 

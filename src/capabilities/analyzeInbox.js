@@ -222,8 +222,15 @@ const SYSTEM_MAIL_PATTERNS = Object.freeze([
   'get more done with apps like word',
 ]);
 
-const CCO_DEFAULT_SENDER_MAILBOX = 'contact@hairtpclinic.com';
+const CCO_DEFAULT_SENDER_MAILBOX =
+  normalizeText(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) || 'contact@hairtpclinic.com';
 const CCO_SIGNATURE_PROFILES = Object.freeze([
+  Object.freeze({
+    key: 'contact',
+    fullName: 'Hair TP Clinic',
+    title: 'Patientservice',
+    senderMailboxId: 'contact@hairtpclinic.com',
+  }),
   Object.freeze({
     key: 'egzona',
     fullName: 'Egzona Krasniqi',
@@ -309,12 +316,17 @@ function buildSnapshotDebugInfo(snapshot = {}, derived = {}) {
 }
 
 function toMessageSnapshot(message = {}) {
+  const direction = normalizeDirection(message.direction || message.role || message.type);
   const bodyRaw =
     normalizeText(message.bodyPreview) ||
     normalizeText(message.preview) ||
     normalizeText(message.text) ||
     normalizeText(message.content);
   const bodyMasked = maskBodyPreview(bodyRaw);
+  const bodyHtml =
+    direction === 'outbound'
+      ? clampTextLength(normalizeText(message.bodyHtml), 24000) || null
+      : null;
   const senderEmail =
     normalizeText(message.senderEmail) ||
     normalizeText(message.fromEmail) ||
@@ -330,9 +342,10 @@ function toMessageSnapshot(message = {}) {
       normalizeOpaqueId(message.messageId) ||
       normalizeOpaqueId(message.id) ||
       null,
-    direction: normalizeDirection(message.direction || message.role || message.type),
+    direction,
     sentAt: toIso(message.sentAt || message.createdAt || message.ts) || null,
     bodyPreview: bodyMasked,
+    bodyHtml,
     bodyLength: Math.max(0, Math.min(8000, bodyRaw.length)),
     masked: Boolean(bodyRaw && bodyRaw !== bodyMasked),
     mailboxId:
@@ -410,6 +423,7 @@ function toConversationSnapshot(input = {}) {
         source?.customer?.estimatedRevenueBand ||
         '',
     },
+    historySignals: normalizeHistorySignals(source.historySignals),
     sender:
       maskSender(
         normalizeText(source.sender) ||
@@ -417,6 +431,137 @@ function toConversationSnapshot(input = {}) {
           normalizeText(lastInbound?.sender)
       ) || null,
   };
+}
+
+function normalizeHistoryPattern(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['reschedule', 'complaint', 'booking', 'mixed'].includes(normalized)) return normalized;
+  return 'none';
+}
+
+function normalizeHistoryOutcomeCode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (
+    [
+      'booked',
+      'rebooked',
+      'replied',
+      'not_interested',
+      'escalated',
+      'no_response',
+      'closed_no_action',
+    ].includes(normalized)
+  ) {
+    return normalized;
+  }
+  return '';
+}
+
+function normalizeHistoryDraftMode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['short', 'warm', 'professional'].includes(normalized)) {
+    return normalized;
+  }
+  return '';
+}
+
+function normalizeHistoryMailboxIds(value = []) {
+  return asArray(value)
+    .map((item) => normalizeEmail(item))
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
+function normalizeHistorySignals(raw = null) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const pattern = normalizeHistoryPattern(source.pattern);
+  const summary = capText(source.summary, 180);
+  const actionCue = capText(source.actionCue, 160);
+  const mailboxIds = normalizeHistoryMailboxIds(source.mailboxIds);
+  const mailboxCount = Math.max(mailboxIds.length, toNumber(source.mailboxCount, 0));
+  const messageCount = Math.max(0, toNumber(source.messageCount, 0));
+  const recentMessageCount = Math.max(0, toNumber(source.recentMessageCount, 0));
+  const latestMessageAt = toIso(source.latestMessageAt) || null;
+  const outcomeCode = normalizeHistoryOutcomeCode(source.outcomeCode);
+  const outcomeLabel = capText(source.outcomeLabel, 80);
+  const outcomeSummary = capText(source.outcomeSummary, 180);
+  const outcomeActionCue = capText(source.outcomeActionCue, 160);
+  const outcomeAt = toIso(source.outcomeAt) || null;
+  const calibrationSummary = capText(source.calibrationSummary, 180);
+  const calibrationActionCue = capText(source.calibrationActionCue, 160);
+  const preferredMode = normalizeHistoryDraftMode(source.preferredMode);
+  const positiveOutcomeCount = Math.max(0, toNumber(source.positiveOutcomeCount, 0));
+  const negativeOutcomeCount = Math.max(0, toNumber(source.negativeOutcomeCount, 0));
+  const dominantFailureOutcome = normalizeHistoryOutcomeCode(source.dominantFailureOutcome);
+  const dominantFailureRisk = capText(normalizeText(source.dominantFailureRisk).toLowerCase(), 60);
+
+  if (
+    pattern === 'none' &&
+    !summary &&
+    !actionCue &&
+    !outcomeCode &&
+    !outcomeSummary &&
+    !outcomeActionCue &&
+    !calibrationSummary &&
+    !calibrationActionCue &&
+    !preferredMode &&
+    positiveOutcomeCount <= 0 &&
+    negativeOutcomeCount <= 0 &&
+    mailboxCount <= 0 &&
+    messageCount <= 0 &&
+    recentMessageCount <= 0
+  ) {
+    return null;
+  }
+
+  return {
+    pattern,
+    summary: summary || null,
+    actionCue: actionCue || null,
+    mailboxIds,
+    mailboxCount,
+    messageCount,
+    recentMessageCount,
+    latestMessageAt,
+    outcomeCode: outcomeCode || null,
+    outcomeLabel: outcomeLabel || null,
+    outcomeSummary: outcomeSummary || null,
+    outcomeActionCue: outcomeActionCue || null,
+    outcomeAt,
+    calibrationSummary: calibrationSummary || null,
+    calibrationActionCue: calibrationActionCue || null,
+    preferredMode: preferredMode || null,
+    positiveOutcomeCount,
+    negativeOutcomeCount,
+    dominantFailureOutcome: dominantFailureOutcome || null,
+    dominantFailureRisk: dominantFailureRisk || null,
+  };
+}
+
+function selectCustomerHistorySignals(current = null, candidate = null) {
+  const safeCurrent = normalizeHistorySignals(current);
+  const safeCandidate = normalizeHistorySignals(candidate);
+  if (!safeCurrent) return safeCandidate;
+  if (!safeCandidate) return safeCurrent;
+  if (safeCandidate.outcomeAt !== safeCurrent.outcomeAt) {
+    const candidateOutcomeMs = toTimestampMs(safeCandidate.outcomeAt);
+    const currentOutcomeMs = toTimestampMs(safeCurrent.outcomeAt);
+    if (Number.isFinite(candidateOutcomeMs) && !Number.isFinite(currentOutcomeMs)) return safeCandidate;
+    if (Number.isFinite(candidateOutcomeMs) && Number.isFinite(currentOutcomeMs)) {
+      return candidateOutcomeMs > currentOutcomeMs ? safeCandidate : safeCurrent;
+    }
+  }
+  if (safeCandidate.outcomeCode && !safeCurrent.outcomeCode) return safeCandidate;
+  if (safeCandidate.messageCount !== safeCurrent.messageCount) {
+    return safeCandidate.messageCount > safeCurrent.messageCount ? safeCandidate : safeCurrent;
+  }
+  if (safeCandidate.recentMessageCount !== safeCurrent.recentMessageCount) {
+    return safeCandidate.recentMessageCount > safeCurrent.recentMessageCount ? safeCandidate : safeCurrent;
+  }
+  if (safeCandidate.mailboxCount !== safeCurrent.mailboxCount) {
+    return safeCandidate.mailboxCount > safeCurrent.mailboxCount ? safeCandidate : safeCurrent;
+  }
+  return safeCurrent;
 }
 
 function toFeedTimestampMs(value = '') {
@@ -502,6 +647,9 @@ function toConversationFeedEntries(conversation = {}) {
       sentAt,
       preview,
     };
+    if (direction === 'outbound') {
+      feedEntry.bodyHtml = clampTextLength(normalizeText(safeMessage.bodyHtml), 24000) || null;
+    }
     if (direction === 'outbound') {
       outbound.push(feedEntry);
     } else {
@@ -699,6 +847,7 @@ function buildCustomerIndex(conversations = [], nowMs = Date.now()) {
       lastInteractionAt: null,
       lastClosedAt: null,
       timeline: [],
+      historySignals: null,
     };
 
     current.caseCount += 1;
@@ -720,6 +869,10 @@ function buildCustomerIndex(conversations = [], nowMs = Date.now()) {
     }
 
     if (timelineEntry.conversationId) current.timeline.push(timelineEntry);
+    current.historySignals = selectCustomerHistorySignals(
+      current.historySignals,
+      conversation.historySignals
+    );
     index.set(key, current);
   }
 
@@ -766,6 +919,7 @@ function buildCustomerIndex(conversations = [], nowMs = Date.now()) {
 }
 
 function buildCustomerSummaryView(bucket = {}) {
+  const historySignals = normalizeHistorySignals(bucket.historySignals);
   const timeline = asArray(bucket.timeline).slice(0, 6).map((entry) => ({
     conversationId: normalizeText(entry.conversationId),
     subject: sanitizeSubject(entry.subject),
@@ -790,6 +944,19 @@ function buildCustomerSummaryView(bucket = {}) {
       Number.isFinite(toNumber(bucket.daysSinceLastClosedCase, NaN))
         ? toNumber(bucket.daysSinceLastClosedCase, 0)
         : null,
+    historySignalPattern: historySignals?.pattern || 'none',
+    historySignalSummary: historySignals?.summary || null,
+    historySignalActionCue: historySignals?.actionCue || null,
+    historyMailboxCount: historySignals?.mailboxCount || 0,
+    historyMailboxIds: historySignals?.mailboxIds || [],
+    historyMessageCount: historySignals?.messageCount || 0,
+    historyRecentMessageCount: historySignals?.recentMessageCount || 0,
+    historyLatestMessageAt: historySignals?.latestMessageAt || null,
+    historyOutcomeCode: historySignals?.outcomeCode || null,
+    historyOutcomeLabel: historySignals?.outcomeLabel || null,
+    historyOutcomeSummary: historySignals?.outcomeSummary || null,
+    historyOutcomeActionCue: historySignals?.outcomeActionCue || null,
+    historyOutcomeAt: historySignals?.outcomeAt || null,
     timeline,
   };
 }
@@ -886,6 +1053,14 @@ class AnalyzeInboxCapability extends BaseCapability {
       includeClosed: { type: 'boolean' },
       maxDrafts: { type: 'integer', minimum: 1, maximum: 5 },
       debug: { type: 'boolean' },
+      mailboxId: { type: 'string', minLength: 1, maxLength: 320 },
+      mailboxAddress: { type: 'string', minLength: 1, maxLength: 320 },
+      mailboxIds: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 50,
+        items: { type: 'string', minLength: 1, maxLength: 320 },
+      },
       writingIdentityProfiles: { type: 'object', additionalProperties: true },
     },
   };
@@ -1190,6 +1365,38 @@ class AnalyzeInboxCapability extends BaseCapability {
                     engagementScore: { type: 'number', minimum: 0, maximum: 1 },
                     lastCaseSummary: { type: 'string', minLength: 1, maxLength: 240 },
                     daysSinceLastClosedCase: { type: ['number', 'null'], minimum: 0 },
+                    historySignalPattern: {
+                      type: 'string',
+                      enum: ['none', 'reschedule', 'complaint', 'booking', 'mixed'],
+                    },
+                    historySignalSummary: { type: ['string', 'null'], maxLength: 180 },
+                    historySignalActionCue: { type: ['string', 'null'], maxLength: 160 },
+                    historyMailboxCount: { type: 'number', minimum: 0 },
+                    historyMailboxIds: {
+                      type: 'array',
+                      maxItems: 10,
+                      items: { type: 'string', minLength: 1, maxLength: 320 },
+                    },
+                    historyMessageCount: { type: 'number', minimum: 0 },
+                    historyRecentMessageCount: { type: 'number', minimum: 0 },
+                    historyLatestMessageAt: { type: ['string', 'null'], maxLength: 50 },
+                    historyOutcomeCode: {
+                      type: ['string', 'null'],
+                      enum: [
+                        'booked',
+                        'rebooked',
+                        'replied',
+                        'not_interested',
+                        'escalated',
+                        'no_response',
+                        'closed_no_action',
+                        null,
+                      ],
+                    },
+                    historyOutcomeLabel: { type: ['string', 'null'], maxLength: 80 },
+                    historyOutcomeSummary: { type: ['string', 'null'], maxLength: 180 },
+                    historyOutcomeActionCue: { type: ['string', 'null'], maxLength: 160 },
+                    historyOutcomeAt: { type: ['string', 'null'], maxLength: 50 },
                     timeline: {
                       type: 'array',
                       maxItems: 6,
@@ -1311,6 +1518,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 mailboxAddress: { type: 'string', minLength: 1, maxLength: 320 },
                 sentAt: { type: 'string', maxLength: 50 },
                 preview: { type: 'string', minLength: 1, maxLength: 360 },
+                bodyHtml: { type: ['string', 'null'], maxLength: 24000 },
               },
             },
           },
@@ -1478,6 +1686,38 @@ class AnalyzeInboxCapability extends BaseCapability {
                     engagementScore: { type: 'number', minimum: 0, maximum: 1 },
                     lastCaseSummary: { type: 'string', minLength: 1, maxLength: 240 },
                     daysSinceLastClosedCase: { type: ['number', 'null'], minimum: 0 },
+                    historySignalPattern: {
+                      type: 'string',
+                      enum: ['none', 'reschedule', 'complaint', 'booking', 'mixed'],
+                    },
+                    historySignalSummary: { type: ['string', 'null'], maxLength: 180 },
+                    historySignalActionCue: { type: ['string', 'null'], maxLength: 160 },
+                    historyMailboxCount: { type: 'number', minimum: 0 },
+                    historyMailboxIds: {
+                      type: 'array',
+                      maxItems: 10,
+                      items: { type: 'string', minLength: 1, maxLength: 320 },
+                    },
+                    historyMessageCount: { type: 'number', minimum: 0 },
+                    historyRecentMessageCount: { type: 'number', minimum: 0 },
+                    historyLatestMessageAt: { type: ['string', 'null'], maxLength: 50 },
+                    historyOutcomeCode: {
+                      type: ['string', 'null'],
+                      enum: [
+                        'booked',
+                        'rebooked',
+                        'replied',
+                        'not_interested',
+                        'escalated',
+                        'no_response',
+                        'closed_no_action',
+                        null,
+                      ],
+                    },
+                    historyOutcomeLabel: { type: ['string', 'null'], maxLength: 80 },
+                    historyOutcomeSummary: { type: ['string', 'null'], maxLength: 180 },
+                    historyOutcomeActionCue: { type: ['string', 'null'], maxLength: 160 },
+                    historyOutcomeAt: { type: ['string', 'null'], maxLength: 50 },
                     timeline: {
                       type: 'array',
                       maxItems: 6,
@@ -1607,6 +1847,38 @@ class AnalyzeInboxCapability extends BaseCapability {
                 engagementScore: { type: 'number', minimum: 0, maximum: 1 },
                 lastCaseSummary: { type: 'string', minLength: 1, maxLength: 240 },
                 daysSinceLastClosedCase: { type: ['number', 'null'], minimum: 0 },
+                historySignalPattern: {
+                  type: 'string',
+                  enum: ['none', 'reschedule', 'complaint', 'booking', 'mixed'],
+                },
+                historySignalSummary: { type: ['string', 'null'], maxLength: 180 },
+                historySignalActionCue: { type: ['string', 'null'], maxLength: 160 },
+                historyMailboxCount: { type: 'number', minimum: 0 },
+                historyMailboxIds: {
+                  type: 'array',
+                  maxItems: 10,
+                  items: { type: 'string', minLength: 1, maxLength: 320 },
+                },
+                historyMessageCount: { type: 'number', minimum: 0 },
+                historyRecentMessageCount: { type: 'number', minimum: 0 },
+                historyLatestMessageAt: { type: ['string', 'null'], maxLength: 50 },
+                historyOutcomeCode: {
+                  type: ['string', 'null'],
+                  enum: [
+                    'booked',
+                    'rebooked',
+                    'replied',
+                    'not_interested',
+                    'escalated',
+                    'no_response',
+                    'closed_no_action',
+                    null,
+                  ],
+                },
+                historyOutcomeLabel: { type: ['string', 'null'], maxLength: 80 },
+                historyOutcomeSummary: { type: ['string', 'null'], maxLength: 180 },
+                historyOutcomeActionCue: { type: ['string', 'null'], maxLength: 160 },
+                historyOutcomeAt: { type: ['string', 'null'], maxLength: 50 },
                 timeline: {
                   type: 'array',
                   maxItems: 6,
@@ -1775,12 +2047,16 @@ class AnalyzeInboxCapability extends BaseCapability {
           daysSinceLastClosedCase: null,
           timeline: [],
         };
+      const historySignals = normalizeHistorySignals(
+        conversation.historySignals || customerBucket.historySignals
+      );
 
       const priorityInfo = computeWeightedPriorityScore({
         hoursSinceInbound: wallHoursSinceInbound,
         intent,
         tone,
         customerContext: conversation.customerContext,
+        historySignals,
       });
       const priorityReasons = asArray(priorityInfo.priorityReasons)
         .map((item) => normalizeText(item))
@@ -1934,6 +2210,7 @@ class AnalyzeInboxCapability extends BaseCapability {
         relationshipStatus,
         interactionCount: customerSummary.interactionCount,
         intent,
+        historySignals,
       });
       const dominantRisk = normalizeText(riskStack.dominantRisk) || 'neutral';
       const riskStackScore = clamp(toNumber(riskStack.weightedScore, 0), 0, 1, 0);
@@ -2084,6 +2361,7 @@ class AnalyzeInboxCapability extends BaseCapability {
         followUpManualApprovalRequired: timingSuggestion.manualApprovalRequired !== false,
         estimatedWorkMinutes: workload.estimatedMinutes,
         workloadBreakdown: asObject(workload.breakdown),
+        historySignals,
         dominantRisk,
         riskStackScore,
         riskStackExplanation,
@@ -2180,7 +2458,21 @@ class AnalyzeInboxCapability extends BaseCapability {
         intent: item.intent,
         tone: item.tone,
         toneStyle,
-        customerProfile: item.conversation.customerContext,
+        customerProfile: {
+          ...asObject(item.conversation.customerContext),
+          historySignalPattern: item.historySignals?.pattern || item.customerSummary?.historySignalPattern || 'none',
+          historySignalSummary: item.historySignals?.summary || item.customerSummary?.historySignalSummary || '',
+          historySignalActionCue: item.historySignals?.actionCue || item.customerSummary?.historySignalActionCue || '',
+          historyMailboxCount: item.historySignals?.mailboxCount || item.customerSummary?.historyMailboxCount || 0,
+          historyOutcomeCode: item.historySignals?.outcomeCode || item.customerSummary?.historyOutcomeCode || '',
+          historyOutcomeLabel: item.historySignals?.outcomeLabel || item.customerSummary?.historyOutcomeLabel || '',
+          historyOutcomeSummary: item.historySignals?.outcomeSummary || item.customerSummary?.historyOutcomeSummary || '',
+          historyOutcomeActionCue: item.historySignals?.outcomeActionCue || item.customerSummary?.historyOutcomeActionCue || '',
+          historyOutcomeAt: item.historySignals?.outcomeAt || item.customerSummary?.historyOutcomeAt || '',
+          historyCalibrationPreferredMode: item.historySignals?.preferredMode || '',
+          historyCalibrationPositiveOutcomeCount: item.historySignals?.positiveOutcomeCount || 0,
+          historyCalibrationNegativeOutcomeCount: item.historySignals?.negativeOutcomeCount || 0,
+        },
         writingProfile: item.writingProfile,
       });
       suggestedDrafts.push({
@@ -2286,11 +2578,13 @@ class AnalyzeInboxCapability extends BaseCapability {
       deliveryMode: 'manual_review_required',
       toneStyleApplied: toneStyle,
       ccoDefaultSenderMailbox: CCO_DEFAULT_SENDER_MAILBOX,
-      ccoSenderMailboxOptions: [
-        CCO_DEFAULT_SENDER_MAILBOX,
-        ...CCO_SIGNATURE_PROFILES.map((item) => item.senderMailboxId),
-      ],
-      ccoDefaultSignatureProfile: 'egzona',
+      ccoSenderMailboxOptions: Array.from(
+        new Set([
+          CCO_DEFAULT_SENDER_MAILBOX,
+          ...CCO_SIGNATURE_PROFILES.map((item) => item.senderMailboxId),
+        ])
+      ),
+      ccoDefaultSignatureProfile: 'contact',
       ccoSignatureProfiles: CCO_SIGNATURE_PROFILES.map((item) => ({
         key: item.key,
         fullName: item.fullName,

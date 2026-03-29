@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "cco:live": "PORT=${PORT:-3000} ARCANA_GRAPH_READ_ENABLED=true ARCANA_GRAPH_SEND_ENABLED=true ARCANA_CCO_DELETE_ENABLED=true node server.js",
     "setup:mac": "bash ./scripts/bootstrap-mac-studio.sh",
     "workstation:bootstrap": "bash ./scripts/bootstrap-apple-workstation.sh",
     "workstation:bootstrap:remote": "bash ./scripts/bootstrap-remote-apple-client.sh",
@@ -24,7 +25,7 @@
     "imac:shell": "bash ./scripts/imac-remote.sh shell",
     "imac:codex": "bash ./scripts/imac-remote.sh codex",
     "imac:start": "bash ./scripts/imac-start.sh",
-    "dev:offline": "ARCANA_AI_PROVIDER=fallback ARCANA_GRAPH_READ_ENABLED=false ARCANA_GRAPH_SEND_ENABLED=false node server.js",
+    "dev:offline": "PORT=${PORT:-3100} ARCANA_AI_PROVIDER=fallback ARCANA_GRAPH_READ_ENABLED=false ARCANA_GRAPH_SEND_ENABLED=false node server.js",
     "cco-next:sync-release": "bash ./scripts/sync-cco-next-release.sh",
     "check:syntax": "find ./src ./scripts ./public \\( -path \"./public/cco-next-release\" -o -path \"./public/cco-next-release/*\" \\) -prune -o -type f -name \"*.js\" -print0 | xargs -0 -n1 node --check && node --check server.js",
     "smoke": "bash ./scripts/smoke-template.sh",
@@ -103,7 +104,7 @@
     "design:colors": "node ./scripts/generate-admin-color-docs.js",
     "ingest:hairtpclinic": "node scripts/ingest-site.js --base https://www.hairtpclinic.se --out ./knowledge/hair-tp-clinic/site --sitemap --maxPages 120",
     "ingest:curatiio": "node scripts/ingest-site.js --base https://www.curatiio.se --out ./knowledge/curatiio/site --sitemap --maxPages 120",
-    "lint:no-bypass": "node ./scripts/check-route-bypass.js",
+    "lint:no-bypass": "node ./scripts/check-route-bypass.js && node ./scripts/check-cco-next-read-only.js",
     "audit:repair": "node ./scripts/audit-repair.js",
     "test": "npm run test:unit",
     "test:unit": "find ./tests -type f -name \"*.test.js\" -print0 | xargs -0 node --test",
@@ -119,6 +120,7 @@
     "express": "^5.2.1",
     "openai": "^6.22.0",
     "playwright": "1.58.2",
-    "redis": "^4.7.1"
+    "redis": "^4.7.1",
+    "xlsx": "^0.18.5"
   }
 }

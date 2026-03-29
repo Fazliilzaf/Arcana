@@ -34,6 +34,8 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
               direction: 'outbound',
               sentAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
               bodyPreview: 'Tack för ditt meddelande. Vi återkommer inom kort.',
+              bodyHtml:
+                '<div><p>Tack för ditt meddelande.</p><img src="https://arcana.hairtpclinic.se/assets/hair-tp-clinic/hairtpclinic-mark-light.svg" alt="Hair TP Clinic" /></div>',
             },
           ],
         },
@@ -95,6 +97,12 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
   assert.equal(typeof output.data.conversationWorklist?.[0]?.customerKey, 'string');
   assert.equal(typeof output.data.conversationWorklist?.[0]?.customerSummary?.customerName, 'string');
   assert.equal(
+    ['none', 'reschedule', 'complaint', 'booking', 'mixed'].includes(
+      output.data.conversationWorklist?.[0]?.customerSummary?.historySignalPattern
+    ),
+    true
+  );
+  assert.equal(
     ['responsive', 'reflective', 'hesitant', 'low_engagement'].includes(
       output.data.conversationWorklist?.[0]?.tempoProfile
     ),
@@ -119,6 +127,10 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
   assert.equal(output.data.outboundFeed.length >= 1, true);
   assert.equal(output.data.inboundFeed[0].direction, 'inbound');
   assert.equal(output.data.outboundFeed[0].direction, 'outbound');
+  assert.match(
+    String(output.data.outboundFeed[0].bodyHtml || ''),
+    /hairtpclinic-mark-light\.svg/
+  );
   const firstDraft = output.data.suggestedDrafts?.[0] || {};
   assert.equal(typeof firstDraft?.draftModes?.short, 'string');
   assert.equal(typeof firstDraft?.draftModes?.warm, 'string');
@@ -529,6 +541,49 @@ test('AnalyzeInbox applies mailbox-specific writing identity overrides to drafts
   );
 });
 
+test('AnalyzeInbox exposes contact as default sender and default signature profile metadata', async () => {
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-contact-default',
+    actor: { id: 'owner-contact-default', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-contact-default',
+    correlationId: 'corr-contact-default',
+    input: {
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-contact-default',
+          subject: 'Fråga om konsultation',
+          status: 'open',
+          mailboxAddress: 'kons@hairtpclinic.com',
+          messages: [
+            {
+              messageId: 'msg-contact-default',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+              mailboxAddress: 'kons@hairtpclinic.com',
+              bodyPreview: 'Hej, jag vill ha hjälp med en konsultationstid.',
+            },
+          ],
+        },
+      ],
+    },
+  });
+
+  assert.equal(output.metadata.ccoDefaultSenderMailbox, 'contact@hairtpclinic.com');
+  assert.equal(output.metadata.ccoDefaultSignatureProfile, 'contact');
+  assert.deepEqual(
+    output.metadata.ccoSenderMailboxOptions,
+    ['contact@hairtpclinic.com', 'egzona@hairtpclinic.com', 'fazli@hairtpclinic.com']
+  );
+  assert.deepEqual(
+    output.metadata.ccoSignatureProfiles.map((item) => item.key),
+    ['contact', 'egzona', 'fazli']
+  );
+});
+
 test('AnalyzeInbox debug mode exposes snapshot structure for conversations', async () => {
   const output = await new analyzeInboxCapability().execute({
     tenantId: 'tenant-a',
@@ -713,6 +768,162 @@ test('AnalyzeInbox includes customer context factors in priority reasons', async
     assert.equal(rich.priorityReasons.includes('CUSTOMER_OPEN_COMMITMENTS:+15'), true);
     assert.equal(rich.priorityReasons.includes('CUSTOMER_REPEAT:+5'), true);
     assert.equal(rich.priorityReasons.includes('CUSTOMER_REVENUE_HIGH:+10'), true);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('AnalyzeInbox carries customer history signals into priority, recommendation and summary', async () => {
+  const fixedNowMs = Date.parse('2026-03-10T12:00:00.000Z');
+  const originalNow = Date.now;
+  const isoHoursAgo = (hours) => new Date(fixedNowMs - hours * 60 * 60 * 1000).toISOString();
+
+  Date.now = () => fixedNowMs;
+  try {
+    const output = await new analyzeInboxCapability().execute({
+      tenantId: 'tenant-a',
+      actor: { id: 'owner-a', role: 'OWNER' },
+      channel: 'admin',
+      requestId: 'req-inbox-history-signal',
+      correlationId: 'corr-inbox-history-signal',
+      input: {
+        maxDrafts: 1,
+      },
+      systemStateSnapshot: {
+        conversations: [
+          {
+            conversationId: 'conv-history-signal',
+            subject: 'Boka om min tid',
+            status: 'open',
+            historySignals: {
+              pattern: 'reschedule',
+              summary: 'Historik visar återkommande ombokning över flera mailboxar.',
+              actionCue: 'Skicka två konkreta tider direkt och be kunden välja i samma svar.',
+              mailboxIds: ['kons@hairtpclinic.com', 'info@hairtpclinic.com'],
+              mailboxCount: 2,
+              messageCount: 6,
+              recentMessageCount: 4,
+              latestMessageAt: new Date(fixedNowMs - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              outcomeCode: 'rebooked',
+              outcomeSummary: 'Tidigare utfall: ombokning lyckades efter tydliga alternativ.',
+              outcomeActionCue: 'Upprepa två tydliga tider direkt.',
+              outcomeAt: new Date(fixedNowMs - 24 * 60 * 60 * 1000).toISOString(),
+            },
+            messages: [
+              {
+                messageId: 'msg-history-signal',
+                direction: 'inbound',
+                senderEmail: 'kund@example.com',
+                sentAt: isoHoursAgo(28),
+                bodyPreview: 'Hej, jag behöver boka om min tid och vill gärna ha två nya alternativ.',
+              },
+            ],
+          },
+        ],
+        timestamps: {
+          capturedAt: new Date(fixedNowMs).toISOString(),
+        },
+      },
+    });
+
+    const row = output.data.conversationWorklist.find((item) => item.conversationId === 'conv-history-signal');
+    assert.equal(Boolean(row), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_PATTERN_RESCHEDULE:+8'), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_MULTI_MAILBOX:+6'), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_RECENT_ACTIVITY:+5'), true);
+    assert.equal(row.recommendedAction.includes('två tydliga tider direkt'), true);
+    assert.equal(row.customerSummary.historySignalPattern, 'reschedule');
+    assert.equal(row.customerSummary.historyMailboxCount, 2);
+    assert.equal(row.customerSummary.historyRecentMessageCount, 4);
+    assert.equal(row.customerSummary.historyOutcomeCode, 'rebooked');
+    assert.equal(row.customerSummary.historyOutcomeSummary.includes('ombokning lyckades'), true);
+    const suggestedDraft = output.data.suggestedDrafts.find(
+      (item) => item.conversationId === 'conv-history-signal'
+    );
+    assert.equal(Boolean(suggestedDraft), true);
+    assert.equal(
+      String(
+        suggestedDraft.draftModes?.[suggestedDraft.recommendedMode] || suggestedDraft.draftModes?.professional || ''
+      ).includes('Tidigare liknande dialog löstes bäst med två tydliga alternativ direkt.'),
+      true
+    );
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('AnalyzeInbox uses calibration history to shape priority, action and draft mode', async () => {
+  const fixedNowMs = Date.parse('2026-03-10T12:00:00.000Z');
+  const originalNow = Date.now;
+  const isoHoursAgo = (hours) => new Date(fixedNowMs - hours * 60 * 60 * 1000).toISOString();
+
+  Date.now = () => fixedNowMs;
+  try {
+    const output = await new analyzeInboxCapability().execute({
+      tenantId: 'tenant-a',
+      actor: { id: 'owner-a', role: 'OWNER' },
+      channel: 'admin',
+      requestId: 'req-inbox-calibration-signal',
+      correlationId: 'corr-inbox-calibration-signal',
+      input: {
+        maxDrafts: 1,
+      },
+      systemStateSnapshot: {
+        conversations: [
+          {
+            conversationId: 'conv-calibration-signal',
+            subject: 'Jag behöver boka om min tid',
+            status: 'open',
+            historySignals: {
+              pattern: 'reschedule',
+              summary: 'Historik visar återkommande ombokning över flera mailboxar.',
+              actionCue: 'Skicka två konkreta tider direkt och be kunden välja i samma svar.',
+              mailboxIds: ['kons@hairtpclinic.com', 'info@hairtpclinic.com'],
+              mailboxCount: 2,
+              messageCount: 8,
+              recentMessageCount: 5,
+              latestMessageAt: new Date(fixedNowMs - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              outcomeCode: 'rebooked',
+              outcomeSummary: 'Tidigare utfall: ombokning lyckades efter tydliga alternativ.',
+              outcomeActionCue: 'Upprepa två tydliga tider direkt.',
+              outcomeAt: new Date(fixedNowMs - 24 * 60 * 60 * 1000).toISOString(),
+              calibrationSummary: 'Utfallshistorik: professionell ton gav bäst resultat, men uteblivet svar återkommer i liknande trådar.',
+              calibrationActionCue: 'Behåll professionell ton och ge två tydliga alternativ direkt.',
+              preferredMode: 'professional',
+              positiveOutcomeCount: 3,
+              negativeOutcomeCount: 2,
+              dominantFailureOutcome: 'no_response',
+              dominantFailureRisk: 'relationship',
+            },
+            messages: [
+              {
+                messageId: 'msg-calibration-signal',
+                direction: 'inbound',
+                senderEmail: 'kund@example.com',
+                sentAt: isoHoursAgo(28),
+                bodyPreview: 'Hej, jag behöver boka om min tid så snart som möjligt.',
+              },
+            ],
+          },
+        ],
+        timestamps: {
+          capturedAt: new Date(fixedNowMs).toISOString(),
+        },
+      },
+    });
+
+    const row = output.data.conversationWorklist.find((item) => item.conversationId === 'conv-calibration-signal');
+    assert.equal(Boolean(row), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_CALIBRATION_REPEAT_NEGATIVE:+4'), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_CALIBRATION_NO_RESPONSE:+4'), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_CALIBRATION_RELATIONSHIP:+4'), true);
+    assert.equal(row.recommendedAction.includes('två tydliga tider'), true);
+
+    const suggestedDraft = output.data.suggestedDrafts.find(
+      (item) => item.conversationId === 'conv-calibration-signal'
+    );
+    assert.equal(Boolean(suggestedDraft), true);
+    assert.equal(suggestedDraft.recommendedMode, 'professional');
   } finally {
     Date.now = originalNow;
   }

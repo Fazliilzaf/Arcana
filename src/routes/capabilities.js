@@ -3,7 +3,11 @@ const express = require('express');
 
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const { createExecutionGateway } = require('../gateway/executionGateway');
-const { createCapabilityExecutor } = require('../capabilities/executionService');
+const {
+  createCapabilityExecutor,
+  applyCcoSignatureHtml,
+  resolveCcoSignatureProfile,
+} = require('../capabilities/executionService');
 const { createMicrosoftGraphReadConnector } = require('../infra/microsoftGraphReadConnector');
 const { createMicrosoftGraphSendConnector } = require('../infra/microsoftGraphSendConnector');
 const {
@@ -27,6 +31,7 @@ const { evaluateRedFlag } = require('../intelligence/redFlagEngine');
 const { resolveAdaptiveFocusState } = require('../intelligence/adaptiveFocusController');
 const { evaluateRecovery } = require('../intelligence/recoveryEngine');
 const { evaluateStrategicInsights } = require('../intelligence/strategicInsightsEngine');
+const { summarizeShadowReview } = require('../ops/ccoShadowRun');
 
 const CCO_LIFECYCLE_AUDIT_STATES = new Set([
   'NEW',
@@ -49,9 +54,38 @@ const CCO_GRAPH_READ_DEFAULT_ALLOWLIST = Object.freeze([
 const CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET = new Set(
   CCO_GRAPH_READ_DEFAULT_ALLOWLIST.map((item) => normalizeText(item).toLowerCase()).filter(Boolean)
 );
+const CCO_CUSTOMER_HISTORY_DEFAULT_MAILBOX_IDS = Object.freeze([
+  'kons@hairtpclinic.com',
+  'info@hairtpclinic.com',
+  'contact@hairtpclinic.com',
+  'egzona@hairtpclinic.com',
+  'fazli@hairtpclinic.com',
+]);
+const CCO_KONS_HISTORY_DEFAULT_MAILBOX = 'kons@hairtpclinic.com';
+const CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS = 1095;
+const CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS = 1825;
+const CCO_KONS_HISTORY_CHUNK_DAYS = 30;
+const CCO_KONS_HISTORY_RECENT_FRESHNESS_MS = 10 * 60 * 1000;
+const CCO_ANALYZE_HISTORY_SIGNAL_LOOKBACK_DAYS = 365;
+const CCO_ANALYZE_HISTORY_SIGNAL_RECENT_WINDOW_DAYS = 45;
+const CCO_HISTORY_SIGNAL_RESCHEDULE_PATTERN =
+  /\b(ombok|boka om|avbok|cancel|cancell|resched|ny tid|andra tid|ändra tid|flytta tid)\b/i;
+const CCO_HISTORY_SIGNAL_COMPLAINT_PATTERN =
+  /\b(klag|complaint|missn[oö]jd|besviken|arg|reklamation|frustrerad|problem)\b/i;
+const CCO_HISTORY_SIGNAL_BOOKING_PATTERN =
+  /\b(boka|booking|appointment|konsultation|consultation|tid)\b/i;
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function toNumber(value, fallback = 0) {
@@ -91,6 +125,230 @@ function normalizeLifecycleAuditState(value = '') {
   if (normalized === 'FOLLOW_UP_SCHEDULED') return 'FOLLOW_UP_PENDING';
   if (normalized === 'CLOSED' || normalized === 'RESOLVED') return 'HANDLED';
   return '';
+}
+
+function formatSignaturePreviewBodyHtml(value = '') {
+  const safeBody = normalizeText(value) || 'Kontrollerat inspectionsmail från CCO-next.';
+  return escapeHtml(safeBody).replace(/\r?\n/g, '<br />');
+}
+
+function buildSignaturePreviewDocument({
+  profile = null,
+  senderMailboxId = '',
+  emailHtml = '',
+} = {}) {
+  const safeProfileName = normalizeText(profile?.fullName) || 'Hair TP Clinic';
+  const safeProfileKey = normalizeText(profile?.key) || 'contact';
+  const safeSenderMailbox = normalizeText(senderMailboxId) || 'contact@hairtpclinic.com';
+  const safeEmailHtml = String(emailHtml || '');
+
+  return `<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CCO Signaturpreview</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe7;
+        --panel: rgba(255, 252, 248, 0.92);
+        --panel-strong: #ffffff;
+        --line: rgba(120, 105, 90, 0.16);
+        --text: #2f2f33;
+        --muted: rgba(70, 60, 50, 0.62);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        font-family: Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(219, 204, 190, 0.28), transparent 28%),
+          linear-gradient(180deg, #fbf7f2 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+      .page {
+        max-width: 1360px;
+        margin: 0 auto;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 24px;
+        margin-bottom: 24px;
+      }
+      .title {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.1;
+        font-weight: 700;
+      }
+      .meta {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.25;
+      }
+      .meta-chip {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 12px;
+        background: rgba(255,255,255,0.72);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(620px, 1fr) 430px;
+        gap: 24px;
+        align-items: start;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        box-shadow:
+          0 8px 24px rgba(70, 50, 30, 0.08),
+          0 2px 6px rgba(70, 50, 30, 0.05),
+          inset 0 1px 0 rgba(255,255,255,0.55);
+        overflow: hidden;
+      }
+      .panel-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .panel-title {
+        margin: 0;
+        font-size: 16px;
+        line-height: 1.2;
+        font-weight: 700;
+      }
+      .panel-subtitle {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.2;
+      }
+      .frame {
+        padding: 20px;
+        background: var(--panel-strong);
+      }
+      .desktop-canvas {
+        min-height: 560px;
+        border-radius: 16px;
+        border: 1px solid rgba(120, 105, 90, 0.1);
+        background: #ffffff;
+        padding: 28px;
+      }
+      .mobile-shell {
+        margin: 0 auto;
+        width: 390px;
+        max-width: 100%;
+        border-radius: 32px;
+        padding: 14px;
+        background: #111214;
+        box-shadow:
+          0 18px 44px rgba(25, 16, 12, 0.18),
+          inset 0 1px 0 rgba(255,255,255,0.12);
+      }
+      .mobile-screen {
+        min-height: 720px;
+        border-radius: 24px;
+        background: #ffffff;
+        padding: 24px 20px;
+        overflow: hidden;
+      }
+      .email-preview {
+        width: 100%;
+      }
+      .hint {
+        margin: 16px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      @media (max-width: 1180px) {
+        body { padding: 20px; }
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <div>
+          <h1 class="title">CCO signaturpreview</h1>
+          <div class="meta">
+            <span class="meta-chip">Profil: ${escapeHtml(safeProfileName)}</span>
+            <span class="meta-chip">Nyckel: ${escapeHtml(safeProfileKey)}</span>
+            <span class="meta-chip">Avsändare: ${escapeHtml(safeSenderMailbox)}</span>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Desktop</h2>
+              <div class="panel-subtitle">Samma utskicks-HTML i bred klient</div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="desktop-canvas">
+              <div class="email-preview">${safeEmailHtml}</div>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Mobil</h2>
+              <div class="panel-subtitle">Samma utskicks-HTML i smal klient</div>
+            </div>
+          </div>
+          <div class="frame">
+            <div class="mobile-shell">
+              <div class="mobile-screen">
+                <div class="email-preview">${safeEmailHtml}</div>
+              </div>
+            </div>
+            <p class="hint">Previewn återanvänder exakt signatur-HTML från utskicket. Det är alltså samma markup som går ut i mail.</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function toCcoSignaturePreviewHandler() {
+  return async (req, res) => {
+    const profile = resolveCcoSignatureProfile(req.query?.profile);
+    const senderMailboxId =
+      normalizeMailboxAddress(req.query?.senderMailboxId) ||
+      normalizeMailboxAddress(profile?.senderMailboxId) ||
+      'contact@hairtpclinic.com';
+    const bodyHtml = formatSignaturePreviewBodyHtml(req.query?.body);
+    const emailHtml = applyCcoSignatureHtml({
+      bodyHtml,
+      profile,
+      senderMailboxId,
+    });
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(
+      buildSignaturePreviewDocument({
+        profile,
+        senderMailboxId,
+        emailHtml,
+      })
+    );
+  };
 }
 
 function extractCcoWorklistRowsFromResult(result = {}) {
@@ -407,6 +665,10 @@ function clampInteger(value, min, max, fallback) {
   return parsed;
 }
 
+function compareIsoDesc(left = '', right = '') {
+  return String(right || '').localeCompare(String(left || ''));
+}
+
 function toWritingIdentityProfilesMap(source = null) {
   const map = {};
   if (!source || typeof source !== 'object') return map;
@@ -439,6 +701,44 @@ function mergeWritingIdentityProfiles({
 function toMailboxAddress(value = '') {
   const mailbox = normalizeMailboxAddress(value);
   return isValidEmail(mailbox) ? mailbox : '';
+}
+
+function toMailboxAliases(value = '') {
+  const normalized = toMailboxAddress(value);
+  if (!normalized) return [];
+  const [localPart = '', domainPart = ''] = normalized.split('@');
+  const aliases = new Set([normalized]);
+  const plusNormalized = localPart.replace(/\+.*/, '');
+  if (plusNormalized && plusNormalized !== localPart) {
+    aliases.add(`${plusNormalized}@${domainPart}`);
+  }
+  const separatorless = plusNormalized.replace(/[._-]/g, '');
+  if (separatorless && separatorless !== plusNormalized) {
+    aliases.add(`${separatorless}@${domainPart}`);
+  }
+  const domainMatch = domainPart.match(/^([a-z0-9.-]+)\.(com|se)$/i);
+  if (domainMatch) {
+    const domainRoot = normalizeText(domainMatch[1]).toLowerCase();
+    const flippedTld = normalizeText(domainMatch[2]).toLowerCase() === 'com' ? 'se' : 'com';
+    if (domainRoot) {
+      aliases.add(`${plusNormalized}@${domainRoot}.${flippedTld}`);
+      if (separatorless) aliases.add(`${separatorless}@${domainRoot}.${flippedTld}`);
+    }
+  }
+  return Array.from(aliases);
+}
+
+function matchesMailboxAddressAlias(target = '', candidates = []) {
+  const targetAliases = new Set(toMailboxAliases(target));
+  if (targetAliases.size === 0) return false;
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    for (const alias of toMailboxAliases(candidate)) {
+      if (targetAliases.has(alias)) return true;
+    }
+    const normalizedCandidate = toMailboxAddress(candidate);
+    if (normalizedCandidate && targetAliases.has(normalizedCandidate)) return true;
+  }
+  return false;
 }
 
 function parseMailboxList(raw = null) {
@@ -482,6 +782,827 @@ function parseMailboxIds(rawValue = '', maxItems = 200) {
   return mailboxIds;
 }
 
+function parseMailboxIdValues(rawValue = [], maxItems = 200) {
+  const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+  const tokens = [];
+  for (const value of values) {
+    const parsed = parseMailboxIds(value, maxItems);
+    for (const token of parsed) {
+      if (tokens.length >= maxItems) break;
+      tokens.push(token);
+    }
+    if (tokens.length >= maxItems) break;
+  }
+  return tokens;
+}
+
+function normalizeMailboxIdList(rawMailboxIds = [], maxItems = 50) {
+  const normalized = [];
+  const seen = new Set();
+  for (const rawMailboxId of Array.isArray(rawMailboxIds) ? rawMailboxIds : []) {
+    if (normalized.length >= maxItems) break;
+    const mailboxId = toMailboxAddress(rawMailboxId);
+    if (!mailboxId || seen.has(mailboxId)) continue;
+    seen.add(mailboxId);
+    normalized.push(mailboxId);
+  }
+  return normalized;
+}
+
+function resolveCcoRuntimeHistoryMailboxIds(input = {}) {
+  const safeInput = asObject(input);
+  const explicitMailboxIds = normalizeMailboxIdList(
+    parseMailboxIdValues(safeInput.mailboxIds, 50),
+    50
+  ).filter((mailboxId) => CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(mailboxId));
+  if (explicitMailboxIds.length > 0) return explicitMailboxIds;
+
+  const fallbackMailboxId = toMailboxAddress(safeInput.mailboxId);
+  if (fallbackMailboxId && CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(fallbackMailboxId)) {
+    return [fallbackMailboxId];
+  }
+
+  return CCO_CUSTOMER_HISTORY_DEFAULT_MAILBOX_IDS.slice();
+}
+
+function resolveAnalyzeInboxMailboxIds(input = {}) {
+  const safeInput = asObject(input);
+  const explicitMailboxIds = normalizeMailboxIdList(
+    parseMailboxIdValues(safeInput.mailboxIds, 50),
+    50
+  ).filter((mailboxId) => CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(mailboxId));
+  if (explicitMailboxIds.length > 0) return explicitMailboxIds;
+
+  const fallbackMailboxId = toMailboxAddress(safeInput.mailboxId || safeInput.mailboxAddress);
+  if (fallbackMailboxId && CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(fallbackMailboxId)) {
+    return [fallbackMailboxId];
+  }
+
+  return [];
+}
+
+function parseCcoRuntimeOptionList(rawValue = null, maxItems = 20) {
+  const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+  const tokens = [];
+  const seen = new Set();
+  for (const value of values) {
+    const parts = String(value || '')
+      .split(/[,\s;]+/)
+      .map((item) => normalizeText(item).toLowerCase())
+      .filter(Boolean);
+    for (const part of parts) {
+      if (seen.has(part)) continue;
+      seen.add(part);
+      tokens.push(part);
+      if (tokens.length >= maxItems) return tokens;
+    }
+  }
+  return tokens;
+}
+
+function normalizeCcoRuntimeHistoryResultTypes(values = []) {
+  const normalized = [];
+  const seen = new Set();
+  for (const value of parseCcoRuntimeOptionList(values, 10)) {
+    const resultType =
+      value === 'mail' || value === 'email'
+        ? 'message'
+        : value === 'utfall'
+          ? 'outcome'
+          : value === 'activity' || value === 'event'
+            ? 'action'
+            : value;
+    if (!['message', 'outcome', 'action'].includes(resultType) || seen.has(resultType)) continue;
+    seen.add(resultType);
+    normalized.push(resultType);
+  }
+  return normalized;
+}
+
+function normalizeCcoRuntimeHistoryActionTypes(values = []) {
+  const normalized = [];
+  const seen = new Set();
+  for (const value of parseCcoRuntimeOptionList(values, 12)) {
+    const actionType =
+      value === 'sent' || value === 'replysent'
+        ? 'reply_sent'
+        : value === 'later' || value === 'snoozed'
+          ? 'reply_later'
+          : value === 'replied'
+            ? 'customer_replied'
+            : value === 'deleted'
+              ? 'conversation_deleted'
+              : value;
+    if (
+      !['reply_sent', 'reply_later', 'customer_replied', 'conversation_deleted'].includes(actionType) ||
+      seen.has(actionType)
+    ) {
+      continue;
+    }
+    seen.add(actionType);
+    normalized.push(actionType);
+  }
+  return normalized;
+}
+
+function normalizeCcoRuntimeHistoryOutcomeCodes(values = []) {
+  const normalized = [];
+  const seen = new Set();
+  for (const value of parseCcoRuntimeOptionList(values, 12)) {
+    const outcomeCode =
+      value === 'booked' || value === 'bokad'
+        ? 'booked'
+        : value === 'rebooked' || value === 'ombokad'
+          ? 'rebooked'
+          : value === 'replied' || value === 'besvarat'
+            ? 'replied'
+            : value === 'notinterested' || value === 'ejintresserad'
+              ? 'not_interested'
+              : value === 'escalated' || value === 'eskalerad'
+                ? 'escalated'
+                : value === 'noresponse' || value === 'ingenrespons'
+                  ? 'no_response'
+                  : value === 'closedwithoutaction' || value === 'stängdutanåtgärd' || value === 'stangdutanatgard'
+                    ? 'closed_no_action'
+                    : value;
+    if (
+      ![
+        'booked',
+        'rebooked',
+        'replied',
+        'not_interested',
+        'escalated',
+        'no_response',
+        'closed_no_action',
+      ].includes(outcomeCode) ||
+      seen.has(outcomeCode)
+    ) {
+      continue;
+    }
+    seen.add(outcomeCode);
+    normalized.push(outcomeCode);
+  }
+  return normalized;
+}
+
+function toAnalyzeInboxHistoryWindowBounds(
+  lookbackDays = CCO_ANALYZE_HISTORY_SIGNAL_LOOKBACK_DAYS
+) {
+  const safeLookbackDays = Math.max(
+    30,
+    Math.min(CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS, Number(lookbackDays) || CCO_ANALYZE_HISTORY_SIGNAL_LOOKBACK_DAYS)
+  );
+  const endMs = Date.now();
+  const startMs = endMs - safeLookbackDays * 24 * 60 * 60 * 1000;
+  return {
+    startIso: new Date(startMs).toISOString(),
+    endIso: new Date(endMs).toISOString(),
+  };
+}
+
+function resolveAnalyzeInboxCustomerEmail(conversation = {}) {
+  const safeConversation = asObject(conversation);
+  const explicitCustomerEmail = toMailboxAddress(
+    safeConversation.customerEmail || safeConversation.senderEmail
+  );
+  if (explicitCustomerEmail) return explicitCustomerEmail;
+  const messages = asArray(safeConversation.messages);
+  for (const message of messages) {
+    const direction = normalizeText(message?.direction).toLowerCase();
+    if (direction !== 'inbound') continue;
+    const senderEmail = toMailboxAddress(message?.senderEmail);
+    if (senderEmail) return senderEmail;
+  }
+  for (const message of messages) {
+    const senderEmail = toMailboxAddress(message?.senderEmail);
+    if (senderEmail) return senderEmail;
+  }
+  return '';
+}
+
+function createHistorySignalAggregate(customerEmail = '') {
+  return {
+    customerEmail,
+    mailboxIds: new Set(),
+    messageCount: 0,
+    recentMessageCount: 0,
+    inboundCount: 0,
+    outboundCount: 0,
+    complaintCount: 0,
+    rescheduleCount: 0,
+    bookingCount: 0,
+    latestMessageAt: null,
+    outcomeCounts: {},
+    positiveOutcomeCount: 0,
+    negativeOutcomeCount: 0,
+    neutralOutcomeCount: 0,
+    preferredModeStats: {},
+    dominantRiskStats: {},
+    recommendedActionStats: {},
+    latestOutcomeCode: null,
+    latestOutcomeLabel: null,
+    latestOutcomeAt: null,
+  };
+}
+
+function applyHistorySignalPatternCounts(aggregate, text = '') {
+  const safeAggregate = aggregate && typeof aggregate === 'object' ? aggregate : null;
+  if (!safeAggregate) return;
+  const haystack = normalizeText(text);
+  if (!haystack) return;
+  const hasComplaint = CCO_HISTORY_SIGNAL_COMPLAINT_PATTERN.test(haystack);
+  const hasReschedule = CCO_HISTORY_SIGNAL_RESCHEDULE_PATTERN.test(haystack);
+  const hasBooking = CCO_HISTORY_SIGNAL_BOOKING_PATTERN.test(haystack);
+  if (hasComplaint) {
+    safeAggregate.complaintCount += 1;
+  }
+  if (hasReschedule) {
+    safeAggregate.rescheduleCount += 1;
+  }
+  if (hasBooking && !hasReschedule) {
+    safeAggregate.bookingCount += 1;
+  }
+}
+
+function resolveHistorySignalPattern(aggregate = {}) {
+  const complaintCount = Math.max(0, Number(aggregate.complaintCount) || 0);
+  const rescheduleCount = Math.max(0, Number(aggregate.rescheduleCount) || 0);
+  const bookingCount = Math.max(0, Number(aggregate.bookingCount) || 0);
+  const activeKinds = [
+    complaintCount > 0 ? 'complaint' : '',
+    rescheduleCount > 0 ? 'reschedule' : '',
+    bookingCount > 0 ? 'booking' : '',
+  ].filter(Boolean);
+  if (activeKinds.length === 0) return 'none';
+  if (
+    complaintCount >= 2 &&
+    complaintCount >= rescheduleCount &&
+    complaintCount >= bookingCount
+  ) {
+    return 'complaint';
+  }
+  if (
+    rescheduleCount >= 2 &&
+    rescheduleCount >= complaintCount &&
+    rescheduleCount >= bookingCount
+  ) {
+    return 'reschedule';
+  }
+  if (
+    bookingCount >= 2 &&
+    bookingCount >= complaintCount &&
+    bookingCount >= rescheduleCount
+  ) {
+    return 'booking';
+  }
+  if (activeKinds.length >= 2) return 'mixed';
+  return activeKinds[0] || 'none';
+}
+
+function buildHistorySignalSummarySv({
+  pattern = 'none',
+  mailboxCount = 0,
+  recentMessageCount = 0,
+} = {}) {
+  const mailboxPhrase =
+    mailboxCount > 1 ? `över ${mailboxCount} mailboxar` : 'i samma mailbox';
+  const recentPhrase =
+    recentMessageCount >= 3 ? ` (${recentMessageCount} mail senaste tiden)` : '';
+  if (pattern === 'complaint') {
+    return `Historik visar återkommande friktion ${mailboxPhrase}${recentPhrase}.`;
+  }
+  if (pattern === 'reschedule') {
+    return `Historik visar återkommande ombokning ${mailboxPhrase}${recentPhrase}.`;
+  }
+  if (pattern === 'booking') {
+    return `Historik visar tidigare bokningsdialog ${mailboxPhrase}${recentPhrase}.`;
+  }
+  if (pattern === 'mixed') {
+    return `Historik visar återkommande kontakt ${mailboxPhrase}${recentPhrase}.`;
+  }
+  return mailboxCount > 1 || recentMessageCount >= 3
+    ? `Historik visar återkommande kontakt${recentPhrase}.`
+    : '';
+}
+
+function buildHistorySignalActionCueSv({ pattern = 'none', mailboxCount = 0 } = {}) {
+  if (pattern === 'complaint') {
+    return 'Bekräfta tidigare friktion och stäng loopen tydligt i samma svar.';
+  }
+  if (pattern === 'reschedule') {
+    return 'Skicka två konkreta tider direkt och be kunden välja i samma svar.';
+  }
+  if (pattern === 'booking') {
+    return 'Var konkret med tider eller nästa steg direkt i svaret.';
+  }
+  if (pattern === 'mixed' || mailboxCount > 1) {
+    return 'Samla tråden kort och ge ett tydligt nästa steg i samma svar.';
+  }
+  return '';
+}
+
+function normalizeHistoryOutcomeCode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['booked', 'bokad'].includes(normalized)) return 'booked';
+  if (['rebooked', 'ombokad'].includes(normalized)) return 'rebooked';
+  if (['replied', 'answered', 'besvarat'].includes(normalized)) return 'replied';
+  if (['not_interested', 'not interested', 'ej intresserad'].includes(normalized)) {
+    return 'not_interested';
+  }
+  if (['escalated', 'eskalerad'].includes(normalized)) return 'escalated';
+  if (['no_response', 'no response', 'ingen respons'].includes(normalized)) return 'no_response';
+  if (
+    [
+      'closed_no_action',
+      'closed without action',
+      'stängd utan åtgärd',
+      'stangd utan atgard',
+    ].includes(normalized)
+  ) {
+    return 'closed_no_action';
+  }
+  return '';
+}
+
+function normalizeHistoryActionType(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === 'reply_sent' || normalized === 'cco.reply.sent') return 'reply_sent';
+  if (normalized === 'reply_later' || normalized === 'cco.reply.later') return 'reply_later';
+  if (normalized === 'customer_replied' || normalized === 'cco.customer.replied') {
+    return 'customer_replied';
+  }
+  if (normalized === 'conversation_deleted' || normalized === 'cco.conversation.deleted') {
+    return 'conversation_deleted';
+  }
+  return '';
+}
+
+function normalizeHistoryDraftMode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['short', 'warm', 'professional'].includes(normalized)) return normalized;
+  return '';
+}
+
+function normalizeHistoryPriorityLevel(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === 'critical') return 'Critical';
+  if (normalized === 'high') return 'High';
+  if (normalized === 'medium') return 'Medium';
+  if (normalized === 'low') return 'Low';
+  return null;
+}
+
+function classifyHistoryOutcomeBucket(outcomeCode = '') {
+  const safeOutcomeCode = normalizeHistoryOutcomeCode(outcomeCode);
+  if (['booked', 'rebooked', 'replied'].includes(safeOutcomeCode)) return 'positive';
+  if (['escalated', 'no_response'].includes(safeOutcomeCode)) return 'negative';
+  if (['not_interested', 'closed_no_action'].includes(safeOutcomeCode)) return 'neutral';
+  return 'neutral';
+}
+
+function updateHistoryDecisionStat(index = {}, key = '', label = '', bucket = 'neutral', recordedAt = null) {
+  const safeKey = normalizeText(key);
+  if (!safeKey) return;
+  const safeBucket =
+    bucket === 'positive' || bucket === 'negative' || bucket === 'neutral' ? bucket : 'neutral';
+  const current = index[safeKey] || {
+    key: safeKey,
+    label: normalizeText(label) || safeKey,
+    totalCount: 0,
+    positiveCount: 0,
+    negativeCount: 0,
+    neutralCount: 0,
+    lastRecordedAt: null,
+  };
+  current.totalCount += 1;
+  current[`${safeBucket}Count`] += 1;
+  if (
+    recordedAt &&
+    (!current.lastRecordedAt || Date.parse(recordedAt) >= Date.parse(current.lastRecordedAt))
+  ) {
+    current.lastRecordedAt = recordedAt;
+  }
+  index[safeKey] = current;
+}
+
+function pickTopHistoryDecisionStat(index = {}, bucket = 'positive') {
+  const bucketField =
+    bucket === 'negative' ? 'negativeCount' : bucket === 'neutral' ? 'neutralCount' : 'positiveCount';
+  return Object.values(index).sort((left, right) => {
+    if ((right[bucketField] || 0) !== (left[bucketField] || 0)) {
+      return (right[bucketField] || 0) - (left[bucketField] || 0);
+    }
+    if ((right.totalCount || 0) !== (left.totalCount || 0)) {
+      return (right.totalCount || 0) - (left.totalCount || 0);
+    }
+    const byRecordedAt = compareIsoDesc(left.lastRecordedAt, right.lastRecordedAt);
+    if (byRecordedAt !== 0) return byRecordedAt;
+    return String(left.label || '').localeCompare(String(right.label || ''));
+  })[0] || null;
+}
+
+function pickDominantNegativeHistoryOutcome(outcomeCounts = {}) {
+  let winningCode = '';
+  let winningCount = 0;
+  for (const code of ['no_response', 'escalated']) {
+    const count = Math.max(0, Number(outcomeCounts?.[code]) || 0);
+    if (count > winningCount) {
+      winningCode = code;
+      winningCount = count;
+    }
+  }
+  return {
+    code: winningCode || null,
+    count: winningCount,
+  };
+}
+
+function formatHistoryCalibrationModeSv(mode = '') {
+  const safeMode = normalizeHistoryDraftMode(mode);
+  if (safeMode === 'short') return 'kort ton';
+  if (safeMode === 'warm') return 'varm ton';
+  if (safeMode === 'professional') return 'professionell ton';
+  return '';
+}
+
+function formatHistoryNegativeOutcomeSv(outcomeCode = '') {
+  const safeOutcomeCode = normalizeHistoryOutcomeCode(outcomeCode);
+  if (safeOutcomeCode === 'no_response') return 'uteblivet svar';
+  if (safeOutcomeCode === 'escalated') return 'eskalering';
+  return '';
+}
+
+function buildHistoryCalibrationSummarySv({
+  preferredMode = '',
+  positiveOutcomeCount = 0,
+  negativeOutcomeCount = 0,
+  dominantFailureOutcome = '',
+} = {}) {
+  const positiveModeLabel = formatHistoryCalibrationModeSv(preferredMode);
+  const negativeOutcomeLabel = formatHistoryNegativeOutcomeSv(dominantFailureOutcome);
+  if (positiveModeLabel && positiveOutcomeCount >= 2 && negativeOutcomeLabel && negativeOutcomeCount > 0) {
+    return `Utfallshistorik: ${positiveModeLabel} gav bäst resultat, men ${negativeOutcomeLabel} återkommer i liknande trådar.`;
+  }
+  if (positiveModeLabel && positiveOutcomeCount >= 2) {
+    return `Utfallshistorik: ${positiveModeLabel} gav bäst resultat i liknande trådar.`;
+  }
+  if (negativeOutcomeLabel && negativeOutcomeCount > 0) {
+    return `Utfallshistorik: negativt mönster domineras av ${negativeOutcomeLabel}.`;
+  }
+  return '';
+}
+
+function buildHistoryCalibrationActionCueSv({
+  preferredAction = '',
+  preferredMode = '',
+  dominantFailureOutcome = '',
+} = {}) {
+  const safePreferredAction = normalizeText(preferredAction);
+  if (safePreferredAction) return safePreferredAction;
+  if (normalizeHistoryOutcomeCode(dominantFailureOutcome) === 'no_response') {
+    return 'Gör nästa steg binärt och tidsatt.';
+  }
+  if (normalizeHistoryOutcomeCode(dominantFailureOutcome) === 'escalated') {
+    return 'Förbered tidig handoff om samma mönster återkommer.';
+  }
+  const safePreferredMode = normalizeHistoryDraftMode(preferredMode);
+  if (safePreferredMode === 'short') {
+    return 'Håll svaret kort och stäng nästa steg direkt.';
+  }
+  if (safePreferredMode === 'warm') {
+    return 'Behåll varm ton men stäng nästa steg tydligt.';
+  }
+  if (safePreferredMode === 'professional') {
+    return 'Håll svaret sakligt och ge ett tydligt nästa steg.';
+  }
+  return '';
+}
+
+function buildHistoryOutcomeSummarySv(outcomeCode = '') {
+  const safeOutcomeCode = normalizeHistoryOutcomeCode(outcomeCode);
+  if (safeOutcomeCode === 'booked') {
+    return 'Tidigare utfall: bokning lyckades.';
+  }
+  if (safeOutcomeCode === 'rebooked') {
+    return 'Tidigare utfall: ombokning lyckades efter tydliga alternativ.';
+  }
+  if (safeOutcomeCode === 'replied') {
+    return 'Tidigare utfall: kunden svarade när svaret var kort och tydligt.';
+  }
+  if (safeOutcomeCode === 'not_interested') {
+    return 'Tidigare utfall: kunden tackade nej efter tidigare kontakt.';
+  }
+  if (safeOutcomeCode === 'escalated') {
+    return 'Tidigare utfall: liknande tråd krävde eskalering.';
+  }
+  if (safeOutcomeCode === 'no_response') {
+    return 'Tidigare utfall: tidigare liknande tråd tappade fart utan svar.';
+  }
+  if (safeOutcomeCode === 'closed_no_action') {
+    return 'Tidigare utfall: tidigare tråd stängdes utan åtgärd.';
+  }
+  return '';
+}
+
+function buildHistoryOutcomeActionCueSv(outcomeCode = '') {
+  const safeOutcomeCode = normalizeHistoryOutcomeCode(outcomeCode);
+  if (safeOutcomeCode === 'booked') {
+    return 'Var konkret och stäng nästa steg i samma svar.';
+  }
+  if (safeOutcomeCode === 'rebooked') {
+    return 'Upprepa två tydliga tider direkt.';
+  }
+  if (safeOutcomeCode === 'replied') {
+    return 'Håll CTA kort och tydlig.';
+  }
+  if (safeOutcomeCode === 'not_interested') {
+    return 'Bekräfta kort och stäng loopen utan friktion.';
+  }
+  if (safeOutcomeCode === 'escalated') {
+    return 'Förbered tidig handoff om samma mönster återkommer.';
+  }
+  if (safeOutcomeCode === 'no_response') {
+    return 'Gör CTA binär och tidsatt.';
+  }
+  if (safeOutcomeCode === 'closed_no_action') {
+    return 'Bekräfta läget och håll svaret mycket kort.';
+  }
+  return '';
+}
+
+function applyHistoryOutcome(aggregate = null, outcome = {}) {
+  const safeAggregate = aggregate && typeof aggregate === 'object' ? aggregate : null;
+  if (!safeAggregate) return;
+  const outcomeCode = normalizeHistoryOutcomeCode(outcome?.outcomeCode || outcome?.code);
+  if (!outcomeCode) return;
+  const outcomeBucket = classifyHistoryOutcomeBucket(outcomeCode);
+  safeAggregate.outcomeCounts[outcomeCode] = (safeAggregate.outcomeCounts[outcomeCode] || 0) + 1;
+  safeAggregate[`${outcomeBucket}OutcomeCount`] =
+    (safeAggregate[`${outcomeBucket}OutcomeCount`] || 0) + 1;
+  const recordedAt = toIso(outcome?.recordedAt);
+  const preferredMode = normalizeHistoryDraftMode(
+    outcome?.selectedMode || outcome?.recommendedMode
+  );
+  if (preferredMode) {
+    updateHistoryDecisionStat(
+      safeAggregate.preferredModeStats,
+      preferredMode,
+      preferredMode,
+      outcomeBucket,
+      recordedAt
+    );
+  }
+  const dominantRisk = normalizeText(outcome?.dominantRisk).toLowerCase();
+  if (dominantRisk) {
+    updateHistoryDecisionStat(
+      safeAggregate.dominantRiskStats,
+      dominantRisk,
+      dominantRisk,
+      outcomeBucket,
+      recordedAt
+    );
+  }
+  const recommendedAction = normalizeText(outcome?.recommendedAction);
+  if (recommendedAction) {
+    updateHistoryDecisionStat(
+      safeAggregate.recommendedActionStats,
+      recommendedAction.toLowerCase(),
+      recommendedAction,
+      outcomeBucket,
+      recordedAt
+    );
+  }
+  if (
+    recordedAt &&
+    (!safeAggregate.latestOutcomeAt ||
+      Date.parse(recordedAt) >= Date.parse(safeAggregate.latestOutcomeAt))
+  ) {
+    safeAggregate.latestOutcomeCode = outcomeCode;
+    safeAggregate.latestOutcomeLabel = normalizeText(outcome?.outcomeLabel || outcome?.label) || null;
+    safeAggregate.latestOutcomeAt = recordedAt;
+  } else if (!safeAggregate.latestOutcomeCode) {
+    safeAggregate.latestOutcomeCode = outcomeCode;
+    safeAggregate.latestOutcomeLabel = normalizeText(outcome?.outcomeLabel || outcome?.label) || null;
+  }
+}
+
+function finalizeHistorySignal(aggregate = {}) {
+  const mailboxIds = Array.from(aggregate.mailboxIds || []).slice(0, 10);
+  const mailboxCount = mailboxIds.length;
+  const messageCount = Math.max(0, Number(aggregate.messageCount) || 0);
+  const recentMessageCount = Math.max(0, Number(aggregate.recentMessageCount) || 0);
+  const pattern = resolveHistorySignalPattern(aggregate);
+  const outcomeCode = normalizeHistoryOutcomeCode(aggregate.latestOutcomeCode);
+  const outcomeSummary = buildHistoryOutcomeSummarySv(outcomeCode);
+  const outcomeActionCue = buildHistoryOutcomeActionCueSv(outcomeCode);
+  const preferredModeCandidate = pickTopHistoryDecisionStat(aggregate.preferredModeStats, 'positive');
+  const preferredActionCandidate = pickTopHistoryDecisionStat(aggregate.recommendedActionStats, 'positive');
+  const dominantFailureOutcome = pickDominantNegativeHistoryOutcome(aggregate.outcomeCounts || {});
+  const dominantFailureRiskCandidate = pickTopHistoryDecisionStat(aggregate.dominantRiskStats, 'negative');
+  const preferredMode =
+    preferredModeCandidate && preferredModeCandidate.positiveCount > 0
+      ? preferredModeCandidate
+      : null;
+  const preferredAction =
+    preferredActionCandidate && preferredActionCandidate.positiveCount > 0
+      ? preferredActionCandidate
+      : null;
+  const dominantFailureRisk =
+    dominantFailureRiskCandidate && dominantFailureRiskCandidate.negativeCount > 0
+      ? dominantFailureRiskCandidate
+      : null;
+  const calibrationSummary = buildHistoryCalibrationSummarySv({
+    preferredMode: preferredMode?.key || '',
+    positiveOutcomeCount: Math.max(0, Number(aggregate.positiveOutcomeCount) || 0),
+    negativeOutcomeCount: Math.max(0, Number(aggregate.negativeOutcomeCount) || 0),
+    dominantFailureOutcome: dominantFailureOutcome.code || '',
+  });
+  const calibrationActionCue = buildHistoryCalibrationActionCueSv({
+    preferredAction: preferredAction?.label || '',
+    preferredMode: preferredMode?.key || '',
+    dominantFailureOutcome: dominantFailureOutcome.code || '',
+  });
+  const hasOutcomeSignal = Boolean(outcomeCode && (outcomeSummary || outcomeActionCue));
+  const hasCalibrationSignal = Boolean(calibrationSummary || calibrationActionCue);
+  if (!hasOutcomeSignal && messageCount < 2 && mailboxCount <= 1 && recentMessageCount < 3) {
+    if (!hasCalibrationSignal) return null;
+  }
+  if (!hasOutcomeSignal && !hasCalibrationSignal && pattern === 'none' && mailboxCount <= 1 && recentMessageCount < 3) {
+    return null;
+  }
+  const summary = buildHistorySignalSummarySv({
+    pattern,
+    mailboxCount,
+    recentMessageCount,
+  });
+  const actionCue = buildHistorySignalActionCueSv({
+    pattern,
+    mailboxCount,
+  });
+  if (!summary && !actionCue && !hasOutcomeSignal) return null;
+  return {
+    pattern,
+    summary: summary || null,
+    actionCue: actionCue || null,
+    mailboxIds,
+    mailboxCount,
+    messageCount,
+    recentMessageCount,
+    latestMessageAt: normalizeText(aggregate.latestMessageAt) || null,
+    outcomeCode: outcomeCode || null,
+    outcomeLabel: normalizeText(aggregate.latestOutcomeLabel) || null,
+    outcomeSummary: outcomeSummary || null,
+    outcomeActionCue: outcomeActionCue || null,
+    outcomeAt: normalizeText(aggregate.latestOutcomeAt) || null,
+    calibrationSummary: calibrationSummary || null,
+    calibrationActionCue: calibrationActionCue || null,
+    preferredMode: preferredMode?.key || null,
+    positiveOutcomeCount: Math.max(0, Number(aggregate.positiveOutcomeCount) || 0),
+    negativeOutcomeCount: Math.max(0, Number(aggregate.negativeOutcomeCount) || 0),
+    dominantFailureOutcome: dominantFailureOutcome.code || null,
+    dominantFailureRisk: dominantFailureRisk?.key || null,
+  };
+}
+
+async function buildAnalyzeInboxHistorySignalIndex({
+  tenantId,
+  conversations = [],
+  ccoHistoryStore = null,
+  mailboxIds = CCO_CUSTOMER_HISTORY_DEFAULT_MAILBOX_IDS,
+  lookbackDays = CCO_ANALYZE_HISTORY_SIGNAL_LOOKBACK_DAYS,
+} = {}) {
+  if (!ccoHistoryStore || typeof ccoHistoryStore.listMailboxMessages !== 'function') {
+    return new Map();
+  }
+  const customerEmails = Array.from(
+    new Set(
+      asArray(conversations)
+        .map((conversation) => resolveAnalyzeInboxCustomerEmail(conversation))
+        .filter(Boolean)
+    )
+  );
+  if (customerEmails.length === 0) return new Map();
+
+  const customerEmailSet = new Set(customerEmails.map((value) => value.toLowerCase()));
+  const safeMailboxIds = normalizeMailboxIdList(mailboxIds, 20).filter((mailboxId) =>
+    CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(mailboxId)
+  );
+  if (safeMailboxIds.length === 0) return new Map();
+
+  const { startIso, endIso } = toAnalyzeInboxHistoryWindowBounds(lookbackDays);
+  const recentThresholdMs =
+    Date.now() - CCO_ANALYZE_HISTORY_SIGNAL_RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const mailboxResults = await Promise.allSettled(
+    safeMailboxIds.map((mailboxId) =>
+      ccoHistoryStore.listMailboxMessages({
+        tenantId,
+        mailboxId,
+        sinceIso: startIso,
+        untilIso: endIso,
+      })
+    )
+  );
+
+  const aggregatesByCustomer = new Map();
+  for (let index = 0; index < mailboxResults.length; index += 1) {
+    const result = mailboxResults[index];
+    if (!result || result.status !== 'fulfilled') continue;
+    const mailboxId = safeMailboxIds[index];
+    for (const message of asArray(result.value)) {
+      const customerEmail = toMailboxAddress(message?.customerEmail || message?.senderEmail);
+      if (!customerEmail || !customerEmailSet.has(customerEmail.toLowerCase())) continue;
+      const aggregate =
+        aggregatesByCustomer.get(customerEmail) || createHistorySignalAggregate(customerEmail);
+      aggregate.messageCount += 1;
+      if (normalizeText(message?.direction).toLowerCase() === 'outbound') {
+        aggregate.outboundCount += 1;
+      } else {
+        aggregate.inboundCount += 1;
+      }
+      if (mailboxId) aggregate.mailboxIds.add(mailboxId);
+      const sentAtMs = Date.parse(normalizeText(message?.sentAt) || '');
+      if (Number.isFinite(sentAtMs) && sentAtMs >= recentThresholdMs) {
+        aggregate.recentMessageCount += 1;
+      }
+      if (
+        normalizeText(message?.sentAt) &&
+        (!aggregate.latestMessageAt || Date.parse(message.sentAt) > Date.parse(aggregate.latestMessageAt))
+      ) {
+        aggregate.latestMessageAt = message.sentAt;
+      }
+      applyHistorySignalPatternCounts(
+        aggregate,
+        [message?.subject, message?.bodyPreview].map((item) => normalizeText(item)).filter(Boolean).join(' ')
+      );
+      aggregatesByCustomer.set(customerEmail, aggregate);
+    }
+  }
+
+  if (typeof ccoHistoryStore.listCustomerOutcomes === 'function') {
+    const outcomeResults = await Promise.allSettled(
+      customerEmails.map((customerEmail) =>
+        ccoHistoryStore.listCustomerOutcomes({
+          tenantId,
+          customerEmail,
+          mailboxIds: safeMailboxIds,
+          sinceIso: startIso,
+          untilIso: endIso,
+        })
+      )
+    );
+    for (let index = 0; index < outcomeResults.length; index += 1) {
+      const result = outcomeResults[index];
+      if (!result || result.status !== 'fulfilled') continue;
+      const customerEmail = customerEmails[index];
+      const aggregate =
+        aggregatesByCustomer.get(customerEmail) || createHistorySignalAggregate(customerEmail);
+      for (const outcome of asArray(result.value)) {
+        applyHistoryOutcome(aggregate, outcome);
+      }
+      aggregatesByCustomer.set(customerEmail, aggregate);
+    }
+  }
+
+  const historySignalIndex = new Map();
+  for (const [customerEmail, aggregate] of aggregatesByCustomer.entries()) {
+    const signal = finalizeHistorySignal(aggregate);
+    if (!signal) continue;
+    historySignalIndex.set(customerEmail, signal);
+  }
+  return historySignalIndex;
+}
+
+async function augmentAnalyzeInboxSnapshotWithHistorySignals({
+  tenantId,
+  systemStateSnapshot = {},
+  ccoHistoryStore = null,
+} = {}) {
+  const safeSnapshot = asObject(systemStateSnapshot);
+  const conversations = asArray(safeSnapshot.conversations);
+  if (conversations.length === 0) return safeSnapshot;
+  const historySignalIndex = await buildAnalyzeInboxHistorySignalIndex({
+    tenantId,
+    conversations,
+    ccoHistoryStore,
+  });
+  if (historySignalIndex.size === 0) return safeSnapshot;
+  return {
+    ...safeSnapshot,
+    conversations: conversations.map((conversation) => {
+      const customerEmail =
+        resolveAnalyzeInboxCustomerEmail(conversation) || toMailboxAddress(conversation?.customerEmail);
+      if (!customerEmail) return conversation;
+      const historySignals = historySignalIndex.get(customerEmail);
+      if (!historySignals) return conversation;
+      return {
+        ...conversation,
+        customerEmail: normalizeText(conversation?.customerEmail) || customerEmail,
+        historySignals,
+      };
+    }),
+  };
+}
+
 function toMailboxAllowlistSet(rawValue = '') {
   const tokens = String(rawValue || '')
     .split(/[,\s;]+/)
@@ -501,11 +1622,14 @@ function toMailboxAllowlistSet(rawValue = '') {
   return allowlist;
 }
 
-function resolveGraphReadAllowlistMailboxIds(maxItems = 500) {
+function resolveGraphReadAllowlistConfig(maxItems = 500) {
   const explicitAllowlist = parseMailboxIds(process.env.ARCANA_MAILBOX_ALLOWLIST, maxItems);
   if (explicitAllowlist.length > 0) {
     const sanitized = explicitAllowlist.filter((item) => CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(item));
-    return mergeUniqueMailboxIds(sanitized, CCO_GRAPH_READ_DEFAULT_ALLOWLIST).slice(0, maxItems);
+    return {
+      source: 'explicit',
+      mailboxIds: sanitized.slice(0, maxItems),
+    };
   }
   const configuredDefaultAllowlist = parseMailboxIds(
     process.env.ARCANA_GRAPH_READ_DEFAULT_ALLOWLIST,
@@ -513,9 +1637,19 @@ function resolveGraphReadAllowlistMailboxIds(maxItems = 500) {
   );
   if (configuredDefaultAllowlist.length > 0) {
     const sanitized = configuredDefaultAllowlist.filter((item) => CCO_GRAPH_READ_LOCKED_ALLOWLIST_SET.has(item));
-    return mergeUniqueMailboxIds(sanitized, CCO_GRAPH_READ_DEFAULT_ALLOWLIST).slice(0, maxItems);
+    return {
+      source: 'configured_default',
+      mailboxIds: sanitized.slice(0, maxItems),
+    };
   }
-  return CCO_GRAPH_READ_DEFAULT_ALLOWLIST.slice(0, maxItems);
+  return {
+    source: 'locked_default',
+    mailboxIds: CCO_GRAPH_READ_DEFAULT_ALLOWLIST.slice(0, maxItems),
+  };
+}
+
+function resolveGraphReadAllowlistMailboxIds(maxItems = 500) {
+  return resolveGraphReadAllowlistConfig(maxItems).mailboxIds;
 }
 
 function mergeUniqueMailboxIds(...collections) {
@@ -534,12 +1668,16 @@ function mergeUniqueMailboxIds(...collections) {
 }
 
 function toGraphReadOptionsFromEnv() {
-  const allowlistMailboxIds = resolveGraphReadAllowlistMailboxIds(500);
+  const allowlistConfig = resolveGraphReadAllowlistConfig(500);
+  const allowlistMailboxIds = allowlistConfig.mailboxIds;
   const allowlistMode = allowlistMailboxIds.length > 0;
-  const fullTenant = allowlistMode
+  const forceFullTenantAllowlist =
+    allowlistMode &&
+    (allowlistConfig.source === 'locked_default' || allowlistMailboxIds.length > 1);
+  const fullTenant = forceFullTenantAllowlist
     ? true
     : toBoolean(process.env.ARCANA_GRAPH_FULL_TENANT, false);
-  const userScope = allowlistMode
+  const userScope = forceFullTenantAllowlist
       ? 'all'
       : normalizeGraphUserScope(
           process.env.ARCANA_GRAPH_USER_SCOPE,
@@ -550,7 +1688,7 @@ function toGraphReadOptionsFromEnv() {
     ? allowlistMailboxIds.slice()
     : mergeUniqueMailboxIds(allowlistMailboxIds, configuredMailboxIds);
   const defaultMailboxIndexes =
-    allowlistMode ? '' : (fullTenant && userScope === 'all' ? '1,2,3,5,8' : '');
+    forceFullTenantAllowlist ? '' : (fullTenant && userScope === 'all' ? '1,2,3,5,8' : '');
   const maxMessages = clampInteger(process.env.ARCANA_GRAPH_MAX_MESSAGES, 1, 200, 100);
   const maxMessagesPerUser = clampInteger(
     process.env.ARCANA_GRAPH_MAX_MESSAGES_PER_USER,
@@ -561,10 +1699,10 @@ function toGraphReadOptionsFromEnv() {
   const splitWindow = Math.max(1, Math.floor(maxMessages / 2));
   const splitWindowPerUser = Math.max(1, Math.floor(maxMessagesPerUser / 2));
   const configuredMaxUsers = clampInteger(process.env.ARCANA_GRAPH_MAX_USERS, 1, 200, 50);
-  const minimumAllowlistUsers = allowlistMode
+  const minimumAllowlistUsers = forceFullTenantAllowlist
     ? Math.max(1, mailboxIds.length || allowlistMailboxIds.length || 1)
     : 1;
-  const maxUsers = allowlistMode
+  const maxUsers = forceFullTenantAllowlist
     ? Math.max(configuredMaxUsers, minimumAllowlistUsers)
     : configuredMaxUsers;
   return {
@@ -585,6 +1723,7 @@ function toGraphReadOptionsFromEnv() {
     includeRead: toBoolean(process.env.ARCANA_GRAPH_INCLUDE_READ, false),
     fullTenant,
     allowlistMode,
+    allowlistSource: allowlistConfig.source,
     allowlistMailboxIds,
     userScope,
     maxUsers,
@@ -690,13 +1829,16 @@ async function hydrateAnalyzeInboxInput({
   systemStateSnapshot = {},
   graphReadConnector = null,
   capabilityAnalysisStore = null,
+  ccoHistoryStore = null,
   authStore = null,
   actorUserId = null,
   correlationId = null,
+  graphReadOptionsOverride = null,
 }) {
   const safeInput = asObject(input);
   const safeSnapshot = asObject(systemStateSnapshot);
   const normalizedInput = {};
+  const requestedMailboxIds = resolveAnalyzeInboxMailboxIds(safeInput);
 
   if (typeof safeInput.includeClosed === 'boolean') {
     normalizedInput.includeClosed = safeInput.includeClosed;
@@ -706,6 +1848,9 @@ async function hydrateAnalyzeInboxInput({
   }
   if (safeInput.debug === true) {
     normalizedInput.debug = true;
+  }
+  if (requestedMailboxIds.length > 0) {
+    normalizedInput.mailboxIds = requestedMailboxIds.slice();
   }
 
   const storedWritingProfiles = capabilityAnalysisStore
@@ -730,9 +1875,14 @@ async function hydrateAnalyzeInboxInput({
   }
 
   if (Array.isArray(safeSnapshot.conversations)) {
+    const augmentedSnapshot = await augmentAnalyzeInboxSnapshotWithHistorySignals({
+      tenantId,
+      systemStateSnapshot: safeSnapshot,
+      ccoHistoryStore,
+    });
     return {
       input: normalizedInput,
-      systemStateSnapshot: safeSnapshot,
+      systemStateSnapshot: augmentedSnapshot,
     };
   }
 
@@ -745,7 +1895,16 @@ async function hydrateAnalyzeInboxInput({
 
   const mailboxReadId = crypto.randomUUID();
   const mailboxSentReadId = crypto.randomUUID();
-  const graphReadOptions = toGraphReadOptionsFromEnv();
+  const graphReadOptions = {
+    ...toGraphReadOptionsFromEnv(),
+    ...(requestedMailboxIds.length > 0
+      ? {
+          mailboxIds: requestedMailboxIds.slice(),
+          mailboxIndexes: [],
+        }
+      : {}),
+    ...asObject(graphReadOptionsOverride),
+  };
   const capturedAt = new Date().toISOString();
 
   await writeMailboxReadAuditEvent({
@@ -834,6 +1993,11 @@ async function hydrateAnalyzeInboxInput({
         normalizeText(safeSnapshot.snapshotVersion) ||
         'graph.inbox.snapshot.v1',
     };
+    const augmentedSnapshot = await augmentAnalyzeInboxSnapshotWithHistorySignals({
+      tenantId,
+      systemStateSnapshot: mergedSnapshot,
+      ccoHistoryStore,
+    });
 
     await writeMailboxReadAuditEvent({
       authStore,
@@ -870,12 +2034,12 @@ async function hydrateAnalyzeInboxInput({
         mailboxIds: graphReadOptions.mailboxIds,
         mailboxCount: toNumber(graphSnapshot?.metadata?.mailboxCount, 0),
         mailboxErrors: toNumber(graphSnapshot?.metadata?.mailboxErrors, 0),
-        conversationCount: asArray(mergedSnapshot.conversations).length,
-        messageCount: toSnapshotMessageCount(mergedSnapshot),
+        conversationCount: asArray(augmentedSnapshot.conversations).length,
+        messageCount: toSnapshotMessageCount(augmentedSnapshot),
         inboundMessageCount: toNumber(graphSnapshot?.metadata?.inboundMessageCount, 0),
         outboundMessageCount: toNumber(graphSnapshot?.metadata?.outboundMessageCount, 0),
-        snapshotVersion: normalizeText(mergedSnapshot.snapshotVersion) || null,
-        capturedAt: normalizeText(mergedSnapshot.timestamps?.capturedAt) || capturedAt,
+        snapshotVersion: normalizeText(augmentedSnapshot.snapshotVersion) || null,
+        capturedAt: normalizeText(augmentedSnapshot.timestamps?.capturedAt) || capturedAt,
       },
     });
 
@@ -900,13 +2064,13 @@ async function hydrateAnalyzeInboxInput({
         maxUsers: graphReadOptions.maxUsers,
         mailboxCount: toNumber(graphSnapshot?.metadata?.mailboxCount, 0),
         outboundMessageCount: toNumber(graphSnapshot?.metadata?.outboundMessageCount, 0),
-        snapshotVersion: normalizeText(mergedSnapshot.snapshotVersion) || null,
-        capturedAt: normalizeText(mergedSnapshot.timestamps?.capturedAt) || capturedAt,
+        snapshotVersion: normalizeText(augmentedSnapshot.snapshotVersion) || null,
+        capturedAt: normalizeText(augmentedSnapshot.timestamps?.capturedAt) || capturedAt,
       },
     });
 
     if (authStore && typeof authStore.addAuditEvent === 'function') {
-      const answeredConversations = asArray(mergedSnapshot.conversations).filter((conversation) => {
+      const answeredConversations = asArray(augmentedSnapshot.conversations).filter((conversation) => {
         const inboundAt = toIso(conversation?.lastInboundAt);
         const outboundAt = toIso(conversation?.lastOutboundAt);
         if (!inboundAt || !outboundAt) return false;
@@ -940,7 +2104,7 @@ async function hydrateAnalyzeInboxInput({
 
     return {
       input: normalizedInput,
-      systemStateSnapshot: mergedSnapshot,
+      systemStateSnapshot: augmentedSnapshot,
     };
   } catch (error) {
     await writeMailboxReadAuditEvent({
@@ -1233,6 +2397,7 @@ async function maybeHydrateCapabilityPayload({
   systemStateSnapshot,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
   actorUserId = null,
   correlationId = null,
@@ -1261,6 +2426,7 @@ async function maybeHydrateCapabilityPayload({
       systemStateSnapshot,
       graphReadConnector,
       capabilityAnalysisStore,
+      ccoHistoryStore,
       authStore,
       actorUserId,
       correlationId,
@@ -1280,6 +2446,7 @@ async function maybeHydrateAgentPayload({
   systemStateSnapshot,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
   actorUserId,
   correlationId,
@@ -1375,6 +2542,7 @@ async function maybeHydrateAgentPayload({
       systemStateSnapshot,
       graphReadConnector,
       capabilityAnalysisStore,
+      ccoHistoryStore,
       authStore,
       actorUserId,
       correlationId,
@@ -1408,6 +2576,28 @@ function toIdempotencyKey(req) {
     normalizeText(req.body?.idempotencyKey) ||
     null
   );
+}
+
+function toRunInputBody(rawBody = {}) {
+  const payload = asObject(rawBody);
+  if (payload.input && typeof payload.input === 'object') {
+    return asObject(payload.input);
+  }
+
+  const input = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (
+      key === 'channel' ||
+      key === 'debug' ||
+      key === 'idempotencyKey' ||
+      key === 'input' ||
+      key === 'systemStateSnapshot'
+    ) {
+      continue;
+    }
+    input[key] = value;
+  }
+  return input;
 }
 
 function isDebugRequested(req) {
@@ -1569,6 +2759,21 @@ function toCcoUsageEventType(value = '') {
     normalized === 'cco.indicator.override.cleared'
   ) {
     return 'indicator_override_cleared';
+  }
+  if (normalized === 'outcome_recorded' || normalized === 'cco.outcome.recorded') {
+    return 'outcome_recorded';
+  }
+  if (normalized === 'reply_sent' || normalized === 'cco.reply.sent') {
+    return 'reply_sent';
+  }
+  if (normalized === 'reply_later' || normalized === 'cco.reply.later') {
+    return 'reply_later';
+  }
+  if (normalized === 'customer_replied' || normalized === 'cco.customer.replied') {
+    return 'customer_replied';
+  }
+  if (normalized === 'conversation_deleted' || normalized === 'cco.conversation.deleted') {
+    return 'conversation_deleted';
   }
   return '';
 }
@@ -1802,7 +3007,7 @@ async function runCcoSprintEventHandler({ req, res, authStore }) {
   });
 }
 
-async function runCcoUsageEventHandler({ req, res, authStore }) {
+async function runCcoUsageEventHandler({ req, res, authStore, ccoHistoryStore = null }) {
   if (!authStore || typeof authStore.addAuditEvent !== 'function') {
     return res.status(503).json({ error: 'Auth store saknar audit writer.' });
   }
@@ -1817,7 +3022,7 @@ async function runCcoUsageEventHandler({ req, res, authStore }) {
   if (!eventType) {
     return res.status(422).json({
       error:
-        'eventType måste vara workspace_open, draft_mode_selected, focus_mode_toggled, indicator_override_set eller indicator_override_cleared.',
+        'eventType måste vara workspace_open, draft_mode_selected, focus_mode_toggled, indicator_override_set, indicator_override_cleared, outcome_recorded, reply_sent, reply_later, customer_replied eller conversation_deleted.',
     });
   }
 
@@ -1904,6 +3109,186 @@ async function runCcoUsageEventHandler({ req, res, authStore }) {
       ...metadata,
       conversationId,
       clearedAt: toIso(input.clearedAt) || timestamp,
+    };
+  } else if (eventType === 'outcome_recorded') {
+    if (!conversationId) {
+      return res.status(422).json({ error: 'conversationId krävs för outcome_recorded.' });
+    }
+    const outcomeCode = normalizeHistoryOutcomeCode(
+      input.outcomeCode || input.outcomeLabel || input.outcome || input.label
+    );
+    if (!outcomeCode) {
+      return res.status(422).json({
+        error:
+          'outcomeCode måste vara booked, rebooked, replied, not_interested, escalated, no_response eller closed_no_action.',
+      });
+    }
+    const customerEmail = toMailboxAddress(input.customerEmail);
+    if (!customerEmail) {
+      return res.status(422).json({ error: 'customerEmail krävs för outcome_recorded.' });
+    }
+    const mailboxId = toMailboxAddress(input.mailboxId || input.mailboxAddress);
+    const outcomeLabel = normalizeText(input.outcomeLabel || input.outcome || input.label) || null;
+    const recordedAt = toIso(input.recordedAt || input.handledAt) || timestamp;
+    const selectedMode = normalizeHistoryDraftMode(input.selectedMode);
+    const recommendedMode = normalizeHistoryDraftMode(input.recommendedMode);
+    const priorityLevel = normalizeHistoryPriorityLevel(input.priorityLevel);
+    const priorityScore = Number(input.priorityScore);
+    const dominantRisk = normalizeText(input.dominantRisk).toLowerCase() || null;
+    const recommendedAction = normalizeText(input.recommendedAction) || null;
+    const riskStackExplanation = normalizeText(input.riskStackExplanation) || null;
+    const historySignalPattern = normalizeText(input.historySignalPattern).toLowerCase() || null;
+    const historySignalSummary = normalizeText(input.historySignalSummary) || null;
+    const intent = normalizeText(input.intent) || null;
+
+    if (ccoHistoryStore && typeof ccoHistoryStore.recordOutcome === 'function') {
+      await ccoHistoryStore.recordOutcome({
+        tenantId,
+        conversationId,
+        mailboxId: mailboxId || null,
+        customerEmail,
+        outcomeCode,
+        outcomeLabel,
+        recordedAt,
+        actorUserId: actor.id,
+        source: 'cco_usage_event',
+        selectedMode: selectedMode || null,
+        recommendedMode: recommendedMode || null,
+        priorityLevel,
+        priorityScore: Number.isFinite(priorityScore) ? priorityScore : null,
+        dominantRisk,
+        recommendedAction,
+        riskStackExplanation,
+        historySignalPattern,
+        historySignalSummary,
+        intent,
+      });
+    }
+
+    action = 'cco.outcome.recorded';
+    targetType = 'cco_conversation';
+    targetId = conversationId;
+    metadata = {
+      ...metadata,
+      conversationId,
+      messageId: normalizeText(input.messageId) || null,
+      mailboxId: mailboxId || null,
+      customerEmail,
+      outcomeCode,
+      outcomeLabel,
+      recordedAt,
+      selectedMode: selectedMode || null,
+      recommendedMode: recommendedMode || null,
+      priorityLevel: priorityLevel || null,
+      priorityScore: Number.isFinite(priorityScore) ? priorityScore : null,
+      dominantRisk,
+      recommendedAction,
+      historySignalPattern,
+      intent,
+    };
+  } else if (
+    eventType === 'reply_sent' ||
+    eventType === 'reply_later' ||
+    eventType === 'customer_replied' ||
+    eventType === 'conversation_deleted'
+  ) {
+    if (!conversationId) {
+      return res.status(422).json({
+        error: `conversationId krävs för ${eventType}.`,
+      });
+    }
+    const mailboxId = toMailboxAddress(input.mailboxId || input.mailboxAddress);
+    const customerEmail = toMailboxAddress(input.customerEmail);
+    const selectedActionType = normalizeHistoryActionType(eventType);
+    const recordedAt = toIso(
+      input.recordedAt || input.handledAt || input.deletedAt || input.replyAt || input.timestamp
+    ) || timestamp;
+    const selectedMode = normalizeHistoryDraftMode(input.selectedMode);
+    const recommendedMode = normalizeHistoryDraftMode(input.recommendedMode);
+    const priorityLevel = normalizeHistoryPriorityLevel(input.priorityLevel);
+    const priorityScore = Number(input.priorityScore);
+    const dominantRisk = normalizeText(input.dominantRisk).toLowerCase() || null;
+    const recommendedAction = normalizeText(input.recommendedAction) || null;
+    const riskStackExplanation = normalizeText(input.riskStackExplanation) || null;
+    const historySignalPattern = normalizeText(input.historySignalPattern).toLowerCase() || null;
+    const historySignalSummary = normalizeText(input.historySignalSummary) || null;
+    const subject = normalizeText(input.subject) || null;
+    const waitingOn = normalizeText(input.waitingOn).toLowerCase() || null;
+    const nextActionLabel = normalizeText(input.nextActionLabel) || null;
+    const nextActionSummary = normalizeText(input.nextActionSummary) || null;
+    const followUpDueAt = toIso(input.followUpDueAt) || null;
+    const intent = normalizeText(input.intent) || null;
+    const actionLabel =
+      normalizeText(input.actionLabel) ||
+      (eventType === 'reply_sent'
+        ? 'Svar skickat'
+        : eventType === 'reply_later'
+          ? 'Svara senare'
+          : eventType === 'customer_replied'
+            ? 'Kunden svarade'
+            : 'Flyttad till papperskorg');
+
+    if (ccoHistoryStore && typeof ccoHistoryStore.recordAction === 'function') {
+      await ccoHistoryStore.recordAction({
+        tenantId,
+        conversationId,
+        mailboxId: mailboxId || null,
+        customerEmail: customerEmail || null,
+        actionType: selectedActionType,
+        actionLabel,
+        subject,
+        recordedAt,
+        actorUserId: actor.id,
+        source: 'cco_usage_event',
+        selectedMode: selectedMode || null,
+        recommendedMode: recommendedMode || null,
+        priorityLevel,
+        priorityScore: Number.isFinite(priorityScore) ? priorityScore : null,
+        dominantRisk,
+        recommendedAction,
+        riskStackExplanation,
+        historySignalPattern,
+        historySignalSummary,
+        waitingOn,
+        nextActionLabel,
+        nextActionSummary,
+        followUpDueAt,
+        intent,
+      });
+    }
+
+    action =
+      eventType === 'reply_sent'
+        ? 'cco.reply.sent'
+        : eventType === 'reply_later'
+          ? 'cco.reply.later'
+          : eventType === 'customer_replied'
+            ? 'cco.customer.replied'
+            : 'cco.conversation.deleted';
+    targetType = 'cco_conversation';
+    targetId = conversationId;
+    metadata = {
+      ...metadata,
+      conversationId,
+      messageId: normalizeText(input.messageId) || null,
+      mailboxId: mailboxId || null,
+      customerEmail: customerEmail || null,
+      subject,
+      actionLabel,
+      recordedAt,
+      selectedMode: selectedMode || null,
+      recommendedMode: recommendedMode || null,
+      priorityLevel: priorityLevel || null,
+      priorityScore: Number.isFinite(priorityScore) ? priorityScore : null,
+      dominantRisk,
+      recommendedAction,
+      historySignalPattern,
+      historySignalSummary,
+      waitingOn,
+      nextActionLabel,
+      nextActionSummary,
+      followUpDueAt,
+      intent,
     };
   }
 
@@ -2173,6 +3558,21 @@ function toCcoRuntimeStatusHandler({
   return async (req, res) => {
     const tenantId = toTenantId(req);
     const graphReadOptions = toGraphReadOptionsFromEnv();
+    const signatureProfiles = ['contact', 'egzona', 'fazli'].map((key) => {
+      const profile = resolveCcoSignatureProfile(key);
+      return {
+        key: normalizeText(profile?.key) || 'contact',
+        fullName: normalizeText(profile?.fullName) || 'Hair TP Clinic',
+        title: normalizeText(profile?.title) || '',
+        senderMailboxId:
+          normalizeMailboxAddress(profile?.senderMailboxId) || 'contact@hairtpclinic.com',
+      };
+    });
+    const defaultSenderMailbox =
+      normalizeMailboxAddress(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) ||
+      'contact@hairtpclinic.com';
+    const defaultSignatureProfile =
+      normalizeText(resolveCcoSignatureProfile('contact')?.key) || 'contact';
 
     let latestAnalysisEntry = null;
     if (capabilityAnalysisStore && typeof capabilityAnalysisStore.list === 'function') {
@@ -2236,6 +3636,12 @@ function toCcoRuntimeStatusHandler({
         readEnabled: graphReadEnabled === true,
         sendEnabled: graphSendEnabled === true,
         deleteEnabled: graphDeleteEnabled === true,
+        defaultSenderMailbox,
+        defaultSignatureProfile,
+        senderMailboxOptions: Array.from(
+          new Set(signatureProfiles.map((profile) => profile.senderMailboxId).filter(Boolean))
+        ),
+        signatureProfiles,
         readConnectorAvailable: graphReadConnectorAvailable === true,
         sendConnectorAvailable: graphSendConnectorAvailable === true,
         fullTenant: graphReadOptions.fullTenant === true,
@@ -2270,6 +3676,960 @@ function toCcoRuntimeStatusHandler({
   };
 }
 
+function toCcoRuntimeHistoryQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  const customerEmail = toMailboxAddress(safeQuery.customerEmail);
+  const conversationId = normalizeText(safeQuery.conversationId);
+  const requestedCustomerEmail = normalizeText(safeQuery.customerEmail);
+  const lookbackDays = clampInteger(
+    safeQuery.lookbackDays,
+    30,
+    CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS,
+    CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS
+  );
+
+  if (requestedCustomerEmail && !customerEmail) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'customerEmail måste vara en giltig e-postadress.',
+    };
+  }
+  if (!customerEmail && !conversationId && mailboxIds.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'customerEmail, conversationId eller mailboxIds krävs för att läsa historik.',
+    };
+  }
+
+  return {
+    ok: true,
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    customerEmail,
+    conversationId,
+    lookbackDays,
+  };
+}
+
+function doesHistoryMessageMatchCustomer(message = {}, customerEmail = '') {
+  return matchesMailboxAddressAlias(customerEmail, [
+    message.customerEmail,
+    message.counterpartyEmail,
+    message.senderEmail,
+    ...asArray(message.recipients),
+    ...asArray(message.replyToRecipients),
+  ]);
+}
+
+function collectHistoryMessages(snapshot = {}) {
+  const allMessages = [];
+  for (const conversation of asArray(snapshot.conversations)) {
+    const conversationId = normalizeText(conversation.conversationId);
+    const subject = normalizeText(conversation.subject) || '(utan ämne)';
+    const customerEmail = toMailboxAddress(conversation.customerEmail).toLowerCase() || null;
+    for (const message of asArray(conversation.messages)) {
+      const messageId = normalizeText(message.messageId);
+      if (!messageId) continue;
+      allMessages.push({
+        messageId,
+        conversationId: normalizeText(message.conversationId) || conversationId,
+        subject: normalizeText(message.subject) || subject,
+        customerEmail,
+        sentAt: toIso(message.sentAt),
+        direction: normalizeText(message.direction).toLowerCase() === 'outbound' ? 'outbound' : 'inbound',
+        bodyPreview: normalizeText(message.bodyPreview) || '',
+        senderEmail: toMailboxAddress(message.senderEmail) || null,
+        senderName: normalizeText(message.senderName) || null,
+        recipients: asArray(message.recipients).map((item) => toMailboxAddress(item)).filter(Boolean),
+        replyToRecipients: asArray(message.replyToRecipients)
+          .map((item) => toMailboxAddress(item))
+          .filter(Boolean),
+        internetMessageId: normalizeText(message.internetMessageId).toLowerCase() || null,
+        counterpartyEmail:
+          toMailboxAddress(message.counterpartyEmail || message.customerEmail || message.senderEmail) ||
+          null,
+        mailboxId: toMailboxAddress(message.mailboxId || conversation.mailboxId) || null,
+        mailboxAddress: toMailboxAddress(message.mailboxAddress || conversation.mailboxAddress) || null,
+        userPrincipalName: toMailboxAddress(message.userPrincipalName || conversation.userPrincipalName) || null,
+      });
+    }
+  }
+  return allMessages;
+}
+
+function filterHistoryMessages(messages = [], { conversationId = '', customerEmail = '' } = {}) {
+  const safeConversationId = normalizeText(conversationId);
+  const safeCustomerEmail = toMailboxAddress(customerEmail).toLowerCase();
+  if (!safeConversationId && !safeCustomerEmail) return asArray(messages).slice();
+  return asArray(messages).filter((message) => {
+    if (safeConversationId && normalizeText(message.conversationId) === safeConversationId) {
+      return true;
+    }
+    if (safeCustomerEmail && doesHistoryMessageMatchCustomer(message, safeCustomerEmail)) {
+      return true;
+    }
+    return false;
+  });
+}
+
+function summarizeHistoryMessages(messages = []) {
+  const safeMessages = asArray(messages)
+    .filter((message) => normalizeText(message.messageId))
+    .slice()
+    .sort((left, right) => String(left?.sentAt || '').localeCompare(String(right?.sentAt || '')));
+  const firstMessage = safeMessages[0] || null;
+  const latestMessage = safeMessages[safeMessages.length - 1] || null;
+  const inboundCount = safeMessages.filter(
+    (message) => normalizeText(message.direction).toLowerCase() !== 'outbound'
+  ).length;
+  const outboundCount = safeMessages.length - inboundCount;
+  const conversationCount = new Set(
+    safeMessages.map((message) => normalizeText(message.conversationId)).filter(Boolean)
+  ).size;
+  const mailboxIds = Array.from(
+    new Set(
+      safeMessages
+        .map((message) => toMailboxAddress(message.mailboxId || message.mailboxAddress))
+        .filter(Boolean)
+    )
+  );
+
+  return {
+    firstMessageAt: normalizeText(firstMessage?.sentAt) || null,
+    latestMessageAt: normalizeText(latestMessage?.sentAt) || null,
+    messageCount: safeMessages.length,
+    inboundCount,
+    outboundCount,
+    conversationCount,
+    mailboxIds,
+    mailboxCount: mailboxIds.length,
+  };
+}
+
+function toHistoryWindowBounds(lookbackDays = CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS) {
+  const endMs = Date.now();
+  const startMs = endMs - lookbackDays * 24 * 60 * 60 * 1000;
+  return {
+    startIso: new Date(startMs).toISOString(),
+    endIso: new Date(endMs).toISOString(),
+  };
+}
+
+function splitHistoryWindowIntoChunks({
+  startIso,
+  endIso,
+  chunkDays = CCO_KONS_HISTORY_CHUNK_DAYS,
+} = {}) {
+  const startMs = Date.parse(String(startIso || ''));
+  const endMs = Date.parse(String(endIso || ''));
+  const safeChunkDays = Math.max(1, Math.min(90, Number(chunkDays) || CCO_KONS_HISTORY_CHUNK_DAYS));
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return [];
+  const chunkMs = safeChunkDays * 24 * 60 * 60 * 1000;
+  const chunks = [];
+  for (let cursorMs = startMs; cursorMs < endMs; cursorMs += chunkMs) {
+    const chunkEndMs = Math.min(endMs, cursorMs + chunkMs);
+    chunks.push({
+      startIso: new Date(cursorMs).toISOString(),
+      endIso: new Date(chunkEndMs).toISOString(),
+    });
+  }
+  return chunks.reverse();
+}
+
+function trimRecentHistoryGap(missingWindows = [], mailbox = null, requestedEndIso = '') {
+  const safeRequestedEndIso = toIso(requestedEndIso);
+  const coverageEndIso = toIso(mailbox?.coverageEndIso);
+  if (!safeRequestedEndIso || !coverageEndIso) return asArray(missingWindows);
+  const requestedEndMs = Date.parse(safeRequestedEndIso);
+  const coverageEndMs = Date.parse(coverageEndIso);
+  if (!Number.isFinite(requestedEndMs) || !Number.isFinite(coverageEndMs)) {
+    return asArray(missingWindows);
+  }
+  const trailingGapMs = requestedEndMs - coverageEndMs;
+  if (trailingGapMs <= 0 || trailingGapMs > CCO_KONS_HISTORY_RECENT_FRESHNESS_MS) {
+    return asArray(missingWindows);
+  }
+  return asArray(missingWindows).filter((window) => {
+    const startMs = Date.parse(String(window?.startIso || ''));
+    const endMs = Date.parse(String(window?.endIso || ''));
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return true;
+    const isTrailingGap = startMs >= coverageEndMs && endMs <= requestedEndMs;
+    return !isTrailingGap;
+  });
+}
+
+async function fetchHistoryWindowMessagesFromGraph({
+  graphReadConnector,
+  mailboxId,
+  windowStartIso,
+  windowEndIso,
+}) {
+  const graphReadOptions = toGraphReadOptionsFromEnv();
+  const snapshot = asObject(
+    await graphReadConnector.fetchInboxSnapshot({
+      ...graphReadOptions,
+      includeRead: true,
+      fullTenant: true,
+      userScope: 'all',
+      maxUsers: 1,
+      maxMessages: 200,
+      maxInboxMessages: 200,
+      maxSentMessages: 200,
+      maxMessagesPerUser: 200,
+      maxInboxMessagesPerUser: 200,
+      maxSentMessagesPerUser: 200,
+      mailboxIds: [mailboxId],
+      sinceIso: windowStartIso,
+      untilIso: windowEndIso,
+    })
+  );
+  return collectHistoryMessages(snapshot);
+}
+
+async function readHistoryMessagesFromGraph({
+  graphReadConnector,
+  mailboxId,
+  mailboxIds = [],
+  customerEmail,
+  conversationId,
+  lookbackDays,
+}) {
+  const { startIso, endIso } = toHistoryWindowBounds(lookbackDays);
+  const messageMap = new Map();
+  const chunkWindows = splitHistoryWindowIntoChunks({
+    startIso,
+    endIso,
+    chunkDays: CCO_KONS_HISTORY_CHUNK_DAYS,
+  });
+  const targetMailboxIds = normalizeMailboxIdList(
+    mailboxIds.length > 0 ? mailboxIds : [mailboxId],
+    50
+  );
+
+  for (const currentMailboxId of targetMailboxIds) {
+    for (const chunkWindow of chunkWindows) {
+      const allMessages = await fetchHistoryWindowMessagesFromGraph({
+        graphReadConnector,
+        mailboxId: currentMailboxId,
+        windowStartIso: chunkWindow.startIso,
+        windowEndIso: chunkWindow.endIso,
+      });
+      const matchedMessages = filterHistoryMessages(allMessages, {
+        conversationId,
+        customerEmail,
+      });
+      for (const message of matchedMessages) {
+        const compositeKey = `${toMailboxAddress(message.mailboxId || currentMailboxId)}:${normalizeText(message.messageId)}`;
+        if (!normalizeText(message.messageId) || messageMap.has(compositeKey)) continue;
+        messageMap.set(compositeKey, message);
+      }
+    }
+  }
+
+  const messages = Array.from(messageMap.values()).sort((left, right) =>
+    String(right?.sentAt || '').localeCompare(String(left?.sentAt || ''))
+  );
+  return {
+    messages,
+    summary: summarizeHistoryMessages(messages),
+    windowCount: chunkWindows.length * Math.max(1, targetMailboxIds.length),
+    store: null,
+  };
+}
+
+async function ensureCcoRuntimeHistoryCoverage({
+  tenantId,
+  mailboxId,
+  lookbackDays,
+  graphReadConnector,
+  graphReadEnabled = false,
+  ccoHistoryStore = null,
+  refresh = false,
+}) {
+  const safeTenantId = normalizeText(tenantId);
+  const safeMailboxId = toMailboxAddress(mailboxId);
+  if (
+    !ccoHistoryStore ||
+    typeof ccoHistoryStore.getMissingMailboxWindows !== 'function' ||
+    typeof ccoHistoryStore.upsertMailboxWindow !== 'function' ||
+    typeof ccoHistoryStore.getMailboxSummary !== 'function'
+  ) {
+    return {
+      mailbox: null,
+      missingWindows: [],
+      backfilledWindowCount: 0,
+      available: false,
+      startIso: null,
+      endIso: null,
+    };
+  }
+
+  const { startIso, endIso } = toHistoryWindowBounds(lookbackDays);
+  const missingWindows = refresh
+    ? [{ startIso, endIso }]
+    : trimRecentHistoryGap(
+        ccoHistoryStore.getMissingMailboxWindows({
+          tenantId: safeTenantId,
+          mailboxId: safeMailboxId,
+          startIso,
+          endIso,
+        }),
+        ccoHistoryStore.getMailboxSummary({
+          tenantId: safeTenantId,
+          mailboxId: safeMailboxId,
+        }),
+        endIso
+      );
+
+  if (missingWindows.length === 0) {
+    return {
+      mailbox: ccoHistoryStore.getMailboxSummary({
+        tenantId: safeTenantId,
+        mailboxId: safeMailboxId,
+      }),
+      missingWindows: [],
+      backfilledWindowCount: 0,
+      available: true,
+      startIso,
+      endIso,
+    };
+  }
+
+  if (
+    graphReadEnabled !== true ||
+    !graphReadConnector ||
+    typeof graphReadConnector.fetchInboxSnapshot !== 'function'
+  ) {
+    return {
+      mailbox: ccoHistoryStore.getMailboxSummary({
+        tenantId: safeTenantId,
+        mailboxId: safeMailboxId,
+      }),
+      missingWindows,
+      backfilledWindowCount: 0,
+      available: true,
+      startIso,
+      endIso,
+    };
+  }
+
+  const chunkWindows = missingWindows
+    .flatMap((window) =>
+      splitHistoryWindowIntoChunks({
+        startIso: window.startIso,
+        endIso: window.endIso,
+        chunkDays: CCO_KONS_HISTORY_CHUNK_DAYS,
+      })
+    );
+
+  for (const chunkWindow of chunkWindows) {
+    const allMessages = await fetchHistoryWindowMessagesFromGraph({
+      graphReadConnector,
+      mailboxId: safeMailboxId,
+      windowStartIso: chunkWindow.startIso,
+      windowEndIso: chunkWindow.endIso,
+    });
+    await ccoHistoryStore.upsertMailboxWindow({
+      tenantId: safeTenantId,
+      mailboxId: safeMailboxId,
+      messages: allMessages,
+      windowStartIso: chunkWindow.startIso,
+      windowEndIso: chunkWindow.endIso,
+      source: 'graph_runtime_history_backfill',
+    });
+  }
+
+  return {
+    mailbox: ccoHistoryStore.getMailboxSummary({
+      tenantId: safeTenantId,
+      mailboxId: safeMailboxId,
+    }),
+    missingWindows: trimRecentHistoryGap(
+      ccoHistoryStore.getMissingMailboxWindows({
+        tenantId: safeTenantId,
+        mailboxId: safeMailboxId,
+        startIso,
+        endIso,
+      }),
+      ccoHistoryStore.getMailboxSummary({
+        tenantId: safeTenantId,
+        mailboxId: safeMailboxId,
+      }),
+      endIso
+    ),
+    backfilledWindowCount: chunkWindows.length,
+    available: true,
+    startIso,
+    endIso,
+  };
+}
+
+async function ensureCcoRuntimeHistoryCoverageForMailboxIds({
+  tenantId,
+  mailboxIds = [],
+  lookbackDays,
+  graphReadConnector,
+  graphReadEnabled = false,
+  ccoHistoryStore = null,
+  refresh = false,
+}) {
+  const coverages = [];
+  for (const mailboxId of normalizeMailboxIdList(mailboxIds, 50)) {
+    coverages.push(
+      await ensureCcoRuntimeHistoryCoverage({
+        tenantId,
+        mailboxId,
+        lookbackDays,
+        graphReadConnector,
+        graphReadEnabled,
+        ccoHistoryStore,
+        refresh,
+      })
+    );
+  }
+  return coverages;
+}
+
+async function collectStoredMailboxHistoryMessages({
+  tenantId,
+  mailboxIds = [],
+  ccoHistoryStore = null,
+  sinceIso = null,
+  untilIso = null,
+}) {
+  if (!ccoHistoryStore || typeof ccoHistoryStore.listMailboxMessages !== 'function') return [];
+  const merged = [];
+  const seen = new Set();
+  for (const mailboxId of normalizeMailboxIdList(mailboxIds, 50)) {
+    const mailboxMessages = await ccoHistoryStore.listMailboxMessages({
+      tenantId,
+      mailboxId,
+      sinceIso,
+      untilIso,
+    });
+    for (const message of asArray(mailboxMessages)) {
+      const internetMessageId = normalizeText(message.internetMessageId).toLowerCase();
+      const dedupeKey = internetMessageId
+        ? `internet:${internetMessageId}`
+        : [
+            normalizeText(message.direction).toLowerCase(),
+            toIso(message.sentAt),
+            normalizeText(message.normalizedSubject || message.subject).toLowerCase(),
+            toMailboxAddress(
+              message.counterpartyEmail ||
+                message.customerEmail ||
+                message.senderEmail ||
+                asArray(message.recipients)[0]
+            ),
+            normalizeText(message.bodyPreview).slice(0, 120).toLowerCase(),
+          ].join(':');
+      if (!normalizeText(message.messageId) || seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      merged.push(message);
+    }
+  }
+  return merged.sort((left, right) =>
+    String(right?.sentAt || '').localeCompare(String(left?.sentAt || ''))
+  );
+}
+
+function toCcoRuntimeHistoryBackfillInput(input = {}) {
+  const safeInput = asObject(input);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeInput);
+  const lookbackDays = clampInteger(
+    safeInput.lookbackDays,
+    30,
+    CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS,
+    CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS
+  );
+  const refresh = toBoolean(safeInput.refresh, false);
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    lookbackDays,
+    refresh,
+  };
+}
+
+function toCcoRuntimeHistoryStatusQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    lookbackDays: clampInteger(
+      safeQuery.lookbackDays,
+      30,
+      CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS,
+      CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS
+    ),
+  };
+}
+
+function toCcoRuntimeCalibrationSummaryQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  const explicitSinceIso = toIso(safeQuery.sinceIso || safeQuery.from);
+  const explicitUntilIso = toIso(safeQuery.untilIso || safeQuery.to);
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    customerEmail: toMailboxAddress(safeQuery.customerEmail) || null,
+    intent: normalizeText(safeQuery.intent) || null,
+    lookbackDays: clampInteger(
+      safeQuery.lookbackDays,
+      30,
+      CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS,
+      CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS
+    ),
+    sinceIso: explicitSinceIso,
+    untilIso: explicitUntilIso,
+  };
+}
+
+function toCcoRuntimeHistorySearchQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  const customerEmail = toMailboxAddress(safeQuery.customerEmail) || null;
+  const conversationId = normalizeText(safeQuery.conversationId) || null;
+  const lookbackDays = clampInteger(
+    safeQuery.lookbackDays,
+    7,
+    CCO_KONS_HISTORY_MAX_LOOKBACK_DAYS,
+    90
+  );
+  const limit = clampInteger(safeQuery.limit, 1, 250, 50);
+  const q = normalizeText(safeQuery.q || safeQuery.query || safeQuery.search);
+  const explicitSinceIso = toIso(safeQuery.sinceIso || safeQuery.from);
+  const explicitUntilIso = toIso(safeQuery.untilIso || safeQuery.to);
+  const resultTypes = normalizeCcoRuntimeHistoryResultTypes(
+    safeQuery.resultTypes || safeQuery.types || safeQuery.type
+  );
+  const includeMessages = toBoolean(safeQuery.includeMessages, true);
+  const includeOutcomes = toBoolean(safeQuery.includeOutcomes, true);
+  const includeActions = toBoolean(safeQuery.includeActions, true);
+  const actionTypes = normalizeCcoRuntimeHistoryActionTypes(
+    safeQuery.actionTypes || safeQuery.actions || safeQuery.action
+  );
+  const outcomeCodes = normalizeCcoRuntimeHistoryOutcomeCodes(
+    safeQuery.outcomeCodes || safeQuery.outcomes || safeQuery.outcome
+  );
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    customerEmail,
+    conversationId,
+    lookbackDays,
+    limit,
+    q,
+    intent: normalizeText(safeQuery.intent) || null,
+    sinceIso: explicitSinceIso,
+    untilIso: explicitUntilIso,
+    includeMessages,
+    includeOutcomes,
+    includeActions,
+    resultTypes,
+    actionTypes,
+    outcomeCodes,
+  };
+}
+
+function toCcoRuntimeShadowQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  const explicitSinceIso = toIso(safeQuery.sinceIso || safeQuery.from);
+  const explicitUntilIso = toIso(safeQuery.untilIso || safeQuery.to);
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    lookbackDays: clampInteger(safeQuery.lookbackDays, 7, 90, 14),
+    limit: clampInteger(safeQuery.limit, 5, 120, 24),
+    intent: normalizeText(safeQuery.intent) || null,
+    sinceIso: explicitSinceIso,
+    untilIso: explicitUntilIso,
+  };
+}
+
+function resolveCcoRuntimeWindowBounds({
+  lookbackDays = CCO_KONS_HISTORY_DEFAULT_LOOKBACK_DAYS,
+  sinceIso = null,
+  untilIso = null,
+} = {}) {
+  if (sinceIso || untilIso) {
+    const fallback = toHistoryWindowBounds(lookbackDays);
+    return {
+      startIso: sinceIso || fallback.startIso,
+      endIso: untilIso || fallback.endIso,
+    };
+  }
+  return toHistoryWindowBounds(lookbackDays);
+}
+
+function buildCcoNextConversationHref(conversationId = '') {
+  const safeConversationId = normalizeText(conversationId);
+  if (!safeConversationId) return '/cco-next';
+  const params = new URLSearchParams({ conversationId: safeConversationId });
+  return `/cco-next?${params.toString()}`;
+}
+
+async function materializeCustomerReplyActions({
+  tenantId,
+  messages = [],
+  ccoHistoryStore = null,
+} = {}) {
+  if (
+    !ccoHistoryStore ||
+    typeof ccoHistoryStore.searchHistoryRecords !== 'function' ||
+    typeof ccoHistoryStore.recordAction !== 'function'
+  ) {
+    return 0;
+  }
+
+  const messagesByConversation = new Map();
+  for (const message of asArray(messages)) {
+    const conversationId = normalizeText(message?.conversationId);
+    if (!conversationId) continue;
+    const entry = messagesByConversation.get(conversationId) || [];
+    entry.push(message);
+    messagesByConversation.set(conversationId, entry);
+  }
+
+  let recordedCount = 0;
+  for (const [conversationId, conversationMessages] of messagesByConversation.entries()) {
+    const latestInboundMessage = conversationMessages
+      .filter((message) => normalizeText(message?.direction).toLowerCase() !== 'outbound')
+      .sort((left, right) => compareIsoDesc(left?.sentAt, right?.sentAt))[0];
+    if (!latestInboundMessage?.sentAt) continue;
+
+    const actionResults = await ccoHistoryStore.searchHistoryRecords({
+      tenantId,
+      conversationId,
+      sinceIso: null,
+      untilIso: null,
+      limit: 100,
+      includeMessages: false,
+      includeOutcomes: false,
+      includeActions: true,
+      resultTypes: ['action'],
+    });
+    const actions = asArray(actionResults).filter((item) => item?.resultType === 'action');
+    const latestWaitingAction = actions
+      .filter((item) => ['reply_sent', 'reply_later'].includes(normalizeHistoryActionType(item?.actionType)))
+      .sort((left, right) => compareIsoDesc(left?.recordedAt, right?.recordedAt))[0];
+    if (!latestWaitingAction?.recordedAt) continue;
+    if (Date.parse(latestInboundMessage.sentAt) < Date.parse(latestWaitingAction.recordedAt)) continue;
+
+    const existingCustomerReply = actions.find(
+      (item) =>
+        normalizeHistoryActionType(item?.actionType) === 'customer_replied' &&
+        normalizeText(item?.recordedAt) === normalizeText(latestInboundMessage.sentAt)
+    );
+    if (existingCustomerReply) continue;
+
+    await ccoHistoryStore.recordAction({
+      tenantId,
+      conversationId,
+      mailboxId:
+        toMailboxAddress(
+          latestInboundMessage?.mailboxId ||
+            latestInboundMessage?.mailboxAddress ||
+            latestInboundMessage?.userPrincipalName
+        ) || null,
+      customerEmail: toMailboxAddress(
+        latestInboundMessage?.customerEmail ||
+          latestInboundMessage?.counterpartyEmail ||
+          latestInboundMessage?.senderEmail
+      ) || null,
+      actionType: 'customer_replied',
+      actionLabel: 'Kunden svarade',
+      subject: normalizeText(latestInboundMessage?.subject) || null,
+      recordedAt: latestInboundMessage.sentAt,
+      source: 'cco_history_runtime',
+      waitingOn: 'owner',
+      nextActionLabel: 'Återuppta tråden',
+      nextActionSummary: 'Kunden har svarat och tråden bör öppnas igen.',
+      intent: normalizeText(latestWaitingAction?.intent || latestInboundMessage?.intent) || null,
+    });
+    recordedCount += 1;
+  }
+
+  return recordedCount;
+}
+
+function toCcoRuntimeHistoryHandler({
+  graphReadConnector,
+  graphReadEnabled = false,
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const parsedQuery = toCcoRuntimeHistoryQuery(req.query);
+      if (parsedQuery.ok !== true) {
+        return res.status(parsedQuery.status || 400).json({
+          ok: false,
+          error: parsedQuery.error || 'Historikfrågan kunde inte tolkas.',
+        });
+      }
+
+      const {
+        mailboxId,
+        mailboxIds,
+        customerEmail,
+        conversationId,
+        lookbackDays,
+      } = parsedQuery;
+      const tenantId = toTenantId(req);
+      const { startIso, endIso } = resolveCcoRuntimeWindowBounds({ lookbackDays });
+
+      if (ccoHistoryStore && typeof ccoHistoryStore.listMailboxMessages === 'function') {
+        const coverages = await ensureCcoRuntimeHistoryCoverageForMailboxIds({
+          tenantId,
+          mailboxIds,
+          lookbackDays,
+          graphReadConnector,
+          graphReadEnabled,
+          ccoHistoryStore,
+        });
+        const missingCoverages = coverages.filter(
+          (coverage) => Array.isArray(coverage?.missingWindows) && coverage.missingWindows.length > 0
+        );
+
+        if (missingCoverages.length > 0 && graphReadEnabled !== true) {
+          return res.status(503).json({
+            ok: false,
+            error: 'Historik finns inte lokalt ännu och Graph-läsning är inte tillgänglig.',
+          });
+        }
+
+        const messages = filterHistoryMessages(
+          await collectStoredMailboxHistoryMessages({
+            tenantId,
+            mailboxIds,
+            ccoHistoryStore,
+            sinceIso: startIso,
+            untilIso: endIso,
+          }),
+          {
+            conversationId,
+            customerEmail,
+          }
+        );
+        await materializeCustomerReplyActions({
+          tenantId,
+          messages,
+          ccoHistoryStore,
+        });
+        const events =
+          typeof ccoHistoryStore.searchHistoryRecords === 'function'
+            ? await ccoHistoryStore.searchHistoryRecords({
+                tenantId,
+                mailboxIds,
+                customerEmail,
+                conversationId,
+                sinceIso: startIso,
+                untilIso: endIso,
+                limit: 250,
+                includeMessages: true,
+                includeOutcomes: true,
+                includeActions: true,
+                resultTypes: ['message', 'outcome', 'action'],
+              })
+            : [];
+        const summary = summarizeHistoryMessages(messages);
+        const missingWindowCount = missingCoverages.reduce(
+          (sum, coverage) => sum + Number(coverage?.missingWindows?.length || 0),
+          0
+        );
+        const mailboxSummaries = coverages
+          .map((coverage, index) => ({
+            mailboxId: mailboxIds[index] || null,
+            mailbox: coverage?.mailbox || null,
+            missingWindowCount: Array.isArray(coverage?.missingWindows)
+              ? coverage.missingWindows.length
+              : 0,
+            missingWindowsPreview: asArray(coverage?.missingWindows).slice(0, 6),
+            backfilledWindowCount: Number(coverage?.backfilledWindowCount || 0),
+            complete: Array.isArray(coverage?.missingWindows)
+              ? coverage.missingWindows.length === 0
+              : false,
+          }))
+          .filter((item) => item.mailboxId);
+        const totalWindowCount = mailboxSummaries.reduce(
+          (sum, item) => sum + Number(item?.mailbox?.coverageWindowCount || 0),
+          0
+        );
+        const totalBackfilledWindowCount = mailboxSummaries.reduce(
+          (sum, item) => sum + Number(item?.backfilledWindowCount || 0),
+          0
+        );
+
+        return res.json({
+          ok: true,
+          mailboxId,
+          mailboxIds,
+          customerEmail: customerEmail || null,
+          conversationId: conversationId || null,
+          lookbackDays,
+          window: {
+            startIso,
+            endIso,
+          },
+          windowCount: totalWindowCount,
+          backfilledWindowCount: totalBackfilledWindowCount,
+          summary,
+          messages,
+          events,
+          store: {
+            source: 'cco_history_store',
+            mailbox: mailboxSummaries[0]?.mailbox || null,
+            mailboxes: mailboxSummaries,
+            missingWindowCount,
+            mailboxCount: mailboxSummaries.length,
+          },
+        });
+      }
+
+      if (
+        graphReadEnabled !== true ||
+        !graphReadConnector ||
+        typeof graphReadConnector.fetchInboxSnapshot !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Graph-läsning är inte tillgänglig för historik just nu.',
+        });
+      }
+
+      const result = await readHistoryMessagesFromGraph({
+        graphReadConnector,
+        mailboxId,
+        mailboxIds,
+        customerEmail,
+        conversationId,
+        lookbackDays,
+      });
+
+      return res.json({
+        ok: true,
+        mailboxId,
+        mailboxIds: [mailboxId],
+        customerEmail: customerEmail || null,
+        conversationId: conversationId || null,
+        lookbackDays,
+        window: {
+          startIso,
+          endIso,
+        },
+        windowCount: result.windowCount,
+        summary: result.summary,
+        messages: result.messages,
+        events: [],
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Historik kunde inte läsas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeHistoryBackfillHandler({
+  graphReadConnector,
+  graphReadEnabled = false,
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      if (
+        !ccoHistoryStore ||
+        typeof ccoHistoryStore.getMailboxSummary !== 'function' ||
+        typeof ccoHistoryStore.upsertMailboxWindow !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Persistent historikstore är inte tillgänglig just nu.',
+        });
+      }
+      if (
+        graphReadEnabled !== true ||
+        !graphReadConnector ||
+        typeof graphReadConnector.fetchInboxSnapshot !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Graph-läsning är inte tillgänglig för backfill just nu.',
+        });
+      }
+
+      const input = toCcoRuntimeHistoryBackfillInput({
+        ...(asObject(req.body)),
+        ...(asObject(req.query)),
+      });
+      const tenantId = toTenantId(req);
+      const coverages = await ensureCcoRuntimeHistoryCoverageForMailboxIds({
+        tenantId,
+        mailboxIds: input.mailboxIds,
+        lookbackDays: input.lookbackDays,
+        graphReadConnector,
+        graphReadEnabled,
+        ccoHistoryStore,
+        refresh: input.refresh,
+      });
+      const { startIso, endIso } = toHistoryWindowBounds(input.lookbackDays);
+      await materializeCustomerReplyActions({
+        tenantId,
+        messages: await collectStoredMailboxHistoryMessages({
+          tenantId,
+          mailboxIds: input.mailboxIds,
+          ccoHistoryStore,
+          sinceIso: startIso,
+          untilIso: endIso,
+        }),
+        ccoHistoryStore,
+      });
+      const mailboxSummaries = coverages
+        .map((coverage, index) => ({
+          mailboxId: input.mailboxIds[index] || null,
+          mailbox: coverage?.mailbox || null,
+          missingWindowCount: Array.isArray(coverage?.missingWindows)
+            ? coverage.missingWindows.length
+            : 0,
+          backfilledWindowCount: Number(coverage?.backfilledWindowCount || 0),
+        }))
+        .filter((item) => item.mailboxId);
+      const missingWindowCount = mailboxSummaries.reduce(
+        (sum, item) => sum + Number(item?.missingWindowCount || 0),
+        0
+      );
+      const backfilledWindowCount = mailboxSummaries.reduce(
+        (sum, item) => sum + Number(item?.backfilledWindowCount || 0),
+        0
+      );
+
+      return res.json({
+        ok: true,
+        mailboxId: input.mailboxId,
+        mailboxIds: input.mailboxIds,
+        lookbackDays: input.lookbackDays,
+        refresh: input.refresh,
+        backfilledWindowCount,
+        missingWindowCount,
+        mailbox: mailboxSummaries[0]?.mailbox || null,
+        mailboxes: mailboxSummaries,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Kunde inte backfilla historik.',
+      });
+    }
+  };
+}
+
 function toCapabilityRunError(res, error) {
   const status = pickErrorStatus(error?.code);
   return res.status(status).json(toErrorPayload(error));
@@ -2298,21 +4658,24 @@ async function runCapabilityHandler({
   templateStore,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
 }) {
   const actor = toActor(req);
   const correlationId = toCorrelationId(req);
+  const rawPayload = asObject(req.body);
   const payload = await maybeHydrateCapabilityPayload({
     capabilityName,
     tenantId: toTenantId(req),
     templateStore,
-      input: req.body?.input,
-      systemStateSnapshot: req.body?.systemStateSnapshot,
-      graphReadConnector,
-      capabilityAnalysisStore,
-      authStore,
-      actorUserId: actor.id,
-      correlationId,
+    input: toRunInputBody(rawPayload),
+    systemStateSnapshot: rawPayload.systemStateSnapshot,
+    graphReadConnector,
+    capabilityAnalysisStore,
+    ccoHistoryStore,
+    authStore,
+    actorUserId: actor.id,
+    correlationId,
   });
   if (isDebugRequested(req)) {
     payload.input = {
@@ -2354,21 +4717,24 @@ async function runAgentHandler({
   templateStore,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
 }) {
   const actor = toActor(req);
   const correlationId = toCorrelationId(req);
+  const rawPayload = asObject(req.body);
   const payload = await maybeHydrateAgentPayload({
     agentName,
     tenantId: toTenantId(req),
     templateStore,
-      input: req.body?.input,
-      systemStateSnapshot: req.body?.systemStateSnapshot,
-      graphReadConnector,
-      capabilityAnalysisStore,
-      authStore,
-      actorUserId: actor.id,
-      correlationId,
+    input: toRunInputBody(rawPayload),
+    systemStateSnapshot: rawPayload.systemStateSnapshot,
+    graphReadConnector,
+    capabilityAnalysisStore,
+    ccoHistoryStore,
+    authStore,
+    actorUserId: actor.id,
+    correlationId,
   });
   if (isDebugRequested(req)) {
     payload.input = {
@@ -2430,7 +4796,31 @@ async function runCcoSendHandler({
     graphSendAllowlist,
   });
 
-  if (isBlockedDecision(result.gatewayResult || {})) {
+  const gatewayResult = result.gatewayResult || {};
+  if (
+    isBlockedDecision(gatewayResult) &&
+    normalizeText(gatewayResult.error_stage) === 'persist'
+  ) {
+    const statusCode =
+      Number.isFinite(Number(gatewayResult.error_status)) && Number(gatewayResult.error_status) >= 400
+        ? Number(gatewayResult.error_status)
+        : 503;
+    return res.status(statusCode).json({
+      error:
+        normalizeText(gatewayResult.error_message) ||
+        'Microsoft Graph-send misslyckades. Försök igen om en stund.',
+      code: normalizeText(gatewayResult.error_code) || 'CCO_SEND_TRANSPORT_ERROR',
+      ccoSendRunId: normalizeText(result.ccoSendRunId) || null,
+      decision: gatewayResult.decision || 'blocked',
+      retryAfterSeconds:
+        Number.isFinite(Number(gatewayResult.retry_after_seconds)) &&
+        Number(gatewayResult.retry_after_seconds) >= 0
+          ? Number(gatewayResult.retry_after_seconds)
+          : null,
+    });
+  }
+
+  if (isBlockedDecision(gatewayResult)) {
     return toCapabilityRunBlocked(res, result);
   }
   return toCapabilityRunSuccess(res, result);
@@ -2589,6 +4979,7 @@ async function runCcoDeleteStatusHandler({
   let deleteEnabled = true;
   let reasonCode = '';
   let reason = '';
+  let permissionSummary = null;
 
   if (!graphDeleteEnabled) {
     deleteEnabled = false;
@@ -2602,6 +4993,19 @@ async function runCcoDeleteStatusHandler({
     deleteEnabled = false;
     reasonCode = 'CCO_DELETE_ALLOWLIST_EMPTY';
     reason = 'CCO delete-allowlist är tom.';
+  } else if (typeof graphSendConnector?.inspectPermissions === 'function') {
+    try {
+      permissionSummary = await graphSendConnector.inspectPermissions();
+      if (permissionSummary?.hasMailReadWrite !== true) {
+        deleteEnabled = false;
+        reasonCode = 'CCO_DELETE_GRAPH_PERMISSION_MISSING';
+        reason = 'Microsoft Graph app saknar Mail.ReadWrite för delete/move.';
+      }
+    } catch (error) {
+      deleteEnabled = false;
+      reasonCode = 'CCO_DELETE_PERMISSION_CHECK_FAILED';
+      reason = normalizeText(error?.message) || 'Kunde inte verifiera Graph delete-behörighet.';
+    }
   }
 
   return res.json({
@@ -2611,6 +5015,7 @@ async function runCcoDeleteStatusHandler({
     reason: reason || null,
     allowlist: Array.from(allowlist),
     connectorReady: hasConnector,
+    permissions: permissionSummary,
   });
 }
 
@@ -2760,6 +5165,7 @@ function toCapabilityRunHandler({
   templateStore,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
 }) {
   return async (req, res) => {
@@ -2774,6 +5180,7 @@ function toCapabilityRunHandler({
         templateStore,
         graphReadConnector,
         capabilityAnalysisStore,
+        ccoHistoryStore,
         authStore,
       });
     } catch (error) {
@@ -2787,6 +5194,7 @@ function toAgentRunHandler({
   templateStore,
   graphReadConnector,
   capabilityAnalysisStore,
+  ccoHistoryStore,
   authStore,
 }) {
   return async (req, res) => {
@@ -2801,6 +5209,7 @@ function toAgentRunHandler({
         templateStore,
         graphReadConnector,
         capabilityAnalysisStore,
+        ccoHistoryStore,
         authStore,
       });
     } catch (error) {
@@ -2903,10 +5312,10 @@ function toCcoSprintEventHandler({ authStore }) {
   };
 }
 
-function toCcoUsageEventHandler({ authStore }) {
+function toCcoUsageEventHandler({ authStore, ccoHistoryStore = null }) {
   return async (req, res) => {
     try {
-      return await runCcoUsageEventHandler({ req, res, authStore });
+      return await runCcoUsageEventHandler({ req, res, authStore, ccoHistoryStore });
     } catch (error) {
       return res.status(500).json({
         error: error?.message || 'Kunde inte logga usage-event.',
@@ -2978,6 +5387,1318 @@ function toWritingIdentityAutoExtractHandler({ capabilityAnalysisStore, authStor
   };
 }
 
+function toCcoRuntimeHistoryStatusHandler({
+  ccoHistoryStore = null,
+  graphReadEnabled = false,
+  scheduler = null,
+}) {
+  return async (req, res) => {
+    try {
+      if (
+        !ccoHistoryStore ||
+        typeof ccoHistoryStore.getMailboxSummary !== 'function' ||
+        typeof ccoHistoryStore.getMissingMailboxWindows !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Persistent historikstore är inte tillgänglig just nu.',
+        });
+      }
+
+      const { mailboxId, mailboxIds, lookbackDays } = toCcoRuntimeHistoryStatusQuery(req.query);
+      const tenantId = toTenantId(req);
+      const { startIso, endIso } = toHistoryWindowBounds(lookbackDays);
+      const mailboxes = normalizeMailboxIdList(mailboxIds, 50).map((currentMailboxId) => {
+        const mailbox = ccoHistoryStore.getMailboxSummary({
+          tenantId,
+          mailboxId: currentMailboxId,
+        });
+        const missingWindows = trimRecentHistoryGap(
+          ccoHistoryStore.getMissingMailboxWindows({
+            tenantId,
+            mailboxId: currentMailboxId,
+            startIso,
+            endIso,
+          }),
+          mailbox,
+          endIso
+        );
+        return {
+          mailboxId: currentMailboxId,
+          mailbox,
+          coverage: {
+            startIso,
+            endIso,
+            missingWindowCount: missingWindows.length,
+            missingWindowsPreview: missingWindows.slice(0, 6),
+            complete: missingWindows.length === 0,
+          },
+        };
+      });
+      const missingWindowCount = mailboxes.reduce(
+        (sum, entry) => sum + Number(entry?.coverage?.missingWindowCount || 0),
+        0
+      );
+      const schedulerStatus =
+        scheduler && typeof scheduler.getStatus === 'function'
+          ? scheduler.getStatus()
+          : null;
+      const historyJob = Array.isArray(schedulerStatus?.jobs)
+        ? schedulerStatus.jobs.find((job) => normalizeText(job?.id) === 'cco_history_sync') || null
+        : null;
+
+      return res.json({
+        ok: true,
+        mailboxId,
+        mailboxIds,
+        lookbackDays,
+        graphReadEnabled: graphReadEnabled === true,
+        mailbox: mailboxes[0]?.mailbox || null,
+        mailboxes,
+        coverage: {
+          startIso,
+          endIso,
+          missingWindowCount,
+          missingWindowsPreview: mailboxes.flatMap((entry) =>
+            asArray(entry?.coverage?.missingWindowsPreview).map((window) => ({
+              mailboxId: entry.mailboxId,
+              startIso: window?.startIso || null,
+              endIso: window?.endIso || null,
+            }))
+          ).slice(0, 6),
+          complete: missingWindowCount === 0,
+        },
+        scheduler: schedulerStatus
+          ? {
+              enabled: schedulerStatus.enabled === true,
+              started: schedulerStatus.started === true,
+              job: historyJob
+                ? {
+                    id: historyJob.id,
+                    name: historyJob.name,
+                    enabled: historyJob.enabled === true,
+                    running: historyJob.running === true,
+                    lastRunAt: historyJob.lastRunAt || null,
+                    lastSuccessAt: historyJob.lastSuccessAt || null,
+                    lastStatus: historyJob.lastStatus || null,
+                    lastError: historyJob.lastError || null,
+                    nextRunAt: historyJob.nextRunAt || null,
+                    lastResult: historyJob.lastResult || null,
+                  }
+                : null,
+            }
+          : null,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Historikstatus kunde inte läsas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeCalibrationSummaryHandler({
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      if (
+        !ccoHistoryStore ||
+        typeof ccoHistoryStore.summarizeOutcomeEvaluations !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Kalibreringsstore är inte tillgänglig just nu.',
+        });
+      }
+
+      const { mailboxId, mailboxIds, customerEmail, lookbackDays, intent, sinceIso, untilIso } =
+        toCcoRuntimeCalibrationSummaryQuery(req.query);
+      const tenantId = toTenantId(req);
+      const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
+        lookbackDays,
+        sinceIso,
+        untilIso,
+      });
+      const summary = await ccoHistoryStore.summarizeOutcomeEvaluations({
+        tenantId,
+        customerEmail,
+        mailboxIds,
+        sinceIso: startIso,
+        untilIso: endIso,
+        intent,
+      });
+
+      return res.json({
+        ok: true,
+        mailboxId,
+        mailboxIds,
+        customerEmail,
+        intent,
+        lookbackDays,
+        window: {
+          startIso,
+          endIso,
+        },
+        summary,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Kalibreringssummary kunde inte läsas.',
+      });
+    }
+  };
+}
+
+function toHistorySearchResultLabelSv(result = {}) {
+  if (result?.resultType === 'outcome') return 'Utfall';
+  if (result?.resultType === 'action') return 'Åtgärd';
+  return 'Mail';
+}
+
+function toHistoryActionLabelSv(actionType = '') {
+  const normalized = normalizeHistoryActionType(actionType);
+  if (normalized === 'reply_sent') return 'Svar skickat';
+  if (normalized === 'reply_later') return 'Svara senare';
+  if (normalized === 'customer_replied') return 'Kunden svarade';
+  if (normalized === 'conversation_deleted') return 'Flyttad till papperskorg';
+  return normalizeText(actionType) || 'Åtgärd';
+}
+
+function toHistoryOutcomeLabelSv(outcomeCode = '') {
+  const normalized = normalizeHistoryOutcomeCode(outcomeCode);
+  if (normalized === 'booked') return 'Bokad';
+  if (normalized === 'rebooked') return 'Ombokad';
+  if (normalized === 'replied') return 'Besvarat';
+  if (normalized === 'not_interested') return 'Ej intresserad';
+  if (normalized === 'escalated') return 'Eskalerad';
+  if (normalized === 'no_response') return 'Ingen respons';
+  if (normalized === 'closed_no_action') return 'Stängd utan åtgärd';
+  return normalizeText(outcomeCode) || 'Utfall';
+}
+
+function formatReadoutDateTimeSv(value = '') {
+  const iso = toIso(value);
+  if (!iso) return '–';
+  return new Intl.DateTimeFormat('sv-SE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+}
+
+function formatCalibrationStatList(summary = [], formatter = (item) => item.label) {
+  const items = asArray(summary).slice(0, 5);
+  if (items.length === 0) {
+    return '<li class="readout-empty">Ingen signal ännu.</li>';
+  }
+  return items
+    .map(
+      (item) => `<li><strong>${escapeHtml(formatter(item))}</strong><span>${escapeHtml(
+        `${item.positiveCount || 0} positiva · ${item.negativeCount || 0} negativa · ${item.totalCount || 0} totalt`
+      )}</span></li>`
+    )
+    .join('');
+}
+
+function formatCalibrationIntentBreakdown(summary = [], type = 'action') {
+  const items = asArray(summary).slice(0, 6);
+  if (items.length === 0) {
+    return '<li class="readout-empty">Ingen intentsignal ännu.</li>';
+  }
+  return items
+    .map((item) => {
+      const bestLabel =
+        normalizeText(item?.best?.label || item?.best?.key) || '–';
+      const worstEntry = item?.worst || null;
+      const worstLabel =
+        worstEntry && type === 'mode'
+          ? normalizeText(worstEntry?.label || worstEntry?.key) || '–'
+          : worstEntry && worstEntry?.key === 'no_response'
+            ? toHistoryOutcomeLabelSv(worstEntry?.key)
+            : normalizeText(worstEntry?.label || worstEntry?.key) || '–';
+      return `<li><strong>${escapeHtml(normalizeText(item?.label) || 'Okänd intent')}</strong><span>${escapeHtml(
+        `Bäst: ${bestLabel} · Svagast: ${worstLabel} · ${Number(item?.totalCount || 0)} case`
+      )}</span></li>`;
+    })
+    .join('');
+}
+
+function formatFailurePatternList(summary = []) {
+  const items = asArray(summary).slice(0, 6);
+  if (items.length === 0) {
+    return '<li class="readout-empty">Inga tydliga failure patterns ännu.</li>';
+  }
+  return items
+    .map((item) => {
+      const label =
+        item?.type === 'outcome'
+          ? toHistoryOutcomeLabelSv(item?.key)
+          : normalizeText(item?.label || item?.key) || '–';
+      return `<li><strong>${escapeHtml(label)}</strong><span>${escapeHtml(
+        `${Number(item?.count || 0)} träffar`
+      )}</span></li>`;
+    })
+    .join('');
+}
+
+function buildMailboxComparisonCards(mailboxSummaries = []) {
+  const items = asArray(mailboxSummaries);
+  if (items.length === 0) {
+    return '<p class="readout-empty">Ingen mailboxsummary ännu.</p>';
+  }
+  return items
+    .map(
+      (entry) => `<article class="mailbox-card">
+        <h4>${escapeHtml(normalizeText(entry.mailboxId || entry.label) || 'Mailbox')}</h4>
+        <p>${escapeHtml(
+          `Positiva ${Number(entry.positiveOutcomeCount || 0)} · Negativa ${Number(entry.negativeOutcomeCount || 0)} · Totalt ${Number(entry.totalOutcomeCount || 0)}`
+        )}</p>
+        <p>${escapeHtml(
+          `Bästa action: ${normalizeText(entry.preferredAction) || '–'}`
+        )}</p>
+        <p>${escapeHtml(
+          `Bästa mode: ${normalizeText(entry.preferredMode) || '–'}`
+        )}</p>
+        <p>${escapeHtml(
+          `Svagaste utfall: ${toHistoryOutcomeLabelSv(entry.dominantFailureOutcome)}`
+        )}</p>
+      </article>`
+    )
+    .join('');
+}
+
+function buildCalibrationReadoutDocument({
+  mailboxIds = [],
+  customerEmail = null,
+  conversationId = null,
+  lookbackDays = 90,
+  q = '',
+  intent = null,
+  resultTypes = [],
+  actionTypes = [],
+  outcomeCodes = [],
+  sinceIso = null,
+  untilIso = null,
+  summary = {},
+  mailboxSummaries = [],
+  searchResults = [],
+} = {}) {
+  const mailboxValue = mailboxIds.join(',');
+  const intentValue = normalizeText(intent);
+  const resultTypeValue = asArray(resultTypes).join(',');
+  const actionTypeValue = asArray(actionTypes).join(',');
+  const outcomeCodeValue = asArray(outcomeCodes).join(',');
+  const positiveRate =
+    Number(summary.totalOutcomeCount || 0) > 0
+      ? Math.round((Number(summary.positiveOutcomeCount || 0) / Number(summary.totalOutcomeCount || 1)) * 100)
+      : 0;
+  const bestActionLabel = normalizeText(summary.preferredAction) || '–';
+  const bestModeLabel = normalizeText(summary.preferredMode) || '–';
+  const worstOutcomeLabel = toHistoryOutcomeLabelSv(summary.dominantFailureOutcome);
+  const worstRiskLabel = normalizeText(summary.dominantFailureRisk) || '–';
+  const searchItems = asArray(searchResults)
+    .map((result) => {
+      const label =
+        result.resultType === 'outcome'
+          ? toHistoryOutcomeLabelSv(result.outcomeCode || result.title)
+          : result.resultType === 'action'
+            ? toHistoryActionLabelSv(result.actionType || result.title)
+            : normalizeText(result.title) || 'Mail';
+      return `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">${escapeHtml(toHistorySearchResultLabelSv(result))}</span>
+          <span class="result-time">${escapeHtml(formatReadoutDateTimeSv(result.recordedAt))}</span>
+        </div>
+        <h4>${escapeHtml(label)}</h4>
+        <p class="result-summary">${escapeHtml(normalizeText(result.summary || result.subject || result.detail) || '–')}</p>
+        <p class="result-meta">${escapeHtml(
+          [
+            normalizeText(result.mailboxId),
+            normalizeText(result.customerEmail),
+            normalizeText(result.conversationId),
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        )}</p>
+        ${
+          normalizeText(result.conversationId)
+            ? `<p class="result-links"><a href="${escapeHtml(
+                buildCcoNextConversationHref(result.conversationId)
+              )}" target="_blank" rel="noreferrer">Öppna i CCO Next</a></p>`
+            : ''
+        }
+      </article>`;
+    })
+    .join('');
+
+  const mailboxCards = buildMailboxComparisonCards(
+    asArray(summary.mailboxComparisonSummary).length > 0
+      ? summary.mailboxComparisonSummary
+      : asArray(mailboxSummaries).map((entry) => ({
+          mailboxId: entry.mailboxId,
+          totalOutcomeCount: entry.summary?.totalOutcomeCount || 0,
+          positiveOutcomeCount: entry.summary?.positiveOutcomeCount || 0,
+          negativeOutcomeCount: entry.summary?.negativeOutcomeCount || 0,
+          preferredAction: entry.summary?.preferredAction || null,
+          preferredMode: entry.summary?.preferredMode || null,
+          dominantFailureOutcome: entry.summary?.dominantFailureOutcome || null,
+        }))
+  );
+
+  return `<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CCO Kons-readout</title>
+    <style>
+      :root { color-scheme: light; }
+      body { margin: 0; padding: 32px; font-family: Arial, sans-serif; background: #f6f2ec; color: #2f2f33; }
+      .page { max-width: 1280px; margin: 0 auto; }
+      h1 { margin: 0 0 8px; font-size: 30px; }
+      .lead { margin: 0 0 24px; color: rgba(70,60,50,.72); }
+      .panel { background: rgba(255,252,248,.92); border: 1px solid rgba(120,105,90,.16); border-radius: 20px; box-shadow: 0 8px 24px rgba(70,50,30,.08), 0 2px 6px rgba(70,50,30,.05), inset 0 1px 0 rgba(255,255,255,.55); padding: 24px; margin-bottom: 24px; }
+      .filters { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr 1fr 1fr auto; gap: 12px; align-items: end; }
+      .filters label { display: block; font-size: 13px; color: rgba(70,60,50,.72); margin-bottom: 6px; }
+      .filters input, .filters select { width: 100%; border: 1px solid rgba(120,105,90,.16); border-radius: 14px; padding: 11px 12px; font-size: 14px; background: rgba(255,255,255,.82); }
+      .filters button { border: 0; border-radius: 14px; padding: 12px 16px; background: linear-gradient(180deg, rgba(34,108,74,.94), rgba(18,88,58,.98)); color: #fff; font-weight: 700; cursor: pointer; }
+      .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+      .kpi { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: rgba(70,60,50,.62); margin-bottom: 8px; }
+      .kpi-value { font-size: 28px; font-weight: 700; }
+      .grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 24px; }
+      .lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .list-card, .mailbox-card, .result-card { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .list-card h3, .mailbox-card h4, .result-card h4 { margin: 0 0 12px; font-size: 16px; }
+      .list-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+      .list-card li { display: grid; gap: 4px; }
+      .list-card li span { color: rgba(70,60,50,.72); font-size: 13px; }
+      .mailboxes { display: grid; gap: 12px; }
+      .result-grid { display: grid; gap: 12px; }
+      .result-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: rgba(70,60,50,.62); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+      .result-summary { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+      .result-meta { margin: 0; color: rgba(70,60,50,.62); font-size: 12px; }
+      .result-links { margin: 10px 0 0; }
+      .result-links a { color: #2a5bd7; text-decoration: none; font-size: 13px; font-weight: 600; }
+      .readout-empty { color: rgba(70,60,50,.62); }
+      @media (max-width: 1100px) {
+        body { padding: 20px; }
+        .filters, .kpis, .grid, .lists { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>CCO kons-readout</h1>
+      <p class="lead">Kalibrering, historiksök och operativ readout för kons-flödet utan att belasta huvudytan i CCO Next.</p>
+
+      <section class="panel">
+        <form method="get" action="/api/v1/cco/runtime/calibration/readout" class="filters">
+          <div>
+            <label for="mailboxIds">Mailboxar</label>
+            <input id="mailboxIds" name="mailboxIds" value="${escapeHtml(mailboxValue)}" />
+          </div>
+          <div>
+            <label for="customerEmail">Kundmail</label>
+            <input id="customerEmail" name="customerEmail" value="${escapeHtml(normalizeText(customerEmail))}" />
+          </div>
+          <div>
+            <label for="conversationId">Conversation</label>
+            <input id="conversationId" name="conversationId" value="${escapeHtml(normalizeText(conversationId))}" />
+          </div>
+          <div>
+            <label for="lookbackDays">Lookback</label>
+            <select id="lookbackDays" name="lookbackDays">
+              ${[30, 90, 365, 1095]
+                .map(
+                  (days) =>
+                    `<option value="${days}"${Number(days) === Number(lookbackDays) ? ' selected' : ''}>${days} dagar</option>`
+                )
+                .join('')}
+            </select>
+          </div>
+          <div>
+            <label for="intent">Intent</label>
+            <input id="intent" name="intent" value="${escapeHtml(intentValue)}" placeholder="reschedule" />
+          </div>
+          <div>
+            <label for="resultTypes">Resultattyper</label>
+            <input id="resultTypes" name="resultTypes" value="${escapeHtml(resultTypeValue)}" placeholder="message,action" />
+          </div>
+          <div>
+            <label for="actionTypes">Åtgärdstyper</label>
+            <input id="actionTypes" name="actionTypes" value="${escapeHtml(actionTypeValue)}" placeholder="reply_sent,reply_later" />
+          </div>
+          <div>
+            <label for="outcomeCodes">Utfall</label>
+            <input id="outcomeCodes" name="outcomeCodes" value="${escapeHtml(outcomeCodeValue)}" placeholder="rebooked,no_response" />
+          </div>
+          <div>
+            <label for="q">Sök historik</label>
+            <input id="q" name="q" value="${escapeHtml(normalizeText(q))}" />
+          </div>
+          <div>
+            <label for="sinceIso">Från</label>
+            <input id="sinceIso" name="sinceIso" value="${escapeHtml(normalizeText(sinceIso))}" />
+          </div>
+          <div>
+            <label for="untilIso">Till</label>
+            <input id="untilIso" name="untilIso" value="${escapeHtml(normalizeText(untilIso))}" />
+          </div>
+          <button type="submit">Uppdatera</button>
+        </form>
+
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-label">Totala utfall</div><div class="kpi-value">${escapeHtml(String(summary.totalOutcomeCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Positiv andel</div><div class="kpi-value">${escapeHtml(`${positiveRate}%`)}</div></div>
+          <div class="kpi"><div class="kpi-label">Bästa action</div><div class="kpi-value">${escapeHtml(bestActionLabel)}</div></div>
+          <div class="kpi"><div class="kpi-label">Bästa mode</div><div class="kpi-value">${escapeHtml(bestModeLabel)}</div></div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="lists">
+            <div class="list-card">
+              <h3>Det som fungerar bäst</h3>
+              <ul>
+                <li><strong>${escapeHtml(bestActionLabel)}</strong><span>Rekommenderad action med bäst positivt utfall.</span></li>
+                <li><strong>${escapeHtml(bestModeLabel)}</strong><span>Draft mode som gav bäst resultat.</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Det som fungerar sämst</h3>
+              <ul>
+                <li><strong>${escapeHtml(worstOutcomeLabel || '–')}</strong><span>Vanligaste negativa utfall.</span></li>
+                <li><strong>${escapeHtml(worstRiskLabel)}</strong><span>Dominant negativ risksignal.</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Toppactions</h3>
+              <ul>${formatCalibrationStatList(summary.actionSummary)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Toppmodes</h3>
+              <ul>${formatCalibrationStatList(summary.modeSummary, (item) => item.label)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Bästa/sämsta action per intent</h3>
+              <ul>${formatCalibrationIntentBreakdown(summary.actionSummaryByIntent, 'action')}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Bästa/sämsta mode per intent</h3>
+              <ul>${formatCalibrationIntentBreakdown(summary.modeSummaryByIntent, 'mode')}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Vanligaste failure patterns</h3>
+              <ul>${formatFailurePatternList(summary.failurePatternSummary)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Intentvolym</h3>
+              <ul>${formatCalibrationStatList(summary.intentSummary)}</ul>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <h3>Per mailbox</h3>
+          <div class="mailboxes">${mailboxCards || '<p class="readout-empty">Ingen mailboxsummary ännu.</p>'}</div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h3>Historiksök</h3>
+        <div class="result-grid">${searchItems || '<p class="readout-empty">Ingen historik matchar filtret ännu.</p>'}</div>
+      </section>
+    </div>
+  </body>
+</html>`;
+}
+
+async function listCapabilityEntriesByName({
+  capabilityAnalysisStore = null,
+  tenantId = '',
+  capabilityName = '',
+  limit = 500,
+} = {}) {
+  if (!capabilityAnalysisStore || typeof capabilityAnalysisStore.list !== 'function') return [];
+  return capabilityAnalysisStore.list({
+    tenantId,
+    capabilityName,
+    limit,
+  });
+}
+
+async function buildShadowReviewContext({
+  tenantId = '',
+  capabilityAnalysisStore = null,
+  ccoHistoryStore = null,
+  mailboxIds = [],
+  lookbackDays = 14,
+  intent = null,
+  limit = 24,
+  sinceIso = null,
+  untilIso = null,
+} = {}) {
+  const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
+    lookbackDays,
+    sinceIso,
+    untilIso,
+  });
+  if (
+    ccoHistoryStore &&
+    typeof ccoHistoryStore.listMailboxMessages === 'function' &&
+    typeof materializeCustomerReplyActions === 'function'
+  ) {
+    const recentMessages = (
+      await Promise.all(
+        asArray(mailboxIds).map((mailboxId) =>
+          ccoHistoryStore.listMailboxMessages({
+            tenantId,
+            mailboxId,
+            sinceIso: startIso,
+            untilIso: endIso,
+          })
+        )
+      )
+    ).flat();
+    await materializeCustomerReplyActions({
+      tenantId,
+      messages: recentMessages,
+      ccoHistoryStore,
+    });
+  }
+  const [shadowEntries, reviewEntries, actions, outcomes] = await Promise.all([
+    listCapabilityEntriesByName({
+      capabilityAnalysisStore,
+      tenantId,
+      capabilityName: 'CCO.ShadowRun',
+      limit: 500,
+    }),
+    listCapabilityEntriesByName({
+      capabilityAnalysisStore,
+      tenantId,
+      capabilityName: 'CCO.ShadowReview',
+      limit: 60,
+    }),
+    ccoHistoryStore && typeof ccoHistoryStore.listActions === 'function'
+      ? ccoHistoryStore.listActions({
+          tenantId,
+          mailboxIds,
+          sinceIso: startIso,
+          untilIso: endIso,
+          intent,
+        })
+      : [],
+    ccoHistoryStore && typeof ccoHistoryStore.listOutcomes === 'function'
+      ? ccoHistoryStore.listOutcomes({
+          tenantId,
+          mailboxIds,
+          sinceIso: startIso,
+          untilIso: endIso,
+          intent,
+        })
+      : [],
+  ]);
+
+  const summary = summarizeShadowReview({
+    shadowEntries,
+    actions,
+    outcomes,
+    mailboxIds,
+    lookbackDays,
+    intent,
+    limit,
+  });
+
+  return {
+    window: {
+      startIso,
+      endIso,
+    },
+    shadowEntries,
+    reviewEntries,
+    actions,
+    outcomes,
+    summary,
+    latestRunEntry: asArray(shadowEntries)[0] || null,
+    latestReviewEntry: asArray(reviewEntries)[0] || null,
+  };
+}
+
+function formatShadowStatList(items = [], formatter = (item) => item?.label || item?.key || '–') {
+  const rows = asArray(items).slice(0, 6);
+  if (rows.length === 0) {
+    return '<li class="readout-empty">Ingen stabil signal ännu.</li>';
+  }
+  return rows
+    .map((item) => {
+      const pending = Number(item?.pendingCount || 0);
+      const pendingLabel = pending > 0 ? ` · ${pending} utan utfall` : '';
+      return `<li><strong>${escapeHtml(formatter(item))}</strong><span>${escapeHtml(
+        `${Number(item?.positiveCount || 0)} positiva · ${Number(item?.negativeCount || 0)} negativa${pendingLabel}`
+      )}</span></li>`;
+    })
+    .join('');
+}
+
+function formatShadowIntentBreakdown(items = [], type = 'action') {
+  const rows = asArray(items).slice(0, 6);
+  if (rows.length === 0) {
+    return '<li class="readout-empty">Ingen intentsignal ännu.</li>';
+  }
+  return rows
+    .map((item) => {
+      const bestLabel =
+        normalizeText(item?.best?.label || item?.best?.key) || '–';
+      const worstLabel =
+        normalizeText(item?.worst?.label || item?.worst?.key) || '–';
+      return `<li><strong>${escapeHtml(normalizeText(item?.label) || 'Okänd intent')}</strong><span>${escapeHtml(
+        `${type === 'mode' ? 'Bästa mode' : 'Bästa action'}: ${bestLabel} · Svagast: ${worstLabel} · ${Number(item?.totalCount || 0)} case`
+      )}</span></li>`;
+    })
+    .join('');
+}
+
+function formatShadowFailurePatterns(items = []) {
+  const rows = asArray(items).slice(0, 6);
+  if (rows.length === 0) {
+    return '<li class="readout-empty">Inga failure patterns ännu.</li>';
+  }
+  return rows
+    .map(
+      (item) => `<li><strong>${escapeHtml(normalizeText(item?.label) || 'Mönster')}</strong><span>${escapeHtml(
+        `${Number(item?.count || 0)} träffar`
+      )}</span></li>`
+    )
+    .join('');
+}
+
+function buildShadowMailboxCards(items = []) {
+  const rows = asArray(items);
+  if (rows.length === 0) {
+    return '<p class="readout-empty">Ingen mailboxjämförelse ännu.</p>';
+  }
+  return rows
+    .map(
+      (item) => `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">Mailbox</span>
+          <span class="result-time">${escapeHtml(String(Number(item?.totalCount || 0)))} case</span>
+        </div>
+        <h4>${escapeHtml(normalizeText(item?.mailboxId) || 'Okänd mailbox')}</h4>
+        <p class="result-summary">${escapeHtml(
+          `Positiva ${Number(item?.positiveCount || 0)} · Negativa ${Number(item?.negativeCount || 0)} · Väntar ${Number(item?.pendingCount || 0)}`
+        )}</p>
+        <p class="result-meta">${escapeHtml(
+          [
+            `Bästa action: ${normalizeText(item?.bestAction?.label) || '–'}`,
+            `Bästa mode: ${normalizeText(item?.bestMode?.label || item?.bestMode?.key) || '–'}`,
+          ].join(' · ')
+        )}</p>
+      </article>`
+    )
+    .join('');
+}
+
+function formatShadowCaseMeta(caseItem = {}) {
+  return [
+    normalizeText(caseItem.mailboxId),
+    normalizeText(caseItem.customerEmail),
+    normalizeText(caseItem.conversationId),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function buildShadowComparisonCards(comparisons = []) {
+  const items = asArray(comparisons).slice(0, 24);
+  if (items.length === 0) {
+    return '<p class="readout-empty">Ingen shadow-run-jämförelse ännu.</p>';
+  }
+  return items
+    .map((item) => {
+      const outcomeLabel = item.outcomeCode ? toHistoryOutcomeLabelSv(item.outcomeCode) : 'Inget utfall ännu';
+      const operatorAction = item.operatorActionType
+        ? toHistoryActionLabelSv(item.operatorActionType)
+        : 'Ingen operatörsåtgärd ännu';
+      const modeLabel = item.recommendedMode
+        ? `${item.recommendedMode}${item.selectedMode ? ` → ${item.selectedMode}` : ''}`
+        : item.selectedMode || '–';
+      return `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">Shadow-run</span>
+          <span class="result-time">${escapeHtml(formatReadoutDateTimeSv(item.generatedAt))}</span>
+        </div>
+        <h4>${escapeHtml(normalizeText(item.subject) || '(utan ämne)')}</h4>
+        <p class="result-summary">${escapeHtml(
+          [
+            `CCO föreslog: ${normalizeText(item.recommendedAction) || '–'}`,
+            `Operatör: ${operatorAction}`,
+            `Utfall: ${outcomeLabel}`,
+          ].join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(
+          [
+            `Mode: ${modeLabel}`,
+            item.intent ? `Intent: ${item.intent}` : '',
+            item.actualIntent && item.actualIntent !== item.intent ? `Faktisk intent: ${item.actualIntent}` : '',
+            item.dominantRisk ? `Risk: ${item.dominantRisk}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(formatShadowCaseMeta(item))}</p>
+        ${
+          normalizeText(item.conversationId)
+            ? `<p class="result-links"><a href="${escapeHtml(
+                buildCcoNextConversationHref(item.conversationId)
+              )}" target="_blank" rel="noreferrer">Öppna i CCO Next</a></p>`
+            : ''
+        }
+      </article>`;
+    })
+    .join('');
+}
+
+function buildShadowIssueCards(items = [], type = 'case') {
+  const rows = asArray(items).slice(0, 16);
+  if (rows.length === 0) {
+    return '<p class="readout-empty">Ingen träff i den här kategorin.</p>';
+  }
+  if (type === 'merge') {
+    return rows
+      .map(
+        (item) => `<article class="result-card">
+          <div class="result-head">
+            <span class="result-type">Merge-suspekt</span>
+            <span class="result-time">${escapeHtml(String(item.count || 0))} trådar</span>
+          </div>
+          <h4>${escapeHtml(normalizeText(item.subject) || '(utan ämne)')}</h4>
+          <p class="result-summary">${escapeHtml(
+            `Kund: ${normalizeText(item.customerEmail) || 'okänd'} · Mailboxar: ${asArray(item.mailboxIds).join(', ')}`
+          )}</p>
+          <p class="result-meta">${escapeHtml(asArray(item.conversationIds).join(' · '))}</p>
+        </article>`
+      )
+      .join('');
+  }
+  return rows
+    .map(
+      (item) => `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">Suspekt</span>
+          <span class="result-time">${escapeHtml(formatReadoutDateTimeSv(item.generatedAt || item.customerRepliedAt || item.followUpSuggestedAt))}</span>
+        </div>
+        <h4>${escapeHtml(normalizeText(item.subject) || '(utan ämne)')}</h4>
+        <p class="result-summary">${escapeHtml(
+          [
+            normalizeText(item.recommendedAction) ? `CCO: ${item.recommendedAction}` : '',
+            item.operatorActionType ? `Operatör: ${toHistoryActionLabelSv(item.operatorActionType)}` : '',
+            item.outcomeCode ? `Utfall: ${toHistoryOutcomeLabelSv(item.outcomeCode)}` : '',
+            item.actualIntent && item.actualIntent !== item.intent ? `Faktisk intent: ${item.actualIntent}` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(formatShadowCaseMeta(item))}</p>
+        ${
+          normalizeText(item.conversationId)
+            ? `<p class="result-links"><a href="${escapeHtml(
+                buildCcoNextConversationHref(item.conversationId)
+              )}" target="_blank" rel="noreferrer">Öppna i CCO Next</a></p>`
+            : ''
+        }
+      </article>`
+    )
+    .join('');
+}
+
+function buildShadowReadoutDocument({
+  mailboxIds = [],
+  lookbackDays = 14,
+  intent = null,
+  limit = 24,
+  summary = {},
+  window = {},
+  latestRunEntry = null,
+  latestReviewEntry = null,
+} = {}) {
+  const mailboxValue = asArray(mailboxIds).join(',');
+  const bestAction = normalizeText(summary?.best?.action?.label) || '–';
+  const bestMode = normalizeText(summary?.best?.mode?.label) || '–';
+  const worstAction = normalizeText(summary?.worst?.action?.label) || '–';
+  const worstMode = normalizeText(summary?.worst?.mode?.label) || '–';
+  const totals = asObject(summary?.totals);
+  const suspectCounts = asObject(summary?.suspectCounts);
+  return `<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CCO shadow-run readout</title>
+    <style>
+      :root { color-scheme: light; }
+      body { margin: 0; padding: 32px; font-family: Arial, sans-serif; background: #f6f2ec; color: #2f2f33; }
+      .page { max-width: 1360px; margin: 0 auto; }
+      h1 { margin: 0 0 8px; font-size: 30px; }
+      .lead { margin: 0 0 24px; color: rgba(70,60,50,.72); }
+      .panel { background: rgba(255,252,248,.92); border: 1px solid rgba(120,105,90,.16); border-radius: 20px; box-shadow: 0 8px 24px rgba(70,50,30,.08), 0 2px 6px rgba(70,50,30,.05), inset 0 1px 0 rgba(255,255,255,.55); padding: 24px; margin-bottom: 24px; }
+      .filters { display: grid; grid-template-columns: 1.2fr .8fr .8fr .8fr auto; gap: 12px; align-items: end; }
+      .filters label { display: block; font-size: 13px; color: rgba(70,60,50,.72); margin-bottom: 6px; }
+      .filters input, .filters select { width: 100%; border: 1px solid rgba(120,105,90,.16); border-radius: 14px; padding: 11px 12px; font-size: 14px; background: rgba(255,255,255,.82); }
+      .filters button { border: 0; border-radius: 14px; padding: 12px 16px; background: linear-gradient(180deg, rgba(34,108,74,.94), rgba(18,88,58,.98)); color: #fff; font-weight: 700; cursor: pointer; }
+      .meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; color: rgba(70,60,50,.72); font-size: 13px; }
+      .meta-chip { border: 1px solid rgba(120,105,90,.16); border-radius: 999px; padding: 7px 12px; background: rgba(255,255,255,.72); }
+      .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+      .kpi { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: rgba(70,60,50,.62); margin-bottom: 8px; }
+      .kpi-value { font-size: 28px; font-weight: 700; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .list-card, .result-card { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .list-card h3, .result-card h4 { margin: 0 0 12px; font-size: 16px; }
+      .list-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+      .list-card li { display: grid; gap: 4px; }
+      .list-card li span { color: rgba(70,60,50,.72); font-size: 13px; }
+      .result-grid { display: grid; gap: 12px; }
+      .result-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: rgba(70,60,50,.62); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+      .result-summary { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+      .result-meta { margin: 0; color: rgba(70,60,50,.62); font-size: 12px; }
+      .result-links { margin: 10px 0 0; }
+      .result-links a { color: #2a5bd7; text-decoration: none; font-size: 13px; font-weight: 600; }
+      .readout-empty { color: rgba(70,60,50,.62); }
+      @media (max-width: 1100px) {
+        body { padding: 20px; }
+        .filters, .kpis, .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>CCO shadow-run readout</h1>
+      <p class="lead">Daglig kalibreringsgranskning för kons-trafik. Här jämförs vad CCO föreslog, vad som faktiskt gjordes och vilket utfall det gav.</p>
+
+      <section class="panel">
+        <form method="get" action="/api/v1/cco/runtime/shadow/readout" class="filters">
+          <div>
+            <label for="mailboxIds">Mailboxar</label>
+            <input id="mailboxIds" name="mailboxIds" value="${escapeHtml(mailboxValue)}" />
+          </div>
+          <div>
+            <label for="lookbackDays">Lookback</label>
+            <select id="lookbackDays" name="lookbackDays">
+              ${[7, 14, 30, 90]
+                .map(
+                  (days) =>
+                    `<option value="${days}"${Number(days) === Number(lookbackDays) ? ' selected' : ''}>${days} dagar</option>`
+                )
+                .join('')}
+            </select>
+          </div>
+          <div>
+            <label for="intent">Intent</label>
+            <input id="intent" name="intent" value="${escapeHtml(normalizeText(intent))}" placeholder="reschedule" />
+          </div>
+          <div>
+            <label for="limit">Antal case</label>
+            <input id="limit" name="limit" value="${escapeHtml(String(limit))}" />
+          </div>
+          <button type="submit">Uppdatera</button>
+        </form>
+
+        <div class="meta">
+          <span class="meta-chip">Senaste shadow-run: ${escapeHtml(formatReadoutDateTimeSv(latestRunEntry?.ts))}</span>
+          <span class="meta-chip">Senaste daily review: ${escapeHtml(formatReadoutDateTimeSv(latestReviewEntry?.ts))}</span>
+          <span class="meta-chip">Fönster: ${escapeHtml(formatReadoutDateTimeSv(window?.startIso))} → ${escapeHtml(formatReadoutDateTimeSv(window?.endIso))}</span>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-label">Shadow-cases</div><div class="kpi-value">${escapeHtml(String(totals.recommendationCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Positiva utfall</div><div class="kpi-value">${escapeHtml(String(totals.positiveCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Negativa utfall</div><div class="kpi-value">${escapeHtml(String(totals.negativeCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Överstyrda modes</div><div class="kpi-value">${escapeHtml(String(totals.modeOverrideCount || 0))}</div></div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="grid">
+            <div class="list-card">
+              <h3>Det som fungerar bäst</h3>
+              <ul>
+                <li><strong>${escapeHtml(bestAction)}</strong><span>Bästa rekommenderade action just nu.</span></li>
+                <li><strong>${escapeHtml(bestMode)}</strong><span>Bästa draft mode just nu.</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Det som fungerar sämst</h3>
+              <ul>
+                <li><strong>${escapeHtml(worstAction)}</strong><span>Svagaste action i shadow-run-fönstret.</span></li>
+                <li><strong>${escapeHtml(worstMode)}</strong><span>Svagaste mode i shadow-run-fönstret.</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Actions</h3>
+              <ul>${formatShadowStatList(summary?.summaries?.actionSummary)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Modes</h3>
+              <ul>${formatShadowStatList(summary?.summaries?.modeSummary)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Bästa/sämsta action per intent</h3>
+              <ul>${formatShadowIntentBreakdown(summary?.summaries?.actionSummaryByIntent, 'action')}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Bästa/sämsta mode per intent</h3>
+              <ul>${formatShadowIntentBreakdown(summary?.summaries?.modeSummaryByIntent, 'mode')}</ul>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="grid">
+            <div class="list-card">
+              <h3>Suspekter</h3>
+              <ul>
+                <li><strong>${escapeHtml(String(suspectCounts.intentMismatch || 0))}</strong><span>Intent mismatch</span></li>
+                <li><strong>${escapeHtml(String(suspectCounts.missedReopen || 0))}</strong><span>Missad reopen</span></li>
+                <li><strong>${escapeHtml(String(suspectCounts.missedFollowUp || 0))}</strong><span>Missad follow-up</span></li>
+                <li><strong>${escapeHtml(String(suspectCounts.mergeDuplicate || 0))}</strong><span>Merge/dubblett</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Intent</h3>
+              <ul>${formatShadowStatList(summary?.summaries?.intentSummary)}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Failure patterns</h3>
+              <ul>${formatShadowFailurePatterns(summary?.summaries?.failurePatternSummary)}</ul>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h3>Mailboxjämförelse</h3>
+        <div class="result-grid">${buildShadowMailboxCards(summary?.summaries?.mailboxSummary)}</div>
+      </section>
+
+      <section class="panel">
+        <h3>Jämför vad CCO föreslog mot vad som faktiskt hände</h3>
+        <div class="result-grid">${buildShadowComparisonCards(summary?.comparisons)}</div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>Suspekt intent mismatch</h3>
+          <div class="result-grid">${buildShadowIssueCards(summary?.suspectCases?.intentMismatch)}</div>
+        </section>
+        <section class="panel">
+          <h3>Suspekt missad reopen</h3>
+          <div class="result-grid">${buildShadowIssueCards(summary?.suspectCases?.missedReopen)}</div>
+        </section>
+      </div>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>Suspekt missad follow-up</h3>
+          <div class="result-grid">${buildShadowIssueCards(summary?.suspectCases?.missedFollowUp)}</div>
+        </section>
+        <section class="panel">
+          <h3>Merge/dubblett-suspekter</h3>
+          <div class="result-grid">${buildShadowIssueCards(summary?.suspectCases?.mergeDuplicate, 'merge')}</div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+function toCcoRuntimeShadowStatusHandler({
+  scheduler = null,
+  capabilityAnalysisStore = null,
+  mailboxIds = [],
+  runLookbackDays = 14,
+  reviewLookbackDays = 14,
+}) {
+  return async (req, res) => {
+    const tenantId = toTenantId(req);
+    const schedulerStatus =
+      scheduler && typeof scheduler.getStatus === 'function' ? scheduler.getStatus() : null;
+    const jobs = asArray(schedulerStatus?.jobs);
+    const shadowRunJob = jobs.find((job) => normalizeText(job?.id) === 'cco_shadow_run') || null;
+    const shadowReviewJob =
+      jobs.find((job) => normalizeText(job?.id) === 'cco_shadow_review') || null;
+    const [latestRunEntry, latestReviewEntry] = await Promise.all([
+      listCapabilityEntriesByName({
+        capabilityAnalysisStore,
+        tenantId,
+        capabilityName: 'CCO.ShadowRun',
+        limit: 1,
+      }).then((entries) => asArray(entries)[0] || null),
+      listCapabilityEntriesByName({
+        capabilityAnalysisStore,
+        tenantId,
+        capabilityName: 'CCO.ShadowReview',
+        limit: 1,
+      }).then((entries) => asArray(entries)[0] || null),
+    ]);
+    return res.json({
+      ok: true,
+      mailboxIds: asArray(mailboxIds),
+      runLookbackDays: Number(runLookbackDays || 14),
+      reviewLookbackDays: Number(reviewLookbackDays || 14),
+      shadowRunJob,
+      shadowReviewJob,
+      latestRunEntry: latestRunEntry
+        ? {
+            id: latestRunEntry.id,
+            ts: latestRunEntry.ts,
+            metadata: latestRunEntry.metadata || {},
+          }
+        : null,
+      latestReviewEntry: latestReviewEntry
+        ? {
+            id: latestReviewEntry.id,
+            ts: latestReviewEntry.ts,
+            metadata: latestReviewEntry.metadata || {},
+          }
+        : null,
+    });
+  };
+}
+
+function toCcoRuntimeShadowSummaryHandler({
+  capabilityAnalysisStore = null,
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeShadowQuery(req.query);
+      const context = await buildShadowReviewContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoHistoryStore,
+        mailboxIds: query.mailboxIds,
+        lookbackDays: query.lookbackDays,
+        intent: query.intent,
+        limit: query.limit,
+        sinceIso: query.sinceIso,
+        untilIso: query.untilIso,
+      });
+      return res.json({
+        ok: true,
+        mailboxId: query.mailboxId,
+        mailboxIds: query.mailboxIds,
+        lookbackDays: query.lookbackDays,
+        intent: query.intent,
+        limit: query.limit,
+        window: context.window,
+        summary: context.summary,
+        latestRunEntry: context.latestRunEntry
+          ? { id: context.latestRunEntry.id, ts: context.latestRunEntry.ts }
+          : null,
+        latestReviewEntry: context.latestReviewEntry
+          ? { id: context.latestReviewEntry.id, ts: context.latestReviewEntry.ts }
+          : null,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Shadow-summary kunde inte byggas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeShadowReadoutHandler({
+  capabilityAnalysisStore = null,
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeShadowQuery(req.query);
+      const context = await buildShadowReviewContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoHistoryStore,
+        mailboxIds: query.mailboxIds,
+        lookbackDays: query.lookbackDays,
+        intent: query.intent,
+        limit: query.limit,
+        sinceIso: query.sinceIso,
+        untilIso: query.untilIso,
+      });
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(
+        buildShadowReadoutDocument({
+          mailboxIds: query.mailboxIds,
+          lookbackDays: query.lookbackDays,
+          intent: query.intent,
+          limit: query.limit,
+          summary: context.summary,
+          window: context.window,
+          latestRunEntry: context.latestRunEntry,
+          latestReviewEntry: context.latestReviewEntry,
+        })
+      );
+    } catch (error) {
+      return res
+        .status(500)
+        .send(escapeHtml(error?.message || 'Shadow-readout kunde inte byggas.'));
+    }
+  };
+}
+
+function toCcoRuntimeHistorySearchHandler({
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      if (!ccoHistoryStore || typeof ccoHistoryStore.searchHistoryRecords !== 'function') {
+        return res.status(503).json({
+          ok: false,
+          error: 'Historiksök är inte tillgänglig just nu.',
+        });
+      }
+      const parsedQuery = toCcoRuntimeHistorySearchQuery(req.query);
+      const tenantId = toTenantId(req);
+      const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
+        lookbackDays: parsedQuery.lookbackDays,
+        sinceIso: parsedQuery.sinceIso,
+        untilIso: parsedQuery.untilIso,
+      });
+      const results = await ccoHistoryStore.searchHistoryRecords({
+        tenantId,
+        mailboxIds: parsedQuery.mailboxIds,
+        customerEmail: parsedQuery.customerEmail,
+        conversationId: parsedQuery.conversationId,
+        queryText: parsedQuery.q,
+        sinceIso: startIso,
+        untilIso: endIso,
+        limit: parsedQuery.limit,
+        includeMessages: parsedQuery.includeMessages,
+        includeOutcomes: parsedQuery.includeOutcomes,
+        includeActions: parsedQuery.includeActions,
+        intent: parsedQuery.intent,
+        resultTypes: parsedQuery.resultTypes,
+        actionTypes: parsedQuery.actionTypes,
+        outcomeCodes: parsedQuery.outcomeCodes,
+      });
+      return res.json({
+        ok: true,
+        mailboxId: parsedQuery.mailboxId,
+        mailboxIds: parsedQuery.mailboxIds,
+        customerEmail: parsedQuery.customerEmail,
+        conversationId: parsedQuery.conversationId,
+        lookbackDays: parsedQuery.lookbackDays,
+        q: parsedQuery.q,
+        intent: parsedQuery.intent,
+        resultTypes: parsedQuery.resultTypes,
+        actionTypes: parsedQuery.actionTypes,
+        outcomeCodes: parsedQuery.outcomeCodes,
+        window: {
+          startIso,
+          endIso,
+        },
+        resultCount: results.length,
+        results,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Historiksök kunde inte köras.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeCalibrationReadoutHandler({
+  ccoHistoryStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      if (!ccoHistoryStore || typeof ccoHistoryStore.summarizeOutcomeEvaluations !== 'function') {
+        return res.status(503).send('Kalibreringsstore är inte tillgänglig just nu.');
+      }
+      const searchQuery = toCcoRuntimeHistorySearchQuery(req.query);
+      const calibrationQuery = toCcoRuntimeCalibrationSummaryQuery(req.query);
+      const tenantId = toTenantId(req);
+      const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
+        lookbackDays: calibrationQuery.lookbackDays,
+        sinceIso: searchQuery.sinceIso || calibrationQuery.sinceIso,
+        untilIso: searchQuery.untilIso || calibrationQuery.untilIso,
+      });
+      const summary = await ccoHistoryStore.summarizeOutcomeEvaluations({
+        tenantId,
+        customerEmail: calibrationQuery.customerEmail,
+        mailboxIds: calibrationQuery.mailboxIds,
+        sinceIso: startIso,
+        untilIso: endIso,
+        intent: calibrationQuery.intent,
+      });
+      const mailboxSummaries = [];
+      for (const mailboxId of calibrationQuery.mailboxIds) {
+        mailboxSummaries.push({
+          mailboxId,
+          summary: await ccoHistoryStore.summarizeOutcomeEvaluations({
+            tenantId,
+            customerEmail: calibrationQuery.customerEmail,
+            mailboxIds: [mailboxId],
+            sinceIso: startIso,
+            untilIso: endIso,
+            intent: calibrationQuery.intent,
+          }),
+        });
+      }
+      const searchResults =
+        typeof ccoHistoryStore.searchHistoryRecords === 'function'
+          ? await ccoHistoryStore.searchHistoryRecords({
+              tenantId,
+              mailboxIds: searchQuery.mailboxIds,
+              customerEmail: searchQuery.customerEmail,
+              conversationId: searchQuery.conversationId,
+              queryText: searchQuery.q,
+              sinceIso: startIso,
+              untilIso: endIso,
+              limit: 24,
+              intent: searchQuery.intent,
+              resultTypes: searchQuery.resultTypes,
+              actionTypes: searchQuery.actionTypes,
+              outcomeCodes: searchQuery.outcomeCodes,
+            })
+          : [];
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(200).send(
+        buildCalibrationReadoutDocument({
+          mailboxIds: calibrationQuery.mailboxIds,
+          customerEmail: calibrationQuery.customerEmail,
+          conversationId: searchQuery.conversationId,
+          lookbackDays: calibrationQuery.lookbackDays,
+          q: searchQuery.q,
+          intent: searchQuery.intent || calibrationQuery.intent,
+          resultTypes: searchQuery.resultTypes,
+          actionTypes: searchQuery.actionTypes,
+          outcomeCodes: searchQuery.outcomeCodes,
+          sinceIso: searchQuery.sinceIso,
+          untilIso: searchQuery.untilIso,
+          summary,
+          mailboxSummaries,
+          searchResults,
+        })
+      );
+    } catch (error) {
+      return res.status(500).send(escapeHtml(error?.message || 'Kalibreringsreadout kunde inte byggas.'));
+    }
+  };
+}
+
 function createCapabilitiesRouter({
   authStore,
   tenantConfigStore,
@@ -2985,7 +6706,9 @@ function createCapabilitiesRouter({
   requireRole,
   executionGateway = null,
   capabilityAnalysisStore = null,
+  ccoHistoryStore = null,
   templateStore = null,
+  scheduler = null,
   graphReadConnector = null,
   graphReadConnectorFactory = createMicrosoftGraphReadConnector,
   graphSendConnector = null,
@@ -2998,12 +6721,16 @@ function createCapabilitiesRouter({
       buildVersion: process.env.npm_package_version || 'dev',
     });
   const shouldEnableGraphRead = toBoolean(process.env.ARCANA_GRAPH_READ_ENABLED, false);
-  const graphReadAllowlist = resolveGraphReadAllowlistMailboxIds(500);
+  const graphReadAllowlistConfig = resolveGraphReadAllowlistConfig(500);
+  const graphReadAllowlist = graphReadAllowlistConfig.mailboxIds;
   const graphReadAllowlistMode = graphReadAllowlist.length > 0;
-  const graphReadFullTenant = graphReadAllowlistMode
+  const graphReadForceFullTenantAllowlist =
+    graphReadAllowlistMode &&
+    (graphReadAllowlistConfig.source === 'locked_default' || graphReadAllowlist.length > 1);
+  const graphReadFullTenant = graphReadForceFullTenantAllowlist
     ? true
     : toBoolean(process.env.ARCANA_GRAPH_FULL_TENANT, false);
-  const graphReadUserScope = graphReadAllowlistMode
+  const graphReadUserScope = graphReadForceFullTenantAllowlist
     ? 'all'
     : normalizeGraphUserScope(
         process.env.ARCANA_GRAPH_USER_SCOPE,
@@ -3048,7 +6775,11 @@ function createCapabilitiesRouter({
     });
   })();
   const resolvedGraphSendConnector = (() => {
-    if (graphSendConnector && typeof graphSendConnector.sendReply === 'function') {
+    if (
+      graphSendConnector &&
+      (typeof graphSendConnector.sendReply === 'function' ||
+        typeof graphSendConnector.sendNewMessage === 'function')
+    ) {
       return graphSendConnector;
     }
     if (!shouldEnableGraphSend && !shouldEnableGraphDelete) return null;
@@ -3085,6 +6816,10 @@ function createCapabilitiesRouter({
       ),
     });
   })();
+  const isGraphReadOperational =
+    shouldEnableGraphRead ||
+    (!!resolvedGraphReadConnector &&
+      typeof resolvedGraphReadConnector.fetchInboxSnapshot === 'function');
   const executor = createCapabilityExecutor({
     executionGateway: gateway,
     authStore,
@@ -3131,6 +6866,7 @@ function createCapabilitiesRouter({
         templateStore,
         graphReadConnector: resolvedGraphReadConnector,
         capabilityAnalysisStore,
+        ccoHistoryStore,
         authStore,
       })
     )
@@ -3147,7 +6883,7 @@ function createCapabilitiesRouter({
     '/cco/usage/event',
     requireAuth,
     requireRole(ROLE_OWNER, ROLE_STAFF),
-    toRoleGuardedHandler(toCcoUsageEventHandler({ authStore }))
+    toRoleGuardedHandler(toCcoUsageEventHandler({ authStore, ccoHistoryStore }))
   );
 
   router.get(
@@ -3167,7 +6903,7 @@ function createCapabilitiesRouter({
       toCcoRuntimeStatusHandler({
         authStore,
         capabilityAnalysisStore,
-        graphReadEnabled: shouldEnableGraphRead,
+        graphReadEnabled: isGraphReadOperational,
         graphSendEnabled: shouldEnableGraphSend,
         graphDeleteEnabled: shouldEnableGraphDelete,
         graphReadConnectorAvailable:
@@ -3175,7 +6911,135 @@ function createCapabilitiesRouter({
           typeof resolvedGraphReadConnector.fetchInboxSnapshot === 'function',
         graphSendConnectorAvailable:
           !!resolvedGraphSendConnector &&
-          typeof resolvedGraphSendConnector.sendReply === 'function',
+          (typeof resolvedGraphSendConnector.sendReply === 'function' ||
+            typeof resolvedGraphSendConnector.sendNewMessage === 'function'),
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/history/status',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeHistoryStatusHandler({
+        ccoHistoryStore,
+        graphReadEnabled: isGraphReadOperational,
+        scheduler,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/shadow/status',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeShadowStatusHandler({
+        scheduler,
+        capabilityAnalysisStore,
+        mailboxIds: normalizeMailboxIdList(
+          parseMailboxIdValues(
+            process.env.ARCANA_SCHEDULER_CCO_SHADOW_MAILBOX_IDS || 'kons@hairtpclinic.com',
+            50
+          ),
+          50
+        ),
+        runLookbackDays: clampInteger(
+          process.env.ARCANA_SCHEDULER_CCO_SHADOW_LOOKBACK_DAYS,
+          7,
+          90,
+          14
+        ),
+        reviewLookbackDays: clampInteger(
+          process.env.ARCANA_SCHEDULER_CCO_SHADOW_REVIEW_LOOKBACK_DAYS,
+          7,
+          90,
+          14
+        ),
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/shadow/summary',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeShadowSummaryHandler({
+        capabilityAnalysisStore,
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/shadow/readout',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeShadowReadoutHandler({
+        capabilityAnalysisStore,
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/calibration/summary',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeCalibrationSummaryHandler({
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/calibration/readout',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeCalibrationReadoutHandler({
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/history',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeHistoryHandler({
+        graphReadConnector: resolvedGraphReadConnector,
+        graphReadEnabled: isGraphReadOperational,
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/history/search',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeHistorySearchHandler({
+        ccoHistoryStore,
+      })
+    )
+  );
+
+  router.post(
+    '/cco/runtime/history/backfill',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeHistoryBackfillHandler({
+        graphReadConnector: resolvedGraphReadConnector,
+        graphReadEnabled: isGraphReadOperational,
+        ccoHistoryStore,
       })
     )
   );
@@ -3221,6 +7085,13 @@ function createCapabilitiesRouter({
     )
   );
 
+  router.get(
+    '/cco/signature-preview',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(toCcoSignaturePreviewHandler())
+  );
+
   router.post(
     '/cco/delete',
     requireAuth,
@@ -3258,6 +7129,7 @@ function createCapabilitiesRouter({
         templateStore,
         graphReadConnector: resolvedGraphReadConnector,
         capabilityAnalysisStore,
+        ccoHistoryStore,
         authStore,
       })
     )
@@ -3268,4 +7140,7 @@ function createCapabilitiesRouter({
 
 module.exports = {
   createCapabilitiesRouter,
+  hydrateAnalyzeInboxInput,
+  materializeCustomerReplyActions,
+  toGraphReadOptionsFromEnv,
 };

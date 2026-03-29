@@ -194,3 +194,58 @@ test('Draft composer changes output by mailbox writing profile for same message'
   assert.notEqual(egzonaStyle.draftModes.warm, fazliStyle.draftModes.warm);
   assert.notEqual(egzonaStyle.draftModes.professional, fazliStyle.draftModes.professional);
 });
+
+test('Draft composer can include compact history support in reply structure', async () => {
+  const result = await composeContextAwareDraft({
+    intent: 'booking_request',
+    tone: 'neutral',
+    priorityLevel: 'High',
+    tenantToneStyle: 'balanserad',
+    originalMessage: 'Hej, jag behöver boka om min tid så snart som möjligt.',
+    customerProfile: {
+      firstName: 'Sara',
+      historySignalPattern: 'reschedule',
+      historyMailboxCount: 2,
+    },
+  });
+
+  const text = String(result.draftModes[result.recommendedMode] || '').toLowerCase();
+  assert.equal(text.includes('tidigare kontakt visar'), true);
+  assert.equal(text.includes('tydliga tider'), true);
+});
+
+test('Draft composer can include outcome support in reply structure', async () => {
+  const result = await composeContextAwareDraft({
+    intent: 'follow_up',
+    tone: 'neutral',
+    priorityLevel: 'High',
+    tenantToneStyle: 'balanserad',
+    originalMessage: 'Hej, jag återkommer igen men får inget svar.',
+    customerProfile: {
+      firstName: 'Sara',
+      historyOutcomeCode: 'no_response',
+    },
+  });
+
+  const text = String(result.draftModes[result.recommendedMode] || '').toLowerCase();
+  assert.equal(text.includes('tappade fart'), true);
+  assert.equal(text.includes('tydlig och tidsatt cta'), true);
+});
+
+test('Draft composer can prefer calibrated mode when positive history is strong', async () => {
+  const result = await composeContextAwareDraft({
+    intent: 'booking_request',
+    tone: 'neutral',
+    priorityLevel: 'Medium',
+    tenantToneStyle: 'balanserad',
+    originalMessage: 'Hej, jag behöver boka om min tid.',
+    customerProfile: {
+      firstName: 'Sara',
+      historyCalibrationPreferredMode: 'professional',
+      historyCalibrationPositiveOutcomeCount: 3,
+      historyCalibrationNegativeOutcomeCount: 1,
+    },
+  });
+
+  assert.equal(result.recommendedMode, 'professional');
+});

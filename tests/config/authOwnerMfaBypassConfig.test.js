@@ -42,3 +42,11 @@ test('config still keeps non-public owner MFA bypass hosts', () => {
     'arcana-staging.onrender.com',
   ].sort());
 });
+
+test('config can disable owner MFA requirement explicitly', () => {
+  const config = loadConfigWithEnv({
+    ARCANA_AUTH_OWNER_MFA_REQUIRED: 'false',
+  });
+
+  assert.equal(config.authOwnerMfaRequired, false);
+});

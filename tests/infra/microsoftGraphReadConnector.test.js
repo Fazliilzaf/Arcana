@@ -186,6 +186,56 @@ test('MicrosoftGraphReadConnector supports custom window and includeRead=true fi
   assert.equal(snapshot.metadata.includeReadMessages, true);
 });
 
+test('MicrosoftGraphReadConnector supports explicit sinceIso/untilIso filters', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-range',
+        },
+      });
+    }
+    return createJsonResponse({
+      body: {
+        value: [],
+      },
+    });
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-range',
+    clientId: 'client-id-range',
+    clientSecret: 'client-secret-range',
+    userId: 'mailbox@hairtpclinic.se',
+    fetchImpl,
+    now: () => Date.parse('2026-02-26T18:00:00.000Z'),
+  });
+
+  const snapshot = await connector.fetchInboxSnapshot({
+    includeRead: true,
+    sinceIso: '2025-01-01T00:00:00.000Z',
+    untilIso: '2025-02-01T00:00:00.000Z',
+  });
+
+  const inboxCall = calls.find((item) => String(item.url).includes('/mailFolders/inbox/messages'));
+  const sentCall = calls.find((item) => String(item.url).includes('/mailFolders/SentItems/messages'));
+  const inboxUrl = new URL(inboxCall.url);
+  const sentUrl = new URL(sentCall.url);
+
+  assert.equal(
+    inboxUrl.searchParams.get('$filter'),
+    'receivedDateTime ge 2025-01-01T00:00:00.000Z and receivedDateTime lt 2025-02-01T00:00:00.000Z'
+  );
+  assert.equal(
+    sentUrl.searchParams.get('$filter'),
+    'sentDateTime ge 2025-01-01T00:00:00.000Z and sentDateTime lt 2025-02-01T00:00:00.000Z'
+  );
+  assert.equal(snapshot.metadata.windowStartIso, '2025-01-01T00:00:00.000Z');
+  assert.equal(snapshot.metadata.windowEndIso, '2025-02-01T00:00:00.000Z');
+});
+
 test('MicrosoftGraphReadConnector omits unsupported inReplyTo/references select fields', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
@@ -530,6 +580,77 @@ test('MicrosoftGraphReadConnector merges typo alias via fuzzy email + fuzzy subj
   const conversation = snapshot.conversations[0];
   assert.equal(conversation.messages.length, 2);
   assert.equal(conversation.lastOutboundAt, '2026-02-26T10:20:00.000Z');
+});
+
+test('MicrosoftGraphReadConnector keeps alias-similar threads separate when activity is too far apart', async () => {
+  const fixedNowMs = Date.parse('2026-03-15T18:00:00.000Z');
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-alias-window',
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-window-in',
+              conversationId: 'conv-window-a',
+              subject: 'Bokning konsultation',
+              bodyPreview: 'Hej, jag vill boka en tid.',
+              receivedDateTime: '2026-03-01T10:00:00.000Z',
+              from: {
+                emailAddress: {
+                  address: 'patient+vip@hairtpclinic.se',
+                  name: 'Patient Alias',
+                },
+              },
+              replyTo: [{ emailAddress: { address: 'patient+vip@hairtpclinic.se' } }],
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+              isRead: false,
+            },
+          ],
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-window-out',
+              conversationId: 'conv-window-b',
+              subject: 'SV: Bokning konsultation',
+              bodyPreview: 'Vi har tider senare i månaden.',
+              sentDateTime: '2026-03-12T10:00:00.000Z',
+              from: {
+                emailAddress: {
+                  address: 'info@hairtpclinic.com',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'patient@hairtpclinic.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-alias-window',
+    clientId: 'client-id-alias-window',
+    clientSecret: 'client-secret-alias-window',
+    userId: 'info@hairtpclinic.com',
+    fetchImpl,
+    now: () => fixedNowMs,
+  });
+
+  const snapshot = await connector.fetchInboxSnapshot();
+  assert.equal(snapshot.conversations.length, 2);
 });
 
 test('MicrosoftGraphReadConnector full-tenant mode lists users and reads each inbox with limits', async () => {

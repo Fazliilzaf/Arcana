@@ -32,6 +32,42 @@ if (typeof ref === 'object') {
 " "$path"
 }
 
+validate_monitor_slo_response() {
+  local response="$1"
+  local mode="${2:-shape}"
+  local status_label="${3:-monitor/slo}"
+
+  local slo_status=""
+  local slo_count=""
+  slo_status="$(printf '%s' "$response" | json_get summary.overallStatus 2>/dev/null || true)"
+  slo_count="$(printf '%s' "$response" | json_get slos | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
+
+  if [[ "$slo_status" != "green" && "$slo_status" != "yellow" && "$slo_status" != "red" && "$slo_status" != "unknown" ]]; then
+    echo "❌ ${status_label} saknar giltig summary.overallStatus"
+    printf '%s\n' "$response"
+    exit 1
+  fi
+
+  if [[ "$slo_count" -lt 3 ]]; then
+    echo "❌ ${status_label} returnerade för få SLO-rader (${slo_count})"
+    printf '%s\n' "$response"
+    exit 1
+  fi
+
+  if [[ "$mode" == "strict" && ( "$slo_status" == "red" || "$slo_status" == "unknown" ) ]]; then
+    echo "❌ ${status_label} är inte frisk efter scheduler-priming (overall: ${slo_status})"
+    printf '%s' "$response" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const slos=Array.isArray(d?.slos)?d.slos:[]; const flagged=slos.filter((item)=>['red','unknown'].includes(String(item?.status||'').toLowerCase())); if (!flagged.length) { console.log('Inga enskilda red/unknown-rader kunde härledas.'); process.exit(0); } flagged.forEach((item)=>{ console.log('- ' + String(item?.id || '?') + ': ' + String(item?.status || '?') + ' | ' + String(item?.label || '')); });"
+    printf '%s\n' "$response"
+    exit 1
+  fi
+
+  if [[ "$mode" == "strict" ]]; then
+    echo "✅ ${status_label} OK efter scheduler-priming (overall: ${slo_status}, slos: ${slo_count})"
+  else
+    echo "✅ ${status_label} format OK (overall: ${slo_status}, slos: ${slo_count})"
+  fi
+}
+
 read_mfa_secret_from_store() {
   local email="$1"
   local auth_store_path="${AUTH_STORE_PATH:-./data/auth.json}"
@@ -415,19 +451,7 @@ echo "✅ monitor/gateway/dead-letters OK (count: ${MONITOR_GATEWAY_DLQ_COUNT}, 
 
 MONITOR_SLO_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/slo" \
   -H "Authorization: Bearer $TOKEN")"
-MONITOR_SLO_STATUS="$(printf '%s' "$MONITOR_SLO_RESPONSE" | json_get summary.overallStatus 2>/dev/null || true)"
-MONITOR_SLO_COUNT="$(printf '%s' "$MONITOR_SLO_RESPONSE" | json_get slos | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(Array.isArray(d)?d.length:0));")"
-if [[ "$MONITOR_SLO_STATUS" != "green" && "$MONITOR_SLO_STATUS" != "yellow" && "$MONITOR_SLO_STATUS" != "red" && "$MONITOR_SLO_STATUS" != "unknown" ]]; then
-  echo "❌ monitor/slo saknar giltig summary.overallStatus"
-  printf '%s\n' "$MONITOR_SLO_RESPONSE"
-  exit 1
-fi
-if [[ "$MONITOR_SLO_COUNT" -lt 3 ]]; then
-  echo "❌ monitor/slo returnerade för få SLO-rader (${MONITOR_SLO_COUNT})"
-  printf '%s\n' "$MONITOR_SLO_RESPONSE"
-  exit 1
-fi
-echo "✅ monitor/slo OK (overall: ${MONITOR_SLO_STATUS}, slos: ${MONITOR_SLO_COUNT})"
+validate_monitor_slo_response "$MONITOR_SLO_RESPONSE" "shape" "monitor/slo"
 
 READINESS_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/readiness" \
   -H "Authorization: Bearer $TOKEN")"
@@ -774,6 +798,44 @@ if [[ "$CURRENT_ROLE" == "OWNER" ]]; then
     printf '%s\n' "$OPS_SCHED_RESTORE_FULL_RUN_RESPONSE"
     exit 1
   fi
+
+  OPS_SCHED_AUDIT_INTEGRITY_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"jobId":"audit_integrity_check"}')"
+  OPS_SCHED_AUDIT_INTEGRITY_OK="$(printf '%s' "$OPS_SCHED_AUDIT_INTEGRITY_RESPONSE" | json_get ok 2>/dev/null || true)"
+  OPS_SCHED_AUDIT_INTEGRITY_ERROR="$(printf '%s' "$OPS_SCHED_AUDIT_INTEGRITY_RESPONSE" | json_get error 2>/dev/null || true)"
+  if [[ "$OPS_SCHED_AUDIT_INTEGRITY_OK" == "true" ]]; then
+    OPS_SCHED_AUDIT_INTEGRITY_JOB="$(printf '%s' "$OPS_SCHED_AUDIT_INTEGRITY_RESPONSE" | json_get jobId)"
+    echo "✅ ops/scheduler/run audit integrity OK (job: ${OPS_SCHED_AUDIT_INTEGRITY_JOB})"
+  elif [[ "$OPS_SCHED_AUDIT_INTEGRITY_ERROR" == "disabled_job" || "$OPS_SCHED_AUDIT_INTEGRITY_ERROR" == "job_running" ]]; then
+    echo "ℹ️ ops/scheduler/run audit integrity SKIP (${OPS_SCHED_AUDIT_INTEGRITY_ERROR})"
+  else
+    echo "❌ ops/scheduler/run audit integrity misslyckades"
+    printf '%s\n' "$OPS_SCHED_AUDIT_INTEGRITY_RESPONSE"
+    exit 1
+  fi
+
+  OPS_SCHED_SECRET_ROTATION_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/scheduler/run" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"jobId":"secrets_rotation_snapshot"}')"
+  OPS_SCHED_SECRET_ROTATION_OK="$(printf '%s' "$OPS_SCHED_SECRET_ROTATION_RESPONSE" | json_get ok 2>/dev/null || true)"
+  OPS_SCHED_SECRET_ROTATION_ERROR="$(printf '%s' "$OPS_SCHED_SECRET_ROTATION_RESPONSE" | json_get error 2>/dev/null || true)"
+  if [[ "$OPS_SCHED_SECRET_ROTATION_OK" == "true" ]]; then
+    OPS_SCHED_SECRET_ROTATION_JOB="$(printf '%s' "$OPS_SCHED_SECRET_ROTATION_RESPONSE" | json_get jobId)"
+    echo "✅ ops/scheduler/run secret rotation snapshot OK (job: ${OPS_SCHED_SECRET_ROTATION_JOB})"
+  elif [[ "$OPS_SCHED_SECRET_ROTATION_ERROR" == "disabled_job" || "$OPS_SCHED_SECRET_ROTATION_ERROR" == "job_running" ]]; then
+    echo "ℹ️ ops/scheduler/run secret rotation snapshot SKIP (${OPS_SCHED_SECRET_ROTATION_ERROR})"
+  else
+    echo "❌ ops/scheduler/run secret rotation snapshot misslyckades"
+    printf '%s\n' "$OPS_SCHED_SECRET_ROTATION_RESPONSE"
+    exit 1
+  fi
+
+  MONITOR_SLO_PRIMED_RESPONSE="$(curl -s "$BASE_URL/api/v1/monitor/slo" \
+    -H "Authorization: Bearer $TOKEN")"
+  validate_monitor_slo_response "$MONITOR_SLO_PRIMED_RESPONSE" "strict" "monitor/slo"
 
   OPS_RELEASE_CYCLE_CREATE_RESPONSE="$(curl -s -X POST "$BASE_URL/api/v1/ops/release/cycles" \
     -H "Authorization: Bearer $TOKEN" \

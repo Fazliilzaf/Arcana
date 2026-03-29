@@ -584,6 +584,71 @@ function createTemplateRouter({
   );
 
   router.post(
+    '/templates/:templateId/drafts',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        const templateId = String(req.params.templateId || '').trim();
+        const access = await templateStore.ensureTemplateTenant(templateId, req.auth.tenantId);
+        if (!(await ensureAllowedTemplate(access, req, res, { authStore, action: 'templates.create_draft_manual' }))) {
+          return;
+        }
+
+        const template = access.template;
+        const title = normalizeText(req.body?.title || template.name);
+        const content =
+          typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+        const source = normalizeText(req.body?.source || 'manual');
+        const variablesUsed = Array.isArray(req.body?.variablesUsed) ? req.body.variablesUsed : [];
+
+        if (!content) {
+          return res.status(400).json({ error: 'Innehåll krävs för att skapa draft.' });
+        }
+
+        const draft = await templateStore.createDraftVersion({
+          templateId,
+          title,
+          content,
+          source: source || 'manual',
+          variablesUsed,
+          createdBy: req.auth.userId,
+        });
+
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'templates.create_draft_manual',
+          outcome: 'success',
+          targetType: 'template_version',
+          targetId: draft.id,
+          metadata: {
+            templateId,
+            source: source || 'manual',
+            revision: draft.revision || 1,
+          },
+        });
+
+        const etag = buildVersionEtag(draft);
+        if (etag) {
+          res.setHeader('ETag', etag);
+        }
+
+        return res.status(201).json({
+          templateId,
+          version: draft,
+        });
+      } catch (error) {
+        if (error?.message) {
+          return res.status(400).json({ error: error.message });
+        }
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte skapa draft.' });
+      }
+    }
+  );
+
+  router.post(
     '/templates/:templateId/drafts/generate',
     requireAuth,
     requireRole(ROLE_OWNER, ROLE_STAFF),

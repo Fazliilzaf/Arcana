@@ -69,6 +69,18 @@ function createGraphError(message, { code = '', status = 0, retryAfterSeconds = 
   return error;
 }
 
+function decodeJwtPayload(token = '') {
+  const parts = String(token || '').split('.');
+  if (parts.length < 2) return {};
+  try {
+    const encoded = parts[1];
+    const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
+    return JSON.parse(Buffer.from(padded, 'base64url').toString('utf8'));
+  } catch (_error) {
+    return {};
+  }
+}
+
 async function fetchWithTimeout(fetchImpl, url, options = {}, timeoutMs = 5000) {
   const safeTimeoutMs = clampInteger(timeoutMs, 500, 120000, 5000);
   const controller = new AbortController();
@@ -122,6 +134,42 @@ async function postGraphJson({
     url,
     {
       method: 'POST',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: payload === null ? null : JSON.stringify(payload),
+    },
+    timeoutMs
+  );
+
+  if (Number(response?.status || 0) === 429) {
+    throw createGraphError(`${label} failed (429): rate_limit_hit`, {
+      code: 'GRAPH_RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: parseRetryAfterSeconds(response),
+    });
+  }
+
+  if (!response?.ok) {
+    await parseJsonResponse(response, label);
+  }
+  return response;
+}
+
+async function patchGraphJson({
+  fetchImpl,
+  url,
+  accessToken,
+  payload = null,
+  timeoutMs = 5000,
+  label = 'request',
+}) {
+  const response = await fetchWithTimeout(
+    fetchImpl,
+    url,
+    {
+      method: 'PATCH',
       headers: {
         authorization: `Bearer ${accessToken}`,
         'content-type': 'application/json',
@@ -206,6 +254,27 @@ function createMicrosoftGraphSendConnector(config = {}) {
     return accessToken;
   }
 
+  async function inspectPermissions({ timeoutMs = tokenTimeoutMs } = {}) {
+    const accessToken = await fetchAccessToken(timeoutMs);
+    const claims = decodeJwtPayload(accessToken);
+    const roles = Array.isArray(claims.roles)
+      ? claims.roles.map((item) => normalizeText(item)).filter(Boolean)
+      : [];
+    const scopes = normalizeText(claims.scp)
+      .split(/\s+/)
+      .map((item) => normalizeText(item))
+      .filter(Boolean);
+    return {
+      aud: normalizeText(claims.aud) || null,
+      appId: normalizeText(claims.appid) || null,
+      idType: normalizeText(claims.idtyp) || null,
+      roles,
+      scopes,
+      hasMailReadWrite:
+        roles.includes('Mail.ReadWrite') || scopes.includes('Mail.ReadWrite'),
+    };
+  }
+
   async function sendReply({
     mailboxId,
     sourceMailboxId = '',
@@ -224,30 +293,59 @@ function createMicrosoftGraphSendConnector(config = {}) {
     const normalizedBodyHtml = normalizeText(bodyHtml);
     const normalizedSubject = normalizeText(subject);
     const normalizedRecipients = toRecipients(to);
+    const shouldReplyInThread = normalizedSenderMailboxId === normalizedSourceMailboxId;
+    const normalizedHtmlContent = normalizedBodyHtml || formatPlainTextAsHtml(normalizedBody);
     if (!normalizedBody) {
       throw new Error('MicrosoftGraphSendConnector sendReply requires body.');
     }
-    if (!normalizedRecipients.length) {
+    if (!shouldReplyInThread && !normalizedRecipients.length) {
       throw new Error('MicrosoftGraphSendConnector sendReply requires to[].');
     }
     const accessToken = await fetchAccessToken();
-    const shouldReplyInThread = normalizedSenderMailboxId === normalizedSourceMailboxId;
     let sendMode = 'send_mail';
     if (shouldReplyInThread) {
-      const replyUrl = `${graphBaseUrl}/users/${encodeURIComponent(
+      const createReplyUrl = `${graphBaseUrl}/users/${encodeURIComponent(
         normalizedSenderMailboxId
-      )}/messages/${encodeURIComponent(normalizedMessageId)}/reply`;
-      await postGraphJson({
+      )}/messages/${encodeURIComponent(normalizedMessageId)}/createReply`;
+      const createReplyResponse = await postGraphJson({
         fetchImpl,
-        url: replyUrl,
+        url: createReplyUrl,
+        accessToken,
+        payload: {},
+        timeoutMs,
+        label: 'Microsoft Graph createReply',
+      });
+      const replyDraft = await parseJsonResponse(
+        createReplyResponse,
+        'Microsoft Graph createReply response'
+      );
+      const draftId = requiredConfig('replyDraftId', replyDraft?.id);
+      const draftUrl = `${graphBaseUrl}/users/${encodeURIComponent(
+        normalizedSenderMailboxId
+      )}/messages/${encodeURIComponent(draftId)}`;
+      await patchGraphJson({
+        fetchImpl,
+        url: draftUrl,
         accessToken,
         payload: {
-          comment: normalizedBody,
+          body: {
+            contentType: 'HTML',
+            content: normalizedHtmlContent,
+          },
         },
         timeoutMs,
-        label: 'Microsoft Graph reply',
+        label: 'Microsoft Graph updateReplyDraft',
       });
-      sendMode = 'reply';
+      const sendDraftUrl = `${draftUrl}/send`;
+      await postGraphJson({
+        fetchImpl,
+        url: sendDraftUrl,
+        accessToken,
+        payload: {},
+        timeoutMs,
+        label: 'Microsoft Graph sendReplyDraft',
+      });
+      sendMode = 'reply_draft';
     } else {
       const sendMailUrl = `${graphBaseUrl}/users/${encodeURIComponent(
         normalizedSenderMailboxId
@@ -261,7 +359,7 @@ function createMicrosoftGraphSendConnector(config = {}) {
             subject: normalizedSubject || 'Uppfoljning fran Hair TP Clinic',
             body: {
               contentType: 'HTML',
-              content: normalizedBodyHtml || formatPlainTextAsHtml(normalizedBody),
+              content: normalizedHtmlContent,
             },
             toRecipients: normalizedRecipients,
           },
@@ -282,6 +380,69 @@ function createMicrosoftGraphSendConnector(config = {}) {
       to: normalizedRecipients.map((item) => item.emailAddress.address),
       sentAt: new Date().toISOString(),
       sendMode,
+    };
+  }
+
+  async function sendNewMessage({
+    mailboxId,
+    sourceMailboxId = '',
+    body = '',
+    bodyHtml = '',
+    subject = '',
+    to = [],
+    timeoutMs = requestTimeoutMs,
+  } = {}) {
+    const normalizedSenderMailboxId = requiredConfig('mailboxId', mailboxId);
+    const normalizedSourceMailboxId =
+      normalizeText(sourceMailboxId) || normalizedSenderMailboxId;
+    const normalizedBody = normalizeText(body);
+    const normalizedBodyHtml = normalizeText(bodyHtml);
+    const normalizedSubject = normalizeText(subject);
+    const normalizedRecipients = toRecipients(to);
+    const normalizedHtmlContent = normalizedBodyHtml || formatPlainTextAsHtml(normalizedBody);
+
+    if (!normalizedBody) {
+      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires body.');
+    }
+    if (!normalizedSubject) {
+      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires subject.');
+    }
+    if (!normalizedRecipients.length) {
+      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires to[].');
+    }
+
+    const accessToken = await fetchAccessToken();
+    const sendMailUrl = `${graphBaseUrl}/users/${encodeURIComponent(
+      normalizedSenderMailboxId
+    )}/sendMail`;
+    await postGraphJson({
+      fetchImpl,
+      url: sendMailUrl,
+      accessToken,
+      payload: {
+        message: {
+          subject: normalizedSubject,
+          body: {
+            contentType: 'HTML',
+            content: normalizedHtmlContent,
+          },
+          toRecipients: normalizedRecipients,
+        },
+        saveToSentItems: true,
+      },
+      timeoutMs,
+      label: 'Microsoft Graph sendMail',
+    });
+
+    return {
+      provider: 'microsoft_graph',
+      mailboxId: normalizedSenderMailboxId,
+      sourceMailboxId: normalizedSourceMailboxId,
+      replyToMessageId: null,
+      subject: normalizedSubject,
+      to: normalizedRecipients.map((item) => item.emailAddress.address),
+      sentAt: new Date().toISOString(),
+      sendMode: 'send_mail',
     };
   }
 
@@ -320,8 +481,10 @@ function createMicrosoftGraphSendConnector(config = {}) {
   }
 
   return {
+    sendNewMessage,
     sendReply,
     moveMessageToDeletedItems,
+    inspectPermissions,
   };
 }
 

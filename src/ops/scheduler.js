@@ -1,9 +1,13 @@
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
+const { AnalyzeInboxCapability } = require('../capabilities/analyzeInbox');
 const { buildPilotReport } = require('../reports/pilotReport');
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
+const { buildShadowRunOutput, summarizeShadowReview } = require('./ccoShadowRun');
+const { hydrateAnalyzeInboxInput, materializeCustomerReplyActions } = require('../routes/capabilities');
 const { pruneSchedulerPilotReports } = require('./pilotReports');
 const {
   getStateFileMap,
@@ -25,6 +29,13 @@ const { evaluateStrategicInsights } = require('../intelligence/strategicInsights
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function toIso(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString();
 }
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -86,6 +97,142 @@ function toMinutesMs(value, fallbackMinutes) {
   return minutes * 60 * 1000;
 }
 
+function normalizeMailboxId(value, fallback = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized) return normalized;
+  return normalizeText(fallback).toLowerCase();
+}
+
+function toLookbackWindowBounds(lookbackDays, endMs = Date.now()) {
+  const safeEndMs = Number.isFinite(Number(endMs)) ? Number(endMs) : Date.now();
+  const safeLookbackDays = Math.max(1, Math.min(3650, Number(lookbackDays) || 1));
+  return {
+    startIso: new Date(safeEndMs - safeLookbackDays * 24 * 60 * 60 * 1000).toISOString(),
+    endIso: new Date(safeEndMs).toISOString(),
+  };
+}
+
+function collectCcoHistoryMessages(snapshot = {}) {
+  const conversations = Array.isArray(snapshot?.conversations) ? snapshot.conversations : [];
+  const messages = [];
+  for (const conversation of conversations) {
+    const conversationId = normalizeText(conversation?.conversationId);
+    const subject = normalizeText(conversation?.subject) || '(utan ämne)';
+    const customerEmail = normalizeMailboxId(conversation?.customerEmail) || null;
+    const conversationMessages = Array.isArray(conversation?.messages) ? conversation.messages : [];
+    for (const message of conversationMessages) {
+      const messageId = normalizeText(message?.messageId);
+      if (!messageId) continue;
+      messages.push({
+        messageId,
+        conversationId: normalizeText(message?.conversationId) || conversationId,
+        subject: normalizeText(message?.subject) || subject,
+        customerEmail,
+        sentAt: toIso(message?.sentAt) || null,
+        direction: normalizeText(message?.direction).toLowerCase() === 'outbound' ? 'outbound' : 'inbound',
+        bodyPreview: normalizeText(message?.bodyPreview) || '',
+        senderEmail: normalizeMailboxId(message?.senderEmail) || null,
+        senderName: normalizeText(message?.senderName) || null,
+        recipients: (Array.isArray(message?.recipients) ? message.recipients : [])
+          .map((item) => normalizeMailboxId(item))
+          .filter(Boolean),
+        replyToRecipients: (Array.isArray(message?.replyToRecipients) ? message.replyToRecipients : [])
+          .map((item) => normalizeMailboxId(item))
+          .filter(Boolean),
+        mailboxId:
+          normalizeMailboxId(message?.mailboxId || conversation?.mailboxId) || null,
+        mailboxAddress:
+          normalizeMailboxId(message?.mailboxAddress || conversation?.mailboxAddress) || null,
+        userPrincipalName:
+          normalizeMailboxId(message?.userPrincipalName || conversation?.userPrincipalName) || null,
+      });
+    }
+  }
+  return messages;
+}
+
+async function fetchCcoHistoryWindowMessagesFromGraph({
+  graphReadConnector,
+  mailboxId,
+  windowStartIso,
+  windowEndIso,
+}) {
+  const snapshot = await graphReadConnector.fetchInboxSnapshot({
+    includeRead: true,
+    fullTenant: true,
+    userScope: 'all',
+    maxUsers: 1,
+    maxMessages: 200,
+    maxInboxMessages: 200,
+    maxSentMessages: 200,
+    maxMessagesPerUser: 200,
+    maxInboxMessagesPerUser: 200,
+    maxSentMessagesPerUser: 200,
+    mailboxIds: [mailboxId],
+    sinceIso: windowStartIso,
+    untilIso: windowEndIso,
+  });
+  return collectCcoHistoryMessages(snapshot);
+}
+
+function selectNextCcoHistoryBackfillWindow({
+  missingWindows = [],
+  chunkDays = 30,
+}) {
+  const safeChunkDays = Math.max(1, Math.min(90, Number(chunkDays) || 30));
+  const chunkMs = safeChunkDays * 24 * 60 * 60 * 1000;
+  const windows = Array.isArray(missingWindows) ? missingWindows : [];
+  if (windows.length === 0) return null;
+  const newestGap = windows[windows.length - 1];
+  const startMs = Date.parse(String(newestGap?.startIso || ''));
+  const endMs = Date.parse(String(newestGap?.endIso || ''));
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
+  const chunkStartMs = Math.max(startMs, endMs - chunkMs);
+  return {
+    startIso: new Date(chunkStartMs).toISOString(),
+    endIso: new Date(endMs).toISOString(),
+  };
+}
+
+function resolveCcoHistoryMailboxIds(config = {}) {
+  const configuredList = Array.isArray(config?.schedulerCcoHistoryMailboxIds)
+    ? config.schedulerCcoHistoryMailboxIds
+    : [];
+  const normalized = [];
+  const seen = new Set();
+
+  for (const rawMailboxId of configuredList) {
+    const mailboxId = normalizeMailboxId(rawMailboxId);
+    if (!mailboxId || seen.has(mailboxId)) continue;
+    seen.add(mailboxId);
+    normalized.push(mailboxId);
+  }
+
+  if (normalized.length > 0) return normalized;
+
+  const fallbackMailboxId = normalizeMailboxId(
+    config?.schedulerCcoHistoryMailboxId,
+    'kons@hairtpclinic.com'
+  );
+  return fallbackMailboxId ? [fallbackMailboxId] : [];
+}
+
+function resolveCcoShadowMailboxIds(config = {}) {
+  const configuredList = Array.isArray(config?.schedulerCcoShadowMailboxIds)
+    ? config.schedulerCcoShadowMailboxIds
+    : [];
+  const normalized = [];
+  const seen = new Set();
+  for (const rawMailboxId of configuredList) {
+    const mailboxId = normalizeMailboxId(rawMailboxId);
+    if (!mailboxId || seen.has(mailboxId)) continue;
+    seen.add(mailboxId);
+    normalized.push(mailboxId);
+  }
+  if (normalized.length > 0) return normalized;
+  return resolveCcoHistoryMailboxIds(config).slice(0, 1);
+}
+
 function toAgeHours(isoTs, nowMs = Date.now()) {
   const ts = Date.parse(String(isoTs || ''));
   if (!Number.isFinite(ts)) return null;
@@ -112,6 +259,8 @@ function createScheduler({
   templateStore,
   capabilityAnalysisStore = null,
   runtimeMetricsStore = null,
+  ccoHistoryStore = null,
+  graphReadConnector = null,
   secretRotationStore = null,
   sloTicketStore = null,
   releaseGovernanceStore = null,
@@ -1316,13 +1465,6 @@ function createScheduler({
     };
   }
 
-  function toIso(value) {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return date.toISOString();
-  }
-
   function toEventTimestampMs(event = {}) {
     const candidates = [event?.ts, event?.createdAt, event?.metadata?.timestamp];
     for (const candidate of candidates) {
@@ -1706,6 +1848,452 @@ function createScheduler({
     };
   }
 
+  async function runSingleCcoHistorySync({ tenantId, mailboxId }) {
+    if (!mailboxId) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'mailbox_id_missing',
+      };
+    }
+    if (
+      !ccoHistoryStore ||
+      typeof ccoHistoryStore.upsertMailboxWindow !== 'function' ||
+      typeof ccoHistoryStore.getMailboxSummary !== 'function' ||
+      typeof ccoHistoryStore.getMissingMailboxWindows !== 'function'
+    ) {
+      return {
+        tenantId,
+        mailboxId,
+        skipped: true,
+        reason: 'cco_history_store_unavailable',
+      };
+    }
+    if (!graphReadConnector || typeof graphReadConnector.fetchInboxSnapshot !== 'function') {
+      return {
+        tenantId,
+        mailboxId,
+        skipped: true,
+        reason: 'graph_read_unavailable',
+      };
+    }
+
+    const recentWindowDays = Math.max(
+      1,
+      Math.min(90, Number(config?.schedulerCcoHistoryRecentWindowDays) || 30)
+    );
+    const lookbackDays = Math.max(
+      recentWindowDays,
+      Math.min(1825, Number(config?.schedulerCcoHistoryBackfillLookbackDays) || 1095)
+    );
+    const chunkDays = Math.max(
+      1,
+      Math.min(90, Number(config?.schedulerCcoHistoryBackfillChunkDays) || 30)
+    );
+    const nowMs = Date.now();
+    const recentWindow = toLookbackWindowBounds(recentWindowDays, nowMs);
+    const fullWindow = toLookbackWindowBounds(lookbackDays, nowMs);
+
+    const recentMessages = await fetchCcoHistoryWindowMessagesFromGraph({
+      graphReadConnector,
+      mailboxId,
+      windowStartIso: recentWindow.startIso,
+      windowEndIso: recentWindow.endIso,
+    });
+    const recentUpsert = await ccoHistoryStore.upsertMailboxWindow({
+      tenantId,
+      mailboxId,
+      messages: recentMessages,
+      windowStartIso: recentWindow.startIso,
+      windowEndIso: recentWindow.endIso,
+      source: 'scheduler_cco_history_recent',
+    });
+
+    let mailbox = ccoHistoryStore.getMailboxSummary({
+      tenantId,
+      mailboxId,
+    });
+    let missingWindows = ccoHistoryStore.getMissingMailboxWindows({
+      tenantId,
+      mailboxId,
+      startIso: fullWindow.startIso,
+      endIso: fullWindow.endIso,
+    });
+    let backfill = {
+      performed: false,
+      insertedCount: 0,
+      updatedCount: 0,
+      messageCount: 0,
+      window: null,
+    };
+
+    const nextBackfillWindow = selectNextCcoHistoryBackfillWindow({
+      missingWindows,
+      chunkDays,
+    });
+    if (nextBackfillWindow) {
+      const backfillMessages = await fetchCcoHistoryWindowMessagesFromGraph({
+        graphReadConnector,
+        mailboxId,
+        windowStartIso: nextBackfillWindow.startIso,
+        windowEndIso: nextBackfillWindow.endIso,
+      });
+      const backfillUpsert = await ccoHistoryStore.upsertMailboxWindow({
+        tenantId,
+        mailboxId,
+        messages: backfillMessages,
+        windowStartIso: nextBackfillWindow.startIso,
+        windowEndIso: nextBackfillWindow.endIso,
+        source: 'scheduler_cco_history_backfill',
+      });
+      mailbox = ccoHistoryStore.getMailboxSummary({
+        tenantId,
+        mailboxId,
+      });
+      missingWindows = ccoHistoryStore.getMissingMailboxWindows({
+        tenantId,
+        mailboxId,
+        startIso: fullWindow.startIso,
+        endIso: fullWindow.endIso,
+      });
+      backfill = {
+        performed: true,
+        insertedCount: Number(backfillUpsert?.insertedCount || 0),
+        updatedCount: Number(backfillUpsert?.updatedCount || 0),
+        messageCount: backfillMessages.length,
+        window: nextBackfillWindow,
+      };
+    }
+
+    return {
+      tenantId,
+      mailboxId,
+      recentWindowDays,
+      lookbackDays,
+      chunkDays,
+      recentSync: {
+        window: recentWindow,
+        messageCount: recentMessages.length,
+        insertedCount: Number(recentUpsert?.insertedCount || 0),
+        updatedCount: Number(recentUpsert?.updatedCount || 0),
+      },
+      backfill,
+      coverageStartIso: mailbox?.coverageStartIso || null,
+      coverageEndIso: mailbox?.coverageEndIso || null,
+      messageCount: Number(mailbox?.messageCount || 0),
+      missingWindowCount: Array.isArray(missingWindows) ? missingWindows.length : 0,
+      complete: Array.isArray(missingWindows) ? missingWindows.length === 0 : false,
+    };
+  }
+
+  async function runCcoHistorySync({ tenantId }) {
+    const mailboxIds = resolveCcoHistoryMailboxIds(config);
+    if (mailboxIds.length === 0) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'mailbox_ids_missing',
+      };
+    }
+
+    const mailboxes = [];
+    for (const mailboxId of mailboxIds) {
+      mailboxes.push(await runSingleCcoHistorySync({ tenantId, mailboxId }));
+    }
+
+    const actionableMailboxes = mailboxes.filter((item) => item?.skipped !== true);
+    const skippedMailboxes = mailboxes.filter((item) => item?.skipped === true);
+    const missingWindowCount = actionableMailboxes.reduce(
+      (sum, item) => sum + Number(item?.missingWindowCount || 0),
+      0
+    );
+    const totalMessageCount = actionableMailboxes.reduce(
+      (sum, item) => sum + Number(item?.messageCount || 0),
+      0
+    );
+    const backfillPerformedCount = actionableMailboxes.filter(
+      (item) => item?.backfill?.performed === true
+    ).length;
+    const completeMailboxCount = actionableMailboxes.filter(
+      (item) => item?.complete === true
+    ).length;
+    const recentWindowDays = Math.max(
+      1,
+      Math.min(90, Number(config?.schedulerCcoHistoryRecentWindowDays) || 30)
+    );
+    const lookbackDays = Math.max(
+      recentWindowDays,
+      Math.min(1825, Number(config?.schedulerCcoHistoryBackfillLookbackDays) || 1095)
+    );
+    const chunkDays = Math.max(
+      1,
+      Math.min(90, Number(config?.schedulerCcoHistoryBackfillChunkDays) || 30)
+    );
+    let customerReplyMaterializedCount = 0;
+    if (
+      ccoHistoryStore &&
+      typeof ccoHistoryStore.listMailboxMessages === 'function' &&
+      typeof materializeCustomerReplyActions === 'function'
+    ) {
+      const recentWindow = toLookbackWindowBounds(recentWindowDays, Date.now());
+      const recentMessages = (
+        await Promise.all(
+          mailboxIds.map((mailboxId) =>
+            ccoHistoryStore.listMailboxMessages({
+              tenantId,
+              mailboxId,
+              sinceIso: recentWindow.startIso,
+              untilIso: recentWindow.endIso,
+            })
+          )
+        )
+      ).flat();
+      customerReplyMaterializedCount = await materializeCustomerReplyActions({
+        tenantId,
+        messages: recentMessages,
+        ccoHistoryStore,
+      });
+    }
+
+    return {
+      tenantId,
+      mailboxId: mailboxIds[0] || null,
+      mailboxIds,
+      mailboxes,
+      syncedMailboxCount: actionableMailboxes.length,
+      skippedMailboxCount: skippedMailboxes.length,
+      completeMailboxCount,
+      backfillPerformedCount,
+      recentWindowDays,
+      lookbackDays,
+      chunkDays,
+      totalMessageCount,
+      missingWindowCount,
+      customerReplyMaterializedCount,
+      complete:
+        actionableMailboxes.length > 0 &&
+        actionableMailboxes.every((item) => item?.complete === true),
+    };
+  }
+
+  async function runCcoShadowRun({ tenantId, trigger = 'scheduled', actorUserId = null }) {
+    if (!graphReadConnector || typeof graphReadConnector.fetchInboxSnapshot !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'graph_read_connector_unavailable',
+      };
+    }
+    if (!capabilityAnalysisStore || typeof capabilityAnalysisStore.append !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'capability_analysis_store_unavailable',
+      };
+    }
+
+    const mailboxIds = resolveCcoShadowMailboxIds(config);
+    if (mailboxIds.length === 0) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'mailbox_ids_missing',
+      };
+    }
+
+    const lookbackDays = Math.max(
+      7,
+      Math.min(30, Number(config?.schedulerCcoShadowLookbackDays) || 14)
+    );
+    const correlationId = `cco-shadow-run:${crypto.randomUUID()}`;
+    const requestId = `scheduler-shadow-run:${crypto.randomUUID()}`;
+    const { input, systemStateSnapshot } = await hydrateAnalyzeInboxInput({
+      tenantId,
+      input: {
+        includeClosed: false,
+        maxDrafts: 5,
+      },
+      systemStateSnapshot: {},
+      graphReadConnector,
+      capabilityAnalysisStore,
+      ccoHistoryStore,
+      authStore,
+      actorUserId: actorUserId || 'scheduler',
+      correlationId,
+      graphReadOptionsOverride: {
+        days: lookbackDays,
+        mailboxIds,
+        includeRead: true,
+        fullTenant: true,
+        userScope: 'all',
+        maxUsers: Math.max(1, mailboxIds.length),
+      },
+    });
+    const capability = new AnalyzeInboxCapability();
+    const analyzeResult = await capability.execute({
+      input,
+      systemStateSnapshot,
+      tenantId,
+      channel: 'admin',
+      requestId,
+      correlationId,
+    });
+    const shadowOutput = buildShadowRunOutput({
+      analyzeResult,
+      systemStateSnapshot,
+      mailboxIds,
+      lookbackDays,
+      generatedAt: nowIso(),
+    });
+    const entry = await capabilityAnalysisStore.append({
+      tenantId,
+      capabilityName: 'CCO.ShadowRun',
+      capabilityVersion: 'v1',
+      persistStrategy: 'analysis_only',
+      decision: 'allow',
+      actor: {
+        id: normalizeText(actorUserId) || 'scheduler',
+        role: 'SYSTEM',
+      },
+      runId: requestId,
+      correlationId,
+      input: {
+        mailboxIds,
+        lookbackDays,
+        trigger,
+      },
+      output: {
+        data: shadowOutput,
+      },
+      metadata: {
+        source: 'scheduler_shadow_run',
+        mailboxIds,
+        lookbackDays,
+        trigger,
+      },
+      riskSummary: {},
+      policySummary: {},
+    });
+
+    return {
+      tenantId,
+      mailboxIds,
+      lookbackDays,
+      recommendationCount: Number(shadowOutput?.summary?.recommendationCount || 0),
+      followUpCount: Number(shadowOutput?.summary?.followUpCount || 0),
+      highPriorityCount: Number(shadowOutput?.summary?.highPriorityCount || 0),
+      entryId: entry?.id || null,
+      capturedAt: entry?.ts || null,
+    };
+  }
+
+  async function runCcoShadowReview({ tenantId, trigger = 'scheduled', actorUserId = null }) {
+    if (!capabilityAnalysisStore || typeof capabilityAnalysisStore.list !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'capability_analysis_store_unavailable',
+      };
+    }
+    if (!ccoHistoryStore) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'cco_history_store_unavailable',
+      };
+    }
+
+    const mailboxIds = resolveCcoShadowMailboxIds(config);
+    const lookbackDays = Math.max(
+      7,
+      Math.min(30, Number(config?.schedulerCcoShadowReviewLookbackDays) || 14)
+    );
+    const shadowEntries = await capabilityAnalysisStore.list({
+      tenantId,
+      capabilityName: 'CCO.ShadowRun',
+      limit: 500,
+    });
+    // History store treats untilIso as exclusive. Nudge the shadow-review
+    // window forward slightly so actions/outcomes recorded immediately before
+    // the review run are still included deterministically.
+    const window = toLookbackWindowBounds(lookbackDays, Date.now() + 1000);
+    let customerReplyMaterializedCount = 0;
+    if (
+      typeof ccoHistoryStore.listMailboxMessages === 'function' &&
+      typeof materializeCustomerReplyActions === 'function'
+    ) {
+      const recentMessages = (
+        await Promise.all(
+          mailboxIds.map((mailboxId) =>
+            ccoHistoryStore.listMailboxMessages({
+              tenantId,
+              mailboxId,
+              sinceIso: window.startIso,
+              untilIso: window.endIso,
+            })
+          )
+        )
+      ).flat();
+      customerReplyMaterializedCount = await materializeCustomerReplyActions({
+        tenantId,
+        messages: recentMessages,
+        ccoHistoryStore,
+      });
+    }
+    const [actions, outcomes] = await Promise.all([
+      typeof ccoHistoryStore.listActions === 'function'
+        ? ccoHistoryStore.listActions({
+            tenantId,
+            mailboxIds,
+            sinceIso: window.startIso,
+            untilIso: window.endIso,
+          })
+        : [],
+      typeof ccoHistoryStore.listOutcomes === 'function'
+        ? ccoHistoryStore.listOutcomes({
+            tenantId,
+            mailboxIds,
+            sinceIso: window.startIso,
+            untilIso: window.endIso,
+          })
+        : [],
+    ]);
+    const summary = summarizeShadowReview({
+      shadowEntries,
+      actions,
+      outcomes,
+      mailboxIds,
+      lookbackDays,
+      limit: 24,
+    });
+    const entry = await appendStrategicAnalysisEntry({
+      tenantId,
+      actorUserId: actorUserId || 'scheduler',
+      capabilityName: 'CCO.ShadowReview',
+      outputData: summary,
+      metadata: {
+        source: 'scheduler_shadow_review',
+        mailboxIds,
+        lookbackDays,
+        trigger,
+      },
+    });
+
+    return {
+      tenantId,
+      mailboxIds,
+      lookbackDays,
+      recommendationCount: Number(summary?.totals?.recommendationCount || 0),
+      positiveCount: Number(summary?.totals?.positiveCount || 0),
+      negativeCount: Number(summary?.totals?.negativeCount || 0),
+      pendingCount: Number(summary?.totals?.pendingCount || 0),
+      suspectCounts: summary?.suspectCounts || {},
+      customerReplyMaterializedCount,
+      entryId: entry?.id || null,
+      generatedAt: summary?.generatedAt || null,
+    };
+  }
+
   const jobDefinitions = [
     {
       id: 'cco_weekly_brief',
@@ -1724,6 +2312,24 @@ function createScheduler({
       name: 'CCO forward outlook + scenario snapshot',
       intervalMs: toHoursMs(config.schedulerCcoForwardOutlookIntervalHours, 6),
       run: runCcoForwardOutlook,
+    },
+    {
+      id: 'cco_history_sync',
+      name: 'CCO kons history sync',
+      intervalMs: toHoursMs(config.schedulerCcoHistorySyncIntervalHours, 6),
+      run: runCcoHistorySync,
+    },
+    {
+      id: 'cco_shadow_run',
+      name: 'CCO kons shadow run',
+      intervalMs: toHoursMs(config.schedulerCcoShadowRunIntervalHours, 6),
+      run: runCcoShadowRun,
+    },
+    {
+      id: 'cco_shadow_review',
+      name: 'CCO kons daily shadow review',
+      intervalMs: toHoursMs(config.schedulerCcoShadowReviewIntervalHours, 24),
+      run: runCcoShadowReview,
     },
     {
       id: 'nightly_pilot_report',

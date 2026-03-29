@@ -5,6 +5,8 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { createScheduler } = require('../../src/ops/scheduler');
+const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
+const { createCcoHistoryStore } = require('../../src/ops/ccoHistoryStore');
 const { createStateBackup } = require('../../src/ops/stateBackup');
 
 function buildBaseConfig(tmpDir) {
@@ -14,6 +16,16 @@ function buildBaseConfig(tmpDir) {
     schedulerEnabled: true,
     defaultTenantId: 'tenant-a',
     schedulerReportWindowDays: 14,
+    schedulerCcoHistorySyncIntervalHours: 6,
+    schedulerCcoHistoryMailboxId: 'kons@hairtpclinic.com',
+    schedulerCcoHistoryRecentWindowDays: 30,
+    schedulerCcoHistoryBackfillLookbackDays: 90,
+    schedulerCcoHistoryBackfillChunkDays: 30,
+    schedulerCcoShadowRunIntervalHours: 6,
+    schedulerCcoShadowReviewIntervalHours: 24,
+    schedulerCcoShadowMailboxIds: ['kons@hairtpclinic.com'],
+    schedulerCcoShadowLookbackDays: 14,
+    schedulerCcoShadowReviewLookbackDays: 14,
     schedulerReportIntervalHours: 24,
     schedulerBackupIntervalHours: 24,
     schedulerRestoreDrillIntervalHours: 168,
@@ -62,6 +74,38 @@ function buildBaseConfig(tmpDir) {
     releasePostLaunchStabilizationDays: 14,
     releaseEnforcePostLaunchStabilization: false,
     releaseRealityAuditIntervalDays: 90,
+  };
+}
+
+function createHistorySnapshotForWindow({
+  mailboxId = 'kons@hairtpclinic.com',
+  customerEmail = 'patient@example.com',
+  messageId = 'msg-1',
+  sentAt,
+} = {}) {
+  return {
+    conversations: [
+      {
+        conversationId: `conv-${messageId}`,
+        subject: 'Kons historik',
+        customerEmail,
+        mailboxId,
+        mailboxAddress: mailboxId,
+        userPrincipalName: mailboxId,
+        messages: [
+          {
+            messageId,
+            sentAt,
+            direction: 'inbound',
+            bodyPreview: 'Historiskt meddelande.',
+            senderEmail: customerEmail,
+            senderName: 'Patient',
+            recipients: [mailboxId],
+            replyToRecipients: [],
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -348,6 +392,120 @@ test('scheduler release_governance_review alerts when release gate has blockers'
     assert.equal(run.result.releaseGatePassed, false);
     assert.equal(run.result.blockerCount, 2);
     assert.ok(alerts.some((item) => String(item?.eventType || '') === 'release.governance.blocked'));
+  } finally {
+    if (scheduler && typeof scheduler.stop === 'function') {
+      await scheduler.stop();
+    }
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('scheduler cco_history_sync värmer senaste fönstret och backfillar bakåt chunkvis', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-history-sync-job-'));
+  let scheduler = null;
+
+  try {
+    const config = buildBaseConfig(tmpDir);
+    config.schedulerCcoHistoryMailboxIds = [
+      'kons@hairtpclinic.com',
+      'info@hairtpclinic.com',
+    ];
+    const ccoHistoryStore = await createCcoHistoryStore({
+      filePath: path.join(tmpDir, 'cco-history.json'),
+    });
+    const baseNowMs = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const graphCalls = [];
+
+    scheduler = createScheduler({
+      config,
+      authStore: createBaseAuthStore(),
+      templateStore: createBaseTemplateStore(),
+      ccoHistoryStore,
+      graphReadConnector: {
+        async fetchInboxSnapshot(options = {}) {
+          graphCalls.push({
+            sinceIso: options.sinceIso,
+            untilIso: options.untilIso,
+            mailboxIds: options.mailboxIds,
+          });
+          const ageDays = Math.round(
+            (baseNowMs - Date.parse(String(options.untilIso || ''))) / dayMs
+          );
+          const bucket =
+            ageDays >= 55 ? 'backfill-2' : ageDays >= 25 ? 'backfill-1' : 'recent';
+          return createHistorySnapshotForWindow({
+            mailboxId: options.mailboxIds?.[0] || 'kons@hairtpclinic.com',
+            messageId: bucket,
+            sentAt: new Date(
+              Date.parse(String(options.sinceIso || '')) + 60 * 60 * 1000
+            ).toISOString(),
+          });
+        },
+      },
+      logger: {
+        log() {},
+        error() {},
+      },
+    });
+
+    const firstRun = await scheduler.runJob('cco_history_sync', {
+      trigger: 'manual',
+      tenantId: 'tenant-a',
+      actorUserId: 'owner-1',
+    });
+
+    assert.equal(firstRun.ok, true);
+    assert.deepEqual(firstRun.result.mailboxIds, [
+      'kons@hairtpclinic.com',
+      'info@hairtpclinic.com',
+    ]);
+    assert.equal(firstRun.result.mailboxes.length, 2);
+    assert.equal(firstRun.result.mailboxes[0].recentSync.messageCount, 1);
+    assert.equal(firstRun.result.mailboxes[0].backfill.performed, true);
+    assert.equal(firstRun.result.mailboxes[1].recentSync.messageCount, 1);
+    assert.equal(firstRun.result.mailboxes[1].backfill.performed, true);
+    assert.equal(firstRun.result.totalMessageCount, 4);
+    assert.equal(firstRun.result.missingWindowCount, 2);
+    assert.equal(firstRun.result.complete, false);
+    assert.equal(firstRun.result.backfillPerformedCount, 2);
+    assert.equal(firstRun.result.customerReplyMaterializedCount, 0);
+    assert.equal(graphCalls.length, 4);
+
+    const secondRun = await scheduler.runJob('cco_history_sync', {
+      trigger: 'manual',
+      tenantId: 'tenant-a',
+      actorUserId: 'owner-1',
+    });
+
+    assert.equal(secondRun.ok, true);
+    assert.equal(secondRun.result.mailboxes[0].backfill.performed, true);
+    assert.equal(secondRun.result.mailboxes[1].backfill.performed, true);
+    assert.equal(secondRun.result.totalMessageCount, 6);
+    assert.equal(secondRun.result.missingWindowCount, 0);
+    assert.equal(secondRun.result.complete, true);
+    assert.equal(secondRun.result.completeMailboxCount, 2);
+    assert.equal(secondRun.result.customerReplyMaterializedCount, 0);
+    assert.equal(graphCalls.length, 8);
+
+    const konsMessages = await ccoHistoryStore.listMailboxMessages({
+      tenantId: 'tenant-a',
+      mailboxId: 'kons@hairtpclinic.com',
+    });
+    const infoMessages = await ccoHistoryStore.listMailboxMessages({
+      tenantId: 'tenant-a',
+      mailboxId: 'info@hairtpclinic.com',
+    });
+    assert.equal(konsMessages.length, 3);
+    assert.equal(infoMessages.length, 3);
+    assert.deepEqual(
+      konsMessages.map((message) => message.messageId).sort(),
+      ['backfill-1', 'backfill-2', 'recent']
+    );
+    assert.deepEqual(
+      infoMessages.map((message) => message.messageId).sort(),
+      ['backfill-1', 'backfill-2', 'recent']
+    );
   } finally {
     if (scheduler && typeof scheduler.stop === 'function') {
       await scheduler.stop();
@@ -647,6 +805,136 @@ test('scheduler release_governance_review alerts on enforced post-launch stabili
           String(item?.eventType || '') ===
           'release.governance.post_launch_stabilization_incomplete'
       )
+    );
+  } finally {
+    if (scheduler && typeof scheduler.stop === 'function') {
+      await scheduler.stop();
+    }
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('scheduler cco_shadow_run stores recommendations and cco_shadow_review summarizes real outcomes', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-shadow-run-'));
+  let scheduler = null;
+
+  try {
+    const config = buildBaseConfig(tmpDir);
+    const capabilityAnalysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tmpDir, 'capability-analysis.json'),
+    });
+    const ccoHistoryStore = await createCcoHistoryStore({
+      filePath: path.join(tmpDir, 'cco-history.json'),
+    });
+    const graphReadConnector = {
+      async fetchInboxSnapshot(options = {}) {
+        assert.equal(options.days, 14);
+        assert.deepEqual(options.mailboxIds, ['kons@hairtpclinic.com']);
+        return {
+          conversations: [
+            {
+              conversationId: 'conv-shadow-1',
+              subject: 'Kan jag boka om min tid?',
+              customerEmail: 'patient@example.com',
+              mailboxId: 'kons@hairtpclinic.com',
+              mailboxAddress: 'kons@hairtpclinic.com',
+              userPrincipalName: 'kons@hairtpclinic.com',
+              messages: [
+                {
+                  messageId: 'msg-shadow-1',
+                  sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                  direction: 'inbound',
+                  bodyPreview: 'Hej, kan jag boka om min tid till fredag eftermiddag?',
+                  senderEmail: 'patient@example.com',
+                  senderName: 'Patient',
+                  recipients: ['kons@hairtpclinic.com'],
+                  replyToRecipients: [],
+                },
+              ],
+            },
+          ],
+        };
+      },
+    };
+
+    scheduler = createScheduler({
+      config,
+      authStore: createBaseAuthStore(),
+      templateStore: createBaseTemplateStore(),
+      capabilityAnalysisStore,
+      ccoHistoryStore,
+      graphReadConnector,
+      logger: {
+        log() {},
+        error() {},
+      },
+    });
+
+    const shadowRun = await scheduler.runJob('cco_shadow_run', {
+      trigger: 'manual',
+      tenantId: 'tenant-a',
+      actorUserId: 'owner-1',
+    });
+
+    assert.equal(shadowRun.ok, true);
+    assert.equal(shadowRun.result.recommendationCount, 1);
+
+    const shadowEntries = await capabilityAnalysisStore.list({
+      tenantId: 'tenant-a',
+      capabilityName: 'CCO.ShadowRun',
+      limit: 1,
+    });
+    const recommendation = shadowEntries[0]?.output?.data?.recommendations?.[0];
+    assert.equal(recommendation.conversationId, 'conv-shadow-1');
+
+    await ccoHistoryStore.recordAction({
+      tenantId: 'tenant-a',
+      conversationId: 'conv-shadow-1',
+      mailboxId: 'kons@hairtpclinic.com',
+      customerEmail: 'patient@example.com',
+      actionType: 'reply_sent',
+      actionLabel: 'Svar skickat',
+      recordedAt: new Date().toISOString(),
+      selectedMode: 'professional',
+      recommendedMode: recommendation.recommendedMode,
+      recommendedAction: recommendation.recommendedAction,
+      intent: recommendation.intent,
+    });
+    await ccoHistoryStore.recordOutcome({
+      tenantId: 'tenant-a',
+      conversationId: 'conv-shadow-1',
+      mailboxId: 'kons@hairtpclinic.com',
+      customerEmail: 'patient@example.com',
+      outcomeCode: 'rebooked',
+      outcomeLabel: 'Ombokad',
+      recordedAt: new Date().toISOString(),
+      selectedMode: 'professional',
+      recommendedMode: recommendation.recommendedMode,
+      recommendedAction: recommendation.recommendedAction,
+      intent: recommendation.intent,
+    });
+
+    const shadowReview = await scheduler.runJob('cco_shadow_review', {
+      trigger: 'manual',
+      tenantId: 'tenant-a',
+      actorUserId: 'owner-1',
+    });
+
+    assert.equal(shadowReview.ok, true);
+    assert.equal(shadowReview.result.recommendationCount, 1);
+    assert.equal(shadowReview.result.positiveCount, 1);
+    assert.equal(shadowReview.result.customerReplyMaterializedCount, 0);
+
+    const reviewEntries = await capabilityAnalysisStore.list({
+      tenantId: 'tenant-a',
+      capabilityName: 'CCO.ShadowReview',
+      limit: 1,
+    });
+    assert.equal(reviewEntries.length, 1);
+    assert.equal(reviewEntries[0]?.output?.data?.totals?.positiveCount, 1);
+    assert.equal(
+      reviewEntries[0]?.output?.data?.summaries?.actionSummaryByIntent?.[0]?.intent,
+      recommendation.intent
     );
   } finally {
     if (scheduler && typeof scheduler.stop === 'function') {

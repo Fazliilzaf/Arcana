@@ -954,6 +954,7 @@ function createMonitorRouter({
     async (req, res) => {
       try {
         const tenantId = req.auth.tenantId;
+        const ownerMfaEnforced = config?.authOwnerMfaRequired !== false;
         const supportsIncidents = typeof templateStore?.summarizeIncidents === 'function';
 
         const [
@@ -2137,6 +2138,7 @@ function createMonitorRouter({
       try {
         const tenantId = req.auth.tenantId;
         const nowMs = Date.now();
+        const ownerMfaEnforced = config?.authOwnerMfaRequired !== false;
         const supportsIncidents = typeof templateStore?.summarizeIncidents === 'function';
         const supportsListIncidents = typeof templateStore?.listIncidents === 'function';
         const supportsActiveVersionSnapshots =
@@ -2502,12 +2504,18 @@ function createMonitorRouter({
               id: 'owner_mfa_enforced',
               label: 'OWNER MFA enforcement',
               status:
-                activeOwners.length > 0 && ownersWithoutMfa.length === 0 ? 'green' : 'red',
-              required: true,
-              target: 'Alla aktiva OWNER har MFA required + configured',
+                !ownerMfaEnforced ||
+                (activeOwners.length > 0 && ownersWithoutMfa.length === 0)
+                  ? 'green'
+                  : 'red',
+              required: ownerMfaEnforced,
+              target: ownerMfaEnforced
+                ? 'Alla aktiva OWNER har MFA required + configured'
+                : 'OWNER MFA är avstängt i runtime-konfigurationen',
               value: {
                 activeOwners: activeOwners.length,
                 ownersWithoutMfa: ownersWithoutMfa.length,
+                enforced: ownerMfaEnforced,
               },
             }),
             buildCheck({

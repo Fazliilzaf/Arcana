@@ -136,6 +136,30 @@ function buildStateFileGuards(config = {}) {
       },
     },
     {
+      scope: 'cco_history_store',
+      filePath: config.ccoHistoryStorePath,
+      maxBytes: toPositiveInt(config.startupCcoHistoryStoreMaxBytes, 250 * MB),
+      fallback: { version: 1, createdAt: ts, updatedAt: ts, mailboxes: {}, messages: [] },
+    },
+    {
+      scope: 'cco_note_store',
+      filePath: config.ccoNoteStorePath,
+      maxBytes: toPositiveInt(config.startupCcoNoteStoreMaxBytes, 12 * MB),
+      fallback: { version: 1, createdAt: ts, updatedAt: ts, notes: [] },
+    },
+    {
+      scope: 'cco_followup_store',
+      filePath: config.ccoFollowUpStorePath,
+      maxBytes: toPositiveInt(config.startupCcoFollowUpStoreMaxBytes, 12 * MB),
+      fallback: { version: 1, createdAt: ts, updatedAt: ts, followUps: [] },
+    },
+    {
+      scope: 'cco_workspace_prefs_store',
+      filePath: config.ccoWorkspacePrefsStorePath,
+      maxBytes: toPositiveInt(config.startupCcoWorkspacePrefsStoreMaxBytes, 4 * MB),
+      fallback: { version: 1, createdAt: ts, updatedAt: ts, preferences: [] },
+    },
+    {
       scope: 'template_store',
       filePath: config.templateStorePath,
       maxBytes: toPositiveInt(config.startupTemplateStoreMaxBytes, 80 * MB),

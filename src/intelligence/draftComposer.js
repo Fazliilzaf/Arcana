@@ -244,7 +244,7 @@ function renderDraftText({
   })();
   const paragraph1 = sanitizePlainText(`${greeting} ${acknowledgement}`);
   const paragraph2 = sanitizePlainText(
-    adjustBySentenceLength(coreAnswer, profile.sentenceLength)
+    coreAnswer
   );
   const paragraph3 = sanitizePlainText(
     `${adjustBySentenceLength(cta, profile.sentenceLength)} ${profile.closingStyle}`.trim()
@@ -387,6 +387,57 @@ function buildSafetySentence({ originalMessage = '', isMedicalTopic = false, isA
   return '';
 }
 
+function buildHistorySupportSentence({ customerProfile = null, mode = 'professional' } = {}) {
+  const safeCustomerProfile =
+    customerProfile && typeof customerProfile === 'object' && !Array.isArray(customerProfile)
+      ? customerProfile
+      : {};
+  const pattern = normalizeText(safeCustomerProfile.historySignalPattern).toLowerCase();
+  const mailboxCount = Math.max(0, Math.round(clampNumber(safeCustomerProfile.historyMailboxCount, 0, 10, 0)));
+
+  if (pattern === 'reschedule') {
+    return mode === 'short'
+      ? 'Tidigare kontakt visar att tydliga tider direkt i samma svar fungerar bäst.'
+      : 'Tidigare kontakt visar att tydliga tider direkt i samma svar minskar friktion.';
+  }
+  if (pattern === 'complaint') {
+    return mode === 'short'
+      ? 'Tidigare friktion gör att tydligt ansvar och konkret återkoppling behövs.'
+      : 'Tidigare friktion gör att svaret bör bära tydligt ansvar och konkret återkoppling.';
+  }
+  if (pattern === 'booking') {
+    return 'Tidigare kontakt visar att kunden svarar bäst på ett konkret nästa steg i samma svar.';
+  }
+  if (pattern === 'mixed' || mailboxCount >= 2) {
+    return 'Kunden har tidigare kontaktat flera mailboxar, så håll svaret samlat och tydligt.';
+  }
+  return '';
+}
+
+function buildHistoryOutcomeSupportSentence({ customerProfile = null } = {}) {
+  const safeCustomerProfile =
+    customerProfile && typeof customerProfile === 'object' && !Array.isArray(customerProfile)
+      ? customerProfile
+      : {};
+  const outcomeCode = normalizeText(safeCustomerProfile.historyOutcomeCode).toLowerCase();
+  if (outcomeCode === 'rebooked') {
+    return 'Tidigare liknande dialog löstes bäst med två tydliga alternativ direkt.';
+  }
+  if (outcomeCode === 'no_response') {
+    return 'Tidigare liknande dialog tappade fart, så svaret behöver en tydlig och tidsatt CTA.';
+  }
+  if (outcomeCode === 'escalated') {
+    return 'Tidigare liknande dialog krävde tydlig handoff och ansvar.';
+  }
+  if (outcomeCode === 'not_interested') {
+    return 'Tidigare liknande dialog avslutades bäst med en kort och friktionsfri stängning.';
+  }
+  if (outcomeCode === 'booked') {
+    return 'Tidigare liknande dialog gick i mål när nästa steg stängdes tydligt i samma svar.';
+  }
+  return '';
+}
+
 function buildCta({
   intent = 'unclear',
   priorityLevel = 'Low',
@@ -431,14 +482,51 @@ function buildCta({
     : `${prefix}när det passar dig får du gärna svara med ${ask}, så hjälper vi dig vidare.${suffix}`.trim();
 }
 
+function resolveHistoryPreferredMode(customerProfile = null) {
+  const safeCustomerProfile =
+    customerProfile && typeof customerProfile === 'object' && !Array.isArray(customerProfile)
+      ? customerProfile
+      : {};
+  const preferredMode = normalizeDraftMode(
+    safeCustomerProfile.historyCalibrationPreferredMode ||
+      safeCustomerProfile.historyPreferredMode ||
+      safeCustomerProfile.preferredMode
+  );
+  const positiveOutcomeCount = Math.round(
+    clampNumber(
+      safeCustomerProfile.historyCalibrationPositiveOutcomeCount ??
+        safeCustomerProfile.historyPositiveOutcomeCount,
+      0,
+      20,
+      0
+    )
+  );
+  const negativeOutcomeCount = Math.round(
+    clampNumber(
+      safeCustomerProfile.historyCalibrationNegativeOutcomeCount ??
+        safeCustomerProfile.historyNegativeOutcomeCount,
+      0,
+      20,
+      0
+    )
+  );
+  if (!preferredMode) return '';
+  if (positiveOutcomeCount < 2) return '';
+  if (negativeOutcomeCount > positiveOutcomeCount) return '';
+  return preferredMode;
+}
+
 function resolveRecommendedMode({
   intent = 'unclear',
   tone = 'neutral',
   tenantToneStyle = '',
   writingProfile = null,
+  customerProfile = null,
 } = {}) {
   if (intent === 'complaint') return 'professional';
   if (tone === 'urgent') return 'short';
+  const historyPreferredMode = resolveHistoryPreferredMode(customerProfile);
+  if (historyPreferredMode) return historyPreferredMode;
   if (intent === 'pricing_question') return 'professional';
   if (intent === 'booking_request') return 'warm';
   if (tone === 'anxious') return 'warm';
@@ -615,11 +703,14 @@ function buildDeterministicStructure({
   isMedicalTopic = false,
   isAcute = false,
   writingProfile = DEFAULT_WRITING_PROFILE,
+  customerProfile = null,
 } = {}) {
   const acknowledgement = buildAcknowledgement({ tone, mode, intent, writingProfile });
   const intentAnswer = buildIntentCoreAnswer({ intent, mode, originalMessage, writingProfile });
+  const historySupport = buildHistorySupportSentence({ customerProfile, mode });
+  const historyOutcomeSupport = buildHistoryOutcomeSupportSentence({ customerProfile });
   const safetySentence = buildSafetySentence({ originalMessage, isMedicalTopic, isAcute });
-  const coreAnswer = [intentAnswer, safetySentence].filter(Boolean).join(' ').trim();
+  const coreAnswer = [intentAnswer, historySupport, historyOutcomeSupport, safetySentence].filter(Boolean).join(' ').trim();
   const cta = buildCta({ intent, priorityLevel, mode, writingProfile });
   return sanitizeStructureSections({ acknowledgement, coreAnswer, cta });
 }
@@ -670,6 +761,7 @@ async function composeContextAwareDraft(input = {}, options = {}) {
         isMedicalTopic: input.isMedicalTopic === true,
         isAcute: input.isAcute === true,
         writingProfile,
+        customerProfile,
       });
 
       const semantic = await runSemanticStructureFill({
@@ -696,6 +788,7 @@ async function composeContextAwareDraft(input = {}, options = {}) {
       tone,
       tenantToneStyle,
       writingProfile,
+      customerProfile,
     });
 
     return {

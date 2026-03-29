@@ -178,6 +178,46 @@ const config = {
     stateRoot,
     fileName: 'capability-analysis.json',
   }),
+  ccoHistoryStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_HISTORY_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-history.json',
+  }),
+  ccoNoteStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_NOTE_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-notes.json',
+  }),
+  ccoFollowUpStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_FOLLOWUP_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-followups.json',
+  }),
+  ccoWorkspacePrefsStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_WORKSPACE_PREFS_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-workspace-prefs.json',
+  }),
+  ccoIntegrationStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_INTEGRATION_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-integrations.json',
+  }),
+  ccoSettingsStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_SETTINGS_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-settings.json',
+  }),
+  ccoMacroStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_MACRO_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-macros.json',
+  }),
+  ccoCustomerStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_CUSTOMER_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-customers.json',
+  }),
   capabilityAnalysisMaxEntries: asInt(process.env.ARCANA_CAPABILITY_ANALYSIS_MAX_ENTRIES, 15000),
   sloTicketStorePath: resolveStatePath({
     explicitPath: process.env.ARCANA_SLO_TICKET_STORE_PATH,
@@ -246,6 +286,22 @@ const config = {
     process.env.ARCANA_STARTUP_CAP_ANALYSIS_STORE_MAX_BYTES,
     32 * 1024 * 1024
   ),
+  startupCcoHistoryStoreMaxBytes: asInt(
+    process.env.ARCANA_STARTUP_CCO_HISTORY_STORE_MAX_BYTES,
+    250 * 1024 * 1024
+  ),
+  startupCcoNoteStoreMaxBytes: asInt(
+    process.env.ARCANA_STARTUP_CCO_NOTE_STORE_MAX_BYTES,
+    12 * 1024 * 1024
+  ),
+  startupCcoFollowUpStoreMaxBytes: asInt(
+    process.env.ARCANA_STARTUP_CCO_FOLLOWUP_STORE_MAX_BYTES,
+    12 * 1024 * 1024
+  ),
+  startupCcoWorkspacePrefsStoreMaxBytes: asInt(
+    process.env.ARCANA_STARTUP_CCO_WORKSPACE_PREFS_STORE_MAX_BYTES,
+    4 * 1024 * 1024
+  ),
   startupTemplateStoreMaxBytes: asInt(
     process.env.ARCANA_STARTUP_TEMPLATE_STORE_MAX_BYTES,
     24 * 1024 * 1024
@@ -284,6 +340,7 @@ const config = {
   authLoginRateLimitWindowSec: asInt(process.env.AUTH_LOGIN_RATE_LIMIT_WINDOW_SEC, 60),
   authLoginRateLimitMax: asInt(process.env.AUTH_LOGIN_RATE_LIMIT_MAX, 20),
   authSelectTenantRateLimitMax: asInt(process.env.AUTH_SELECT_TENANT_RATE_LIMIT_MAX, 30),
+  authOwnerMfaRequired: asBool(process.env.ARCANA_AUTH_OWNER_MFA_REQUIRED, true),
   authOwnerMfaBypassHosts: (() => {
     const defaults = ['arcana-staging.onrender.com', 'localhost', '127.0.0.1'];
     const configured = asStringArray(process.env.ARCANA_AUTH_OWNER_MFA_BYPASS_HOSTS);
@@ -399,6 +456,56 @@ const config = {
   schedulerCcoForwardOutlookIntervalHours: asInt(
     process.env.ARCANA_SCHEDULER_CCO_FORWARD_OUTLOOK_INTERVAL_HOURS,
     6
+  ),
+  schedulerCcoHistorySyncIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_HISTORY_SYNC_INTERVAL_HOURS,
+    6
+  ),
+  schedulerCcoHistoryMailboxId: asNonEmptyString(
+    process.env.ARCANA_SCHEDULER_CCO_HISTORY_MAILBOX_ID,
+    'kons@hairtpclinic.com'
+  ),
+  schedulerCcoHistoryMailboxIds: (() => {
+    const configured = asStringArray(process.env.ARCANA_SCHEDULER_CCO_HISTORY_MAILBOX_IDS)
+      .map((value) => asNonEmptyString(value).toLowerCase())
+      .filter(Boolean);
+    return configured.length > 0
+      ? configured
+      : ['kons@hairtpclinic.com', 'info@hairtpclinic.com', 'contact@hairtpclinic.com', 'egzona@hairtpclinic.com'];
+  })(),
+  schedulerCcoHistoryRecentWindowDays: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_HISTORY_RECENT_WINDOW_DAYS,
+    30
+  ),
+  schedulerCcoHistoryBackfillLookbackDays: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_HISTORY_BACKFILL_LOOKBACK_DAYS,
+    1095
+  ),
+  schedulerCcoHistoryBackfillChunkDays: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_HISTORY_BACKFILL_CHUNK_DAYS,
+    30
+  ),
+  schedulerCcoShadowRunIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_SHADOW_RUN_INTERVAL_HOURS,
+    6
+  ),
+  schedulerCcoShadowReviewIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_SHADOW_REVIEW_INTERVAL_HOURS,
+    24
+  ),
+  schedulerCcoShadowMailboxIds: (() => {
+    const configured = asStringArray(process.env.ARCANA_SCHEDULER_CCO_SHADOW_MAILBOX_IDS)
+      .map((value) => asNonEmptyString(value).toLowerCase())
+      .filter(Boolean);
+    return configured.length > 0 ? configured : ['kons@hairtpclinic.com'];
+  })(),
+  schedulerCcoShadowLookbackDays: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_SHADOW_LOOKBACK_DAYS,
+    14
+  ),
+  schedulerCcoShadowReviewLookbackDays: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_SHADOW_REVIEW_LOOKBACK_DAYS,
+    14
   ),
   schedulerReportIntervalHours: asInt(process.env.ARCANA_SCHEDULER_REPORT_INTERVAL_HOURS, 24),
   schedulerBackupIntervalHours: asInt(process.env.ARCANA_SCHEDULER_BACKUP_INTERVAL_HOURS, 24),

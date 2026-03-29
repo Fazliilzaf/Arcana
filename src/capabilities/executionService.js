@@ -207,26 +207,39 @@ function toCcoSendAllowlistSet(rawValue = '') {
   return new Set(entries);
 }
 
-const CCO_DEFAULT_SENDER_MAILBOX = 'contact@hairtpclinic.com';
+const CCO_DEFAULT_SENDER_MAILBOX =
+  normalizeText(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) || 'contact@hairtpclinic.com';
 const CCO_SIGNATURE_SPLIT_PATTERN =
-  /\n(?:Med vanliga halsningar,|Med vanlig halsning,|Basta halsningar,|Bästa hälsningar,)\n[\s\S]*$/i;
+  /\n(?:Med vanliga halsningar,?|Med vanlig halsning,?|Basta halsningar,?|Bästa hälsningar,?)\n[\s\S]*$/i;
 const CCO_SIGNATURE_PROFILES = Object.freeze({
+  contact: Object.freeze({
+    key: 'contact',
+    fullName: 'Hair TP Clinic',
+    title: 'Patientservice',
+    senderMailboxId: 'contact@hairtpclinic.com',
+  }),
   egzona: Object.freeze({
     key: 'egzona',
     fullName: 'Egzona Krasniqi',
     title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+    senderMailboxId: 'egzona@hairtpclinic.com',
   }),
   fazli: Object.freeze({
     key: 'fazli',
     fullName: 'Fazli Krasniqi',
     title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+    senderMailboxId: 'fazli@hairtpclinic.com',
   }),
 });
 
 function resolveCcoSignatureProfile(rawProfile = '') {
   const normalized = normalizeText(rawProfile).toLowerCase();
+  if (normalized === 'contact' || normalized === 'sara') return CCO_SIGNATURE_PROFILES.contact;
   if (normalized === 'fazli') return CCO_SIGNATURE_PROFILES.fazli;
-  return CCO_SIGNATURE_PROFILES.egzona;
+  if (normalized === 'egzona' || normalized === 'egzona@hairtpclinic.com') {
+    return CCO_SIGNATURE_PROFILES.egzona;
+  }
+  return CCO_SIGNATURE_PROFILES.contact;
 }
 
 function removeCcoSignature(body = '') {
@@ -251,16 +264,16 @@ function formatTextAsHtml(value = '') {
 }
 
 function buildCcoSignature({
-  profile = CCO_SIGNATURE_PROFILES.egzona,
+  profile = CCO_SIGNATURE_PROFILES.contact,
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
   const safeProfile =
-    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.egzona;
+    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.contact;
   const safeSenderMailbox = normalizeText(senderMailboxId) || CCO_DEFAULT_SENDER_MAILBOX;
   const safeTitle =
     normalizeText(safeProfile.title) || 'Hårspecialist I Hårtransplantationer & PRP-injektioner';
   return [
-    'Bästa hälsningar,',
+    'Bästa hälsningar',
     safeProfile.fullName,
     safeTitle,
     '031-88 11 66',
@@ -270,11 +283,11 @@ function buildCcoSignature({
 }
 
 function buildCcoSignatureHtml({
-  profile = CCO_SIGNATURE_PROFILES.egzona,
+  profile = CCO_SIGNATURE_PROFILES.contact,
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
   const safeProfile =
-    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.egzona;
+    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.contact;
   const safeSenderMailbox = normalizeText(senderMailboxId) || CCO_DEFAULT_SENDER_MAILBOX;
   const safeTitle =
     normalizeText(safeProfile.title) || 'Hårspecialist I Hårtransplantationer & PRP-injektioner';
@@ -287,30 +300,29 @@ function buildCcoSignatureHtml({
   ).replace(/\/+$/, '');
   const logoBaseUrl = publicBaseUrl || 'https://arcana.hairtpclinic.se';
   const logoUrl = `${logoBaseUrl}/assets/hair-tp-clinic/hairtpclinic-mark-light.svg`;
-  const iconBaseStyle =
-    'display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;margin-right:6px;border-radius:999px;background:#2f2f33;color:#ffffff;text-decoration:none;';
-  const iconSvgStyle = 'display:block;width:18px;height:18px;fill:currentColor;';
-  const webIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" style="${iconSvgStyle}"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20Zm7.9 9h-3.2a15 15 0 0 0-1.1-5A8 8 0 0 1 19.9 11ZM12 4.1c1.1 1.2 2 3.7 2.4 6.9H9.6c.4-3.2 1.3-5.7 2.4-6.9ZM4.1 13h3.2a15 15 0 0 0 1.1 5A8 8 0 0 1 4.1 13Zm0-2A8 8 0 0 1 8.4 6c-.5 1.3-.9 3-1.1 5H4.1Zm7.9 8a9 9 0 0 1-2.4-6h4.8a9 9 0 0 1-2.4 6Zm3.6-1c.5-1.3.9-3 1.1-5h3.2a8 8 0 0 1-4.3 5Z"/></svg>`;
-  const instagramIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" style="${iconSvgStyle}"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm5 3.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5Zm5.25-2.75a1.25 1.25 0 1 1 0 2.5a1.25 1.25 0 0 1 0-2.5Z"/></svg>`;
-  const facebookIcon = `<svg viewBox="0 0 24 24" aria-hidden="true" style="${iconSvgStyle}"><path d="M13.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.3-1.6 1.6-1.6h1.7V4.8c-.3 0-1.3-.1-2.4-.1c-2.4 0-4 1.4-4 4.1V11H8v3h2.9v8h2.6Z"/></svg>`;
+  const linkStyle = 'color:#b9a89d;text-decoration:none;';
+  const separatorStyle = 'color:#d8cec6;padding:0 6px;';
 
   return `
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;font-family:Arial,sans-serif;color:#2f2f33;">
   <tr>
-    <td style="vertical-align:top;padding-right:18px;">
-      <img src="${escapeHtml(logoUrl)}" alt="Hair TP Clinic" width="122" style="display:block;border:0;outline:none;text-decoration:none;" />
+    <td colspan="3" style="padding-bottom:4px;font-size:11px;line-height:1.15;color:#6a635d;white-space:nowrap;">Bästa hälsningar</td>
+  </tr>
+  <tr>
+    <td style="vertical-align:top;width:94px;padding-right:6px;">
+      <img src="${escapeHtml(logoUrl)}" alt="Hair TP Clinic" width="94" style="display:block;border:0;outline:none;text-decoration:none;width:94px;height:auto;" />
     </td>
-    <td style="vertical-align:top;border-left:4px solid #d8d0c8;padding-left:18px;">
-      <div style="font-size:13px;line-height:1.35;color:#4a4540;">Bästa hälsningar,</div>
-      <div style="margin-top:6px;font-size:22px;line-height:1.15;color:#b9a89d;font-weight:700;">${escapeHtml(safeName)}</div>
-      <div style="margin-top:6px;font-size:18px;line-height:1.25;color:#2f2f33;font-weight:700;">${escapeHtml(safeTitle)}</div>
-      <div style="margin-top:6px;font-size:14px;line-height:1.3;color:#2f2f33;">031-88 11 66</div>
-      <div style="font-size:14px;line-height:1.3;color:#2f2f33;">${escapeHtml(safeSenderMailbox)}</div>
-      <div style="font-size:14px;line-height:1.3;color:#2f2f33;">Vasaplatsen 2, 411 34 Göteborg</div>
-      <div style="margin-top:10px;">
-        <a href="${escapeHtml(websiteUrl)}" title="Webb" style="${iconBaseStyle}">${webIcon}</a>
-        <a href="${escapeHtml(instagramUrl)}" title="Instagram" style="${iconBaseStyle}">${instagramIcon}</a>
-        <a href="${escapeHtml(facebookUrl)}" title="Facebook" style="${iconBaseStyle.replace('margin-right:6px;', '')}">${facebookIcon}</a>
+    <td style="vertical-align:top;width:10px;padding-left:0;padding-right:8px;">
+      <div style="width:1px;height:88px;margin:0 auto;background:#e2dbd4;"></div>
+    </td>
+    <td style="vertical-align:top;padding-top:0;padding-left:0;">
+      <div style="font-size:12px;line-height:1.05;color:#b9a89d;font-weight:700;">${escapeHtml(safeName)}</div>
+      <div style="margin-top:3px;font-size:10px;line-height:1.16;color:#2f2f33;font-weight:700;max-width:260px;">${escapeHtml(safeTitle)}</div>
+      <div style="margin-top:6px;font-size:10px;line-height:1.22;color:#2f2f33;">031-88 11 66</div>
+      <div style="font-size:10px;line-height:1.22;color:#2f2f33;">${escapeHtml(safeSenderMailbox)}</div>
+      <div style="margin-top:2px;font-size:10px;line-height:1.22;color:#2f2f33;">Vasaplatsen 2, 411 34 Göteborg</div>
+      <div style="margin-top:8px;font-size:10px;line-height:1.2;color:#b9a89d;white-space:nowrap;">
+        <a href="${escapeHtml(websiteUrl)}" title="Webb" style="${linkStyle}">Webb</a><span style="${separatorStyle}">·</span><a href="${escapeHtml(instagramUrl)}" title="Instagram" style="${linkStyle}">Instagram</a><span style="${separatorStyle}">·</span><a href="${escapeHtml(facebookUrl)}" title="Facebook" style="${linkStyle}">Facebook</a>
       </div>
     </td>
   </tr>
@@ -319,7 +331,7 @@ function buildCcoSignatureHtml({
 
 function applyCcoSignature({
   body = '',
-  profile = CCO_SIGNATURE_PROFILES.egzona,
+  profile = CCO_SIGNATURE_PROFILES.contact,
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
   const withoutSignature = removeCcoSignature(body);
@@ -330,7 +342,7 @@ function applyCcoSignature({
 
 function applyCcoSignatureHtml({
   body = '',
-  profile = CCO_SIGNATURE_PROFILES.egzona,
+  profile = CCO_SIGNATURE_PROFILES.contact,
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
   const withoutSignature = removeCcoSignature(body);
@@ -1188,16 +1200,22 @@ function createCapabilityExecutor({
       throw makeCapabilityError('CAPABILITY_CHANNEL_DENIED', 'CCO send tillater endast admin-channel.');
     }
 
-    const sourceMailboxId = normalizeText(normalizedInput.mailboxId || normalizedInput.mailbox_id);
+    const signatureProfile = resolveCcoSignatureProfile(
+      normalizedInput.signatureProfile || normalizedInput.signature_profile
+    );
+    const sourceMailboxId = normalizeText(
+      normalizedInput.sourceMailboxId ||
+        normalizedInput.source_mailbox_id ||
+        normalizedInput.mailboxId ||
+        normalizedInput.mailbox_id
+    );
     const senderMailboxId = normalizeText(
       normalizedInput.senderMailboxId ||
         normalizedInput.sender_mailbox_id ||
+        signatureProfile?.senderMailboxId ||
         process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
         CCO_DEFAULT_SENDER_MAILBOX ||
         sourceMailboxId
-    );
-    const signatureProfile = resolveCcoSignatureProfile(
-      normalizedInput.signatureProfile || normalizedInput.signature_profile
     );
     const replyToMessageId = normalizeText(
       normalizedInput.replyToMessageId || normalizedInput.reply_to_message_id
@@ -1218,6 +1236,15 @@ function createCapabilityExecutor({
       senderMailboxId,
     });
     const to = toStringArray(normalizedInput.to, 20);
+    const requestedMode = normalizeText(
+      normalizedInput.mode || normalizedInput.sendMode || normalizedInput.send_mode
+    ).toLowerCase();
+    const isComposeMode =
+      requestedMode === 'compose' || (!replyToMessageId && !conversationId);
+    const capabilityName = isComposeMode ? 'CCO.SendCompose' : 'CCO.SendReply';
+    const sendIntent = isComposeMode ? 'cco.send.compose' : 'cco.send.reply';
+    const requiresExplicitRecipients =
+      isComposeMode || sourceMailboxId.toLowerCase() !== senderMailboxId.toLowerCase();
 
     if (!sourceMailboxId) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'mailboxId kravs.');
@@ -1225,10 +1252,10 @@ function createCapabilityExecutor({
     if (!senderMailboxId) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'senderMailboxId kravs.');
     }
-    if (!replyToMessageId) {
+    if (!isComposeMode && !replyToMessageId) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'replyToMessageId kravs.');
     }
-    if (!conversationId) {
+    if (!isComposeMode && !conversationId) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'conversationId kravs.');
     }
     if (!subject) {
@@ -1237,7 +1264,7 @@ function createCapabilityExecutor({
     if (!body) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'body kravs.');
     }
-    if (!to.length) {
+    if (requiresExplicitRecipients && !to.length) {
       throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'to[] kravs.');
     }
     if (!normalizedIdempotencyKey) {
@@ -1253,7 +1280,12 @@ function createCapabilityExecutor({
         'CCO send ar avstangt (ARCANA_GRAPH_SEND_ENABLED=false).'
       );
     }
-    if (!graphSendConnector || typeof graphSendConnector.sendReply !== 'function') {
+    if (
+      !graphSendConnector ||
+      (isComposeMode
+        ? typeof graphSendConnector.sendNewMessage !== 'function'
+        : typeof graphSendConnector.sendReply !== 'function')
+    ) {
       throw makeCapabilityError(
         'CCO_SEND_CONNECTOR_UNAVAILABLE',
         'Microsoft Graph send connector saknas.'
@@ -1288,6 +1320,7 @@ function createCapabilityExecutor({
         sourceMailboxId,
         senderMailboxId,
         signatureProfile: signatureProfile.key,
+        mode: isComposeMode ? 'compose' : 'reply',
         conversationId,
         replyToMessageId,
         to,
@@ -1299,12 +1332,12 @@ function createCapabilityExecutor({
     let gatewayResult;
     try {
       gatewayResult = await runCapabilityThroughGateway({
-        capabilityName: 'CCO.SendReply',
+        capabilityName,
         context: {
           tenant_id: normalizedTenantId,
           actor: normalizedActor,
           channel: normalizedChannel,
-          intent: 'cco.send.reply',
+          intent: sendIntent,
           payload: {
             ccoSendRunId,
             sourceMailboxId,
@@ -1315,6 +1348,7 @@ function createCapabilityExecutor({
             subject,
             body: bodyWithSignature,
             signatureProfile: signatureProfile.key,
+            mode: isComposeMode ? 'compose' : 'reply',
           },
           correlation_id: normalizedCorrelationId,
           idempotency_key: normalizedIdempotencyKey,
@@ -1331,7 +1365,7 @@ function createCapabilityExecutor({
               metadata: {
                 ...(event.metadata || {}),
                 ccoSendRunId,
-                capabilityName: 'CCO.SendReply',
+                capabilityName,
               },
             });
           },
@@ -1351,6 +1385,7 @@ function createCapabilityExecutor({
               body: bodyWithSignature,
               bodyHtml: bodyWithSignatureHtml,
               signatureProfile: signatureProfile.key,
+              mode: isComposeMode ? 'compose' : 'reply',
               confidenceLevel: 'High',
             },
           }),
@@ -1383,15 +1418,24 @@ function createCapabilityExecutor({
               throw decisionError;
             }
 
-            const sendResult = await graphSendConnector.sendReply({
-              mailboxId: senderMailboxId,
-              sourceMailboxId,
-              replyToMessageId,
-              body: String(agentResult?.output?.body || ''),
-              bodyHtml: String(agentResult?.output?.bodyHtml || ''),
-              subject: String(agentResult?.output?.subject || ''),
-              to,
-            });
+            const sendResult = isComposeMode
+              ? await graphSendConnector.sendNewMessage({
+                  mailboxId: senderMailboxId,
+                  sourceMailboxId,
+                  body: String(agentResult?.output?.body || ''),
+                  bodyHtml: String(agentResult?.output?.bodyHtml || ''),
+                  subject: String(agentResult?.output?.subject || ''),
+                  to,
+                })
+              : await graphSendConnector.sendReply({
+                  mailboxId: senderMailboxId,
+                  sourceMailboxId,
+                  replyToMessageId,
+                  body: String(agentResult?.output?.body || ''),
+                  bodyHtml: String(agentResult?.output?.bodyHtml || ''),
+                  subject: String(agentResult?.output?.subject || ''),
+                  to,
+                });
 
             if (!capabilityAnalysisStore || typeof capabilityAnalysisStore.append !== 'function') {
               const storeError = makeCapabilityError(
@@ -1405,7 +1449,7 @@ function createCapabilityExecutor({
             const analysisEntry = await capabilityAnalysisStore.append({
               tenantId: normalizedTenantId,
               capability: {
-                name: 'CCO.SendReply',
+                name: capabilityName,
                 version: '1.0.0',
                 persistStrategy: 'analysis',
               },
@@ -1450,6 +1494,7 @@ function createCapabilityExecutor({
                 requestMetadata: safeObject(requestMetadata),
                 sendMode: 'manual',
                 signatureProfile: signatureProfile.key,
+                composeMode: isComposeMode,
               },
             });
 
@@ -1463,7 +1508,9 @@ function createCapabilityExecutor({
           },
           safeResponse: ({ decision }) => ({
             error:
-              'Svar blockerades av risk/policy och skickades inte. Justera texten och forsok igen.',
+              isComposeMode
+                ? 'Mejlet blockerades av risk/policy och skickades inte. Justera texten och forsok igen.'
+                : 'Svar blockerades av risk/policy och skickades inte. Justera texten och forsok igen.',
             decision,
             ccoSendRunId,
           }),
@@ -1477,7 +1524,13 @@ function createCapabilityExecutor({
               conversationId,
               decision,
               mode: 'manual',
+              composeMode: isComposeMode,
               signatureProfile: signatureProfile.key,
+            },
+            preview: {
+              subject,
+              body: bodyWithSignature,
+              bodyHtml: bodyWithSignatureHtml,
             },
             decision,
             riskSummary: {
@@ -1506,6 +1559,7 @@ function createCapabilityExecutor({
           sourceMailboxId,
           senderMailboxId,
           signatureProfile: signatureProfile.key,
+          mode: isComposeMode ? 'compose' : 'reply',
           conversationId,
           replyToMessageId,
           correlationId: normalizedCorrelationId,
@@ -1531,6 +1585,7 @@ function createCapabilityExecutor({
         sourceMailboxId,
         senderMailboxId,
         signatureProfile: signatureProfile.key,
+        mode: isComposeMode ? 'compose' : 'reply',
         conversationId,
         replyToMessageId,
         correlationId: normalizedCorrelationId,
@@ -1556,4 +1611,7 @@ function createCapabilityExecutor({
 
 module.exports = {
   createCapabilityExecutor,
+  buildCcoSignatureHtml,
+  applyCcoSignatureHtml,
+  resolveCcoSignatureProfile,
 };

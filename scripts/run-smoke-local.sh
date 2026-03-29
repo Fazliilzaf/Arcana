@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-PORT="${PORT:-3000}"
+PORT="${PORT:-3100}"
 SERVER_PID=""
 DEFAULT_SMOKE_OWNER_EMAIL="fazli@hairtpclinic.com"
 DEFAULT_SMOKE_OWNER_PASSWORD="ArcanaPilot!2026"
@@ -38,6 +38,7 @@ if [[ -n "${EXISTING_PID}" ]]; then
 fi
 
 echo "▶️ Startar Arcana lokalt..."
+PORT="$PORT" \
 ARCANA_OWNER_EMAIL="$SMOKE_OWNER_EMAIL" \
 ARCANA_OWNER_PASSWORD="$SMOKE_OWNER_PASSWORD" \
 ARCANA_DEFAULT_TENANT="$SMOKE_TENANT_ID" \

@@ -75,3 +75,68 @@ test('riskStackEngine: low combined signal resolves to neutral', () => {
   assert.equal(result.dominantRisk, 'neutral');
   assert.equal(result.weightedScore < 0.2, true);
 });
+
+test('riskStackEngine: history-driven reschedule signal strengthens follow-up action', () => {
+  const result = evaluateRiskStack({
+    slaStatus: 'safe',
+    tone: 'neutral',
+    followUpSuggested: true,
+    lifecycleState: 'FOLLOW_UP_PENDING',
+    hoursSinceInbound: 30,
+    relationshipStatus: 'new',
+    historySignals: {
+      pattern: 'reschedule',
+      summary: 'Historik visar återkommande ombokning över flera mailboxar.',
+      actionCue: 'Skicka två konkreta tider direkt och be kunden välja i samma svar.',
+      mailboxCount: 2,
+      recentMessageCount: 4,
+    },
+  });
+
+  assert.equal(result.dominantRisk, 'follow_up');
+  assert.equal(result.explanation.includes('Historik visar återkommande ombokning'), true);
+  assert.equal(result.recommendedAction.includes('två konkreta tider'), true);
+});
+
+test('riskStackEngine: outcome cue overrides generic follow-up action when previous no-response exists', () => {
+  const result = evaluateRiskStack({
+    slaStatus: 'safe',
+    tone: 'neutral',
+    followUpSuggested: true,
+    lifecycleState: 'FOLLOW_UP_PENDING',
+    hoursSinceInbound: 30,
+    relationshipStatus: 'new',
+    historySignals: {
+      pattern: 'none',
+      outcomeCode: 'no_response',
+      outcomeSummary: 'Tidigare utfall: tidigare liknande tråd tappade fart utan svar.',
+      outcomeActionCue: 'Gör CTA binär och tidsatt.',
+    },
+  });
+
+  assert.equal(result.dominantRisk, 'follow_up');
+  assert.equal(result.explanation.includes('tappade fart utan svar'), true);
+  assert.equal(result.recommendedAction.includes('CTA binär och tidsatt'), true);
+});
+
+test('riskStackEngine: calibration cue steers action when repeated negative follow-up pattern exists', () => {
+  const result = evaluateRiskStack({
+    slaStatus: 'safe',
+    tone: 'neutral',
+    followUpSuggested: true,
+    lifecycleState: 'FOLLOW_UP_PENDING',
+    hoursSinceInbound: 30,
+    relationshipStatus: 'new',
+    historySignals: {
+      pattern: 'none',
+      calibrationSummary: 'Utfallshistorik: varm ton gav bäst resultat, men uteblivet svar återkommer i liknande trådar.',
+      calibrationActionCue: 'Behåll varm ton men stäng nästa steg tydligt.',
+      negativeOutcomeCount: 2,
+      dominantFailureOutcome: 'no_response',
+    },
+  });
+
+  assert.equal(result.dominantRisk, 'follow_up');
+  assert.equal(result.explanation.includes('Utfallshistorik'), true);
+  assert.equal(result.recommendedAction.includes('varm ton'), true);
+});

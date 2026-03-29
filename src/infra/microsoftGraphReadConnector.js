@@ -5,6 +5,18 @@ function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function sanitizeStoredBodyHtml(value = '') {
+  const html = normalizeText(value);
+  if (!html) return '';
+  return html
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*\/?\s*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/\s(src|href)\s*=\s*(['"])\s*(javascript:|data:text\/html)[\s\S]*?\2/gi, ' $1="#"')
+    .slice(0, 24000);
+}
+
 function toNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -463,6 +475,10 @@ function toNormalizedMessage(
   const conversationId = toScopedConversationId(rawConversationId, mailboxKey) || rawConversationId;
   const subject = maskInboxText(raw.subject, 180) || '(utan amne)';
   const bodyPreview = maskInboxText(raw.bodyPreview, 360);
+  const bodyHtml =
+    normalizedDirection === 'outbound'
+      ? sanitizeStoredBodyHtml(raw?.body?.content)
+      : '';
   const sentAt =
     toIso(
       normalizedDirection === 'outbound'
@@ -499,6 +515,7 @@ function toNormalizedMessage(
     subject,
     normalizedSubject,
     bodyPreview,
+    bodyHtml: bodyHtml || null,
     sentAt,
     direction: normalizedDirection,
     senderEmail: senderEmail || null,
@@ -524,12 +541,29 @@ function toConversationSnapshots(messages = []) {
   const emailAlias = new Map();
   let syntheticCounter = 0;
 
+  const toActivityBucket = (value = '') => {
+    const iso = normalizeText(value);
+    if (!iso) return 'unknown-window';
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return 'unknown-window';
+    const bucketSizeMs = 48 * 60 * 60 * 1000;
+    const bucket = Math.floor(date.getTime() / bucketSizeMs);
+    return `h48-${bucket}`;
+  };
+
+  const isWithinCorrelationWindow = (left = '', right = '', maxHours = 96) => {
+    const leftDate = new Date(normalizeText(left));
+    const rightDate = new Date(normalizeText(right));
+    if (Number.isNaN(leftDate.getTime()) || Number.isNaN(rightDate.getTime())) return true;
+    return Math.abs(leftDate.getTime() - rightDate.getTime()) <= maxHours * 60 * 60 * 1000;
+  };
+
   const resolveFallbackKey = (message = {}) => {
     const subject = normalizeText(message.normalizedSubject);
     const counterpartyEmail = normalizeText(message.counterpartyEmail).toLowerCase();
-    const activityMonth = normalizeText(message.sentAt).slice(0, 7);
+    const activityBucket = toActivityBucket(message.sentAt);
     if (!subject || !counterpartyEmail) return '';
-    return `${counterpartyEmail}|${subject}|${activityMonth || 'unknown-month'}`;
+    return `${counterpartyEmail}|${subject}|${activityBucket}`;
   };
 
   const sortedMessages = asArray(messages)
@@ -568,13 +602,17 @@ function toConversationSnapshots(messages = []) {
         const candidateClusterId = emailAlias.get(alias);
         if (!candidateClusterId || !map.has(candidateClusterId)) return false;
         const candidate = map.get(candidateClusterId);
-        return isSubjectFuzzyMatch(candidate?.subject, message.subject);
+        return (
+          isSubjectFuzzyMatch(candidate?.subject, message.subject) &&
+          isWithinCorrelationWindow(candidate?.latestActivityAt, message.sentAt)
+        );
       });
       if (!matchedAlias) {
         for (const [knownAlias, candidateClusterId] of emailAlias.entries()) {
           if (!candidateClusterId || !map.has(candidateClusterId)) continue;
           const candidate = map.get(candidateClusterId);
           if (!isSubjectFuzzyMatch(candidate?.subject, message.subject)) continue;
+          if (!isWithinCorrelationWindow(candidate?.latestActivityAt, message.sentAt)) continue;
           const fuzzyHit = aliasCandidates.some((alias) =>
             isEmailAliasFuzzyMatch(alias, knownAlias)
           );
@@ -602,6 +640,7 @@ function toConversationSnapshots(messages = []) {
         status: 'open',
         lastInboundAt: message.sentAt || null,
         lastOutboundAt: null,
+        latestActivityAt: message.sentAt || null,
         messages: [],
         riskWords: [],
         mailboxId: normalizeText(message.mailboxId) || null,
@@ -630,6 +669,7 @@ function toConversationSnapshots(messages = []) {
       direction: messageDirection,
       sentAt: message.sentAt,
       bodyPreview: message.bodyPreview,
+      bodyHtml: normalizeText(message.bodyHtml) || null,
       mailboxId: normalizeText(message.mailboxId) || null,
       mailboxAddress: normalizeText(message.mailboxAddress) || null,
       userPrincipalName: normalizeText(message.userPrincipalName) || null,
@@ -660,6 +700,13 @@ function toConversationSnapshots(messages = []) {
       }
     }
     if (
+      normalizeText(message.sentAt) &&
+      (!normalizeText(entry.latestActivityAt) ||
+        compareIsoDesc(entry.latestActivityAt, message.sentAt) > 0)
+    ) {
+      entry.latestActivityAt = message.sentAt;
+    }
+    if (
       normalizeText(entry.subject) === '(utan amne)' &&
       normalizeText(message.subject) &&
       normalizeText(message.subject) !== '(utan amne)'
@@ -685,6 +732,7 @@ function toConversationSnapshots(messages = []) {
     delete conversation.primaryConversationId;
     delete conversation.conversationIds;
     delete conversation.customerEmails;
+    delete conversation.latestActivityAt;
     conversation.messages.sort((a, b) => compareIsoDesc(a.sentAt, b.sentAt));
   }
   conversations.sort((a, b) => {
@@ -747,6 +795,7 @@ function toInboxMessagesUrl({
   userId,
   maxMessages,
   receivedSinceIso,
+  receivedUntilIso,
   includeReadMessages,
 }) {
   const messagesUrl = new URL(
@@ -760,6 +809,7 @@ function toInboxMessagesUrl({
       'conversationId',
       'subject',
       'bodyPreview',
+      'body',
       'receivedDateTime',
       'sentDateTime',
       'isRead',
@@ -772,12 +822,20 @@ function toInboxMessagesUrl({
   );
   messagesUrl.searchParams.set('$orderby', 'receivedDateTime desc');
   const filterParts = [`receivedDateTime ge ${receivedSinceIso}`];
+  const safeReceivedUntilIso = normalizeText(receivedUntilIso);
+  if (safeReceivedUntilIso) filterParts.push(`receivedDateTime lt ${safeReceivedUntilIso}`);
   if (!includeReadMessages) filterParts.push('isRead eq false');
   messagesUrl.searchParams.set('$filter', filterParts.join(' and '));
   return messagesUrl;
 }
 
-function toSentMessagesUrl({ graphBaseUrl, userId, maxMessages, sentSinceIso }) {
+function toSentMessagesUrl({
+  graphBaseUrl,
+  userId,
+  maxMessages,
+  sentSinceIso,
+  sentUntilIso,
+}) {
   const messagesUrl = new URL(
     `${graphBaseUrl}/users/${encodeURIComponent(userId)}/mailFolders/SentItems/messages`
   );
@@ -789,6 +847,7 @@ function toSentMessagesUrl({ graphBaseUrl, userId, maxMessages, sentSinceIso }) 
       'conversationId',
       'subject',
       'bodyPreview',
+      'body',
       'receivedDateTime',
       'sentDateTime',
       'from',
@@ -799,7 +858,10 @@ function toSentMessagesUrl({ graphBaseUrl, userId, maxMessages, sentSinceIso }) 
     ].join(',')
   );
   messagesUrl.searchParams.set('$orderby', 'sentDateTime desc');
-  messagesUrl.searchParams.set('$filter', `sentDateTime ge ${sentSinceIso}`);
+  const filterParts = [`sentDateTime ge ${sentSinceIso}`];
+  const safeSentUntilIso = normalizeText(sentUntilIso);
+  if (safeSentUntilIso) filterParts.push(`sentDateTime lt ${safeSentUntilIso}`);
+  messagesUrl.searchParams.set('$filter', filterParts.join(' and '));
   return messagesUrl;
 }
 
@@ -992,8 +1054,24 @@ function createMicrosoftGraphReadConnector(config = {}) {
     const defaultInboxMaxMessages = Math.max(1, maxMessages - splitDefault);
     const defaultSentMaxMessages = splitDefault;
     const includeReadMessages = options.includeRead === true;
-    const receivedSinceIso = toIsoFromMs(nowMs - windowDays * 24 * 60 * 60 * 1000);
+    const explicitSinceIso = toIso(options.sinceIso);
+    const explicitUntilIso = toIso(options.untilIso);
+    if (explicitSinceIso && explicitUntilIso && Date.parse(explicitUntilIso) <= Date.parse(explicitSinceIso)) {
+      throw new Error('MicrosoftGraphReadConnector untilIso must be later than sinceIso.');
+    }
+    const fallbackSinceIso = toIsoFromMs(nowMs - windowDays * 24 * 60 * 60 * 1000);
+    const receivedSinceIso = explicitSinceIso || fallbackSinceIso;
+    const receivedUntilIso = explicitUntilIso || '';
     const sentSinceIso = receivedSinceIso;
+    const sentUntilIso = receivedUntilIso;
+    const windowReferenceEndMs = explicitUntilIso ? Date.parse(explicitUntilIso) : nowMs;
+    const effectiveWindowDays =
+      explicitSinceIso && Number.isFinite(windowReferenceEndMs)
+        ? Math.max(
+            1,
+            Math.ceil((windowReferenceEndMs - Date.parse(explicitSinceIso)) / (24 * 60 * 60 * 1000))
+          )
+        : windowDays;
 
     const fullTenant = toBoolean(options.fullTenant, configuredFullTenant);
     const userScope = normalizeUserScope(options.userScope, configuredUserScope);
@@ -1057,6 +1135,7 @@ function createMicrosoftGraphReadConnector(config = {}) {
           userId: userId,
           maxMessages: maxInboxMessages,
           receivedSinceIso,
+          receivedUntilIso,
           includeReadMessages,
         }).toString(),
         accessToken,
@@ -1074,6 +1153,7 @@ function createMicrosoftGraphReadConnector(config = {}) {
           userId: userId,
           maxMessages: maxSentMessages,
           sentSinceIso,
+          sentUntilIso,
         }).toString(),
         accessToken,
         label: 'Microsoft Graph sent-items request',
@@ -1199,6 +1279,7 @@ function createMicrosoftGraphReadConnector(config = {}) {
               userId: user.id,
               maxMessages: maxInboxMessagesPerUser,
               receivedSinceIso,
+              receivedUntilIso,
               includeReadMessages,
             }).toString(),
             accessToken,
@@ -1216,6 +1297,7 @@ function createMicrosoftGraphReadConnector(config = {}) {
               userId: user.id,
               maxMessages: maxSentMessagesPerUser,
               sentSinceIso,
+              sentUntilIso,
             }).toString(),
             accessToken,
             label: `Microsoft Graph sent-items request (${user.mailboxId || user.id})`,
@@ -1321,7 +1403,9 @@ function createMicrosoftGraphReadConnector(config = {}) {
       conversations,
       metadata: {
         connector: 'MicrosoftGraphReadConnector',
-        windowDays,
+        windowDays: effectiveWindowDays,
+        windowStartIso: receivedSinceIso,
+        windowEndIso: receivedUntilIso || null,
         maxMessages,
         maxInboxMessages,
         maxSentMessages,

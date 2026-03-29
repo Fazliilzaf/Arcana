@@ -289,6 +289,9 @@ function createExecutionGateway({
     let decision = 'blocked';
     let errorStage = null;
     let errorMessage = '';
+    let errorCode = null;
+    let errorStatus = null;
+    let retryAfterSeconds = null;
     const stageAttempts = {
       inputRisk: 1,
       agentRun: 1,
@@ -436,6 +439,15 @@ function createExecutionGateway({
           }
           errorStage = 'persist';
           errorMessage = normalizeText(persistWithRetries.error?.message || 'persist_failed');
+          errorCode = normalizeText(persistWithRetries.error?.code) || null;
+          errorStatus = Number.isFinite(Number(persistWithRetries.error?.status))
+            ? Number(persistWithRetries.error.status)
+            : null;
+          retryAfterSeconds =
+            Number.isFinite(Number(persistWithRetries.error?.retryAfterSeconds)) &&
+            Number(persistWithRetries.error.retryAfterSeconds) >= 0
+              ? Number(persistWithRetries.error.retryAfterSeconds)
+              : null;
           decision = 'blocked';
           persisted = null;
           await pushDeadLetter({
@@ -457,6 +469,9 @@ function createExecutionGateway({
           decision,
           errorStage,
           errorMessage: errorMessage || null,
+          errorCode,
+          errorStatus,
+          retryAfterSeconds,
           inputDecision: inputRisk?.decision || null,
           outputDecision: outputRisk?.decision || null,
           policyDecision: policy?.decision || null,
@@ -503,6 +518,10 @@ function createExecutionGateway({
               policy,
               agentResult,
               errorStage,
+              errorMessage,
+              errorCode,
+              errorStatus,
+              retryAfterSeconds,
             })
           : null;
 
@@ -515,6 +534,11 @@ function createExecutionGateway({
         audit_refs: {
           correlation_id: ingressContext.correlation_id,
         },
+        error_stage: errorStage,
+        error_message: errorMessage || null,
+        error_code: errorCode,
+        error_status: errorStatus,
+        retry_after_seconds: retryAfterSeconds,
         safe_response: safeResponse,
         response_payload:
           typeof handlers.response === 'function'
@@ -602,6 +626,7 @@ function createExecutionGateway({
           runId,
           decision: 'blocked',
           errorStage: errorStage || 'ingress',
+          errorMessage: hardFailMessage,
         }),
         response_payload: null,
         started_at: startedAt,

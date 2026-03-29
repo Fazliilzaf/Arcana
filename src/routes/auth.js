@@ -58,6 +58,15 @@ function normalizeHost(value) {
   return host.trim();
 }
 
+function normalizeClientName(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
 function safeEqualText(a, b) {
   return String(a || '') === String(b || '');
 }
@@ -69,6 +78,7 @@ function createAuthRouter({
   requireTenantScope,
   loginRateLimiter = null,
   selectTenantRateLimiter = null,
+  ownerMfaRequired = true,
   ownerMfaBypassHosts = [],
   loginSessionRotationScope = 'none',
   bootstrapOwnerEmail = '',
@@ -103,6 +113,24 @@ function createAuthRouter({
     const requestHost = normalizeHost(req?.hostname);
     const candidates = headerHosts.length > 0 ? headerHosts : requestHost ? [requestHost] : [];
     return candidates.some((item) => ownerMfaBypassHostSet.has(item));
+  }
+
+  function isMajorArcanaAdminClient(req) {
+    const headerClient =
+      (typeof req.get === 'function' && req.get('x-arcana-client')) || '';
+    const bodyClient =
+      req?.body?.client || req?.body?.app || req?.body?.source || '';
+    const candidates = [headerClient, bodyClient]
+      .map((item) => normalizeClientName(item))
+      .filter(Boolean);
+    return candidates.includes('major_arcana_admin');
+  }
+
+  function hasAdminMembership(memberships = []) {
+    return (Array.isArray(memberships) ? memberships : []).some((membership) => {
+      const role = String(membership?.role || '').toUpperCase();
+      return role === ROLE_OWNER || role === ROLE_STAFF;
+    });
   }
 
   async function rotateSessionsAfterLogin({ userId, tenantId, currentSessionId }) {
@@ -263,10 +291,14 @@ function createAuthRouter({
       const hasOwnerMembership = memberships.some(
         (membership) => String(membership?.role || '').toUpperCase() === ROLE_OWNER
       );
+      const hasAdminRoleMembership = hasAdminMembership(memberships);
       const ownerMfaBypassed = isOwnerMfaBypassed(req);
-      const requiresMfa = ownerMfaBypassed
+      const ownerAdminClientBypassed = hasAdminRoleMembership && isMajorArcanaAdminClient(req);
+      const requiresMfa = ownerMfaBypassed || ownerAdminClientBypassed
         ? false
-        : hasOwnerMembership || Boolean(user?.mfaRequired);
+        : hasOwnerMembership
+          ? ownerMfaRequired === true
+          : Boolean(user?.mfaRequired);
 
       if (requiresMfa) {
         const pendingMfa =
@@ -293,6 +325,7 @@ function createAuthRouter({
             setupRequired: Boolean(pendingMfa.setupRequired),
             tenantCount: memberships.length,
             ownerMfaBypassed,
+            ownerAdminClientBypassed,
           },
         });
 
@@ -352,6 +385,7 @@ function createAuthRouter({
           rotatedSessions,
           rotationScope,
           ownerMfaBypassed,
+          ownerAdminClientBypassed,
           ownerCredentialSelfHealed,
         },
       });

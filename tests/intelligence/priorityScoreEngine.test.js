@@ -66,3 +66,51 @@ test('PriorityScore engine handles missing or unknown factors with fail-safe beh
   assert.equal(result.priorityReasons.includes('INTENT_UNCLEAR:+5'), true);
   assert.equal(mapPriorityLevel(result.priorityScore), 'Low');
 });
+
+test('PriorityScore engine adds explainable history weights for repeat multi-mailbox contact', () => {
+  const result = computePriorityScore({
+    hoursSinceInbound: 26,
+    intent: 'booking_request',
+    tone: 'neutral',
+    historySignals: {
+      pattern: 'reschedule',
+      mailboxCount: 2,
+      recentMessageCount: 5,
+    },
+  });
+
+  assert.equal(result.priorityScore, 54);
+  assert.equal(result.priorityReasons.includes('HISTORY_PATTERN_RESCHEDULE:+8'), true);
+  assert.equal(result.priorityReasons.includes('HISTORY_MULTI_MAILBOX:+6'), true);
+  assert.equal(result.priorityReasons.includes('HISTORY_RECENT_ACTIVITY:+5'), true);
+});
+
+test('PriorityScore engine adds explainable outcome weights for no-response history', () => {
+  const result = computePriorityScore({
+    hoursSinceInbound: 26,
+    intent: 'follow_up',
+    tone: 'neutral',
+    historySignals: {
+      outcomeCode: 'no_response',
+    },
+  });
+
+  assert.equal(result.priorityReasons.includes('HISTORY_OUTCOME_NO_RESPONSE:+6'), true);
+});
+
+test('PriorityScore engine adds calibration weights for repeated negative outcomes', () => {
+  const result = computePriorityScore({
+    hoursSinceInbound: 26,
+    intent: 'follow_up',
+    tone: 'neutral',
+    historySignals: {
+      negativeOutcomeCount: 3,
+      dominantFailureOutcome: 'no_response',
+      dominantFailureRisk: 'relationship',
+    },
+  });
+
+  assert.equal(result.priorityReasons.includes('HISTORY_CALIBRATION_REPEAT_NEGATIVE:+4'), true);
+  assert.equal(result.priorityReasons.includes('HISTORY_CALIBRATION_NO_RESPONSE:+4'), true);
+  assert.equal(result.priorityReasons.includes('HISTORY_CALIBRATION_RELATIONSHIP:+4'), true);
+});

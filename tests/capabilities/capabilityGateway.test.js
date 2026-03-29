@@ -10,6 +10,7 @@ const { createExecutionGateway } = require('../../src/gateway/executionGateway')
 const { createAuthStore } = require('../../src/security/authStore');
 const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
 const { AnalyzeInboxCapability } = require('../../src/capabilities/analyzeInbox');
+const { createCcoHistoryStore } = require('../../src/ops/ccoHistoryStore');
 
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
@@ -513,6 +514,149 @@ test('AnalyzeInbox hydrates Graph snapshot and writes mailbox read start/complet
     limit: 20,
   });
   assert.equal(entries.length, 1);
+});
+
+test('AnalyzeInbox hydration can enrich Graph snapshot with persistent customer history signals', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-inbox-history-signal-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+  const historyStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  await historyStore.upsertMailboxWindow({
+    tenantId: 'tenant-a',
+    mailboxId: 'kons@hairtpclinic.com',
+    windowStartIso: '2026-01-01T00:00:00.000Z',
+    windowEndIso: '2026-03-01T00:00:00.000Z',
+    messages: [
+      {
+        messageId: 'history-1',
+        conversationId: 'legacy-1',
+        customerEmail: 'kund@example.com',
+        subject: 'Omboka min tid',
+        sentAt: '2026-02-10T10:00:00.000Z',
+        direction: 'inbound',
+        bodyPreview: 'Jag vill omboka min tid.',
+        senderEmail: 'kund@example.com',
+      },
+      {
+        messageId: 'history-2',
+        conversationId: 'legacy-2',
+        customerEmail: 'kund@example.com',
+        subject: 'Ny tid tack',
+        sentAt: '2026-02-20T10:00:00.000Z',
+        direction: 'outbound',
+        bodyPreview: 'Här kommer två nya tider.',
+        senderEmail: 'kons@hairtpclinic.com',
+      },
+    ],
+  });
+  await historyStore.upsertMailboxWindow({
+    tenantId: 'tenant-a',
+    mailboxId: 'info@hairtpclinic.com',
+    windowStartIso: '2026-01-01T00:00:00.000Z',
+    windowEndIso: '2026-03-01T00:00:00.000Z',
+    messages: [
+      {
+        messageId: 'history-3',
+        conversationId: 'legacy-3',
+        customerEmail: 'kund@example.com',
+        subject: 'Boka om igen',
+        sentAt: '2026-02-25T10:00:00.000Z',
+        direction: 'inbound',
+        bodyPreview: 'Jag behöver boka om igen.',
+        senderEmail: 'kund@example.com',
+      },
+    ],
+  });
+
+  const graphReadConnector = {
+    async fetchInboxSnapshot() {
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-01T12:00:00.000Z',
+          sourceGeneratedAt: '2026-03-01T11:59:58.000Z',
+        },
+        conversations: [
+          {
+            conversationId: 'graph-history-conv-1',
+            subject: 'Behöver boka om min tid',
+            status: 'open',
+            messages: [
+              {
+                messageId: 'graph-history-msg-1',
+                direction: 'inbound',
+                sentAt: '2026-03-01T10:00:00.000Z',
+                senderEmail: 'kund@example.com',
+                bodyPreview: 'Hej, jag behöver boka om min tid och vill ha två alternativ.',
+              },
+            ],
+          },
+        ],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+      ccoHistoryStore: historyStore,
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-correlation-id': 'corr-capability-inbox-history-signal',
+      },
+      body: JSON.stringify({
+        channel: 'admin',
+        input: {
+          maxDrafts: 2,
+        },
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    const row = payload.output?.data?.conversationWorklist?.[0];
+    assert.equal(Boolean(row), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_PATTERN_RESCHEDULE:+8'), true);
+    assert.equal(row.priorityReasons.includes('HISTORY_MULTI_MAILBOX:+6'), true);
+    assert.equal(row.customerSummary?.historySignalPattern, 'reschedule');
+    assert.equal(row.recommendedAction.includes('två konkreta tider'), true);
+  });
 });
 
 test('AnalyzeInbox writes mailbox.read.error and returns 500 when Graph snapshot ingest fails', async () => {
@@ -1245,6 +1389,231 @@ test('AnalyzeInbox uses locked default Graph read allowlist when ARCANA_MAILBOX_
   }
 });
 
+test('AnalyzeInbox honors explicit single-mailbox allowlist without expanding to locked defaults', async () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+    ARCANA_GRAPH_FULL_TENANT: process.env.ARCANA_GRAPH_FULL_TENANT,
+    ARCANA_GRAPH_USER_SCOPE: process.env.ARCANA_GRAPH_USER_SCOPE,
+    ARCANA_GRAPH_MAILBOX_IDS: process.env.ARCANA_GRAPH_MAILBOX_IDS,
+    ARCANA_MAILBOX_ALLOWLIST: process.env.ARCANA_MAILBOX_ALLOWLIST,
+    ARCANA_GRAPH_SEND_ALLOWLIST: process.env.ARCANA_GRAPH_SEND_ALLOWLIST,
+    ARCANA_GRAPH_MAX_USERS: process.env.ARCANA_GRAPH_MAX_USERS,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  process.env.ARCANA_GRAPH_FULL_TENANT = 'false';
+  process.env.ARCANA_GRAPH_USER_SCOPE = 'single';
+  delete process.env.ARCANA_GRAPH_MAILBOX_IDS;
+  process.env.ARCANA_MAILBOX_ALLOWLIST = 'kons@hairtpclinic.com';
+  process.env.ARCANA_GRAPH_SEND_ALLOWLIST = 'kons@hairtpclinic.com';
+  process.env.ARCANA_GRAPH_MAX_USERS = '4';
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-allowlist-explicit-single-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+
+  const graphCalls = [];
+  const graphReadConnector = {
+    async fetchInboxSnapshot(options = {}) {
+      graphCalls.push({ ...options });
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-02T10:00:00.000Z',
+        },
+        conversations: [],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+    })
+  );
+
+  try {
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-correlation-id': 'corr-allowlist-explicit-single-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          input: {
+            maxDrafts: 1,
+          },
+        }),
+      });
+      assert.equal(response.status, 200);
+    });
+
+    assert.equal(graphCalls.length, 1);
+    assert.equal(graphCalls[0].allowlistMode, true);
+    assert.equal(graphCalls[0].fullTenant, false);
+    assert.equal(graphCalls[0].userScope, 'single');
+    assert.equal(graphCalls[0].maxUsers, 4);
+    assert.deepEqual(graphCalls[0].allowlistMailboxIds, ['kons@hairtpclinic.com']);
+    assert.deepEqual(graphCalls[0].mailboxIds, ['kons@hairtpclinic.com']);
+    assert.deepEqual(graphCalls[0].mailboxIndexes, []);
+
+    const audits = await authStore.listAuditEvents({
+      tenantId: 'tenant-a',
+      limit: 200,
+    });
+    const readStartEvent = audits.find((event) => event.action === 'mailbox.read.start');
+    assert.equal(Boolean(readStartEvent), true);
+    assert.equal(readStartEvent.metadata.allowlistMode, true);
+    assert.deepEqual(readStartEvent.metadata.allowlistMailboxIds, ['kons@hairtpclinic.com']);
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
+
+test('AnalyzeInbox can narrow a multi-mailbox allowlist down to requested mailboxIds', async () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+    ARCANA_GRAPH_FULL_TENANT: process.env.ARCANA_GRAPH_FULL_TENANT,
+    ARCANA_GRAPH_USER_SCOPE: process.env.ARCANA_GRAPH_USER_SCOPE,
+    ARCANA_GRAPH_MAILBOX_IDS: process.env.ARCANA_GRAPH_MAILBOX_IDS,
+    ARCANA_MAILBOX_ALLOWLIST: process.env.ARCANA_MAILBOX_ALLOWLIST,
+    ARCANA_GRAPH_SEND_ALLOWLIST: process.env.ARCANA_GRAPH_SEND_ALLOWLIST,
+    ARCANA_GRAPH_MAX_USERS: process.env.ARCANA_GRAPH_MAX_USERS,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  process.env.ARCANA_GRAPH_FULL_TENANT = 'true';
+  process.env.ARCANA_GRAPH_USER_SCOPE = 'all';
+  delete process.env.ARCANA_GRAPH_MAILBOX_IDS;
+  process.env.ARCANA_MAILBOX_ALLOWLIST =
+    'kons@hairtpclinic.com,info@hairtpclinic.com,contact@hairtpclinic.com';
+  process.env.ARCANA_GRAPH_SEND_ALLOWLIST =
+    'kons@hairtpclinic.com,info@hairtpclinic.com,contact@hairtpclinic.com';
+  process.env.ARCANA_GRAPH_MAX_USERS = '8';
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-mailbox-focus-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+
+  const graphCalls = [];
+  const graphReadConnector = {
+    async fetchInboxSnapshot(options = {}) {
+      graphCalls.push({ ...options });
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-02T10:00:00.000Z',
+        },
+        conversations: [],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+    })
+  );
+
+  try {
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-correlation-id': 'corr-mailbox-focus-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          input: {
+            maxDrafts: 1,
+            mailboxIds: ['kons@hairtpclinic.com'],
+          },
+        }),
+      });
+      assert.equal(response.status, 200);
+    });
+
+    assert.equal(graphCalls.length, 1);
+    assert.equal(graphCalls[0].allowlistMode, true);
+    assert.equal(graphCalls[0].fullTenant, true);
+    assert.equal(graphCalls[0].userScope, 'all');
+    assert.deepEqual(graphCalls[0].allowlistMailboxIds, [
+      'kons@hairtpclinic.com',
+      'info@hairtpclinic.com',
+      'contact@hairtpclinic.com',
+    ]);
+    assert.deepEqual(graphCalls[0].mailboxIds, ['kons@hairtpclinic.com']);
+    assert.deepEqual(graphCalls[0].mailboxIndexes, []);
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+  }
+});
+
 test('AnalyzeInbox still uses locked default Graph read allowlist when send allowlist is wildcard-only', async () => {
   const previousEnv = {
     ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
@@ -1469,5 +1838,92 @@ test('AnalyzeInbox ignores ARCANA_GRAPH_MAILBOX_IDS outside locked allowlist', a
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     });
+  }
+});
+
+test('AnalyzeInbox honors top-level mailboxIds without input wrapper', async () => {
+  const previousEnv = {
+    ARCANA_GRAPH_READ_ENABLED: process.env.ARCANA_GRAPH_READ_ENABLED,
+  };
+
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-capability-top-level-mailbox-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+
+  const graphCalls = [];
+  const graphReadConnector = {
+    async fetchInboxSnapshot(options = {}) {
+      graphCalls.push({ ...options });
+      return {
+        snapshotVersion: 'graph.inbox.snapshot.v1',
+        timestamps: {
+          capturedAt: '2026-03-02T10:00:00.000Z',
+        },
+        conversations: [],
+      };
+    },
+  };
+
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {
+            riskSensitivityModifier: 0,
+            riskThresholdVersion: 1,
+          };
+        },
+      },
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      graphReadConnector,
+    })
+  );
+
+  try {
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/capabilities/AnalyzeInbox/run`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-correlation-id': 'corr-top-level-mailbox-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxIds: ['kons@hairtpclinic.com'],
+          maxDrafts: 1,
+        }),
+      });
+      assert.equal(response.status, 200);
+    });
+
+    assert.equal(graphCalls.length, 1);
+    assert.deepEqual(graphCalls[0].mailboxIds, ['kons@hairtpclinic.com']);
+  } finally {
+    Object.entries(previousEnv).forEach(([key, value]) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    });
+    await fs.rm(tempDir, { recursive: true, force: true });
   }
 });

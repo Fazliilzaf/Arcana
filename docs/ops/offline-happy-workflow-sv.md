@@ -18,7 +18,11 @@ Detta gör att Arcana:
 - fortfarande kan köras och testas lokalt
 
 Lokal adress:
-- `http://localhost:3000`
+- `http://localhost:3100`
+
+Viktigt:
+- offline-läget ligger medvetet inte längre på `3000`
+- `3000` är reserverad för live-/Comms-läget så att CCO Next inte råkar öppnas mot fel serverprocess
 
 ## B) Kör lokal hälsocheck före push
 

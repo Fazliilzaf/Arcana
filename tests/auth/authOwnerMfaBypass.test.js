@@ -8,6 +8,7 @@ const express = require('express');
 
 const { createAuthStore } = require('../../src/security/authStore');
 const { createAuthRouter } = require('../../src/routes/auth');
+const { ROLE_PATIENT } = require('../../src/security/roles');
 
 async function withServer(app, run) {
   const server = http.createServer(app);
@@ -109,6 +110,265 @@ test('owner login bypasses MFA on configured prelaunch hosts only', async () => 
     assert.equal(prodPayload.requiresMfa, true);
     assert.equal(typeof prodPayload.mfaTicket, 'string');
     assert.equal(prodPayload.mfaTicket.length > 0, true);
+  });
+});
+
+test('owner login skips MFA entirely when owner MFA is disabled in config', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-auth-owner-mfa-disabled-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+
+  await authStore.bootstrapOwner({
+    tenantId: 'tenant-a',
+    email: 'owner@example.com',
+    password: 'secret12345',
+    forcePasswordReset: true,
+    forceMfaReset: true,
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1',
+    createAuthRouter({
+      authStore,
+      requireAuth: (_req, _res, next) => next(),
+      requireRole: () => (_req, _res, next) => next(),
+      requireTenantScope: () => (_req, _res, next) => next(),
+      ownerMfaRequired: false,
+      ownerMfaBypassHosts: [],
+      loginSessionRotationScope: 'none',
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+      },
+      body: JSON.stringify({
+        email: 'owner@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(typeof payload.token, 'string');
+    assert.equal(payload.requiresMfa, undefined);
+  });
+});
+
+test('major arcana admin login skips MFA for OWNER even when owner MFA is enforced', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-auth-admin-owner-bypass-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+
+  await authStore.bootstrapOwner({
+    tenantId: 'tenant-a',
+    email: 'owner@example.com',
+    password: 'secret12345',
+    forcePasswordReset: true,
+    forceMfaReset: true,
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1',
+    createAuthRouter({
+      authStore,
+      requireAuth: (_req, _res, next) => next(),
+      requireRole: () => (_req, _res, next) => next(),
+      requireTenantScope: () => (_req, _res, next) => next(),
+      ownerMfaRequired: true,
+      ownerMfaBypassHosts: [],
+      loginSessionRotationScope: 'none',
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+      },
+      body: JSON.stringify({
+        client: 'major_arcana_admin',
+        email: 'owner@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(typeof payload.token, 'string');
+    assert.equal(payload.requiresMfa, undefined);
+  });
+});
+
+test('major arcana admin login skips MFA for STAFF but not PATIENT', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-auth-admin-staff-bypass-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+
+  await authStore.upsertStaffMember({
+    tenantId: 'tenant-a',
+    email: 'staff@example.com',
+    password: 'secret12345',
+  });
+
+  const patient = await authStore.createUser({
+    email: 'patient@example.com',
+    password: 'secret12345',
+    mfaRequired: true,
+  });
+  await authStore.ensureMembership({
+    userId: patient.id,
+    tenantId: 'tenant-a',
+    role: ROLE_PATIENT,
+    createdBy: null,
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1',
+    createAuthRouter({
+      authStore,
+      requireAuth: (_req, _res, next) => next(),
+      requireRole: () => (_req, _res, next) => next(),
+      requireTenantScope: () => (_req, _res, next) => next(),
+      ownerMfaRequired: true,
+      ownerMfaBypassHosts: [],
+      loginSessionRotationScope: 'none',
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const staffResponse = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+        'x-arcana-client': 'major_arcana_admin',
+      },
+      body: JSON.stringify({
+        client: 'major_arcana_admin',
+        email: 'staff@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(staffResponse.status, 200);
+    const staffPayload = await staffResponse.json();
+    assert.equal(typeof staffPayload.token, 'string');
+    assert.equal(staffPayload.requiresMfa, undefined);
+
+    const patientResponse = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+        'x-arcana-client': 'major_arcana_admin',
+      },
+      body: JSON.stringify({
+        client: 'major_arcana_admin',
+        email: 'patient@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(patientResponse.status, 200);
+    const patientPayload = await patientResponse.json();
+    assert.equal(patientPayload.requiresMfa, true);
+    assert.equal(typeof patientPayload.mfaTicket, 'string');
+    assert.equal(patientPayload.mfaTicket.length > 0, true);
+  });
+});
+
+test('major arcana admin client bypasses MFA for STAFF users', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-auth-admin-non-owner-mfa-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+
+  const user = await authStore.createUser({
+    email: 'staff@example.com',
+    password: 'secret12345',
+    mfaRequired: true,
+  });
+  await authStore.ensureMembership({
+    userId: user.id,
+    tenantId: 'tenant-a',
+    role: 'STAFF',
+  });
+
+  const app = express();
+  app.use(express.json());
+  app.use(
+    '/api/v1',
+    createAuthRouter({
+      authStore,
+      requireAuth: (_req, _res, next) => next(),
+      requireRole: () => (_req, _res, next) => next(),
+      requireTenantScope: () => (_req, _res, next) => next(),
+      ownerMfaRequired: true,
+      ownerMfaBypassHosts: [],
+      loginSessionRotationScope: 'none',
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-host': 'arcana.hairtpclinic.se',
+        'x-arcana-client': 'major_arcana_admin',
+      },
+      body: JSON.stringify({
+        client: 'major_arcana_admin',
+        email: 'staff@example.com',
+        password: 'secret12345',
+        tenantId: 'tenant-a',
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(typeof payload.token, 'string');
+    assert.equal(payload.requiresMfa, undefined);
   });
 });
 

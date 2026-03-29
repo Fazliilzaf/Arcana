@@ -93,11 +93,59 @@ function isHighRevenueBand(value = '') {
   return ['high', 'premium', 'vip', 'large', 'hög', 'hog'].includes(normalized);
 }
 
+function normalizeHistoryPattern(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['reschedule', 'complaint', 'booking', 'mixed'].includes(normalized)) {
+    return normalized;
+  }
+  return 'none';
+}
+
+function normalizeHistoryOutcomeCode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (
+    [
+      'booked',
+      'rebooked',
+      'replied',
+      'not_interested',
+      'escalated',
+      'no_response',
+      'closed_no_action',
+    ].includes(normalized)
+  ) {
+    return normalized;
+  }
+  return '';
+}
+
+function normalizeDraftMode(value = '') {
+  const normalized = normalizeText(value).toLowerCase();
+  if (['short', 'warm', 'professional'].includes(normalized)) return normalized;
+  return '';
+}
+
+function normalizeHistorySignals(raw = null) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    pattern: normalizeHistoryPattern(source.pattern),
+    mailboxCount: Math.max(0, toNumber(source.mailboxCount, 0)),
+    recentMessageCount: Math.max(0, toNumber(source.recentMessageCount, 0)),
+    outcomeCode: normalizeHistoryOutcomeCode(source.outcomeCode),
+    preferredMode: normalizeDraftMode(source.preferredMode),
+    positiveOutcomeCount: Math.max(0, toNumber(source.positiveOutcomeCount, 0)),
+    negativeOutcomeCount: Math.max(0, toNumber(source.negativeOutcomeCount, 0)),
+    dominantFailureOutcome: normalizeHistoryOutcomeCode(source.dominantFailureOutcome),
+    dominantFailureRisk: normalizeText(source.dominantFailureRisk).toLowerCase(),
+  };
+}
+
 function computePriorityScore({
   hoursSinceInbound = 0,
   intent = 'unclear',
   tone = 'neutral',
   customerContext = null,
+  historySignals = null,
 } = {}) {
   const reasons = [];
   let score = 0;
@@ -132,6 +180,54 @@ function computePriorityScore({
   if (isHighRevenueBand(context.estimatedRevenueBand)) {
     score += 10;
     reasons.push('CUSTOMER_REVENUE_HIGH:+10');
+  }
+
+  const history = normalizeHistorySignals(historySignals);
+  if (history.pattern === 'complaint') {
+    score += 12;
+    reasons.push('HISTORY_PATTERN_COMPLAINT:+12');
+  } else if (history.pattern === 'reschedule') {
+    score += 8;
+    reasons.push('HISTORY_PATTERN_RESCHEDULE:+8');
+  } else if (history.pattern === 'booking') {
+    score += 5;
+    reasons.push('HISTORY_PATTERN_BOOKING:+5');
+  } else if (history.pattern === 'mixed') {
+    score += 6;
+    reasons.push('HISTORY_PATTERN_MIXED:+6');
+  }
+  if (history.mailboxCount >= 2) {
+    score += 6;
+    reasons.push('HISTORY_MULTI_MAILBOX:+6');
+  }
+  if (history.recentMessageCount >= 4) {
+    score += 5;
+    reasons.push('HISTORY_RECENT_ACTIVITY:+5');
+  }
+  if (history.outcomeCode === 'no_response') {
+    score += 6;
+    reasons.push('HISTORY_OUTCOME_NO_RESPONSE:+6');
+  } else if (history.outcomeCode === 'escalated') {
+    score += 5;
+    reasons.push('HISTORY_OUTCOME_ESCALATED:+5');
+  }
+  if (history.negativeOutcomeCount >= 2) {
+    score += 4;
+    reasons.push('HISTORY_CALIBRATION_REPEAT_NEGATIVE:+4');
+  }
+  if (history.dominantFailureOutcome === 'no_response') {
+    score += 4;
+    reasons.push('HISTORY_CALIBRATION_NO_RESPONSE:+4');
+  } else if (history.dominantFailureOutcome === 'escalated') {
+    score += 5;
+    reasons.push('HISTORY_CALIBRATION_ESCALATED:+5');
+  }
+  if (history.dominantFailureRisk === 'relationship') {
+    score += 4;
+    reasons.push('HISTORY_CALIBRATION_RELATIONSHIP:+4');
+  } else if (history.dominantFailureRisk === 'follow_up') {
+    score += 3;
+    reasons.push('HISTORY_CALIBRATION_FOLLOW_UP:+3');
   }
 
   const normalizedScore = Math.round(clamp(score, 0, 100));

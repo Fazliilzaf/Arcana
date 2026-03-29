@@ -249,3 +249,78 @@ test('template PATCH route returns 409 on stale If-Match revision', async () => 
     assert.equal(payload.code, 'version_conflict');
   });
 });
+
+test('template manual draft route creates a real draft version with etag', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-template-manual-draft-route-'));
+  const templateStore = await createTemplateStore({
+    filePath: path.join(tempDir, 'templates.json'),
+    maxEvaluations: 300,
+  });
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const template = await templateStore.createTemplate({
+    tenantId: 'tenant-a',
+    category: 'CONSULTATION',
+    name: 'Manual Draft Mall',
+    channel: 'email',
+    locale: 'sv-SE',
+    createdBy: 'owner-a',
+  });
+
+  const app = express();
+  app.use(express.json());
+  const mockAuth = createMockAuth();
+  app.use(
+    '/api/v1',
+    createTemplateRouter({
+      templateStore,
+      authStore,
+      tenantConfigStore: {
+        async getTenantConfig() {
+          return {};
+        },
+      },
+      openai: null,
+      model: '',
+      requireAuth: mockAuth.requireAuth,
+      requireRole: mockAuth.requireRole,
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const createRes = await fetch(`${baseUrl}/api/v1/templates/${template.id}/drafts`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'Operator Draft',
+        content: 'Hej {{first_name}}, detta ar ett manuellt utkast.',
+        source: 'manual',
+        variablesUsed: ['first_name'],
+      }),
+    });
+
+    assert.equal(createRes.status, 201);
+    assert.equal(Boolean(createRes.headers.get('etag')), true);
+    const payload = await createRes.json();
+    assert.equal(payload.templateId, template.id);
+    assert.equal(payload.version.state, 'draft');
+    assert.equal(payload.version.source, 'manual');
+    assert.equal(payload.version.title, 'Operator Draft');
+    assert.equal(payload.version.content, 'Hej {{first_name}}, detta ar ett manuellt utkast.');
+    assert.deepEqual(payload.version.variablesUsed, ['first_name']);
+    assert.equal(payload.version.revision, 1);
+
+    const stored = await templateStore.getTemplateVersion(template.id, payload.version.id);
+    assert.equal(stored.state, 'draft');
+    assert.equal(stored.title, 'Operator Draft');
+    assert.equal(stored.source, 'manual');
+  });
+});

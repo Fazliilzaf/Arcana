@@ -9,6 +9,7 @@ const { createCapabilitiesRouter } = require('../../src/routes/capabilities');
 const { createExecutionGateway } = require('../../src/gateway/executionGateway');
 const { createAuthStore } = require('../../src/security/authStore');
 const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
+const { createCcoHistoryStore } = require('../../src/ops/ccoHistoryStore');
 
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
@@ -377,4 +378,208 @@ test('CCO usage event route logs indicator override set/cleared audit events', a
   assert.equal(setEvent.metadata.conversationId, 'conv-override-1');
   assert.equal(setEvent.metadata.overrideState, 'high');
   assert.equal(clearEvent.metadata.conversationId, 'conv-override-1');
+});
+
+test('CCO usage event route records handled outcome into audit and history store', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-usage-outcomes-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: createTenantConfigStore(),
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      ccoHistoryStore,
+      graphReadConnector: null,
+      graphSendConnector: null,
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/v1/cco/usage/event`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'outcome_recorded',
+        conversationId: 'conv-outcome-1',
+        mailboxId: 'kons@hairtpclinic.com',
+        customerEmail: 'patient@example.com',
+        outcomeCode: 'rebooked',
+        outcomeLabel: 'Ombokad',
+        recordedAt: '2026-03-25T08:00:00.000Z',
+        selectedMode: 'warm',
+        recommendedMode: 'professional',
+        priorityLevel: 'High',
+        priorityScore: 68,
+        dominantRisk: 'follow_up',
+        recommendedAction: 'Upprepa två tydliga tider direkt.',
+        historySignalPattern: 'reschedule',
+        historySignalSummary: 'Historik visar återkommande ombokning över flera mailboxar.',
+      }),
+    });
+    assert.equal(response.status, 200);
+  });
+
+  const audits = await authStore.listAuditEvents({
+    tenantId: 'tenant-a',
+    limit: 200,
+  });
+  const outcomeEvent = audits.find((event) => event.action === 'cco.outcome.recorded');
+  assert.ok(outcomeEvent);
+  assert.equal(outcomeEvent.metadata.conversationId, 'conv-outcome-1');
+  assert.equal(outcomeEvent.metadata.outcomeCode, 'rebooked');
+
+  const outcomes = await ccoHistoryStore.listCustomerOutcomes({
+    tenantId: 'tenant-a',
+    customerEmail: 'patient@example.com',
+    mailboxIds: ['kons@hairtpclinic.com'],
+  });
+  assert.equal(outcomes.length, 1);
+  assert.equal(outcomes[0].conversationId, 'conv-outcome-1');
+  assert.equal(outcomes[0].outcomeCode, 'rebooked');
+  assert.equal(outcomes[0].selectedMode, 'warm');
+  assert.equal(outcomes[0].recommendedMode, 'professional');
+  assert.equal(outcomes[0].priorityLevel, 'High');
+  assert.equal(outcomes[0].dominantRisk, 'follow_up');
+});
+
+test('CCO usage event route records operational reply/delete actions into audit and history store', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-usage-actions-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const analysisStore = await createCapabilityAnalysisStore({
+    filePath: path.join(tempDir, 'capability-analysis.json'),
+    maxEntries: 2000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const app = express();
+  app.use(express.json());
+  const auth = createMockAuth('OWNER');
+  app.use(
+    '/api/v1',
+    createCapabilitiesRouter({
+      authStore,
+      tenantConfigStore: createTenantConfigStore(),
+      requireAuth: auth.requireAuth,
+      requireRole: auth.requireRole,
+      executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+      capabilityAnalysisStore: analysisStore,
+      templateStore: null,
+      ccoHistoryStore,
+      graphReadConnector: null,
+      graphSendConnector: null,
+    })
+  );
+
+  await withServer(app, async (baseUrl) => {
+    for (const payload of [
+      {
+        eventType: 'reply_sent',
+        conversationId: 'conv-action-1',
+        mailboxId: 'kons@hairtpclinic.com',
+        customerEmail: 'patient@example.com',
+        subject: 'PRP uppföljning',
+        selectedMode: 'warm',
+        recommendedMode: 'professional',
+        priorityLevel: 'High',
+        priorityScore: 72,
+        dominantRisk: 'follow_up',
+        recommendedAction: 'Upprepa två tydliga tider direkt.',
+        nextActionLabel: 'Invänta kundens svar',
+        nextActionSummary: 'Vänta på kundens bekräftelse och följ upp vid behov.',
+        intent: 'reschedule',
+      },
+      {
+        eventType: 'reply_later',
+        conversationId: 'conv-action-1',
+        mailboxId: 'kons@hairtpclinic.com',
+        customerEmail: 'patient@example.com',
+        subject: 'PRP uppföljning',
+        nextActionLabel: 'Återuppta senare',
+        nextActionSummary: 'Tråden är parkerad till nästa arbetsfönster.',
+        followUpDueAt: '2026-03-26T09:00:00.000Z',
+        intent: 'reschedule',
+      },
+      {
+        eventType: 'customer_replied',
+        conversationId: 'conv-action-1',
+        mailboxId: 'kons@hairtpclinic.com',
+        customerEmail: 'patient@example.com',
+        subject: 'PRP uppföljning',
+        nextActionLabel: 'Återuppta tråden',
+        nextActionSummary: 'Kunden svarade och tråden bör öppnas igen.',
+        intent: 'reschedule',
+      },
+      {
+        eventType: 'conversation_deleted',
+        conversationId: 'conv-action-1',
+        mailboxId: 'kons@hairtpclinic.com',
+        customerEmail: 'patient@example.com',
+        subject: 'PRP uppföljning',
+        nextActionLabel: 'Ingen åtgärd just nu',
+        nextActionSummary: 'Tråden ligger i papperskorgen.',
+        intent: 'reschedule',
+      },
+    ]) {
+      const response = await fetch(`${baseUrl}/api/v1/cco/usage/event`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      assert.equal(response.status, 200);
+    }
+  });
+
+  const audits = await authStore.listAuditEvents({
+    tenantId: 'tenant-a',
+    limit: 200,
+  });
+  assert.ok(audits.find((event) => event.action === 'cco.reply.sent'));
+  assert.ok(audits.find((event) => event.action === 'cco.reply.later'));
+  assert.ok(audits.find((event) => event.action === 'cco.customer.replied'));
+  assert.ok(audits.find((event) => event.action === 'cco.conversation.deleted'));
+
+  const actions = await ccoHistoryStore.listCustomerActions({
+    tenantId: 'tenant-a',
+    customerEmail: 'patient@example.com',
+    mailboxIds: ['kons@hairtpclinic.com'],
+  });
+  assert.equal(actions.length, 4);
+  assert.deepEqual(
+    actions.map((action) => action.actionType),
+    ['conversation_deleted', 'customer_replied', 'reply_later', 'reply_sent']
+  );
+  assert.equal(actions[0].nextActionLabel, 'Ingen åtgärd just nu');
+  assert.equal(actions[1].nextActionLabel, 'Återuppta tråden');
+  assert.equal(actions[2].nextActionLabel, 'Återuppta senare');
+  assert.equal(actions[3].nextActionLabel, 'Invänta kundens svar');
 });

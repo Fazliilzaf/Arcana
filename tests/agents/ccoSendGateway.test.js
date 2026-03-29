@@ -54,7 +54,7 @@ async function withSendEnv(run) {
   const prevAllowlist = process.env.ARCANA_GRAPH_SEND_ALLOWLIST;
   process.env.ARCANA_GRAPH_SEND_ENABLED = 'true';
   process.env.ARCANA_GRAPH_SEND_ALLOWLIST =
-    'contact@hairtpclinic.com,owner@hairtpclinic.se,egzona@hairtpclinic.com,fazli@hairtpclinic.com';
+    'contact@hairtpclinic.com,owner@hairtpclinic.se,egzona@hairtpclinic.com,fazli@hairtpclinic.com,kons@hairtpclinic.com';
   try {
     await run();
   } finally {
@@ -152,6 +152,20 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
     const firstBody = await first.json();
     assert.equal(firstBody.decision, 'allow');
     assert.equal(firstBody.send?.mode, 'manual');
+    assert.equal(typeof firstBody.preview?.bodyHtml, 'string');
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('<img'), true);
+    assert.equal(
+      String(firstBody.preview?.bodyHtml || '').includes('hairtpclinic-mark-light.svg'),
+      true
+    );
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('<svg'), false);
+    assert.equal(
+      String(firstBody.preview?.bodyHtml || '').includes('signature-web-icon.svg'),
+      false
+    );
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Webb<'), true);
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Instagram<'), true);
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Facebook<'), true);
 
     const second = await fetch(`${baseUrl}/api/v1/cco/send`, {
       method: 'POST',
@@ -170,8 +184,9 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
   assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
   assert.equal(lastSendArgs.sourceMailboxId, 'owner@hairtpclinic.se');
   assert.equal(lastSendArgs.replyToMessageId, longReplyToMessageId);
-  assert.equal(String(lastSendArgs.body || '').includes('Bästa hälsningar,'), true);
-  assert.equal(String(lastSendArgs.body || '').includes('Egzona Krasniqi'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Bästa hälsningar'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Hair TP Clinic'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Patientservice'), true);
   assert.equal(String(lastSendArgs.body || '').includes('contact@hairtpclinic.com'), true);
 
   const entries = await analysisStore.list({
@@ -191,6 +206,453 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
     assert.equal(actions.has('cco.send.requested'), true);
     assert.equal(actions.has('cco.send.sent'), true);
     assert.equal(actions.has('gateway.run.decision'), true);
+  });
+});
+
+test('CCO send route allows same-mailbox reply without explicit to[]', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-inline-reply-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'reply',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-inline-reply-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'kons@hairtpclinic.com',
+          senderMailboxId: 'kons@hairtpclinic.com',
+          replyToMessageId: 'msg-inline-1',
+          conversationId: 'conv-inline-1',
+          subject: 'Re: Konsultation',
+          body: 'Hej, tack for ditt meddelande. Vi svarar fran samma mailbox.',
+          idempotencyKey: 'send-inline-reply-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'kons@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'kons@hairtpclinic.com');
+    assert.deepEqual(lastSendArgs.to, []);
+  });
+});
+
+test('CCO send route allows compose mode without conversationId or replyToMessageId', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-compose-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendNewMessage(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: null,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'send_mail',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-compose-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mode: 'compose',
+          mailboxId: 'kons@hairtpclinic.com',
+          senderMailboxId: 'contact@hairtpclinic.com',
+          to: ['patient@example.com'],
+          subject: 'Ny kontakt',
+          body: 'Hej, vi ville skicka ett helt nytt mejl från nya CCO.',
+          idempotencyKey: 'send-compose-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+      assert.equal(payload.send?.composeMode, true);
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'kons@hairtpclinic.com');
+    assert.deepEqual(lastSendArgs.to, ['patient@example.com']);
+
+    const entries = await analysisStore.list({
+      tenantId: 'tenant-a',
+      capabilityName: 'CCO.SendCompose',
+      limit: 20,
+    });
+    assert.equal(entries.length, 1);
+    assert.equal(entries[0].metadata?.composeMode, true);
+  });
+});
+
+test('CCO send route uses explicit signature override mailbox when senderMailboxId is omitted', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-signature-override-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'reply',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-signature-override-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          signatureProfile: 'fazli',
+          replyToMessageId: 'msg-signature-override-1',
+          conversationId: 'conv-signature-override-1',
+          to: ['patient@example.com'],
+          subject: 'Uppföljning',
+          body: 'Hej, jag återkommer med en konkret tid inom kort.',
+          idempotencyKey: 'send-signature-override-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'fazli@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'contact@hairtpclinic.com');
+    assert.equal(String(lastSendArgs.body || '').includes('Fazli Krasniqi'), true);
+    assert.equal(String(lastSendArgs.body || '').includes('fazli@hairtpclinic.com'), true);
+  });
+});
+
+test('CCO send route honors explicit sourceMailboxId for cross-mailbox replies', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-cross-mailbox-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'send_mail',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-cross-mailbox-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          sourceMailboxId: 'kons@hairtpclinic.com',
+          signatureProfile: 'contact',
+          replyToMessageId: 'msg-cross-mailbox-1',
+          conversationId: 'conv-cross-mailbox-1',
+          to: ['egzona@hairtpclinic.com'],
+          subject: 'Uppföljning från contact',
+          body: 'Hej, detta ska skickas från contact men svara på en tråd från kons.',
+          idempotencyKey: 'send-cross-mailbox-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'kons@hairtpclinic.com');
+    assert.deepEqual(lastSendArgs.to, ['egzona@hairtpclinic.com']);
+  });
+});
+
+test('CCO send route surfaces persist-stage Graph failures as transport errors', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-persist-error-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    const graphSendConnector = {
+      async sendReply() {
+        const error = new Error('Microsoft Graph createReply failed (503): mailbox move in progress');
+        error.code = 'GRAPH_REQUEST_FAILED';
+        error.status = 503;
+        error.retryAfterSeconds = 10;
+        throw error;
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-persist-error-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'kons@hairtpclinic.com',
+          senderMailboxId: 'kons@hairtpclinic.com',
+          replyToMessageId: 'msg-persist-error-1',
+          conversationId: 'conv-persist-error-1',
+          subject: 'Uppföljning',
+          body: 'Hej, detta ska ge ett Graph-fel.',
+          idempotencyKey: 'send-persist-error-1',
+        }),
+      });
+      assert.equal(response.status, 503);
+      const payload = await response.json();
+      assert.equal(payload.code, 'GRAPH_REQUEST_FAILED');
+      assert.equal(/createReply failed/i.test(String(payload.error || '')), true);
+      assert.equal(payload.retryAfterSeconds, 10);
+      assert.equal(payload.decision, 'blocked');
+    });
   });
 });
 

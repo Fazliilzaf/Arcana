@@ -50,16 +50,23 @@ function resolveBackupFilePath({ backupDir, fileName }) {
 }
 
 function getStateFileMap(config) {
-  return {
+  const map = {
     auth: config.authStorePath,
     templates: config.templateStorePath,
     tenantConfig: config.tenantConfigStorePath,
     memory: config.memoryStorePath,
+    ccoHistory: config.ccoHistoryStorePath,
+    ccoNotes: config.ccoNoteStorePath,
+    ccoFollowUps: config.ccoFollowUpStorePath,
+    ccoWorkspacePrefs: config.ccoWorkspacePrefsStorePath,
     secretRotation: config.secretRotationStorePath,
     patientSignals: config.patientSignalStorePath,
     sloTickets: config.sloTicketStorePath,
     releaseGovernance: config.releaseGovernanceStorePath,
   };
+  return Object.fromEntries(
+    Object.entries(map).filter(([, filePath]) => typeof filePath === 'string' && filePath.trim())
+  );
 }
 
 async function readStoreFile(filePath) {

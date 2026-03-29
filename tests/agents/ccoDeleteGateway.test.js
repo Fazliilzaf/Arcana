@@ -363,3 +363,44 @@ test('CCO delete status route reports enabled state when feature flag and allowl
     }
   );
 });
+
+test('CCO delete status route reports missing Graph Mail.ReadWrite permission when connector inspection fails readiness', async () => {
+  await withDeleteEnv(
+    {
+      ARCANA_CCO_DELETE_ENABLED: 'true',
+      ARCANA_CCO_DELETE_ALLOWLIST: 'contact@hairtpclinic.com',
+    },
+    async () => {
+      const graphSendConnector = {
+        async sendReply() {
+          return { ok: true };
+        },
+        async moveMessageToDeletedItems() {
+          return { ok: true };
+        },
+        async inspectPermissions() {
+          return {
+            aud: 'https://graph.microsoft.com',
+            appId: 'app-1',
+            idType: 'app',
+            roles: ['Mail.Read', 'Mail.Send'],
+            scopes: [],
+            hasMailReadWrite: false,
+          };
+        },
+      };
+      const { app } = await createTestContext({ graphSendConnector });
+
+      await withServer(app, async (baseUrl) => {
+        const response = await fetch(`${baseUrl}/api/v1/cco/delete/status`);
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.equal(body.ok, true);
+        assert.equal(body.deleteEnabled, false);
+        assert.equal(body.reasonCode, 'CCO_DELETE_GRAPH_PERMISSION_MISSING');
+        assert.equal(body.permissions.hasMailReadWrite, false);
+        assert.deepEqual(body.permissions.roles, ['Mail.Read', 'Mail.Send']);
+      });
+    }
+  );
+});
