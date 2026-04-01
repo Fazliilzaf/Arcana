@@ -555,6 +555,53 @@ input {
   font-weight: 700;
 }
 
+.owned-card-placed {
+  display: grid;
+  gap: 6px;
+  width: calc(100% - 62px);
+  margin-left: 62px;
+}
+
+.owned-card-placed-label {
+  color: var(--muted);
+  font-size: 0.54rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.owned-card-placed-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.owned-card-placed-chip {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+  box-shadow:
+    0 2px 5px rgba(75, 53, 37, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 0.54rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.owned-card-placed-chip.is-active {
+  border-color: rgba(88, 63, 46, 0.24);
+  background: rgba(255, 252, 246, 0.98);
+  color: var(--ink);
+  box-shadow:
+    0 6px 14px rgba(75, 53, 37, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
 .product-level-badges-library-current {
   align-self: flex-start;
   gap: 5px;
@@ -2193,6 +2240,11 @@ input {
   }
 
   .owned-card-levels-trigger {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .owned-card-placed {
     width: 100%;
     margin-left: 0;
   }

@@ -1004,6 +1004,7 @@
     customerLibrary: [],
     productLevelSelections: {},
     activeLibraryCatalogId: null,
+    activeLibraryBottleId: null,
     openLibraryLevelPickerId: null,
     layers: [],
     activeLayerId: null,
@@ -1415,12 +1416,28 @@
     return state.bottles.find((entry) => entry.catalogId === catalogId) || null;
   }
 
+  function getBottlesForCatalog(catalogId) {
+    if (!catalogId) {
+      return [];
+    }
+
+    return state.bottles.filter((entry) => entry.catalogId === catalogId);
+  }
+
   function getPlannerContext() {
     const selectedBottle = getSelectedBottle();
     if (selectedBottle) {
       return {
         product: getCatalogItem(selectedBottle.catalogId),
         bottle: selectedBottle,
+      };
+    }
+
+    const activeLibraryBottle = getBottle(state.activeLibraryBottleId);
+    if (activeLibraryBottle) {
+      return {
+        product: getCatalogItem(activeLibraryBottle.catalogId),
+        bottle: activeLibraryBottle,
       };
     }
 
@@ -1744,6 +1761,7 @@
       zoneLayoutVersion: ZONE_LAYOUT_VERSION,
       isAdjustingLabels: state.isAdjustingLabels,
       selectedBottleId: state.selectedBottleId,
+      activeLibraryBottleId: null,
       pendingCatalogId: state.pendingCatalogId,
       currentSheetId: state.currentSheetId,
     };
@@ -1769,6 +1787,7 @@
     state.isAdjustingLabels = Boolean(snapshot.isAdjustingLabels);
     state.selectedBottleId = snapshot.selectedBottleId || null;
     state.activeLibraryCatalogId = null;
+    state.activeLibraryBottleId = null;
     state.pendingCatalogId = snapshot.pendingCatalogId || null;
     state.currentSheetId = snapshot.currentSheetId || null;
     syncBottleSeed();
@@ -1892,6 +1911,7 @@
       isAdjustingLabels: false,
       selectedBottleId: null,
       activeLibraryCatalogId: null,
+      activeLibraryBottleId: null,
       pendingCatalogId: null,
       currentSheetId: snapshot.id,
     });
@@ -1912,6 +1932,7 @@
       isAdjustingLabels: false,
       selectedBottleId: null,
       activeLibraryCatalogId: null,
+      activeLibraryBottleId: null,
       pendingCatalogId: null,
       currentSheetId: null,
     });
@@ -1999,9 +2020,14 @@
     }
 
     const config = options || {};
-    const matchingBottle = getBottleForCatalog(catalogId);
+    const matchingBottles = getBottlesForCatalog(catalogId);
+    const matchingBottle = matchingBottles.find((entry) => entry.id === config.bottleId)
+      || matchingBottles.find((entry) => entry.id === state.activeLibraryBottleId)
+      || matchingBottles[0]
+      || null;
 
     state.activeLibraryCatalogId = catalogId;
+    state.activeLibraryBottleId = matchingBottle ? matchingBottle.id : null;
     state.pendingCatalogId = matchingBottle ? null : catalogId;
     state.selectedBottleId = matchingBottle ? matchingBottle.id : null;
 
@@ -2016,6 +2042,7 @@
     if (!catalogId) {
       state.pendingCatalogId = null;
       state.activeLibraryCatalogId = null;
+      state.activeLibraryBottleId = null;
       state.selectedBottleId = null;
       render();
       return;
@@ -2035,8 +2062,11 @@
     state.activeLayerId = nextLayer.id;
     state.bottles = cloneBottles(nextLayer.bottles);
     state.zoneLabelOffsets = cloneZoneLabelOffsets(nextLayer.zoneLabelOffsets);
-    const focusedBottle = getBottleForCatalog(state.activeLibraryCatalogId);
+    const focusedBottle = state.activeLibraryBottleId
+      ? getBottle(state.activeLibraryBottleId)
+      : getBottleForCatalog(state.activeLibraryCatalogId);
     state.selectedBottleId = focusedBottle ? focusedBottle.id : null;
+    state.activeLibraryBottleId = focusedBottle ? focusedBottle.id : null;
     state.pendingCatalogId = focusedBottle ? null : (state.activeLibraryCatalogId || null);
     syncBottleSeed();
     render();
@@ -2051,6 +2081,7 @@
     state.bottles = [];
     state.zoneLabelOffsets = cloneZoneLabelOffsets({});
     state.selectedBottleId = null;
+    state.activeLibraryBottleId = null;
     state.pendingCatalogId = state.activeLibraryCatalogId || null;
     syncBottleSeed();
     render();
@@ -2122,9 +2153,11 @@
     }
 
     state.selectedBottleId = null;
+    state.activeLibraryBottleId = null;
     if (nextActiveLayer) {
-      const focusedBottle = getBottleForCatalog(state.activeLibraryCatalogId);
+      const focusedBottle = state.activeLibraryCatalogId ? getBottleForCatalog(state.activeLibraryCatalogId) : null;
       state.selectedBottleId = focusedBottle ? focusedBottle.id : null;
+      state.activeLibraryBottleId = focusedBottle ? focusedBottle.id : null;
     }
     state.pendingCatalogId = null;
     if (state.activeLibraryCatalogId && getCatalogItem(state.activeLibraryCatalogId)) {
@@ -2167,6 +2200,7 @@
     state.customerLibrary = state.customerLibrary.filter((entry) => entry !== catalogId);
     delete state.productLevelSelections[catalogId];
     state.activeLibraryCatalogId = state.activeLibraryCatalogId === catalogId ? null : state.activeLibraryCatalogId;
+    state.activeLibraryBottleId = state.activeLibraryBottleId && getBottle(state.activeLibraryBottleId) ? state.activeLibraryBottleId : null;
     state.pendingCatalogId = state.pendingCatalogId === catalogId ? null : state.pendingCatalogId;
     state.openLibraryLevelPickerId = state.openLibraryLevelPickerId === catalogId ? null : state.openLibraryLevelPickerId;
 
@@ -2181,6 +2215,9 @@
 
     if (!state.bottles.some((bottle) => bottle.id === state.selectedBottleId)) {
       state.selectedBottleId = null;
+    }
+    if (!state.bottles.some((bottle) => bottle.id === state.activeLibraryBottleId)) {
+      state.activeLibraryBottleId = null;
     }
 
     syncBottleSeed();
@@ -2211,6 +2248,9 @@
 
     if (!state.bottles.some((bottle) => bottle.id === state.selectedBottleId)) {
       state.selectedBottleId = null;
+    }
+    if (!state.bottles.some((bottle) => bottle.id === state.activeLibraryBottleId)) {
+      state.activeLibraryBottleId = null;
     }
 
     syncBottleSeed();
@@ -2314,6 +2354,7 @@
 
     state.bottles.push(bottle);
     state.activeLibraryCatalogId = catalogId;
+    state.activeLibraryBottleId = bottle.id;
     state.pendingCatalogId = null;
     state.selectedBottleId = bottle.id;
     render();
@@ -2325,7 +2366,25 @@
 
     state.selectedBottleId = nextSelectedBottleId;
     state.activeLibraryCatalogId = nextSelectedBottle ? nextSelectedBottle.catalogId : state.activeLibraryCatalogId;
+    state.activeLibraryBottleId = nextSelectedBottle ? nextSelectedBottle.id : state.activeLibraryBottleId;
     state.pendingCatalogId = nextSelectedBottle ? null : (state.activeLibraryCatalogId || null);
+    render();
+  }
+
+  function selectLibraryBottle(catalogId, bottleId) {
+    if (!catalogId) {
+      return;
+    }
+
+    const bottle = getBottle(bottleId);
+    if (!bottle || bottle.catalogId !== catalogId) {
+      return;
+    }
+
+    state.activeLibraryCatalogId = catalogId;
+    state.activeLibraryBottleId = bottle.id;
+    state.pendingCatalogId = null;
+    state.selectedBottleId = bottle.id;
     render();
   }
 
@@ -2367,6 +2426,7 @@
         state.bottles.push(bottle);
       }
 
+      state.activeLibraryBottleId = bottle.id;
       state.pendingCatalogId = null;
       state.selectedBottleId = bottle.id;
     }
@@ -2978,6 +3038,7 @@
       .filter(Boolean);
     const selectedBottle = getSelectedBottle();
     const activeCatalogId = selectedBottle ? selectedBottle.catalogId : state.activeLibraryCatalogId;
+    const activeBottleId = selectedBottle ? selectedBottle.id : state.activeLibraryBottleId;
 
     if (state.openLibraryLevelPickerId && !ownedItems.some((item) => item.id === state.openLibraryLevelPickerId)) {
       state.openLibraryLevelPickerId = null;
@@ -3002,6 +3063,8 @@
                   const isPopoverOpen = state.openLibraryLevelPickerId === item.id;
                   const isActiveProduct = activeCatalogId === item.id;
                   const activeSummary = allowedLevels.length > 0 ? `${getLevelDescription(allowedLevels)} selected` : "No levels selected";
+                  const matchingBottles = getBottlesForCatalog(item.id);
+                  const hasPlacedBottles = matchingBottles.length > 0;
 
                   return `
                   <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}${isPopoverOpen ? " is-level-open" : ""}${isActiveProduct ? " is-active-product" : ""}" data-library-level-shell="${escapeHtml(item.id)}">
@@ -3019,6 +3082,25 @@
                         ${renderProductLevelBadges(item, item.id, "product-level-badge product-level-badge-library-current")}
                       </span>
                     </button>
+                    ${hasPlacedBottles ? `
+                      <div class="owned-card-placed">
+                        <span class="owned-card-placed-label">Placed in ${escapeHtml(getActiveLayer().name)}</span>
+                        <div class="owned-card-placed-list">
+                          ${matchingBottles
+                            .map((bottle, index) => `
+                              <button
+                                class="owned-card-placed-chip${activeBottleId === bottle.id ? " is-active" : ""}"
+                                type="button"
+                                data-select-library-bottle="${escapeHtml(item.id)}::${escapeHtml(bottle.id)}"
+                                aria-pressed="${activeBottleId === bottle.id ? "true" : "false"}"
+                              >
+                                Bottle ${index + 1}
+                              </button>
+                            `)
+                            .join("")}
+                        </div>
+                      </div>
+                    ` : ""}
                     ${isPopoverOpen ? `
                       <div class="library-level-popover" role="dialog" aria-label="Choose levels for ${escapeHtml(item.name)}">
                         <p class="library-level-popover-title">Choose Head, Heart, or Base</p>
@@ -3092,6 +3174,20 @@
         const catalogId = raw.slice(0, splitIndex);
         const level = raw.slice(splitIndex + 2);
         toggleProductAllowedLevel(catalogId, level);
+      });
+    });
+
+    customerLibraryPanel.querySelectorAll("[data-select-library-bottle]").forEach((button) => {
+      button.addEventListener("click", function () {
+        const raw = button.getAttribute("data-select-library-bottle") || "";
+        const splitIndex = raw.lastIndexOf("::");
+        if (splitIndex <= 0) {
+          return;
+        }
+
+        const catalogId = raw.slice(0, splitIndex);
+        const bottleId = raw.slice(splitIndex + 2);
+        selectLibraryBottle(catalogId, bottleId);
       });
     });
   }
@@ -3198,6 +3294,7 @@
       isAdjustingLabels: false,
       selectedBottleId: null,
       activeLibraryCatalogId: null,
+      activeLibraryBottleId: null,
       pendingCatalogId: null,
       currentSheetId: sheet.id || null,
     };
@@ -3478,6 +3575,7 @@
   state.activeLayerId = state.layers[0].id;
   state.customerLibrary = [];
   state.activeLibraryCatalogId = null;
+  state.activeLibraryBottleId = null;
   syncBottleSeed();
   syncFormFields();
   syncSheetPaperLock();
