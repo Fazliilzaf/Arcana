@@ -1631,10 +1631,10 @@ input {
 
 .zone-planner-overlay-rows {
   position: absolute;
-  left: 39.22%;
-  top: 37.47%;
-  width: 43.78%;
-  height: 60.42%;
+  left: 39.2%;
+  top: 37.44%;
+  width: 43.72%;
+  height: 60.38%;
   display: grid;
   grid-template-rows: repeat(9, 1fr);
   gap: 0;
@@ -1659,20 +1659,20 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 52%;
-  margin: 0 6.45%;
-  padding: 0 0.26cqi;
+  min-height: 50%;
+  margin: 0 6.75%;
+  padding: 0 0.2cqi;
   background: rgba(251, 249, 244, 0.998);
   color: rgba(44, 32, 24, 0.92);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.38px, 0.505cqi, 4.85px);
-  line-height: 1.02;
+  font-size: clamp(3.32px, 0.495cqi, 4.78px);
+  line-height: 1;
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 0 0 0.1cqi rgba(251, 249, 244, 0.998);
+  box-shadow: 0 0 0 0.08cqi rgba(251, 249, 244, 0.998);
 }
 
 .zone-planner-overlay-product.is-empty {
@@ -1709,8 +1709,8 @@ input {
 
 .zone-planner-overlay-checkbox {
   position: relative;
-  width: clamp(13px, 1.78cqi, 17px);
-  height: clamp(10px, 1.24cqi, 12px);
+  width: clamp(12px, 1.72cqi, 16px);
+  height: clamp(9px, 1.18cqi, 11px);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -1725,9 +1725,9 @@ input {
   content: "";
   position: absolute;
   left: 50%;
-  top: 47%;
-  width: 31%;
-  height: 58%;
+  top: 46%;
+  width: 30%;
+  height: 56%;
   border-right: 1.5px solid rgba(86, 63, 49, 0.92);
   border-bottom: 1.5px solid rgba(86, 63, 49, 0.92);
   transform: translate(-50%, -50%) rotate(41deg);
@@ -2108,10 +2108,10 @@ input {
   }
 
   .zone-planner-overlay-rows {
-    left: 39.22%;
-    top: 37.47%;
-    width: 43.78%;
-    height: 60.42%;
+    left: 39.2%;
+    top: 37.44%;
+    width: 43.72%;
+    height: 60.38%;
   }
 
   .zone-editor-summary {
