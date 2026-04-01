@@ -1517,6 +1517,46 @@
     return String(label || "").replace(/^Spray\s+/i, "").trim();
   }
 
+  function getBottleChipBaseLabel(bottle) {
+    if (!bottle) {
+      return "";
+    }
+
+    const levelLabel = getLevelLabel(bottle.level);
+    const compactZones = getBottleZoneNames(bottle).map(getCompactZoneLabel).filter(Boolean);
+
+    if (compactZones.length === 0) {
+      return `${levelLabel} · No areas`;
+    }
+
+    if (compactZones.length === 1) {
+      return `${levelLabel} · ${compactZones[0]}`;
+    }
+
+    return `${levelLabel} · ${compactZones[0]} +${compactZones.length - 1}`;
+  }
+
+  function getBottleChipLabels(bottles) {
+    const source = Array.isArray(bottles) ? bottles : [];
+    const baseLabels = source.map(getBottleChipBaseLabel);
+    const counts = baseLabels.reduce((map, label) => {
+      map.set(label, (map.get(label) || 0) + 1);
+      return map;
+    }, new Map());
+    const seen = new Map();
+
+    return source.map((_, index) => {
+      const baseLabel = baseLabels[index];
+      if ((counts.get(baseLabel) || 0) <= 1) {
+        return baseLabel;
+      }
+
+      const nextIndex = (seen.get(baseLabel) || 0) + 1;
+      seen.set(baseLabel, nextIndex);
+      return `${baseLabel} · ${nextIndex}`;
+    });
+  }
+
   function renderBottleZoneSummary(zoneNames, isSelected) {
     if (!zoneNames.length && !isSelected) {
       return "";
@@ -3064,6 +3104,7 @@
                   const isActiveProduct = activeCatalogId === item.id;
                   const activeSummary = allowedLevels.length > 0 ? `${getLevelDescription(allowedLevels)} selected` : "No levels selected";
                   const matchingBottles = getBottlesForCatalog(item.id);
+                  const bottleChipLabels = getBottleChipLabels(matchingBottles);
                   const hasPlacedBottles = matchingBottles.length > 0;
 
                   return `
@@ -3094,7 +3135,7 @@
                                 data-select-library-bottle="${escapeHtml(item.id)}::${escapeHtml(bottle.id)}"
                                 aria-pressed="${activeBottleId === bottle.id ? "true" : "false"}"
                               >
-                                Bottle ${index + 1}
+                                ${escapeHtml(bottleChipLabels[index] || `Bottle ${index + 1}`)}
                               </button>
                             `)
                             .join("")}
