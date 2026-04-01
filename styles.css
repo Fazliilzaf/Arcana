@@ -450,7 +450,7 @@ input {
   max-width: 220px;
   position: relative;
   align-content: start;
-  gap: 0;
+  gap: 10px;
   padding: 14px;
   text-align: left;
   overflow: visible;
@@ -488,6 +488,14 @@ input {
   z-index: 6;
 }
 
+.owned-card.is-active-product {
+  border-color: rgba(88, 63, 46, 0.32);
+  background: rgba(255, 252, 246, 0.98);
+  box-shadow:
+    0 14px 28px rgba(75, 53, 37, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
 .owned-card strong {
   color: var(--ink);
   font-size: 0.92rem;
@@ -498,15 +506,59 @@ input {
 
 .owned-card-copy {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   align-content: start;
+}
+
+.owned-card-hint {
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.owned-card-levels-trigger {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  justify-items: start;
+  width: calc(100% - 62px);
+  margin-left: 62px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 6px 16px rgba(75, 53, 37, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.owned-card-levels-trigger:hover {
+  border-color: rgba(88, 63, 46, 0.16);
+}
+
+.owned-card-levels-trigger[aria-expanded="true"] {
+  border-color: rgba(88, 63, 46, 0.24);
+  box-shadow:
+    0 10px 22px rgba(75, 53, 37, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.owned-card-levels-label {
+  color: var(--muted);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .product-level-badges-library-current {
   align-self: flex-start;
   gap: 5px;
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .product-level-badge-library-current {
@@ -2138,6 +2190,11 @@ input {
   .library-owned-grid {
     grid-template-columns: repeat(auto-fit, minmax(126px, 126px));
     gap: 10px;
+  }
+
+  .owned-card-levels-trigger {
+    width: 100%;
+    margin-left: 0;
   }
 }
 

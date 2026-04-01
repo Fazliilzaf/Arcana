@@ -1003,6 +1003,7 @@
     search: "",
     customerLibrary: [],
     productLevelSelections: {},
+    activeLibraryCatalogId: null,
     openLibraryLevelPickerId: null,
     layers: [],
     activeLayerId: null,
@@ -1406,6 +1407,14 @@
     return getBottle(state.selectedBottleId);
   }
 
+  function getBottleForCatalog(catalogId) {
+    if (!catalogId) {
+      return null;
+    }
+
+    return state.bottles.find((entry) => entry.catalogId === catalogId) || null;
+  }
+
   function getPlannerContext() {
     const selectedBottle = getSelectedBottle();
     if (selectedBottle) {
@@ -1415,7 +1424,7 @@
       };
     }
 
-    const libraryCatalogId = state.pendingCatalogId || state.openLibraryLevelPickerId || state.customerLibrary[0] || "";
+    const libraryCatalogId = state.activeLibraryCatalogId || state.pendingCatalogId || state.openLibraryLevelPickerId || "";
     if (!libraryCatalogId) {
       return {
         product: null,
@@ -1759,6 +1768,7 @@
     state.zoneLabelOffsets = cloneZoneLabelOffsets(activeLayer.zoneLabelOffsets);
     state.isAdjustingLabels = Boolean(snapshot.isAdjustingLabels);
     state.selectedBottleId = snapshot.selectedBottleId || null;
+    state.activeLibraryCatalogId = null;
     state.pendingCatalogId = snapshot.pendingCatalogId || null;
     state.currentSheetId = snapshot.currentSheetId || null;
     syncBottleSeed();
@@ -1881,6 +1891,7 @@
       zoneLabelOffsets: snapshot.zoneLabelOffsets,
       isAdjustingLabels: false,
       selectedBottleId: null,
+      activeLibraryCatalogId: null,
       pendingCatalogId: null,
       currentSheetId: snapshot.id,
     });
@@ -1900,6 +1911,7 @@
       zoneLabelOffsets: {},
       isAdjustingLabels: false,
       selectedBottleId: null,
+      activeLibraryCatalogId: null,
       pendingCatalogId: null,
       currentSheetId: null,
     });
@@ -1980,9 +1992,36 @@
       .join("");
   }
 
+  function focusLibraryCatalog(catalogId, options) {
+    const product = getCatalogItem(catalogId);
+    if (!product) {
+      return;
+    }
+
+    const config = options || {};
+    const matchingBottle = getBottleForCatalog(catalogId);
+
+    state.activeLibraryCatalogId = catalogId;
+    state.pendingCatalogId = matchingBottle ? null : catalogId;
+    state.selectedBottleId = matchingBottle ? matchingBottle.id : null;
+
+    if (config.openLevels) {
+      state.openLibraryLevelPickerId = catalogId;
+    } else if (config.closeLevels !== false) {
+      state.openLibraryLevelPickerId = null;
+    }
+  }
+
   function setPendingCatalog(catalogId) {
-    state.pendingCatalogId = state.pendingCatalogId === catalogId ? null : catalogId;
-    state.selectedBottleId = null;
+    if (!catalogId) {
+      state.pendingCatalogId = null;
+      state.activeLibraryCatalogId = null;
+      state.selectedBottleId = null;
+      render();
+      return;
+    }
+
+    focusLibraryCatalog(catalogId);
     render();
   }
 
@@ -1996,8 +2035,9 @@
     state.activeLayerId = nextLayer.id;
     state.bottles = cloneBottles(nextLayer.bottles);
     state.zoneLabelOffsets = cloneZoneLabelOffsets(nextLayer.zoneLabelOffsets);
-    state.selectedBottleId = null;
-    state.pendingCatalogId = null;
+    const focusedBottle = getBottleForCatalog(state.activeLibraryCatalogId);
+    state.selectedBottleId = focusedBottle ? focusedBottle.id : null;
+    state.pendingCatalogId = focusedBottle ? null : (state.activeLibraryCatalogId || null);
     syncBottleSeed();
     render();
   }
@@ -2011,7 +2051,7 @@
     state.bottles = [];
     state.zoneLabelOffsets = cloneZoneLabelOffsets({});
     state.selectedBottleId = null;
-    state.pendingCatalogId = null;
+    state.pendingCatalogId = state.activeLibraryCatalogId || null;
     syncBottleSeed();
     render();
   }
@@ -2082,7 +2122,14 @@
     }
 
     state.selectedBottleId = null;
+    if (nextActiveLayer) {
+      const focusedBottle = getBottleForCatalog(state.activeLibraryCatalogId);
+      state.selectedBottleId = focusedBottle ? focusedBottle.id : null;
+    }
     state.pendingCatalogId = null;
+    if (state.activeLibraryCatalogId && getCatalogItem(state.activeLibraryCatalogId)) {
+      state.pendingCatalogId = state.selectedBottleId ? null : state.activeLibraryCatalogId;
+    }
     syncBottleSeed();
     render();
   }
@@ -2119,7 +2166,9 @@
     const activeLayer = state.layers.find((entry) => entry.id === state.activeLayerId) || state.layers[0] || null;
     state.customerLibrary = state.customerLibrary.filter((entry) => entry !== catalogId);
     delete state.productLevelSelections[catalogId];
+    state.activeLibraryCatalogId = state.activeLibraryCatalogId === catalogId ? null : state.activeLibraryCatalogId;
     state.pendingCatalogId = state.pendingCatalogId === catalogId ? null : state.pendingCatalogId;
+    state.openLibraryLevelPickerId = state.openLibraryLevelPickerId === catalogId ? null : state.openLibraryLevelPickerId;
 
     if (activeLayer) {
       state.activeLayerId = activeLayer.id;
@@ -2187,8 +2236,18 @@
   }
 
   function toggleLibraryLevelPicker(catalogId) {
-    state.openLibraryLevelPickerId = state.openLibraryLevelPickerId === catalogId ? null : catalogId;
-    renderCustomerLibrary();
+    if (!catalogId) {
+      return;
+    }
+
+    if (state.openLibraryLevelPickerId === catalogId) {
+      state.openLibraryLevelPickerId = null;
+      renderCustomerLibrary();
+      return;
+    }
+
+    focusLibraryCatalog(catalogId, { openLevels: true });
+    render();
   }
 
   function openLibraryLevelPicker(catalogId) {
@@ -2196,9 +2255,7 @@
       return;
     }
 
-    state.pendingCatalogId = catalogId;
-    state.selectedBottleId = null;
-    state.openLibraryLevelPickerId = catalogId;
+    focusLibraryCatalog(catalogId, { openLevels: true });
     render();
   }
 
@@ -2256,14 +2313,19 @@
     }
 
     state.bottles.push(bottle);
+    state.activeLibraryCatalogId = catalogId;
     state.pendingCatalogId = null;
     state.selectedBottleId = bottle.id;
     render();
   }
 
   function selectBottle(bottleId) {
-    state.pendingCatalogId = null;
-    state.selectedBottleId = state.selectedBottleId === bottleId ? null : bottleId;
+    const nextSelectedBottleId = state.selectedBottleId === bottleId ? null : bottleId;
+    const nextSelectedBottle = nextSelectedBottleId ? getBottle(bottleId) : null;
+
+    state.selectedBottleId = nextSelectedBottleId;
+    state.activeLibraryCatalogId = nextSelectedBottle ? nextSelectedBottle.catalogId : state.activeLibraryCatalogId;
+    state.pendingCatalogId = nextSelectedBottle ? null : (state.activeLibraryCatalogId || null);
     render();
   }
 
@@ -2281,7 +2343,7 @@
     let bottle = getSelectedBottle();
     const zone = getZone(zoneId);
     const plannerContext = getPlannerContext();
-    const fallbackCatalogId = state.pendingCatalogId || (plannerContext.product ? plannerContext.product.id : "");
+    const fallbackCatalogId = state.pendingCatalogId || state.activeLibraryCatalogId || (plannerContext.product ? plannerContext.product.id : "");
 
     if (!bottle && fallbackCatalogId && zone) {
       const pendingProduct = getCatalogItem(fallbackCatalogId);
@@ -2326,11 +2388,13 @@
     const selectedBottle = getSelectedBottle();
     const hasAction = Boolean(state.pendingCatalogId || selectedBottle);
     const hasDropAction = Boolean(dragCatalogId);
-    const activeCatalogId = dragCatalogId || state.pendingCatalogId || (selectedBottle ? selectedBottle.catalogId : "");
+    const activeCatalogId = dragCatalogId || state.pendingCatalogId || state.activeLibraryCatalogId || (selectedBottle ? selectedBottle.catalogId : "");
     const activeProduct = dragCatalogId
       ? getCatalogItem(dragCatalogId)
       : state.pendingCatalogId
         ? getCatalogItem(state.pendingCatalogId)
+        : state.activeLibraryCatalogId
+          ? getCatalogItem(state.activeLibraryCatalogId)
         : selectedBottle
           ? getCatalogItem(selectedBottle.catalogId)
           : null;
@@ -2742,14 +2806,15 @@
 
   function renderStatus() {
     const plannerContext = getPlannerContext();
-    const pendingProduct = state.pendingCatalogId ? getCatalogItem(state.pendingCatalogId) : null;
+    const pendingCatalogId = state.pendingCatalogId || state.activeLibraryCatalogId;
+    const pendingProduct = pendingCatalogId ? getCatalogItem(pendingCatalogId) : null;
     const selectedBottle = plannerContext.bottle;
     const activeLayer = getActiveLayer();
     const activeLayerLabel = activeLayer ? activeLayer.name : "Current layer";
 
     if (pendingProduct) {
       const levelLabel = getLevelDescription(getProductAllowedLevels(pendingProduct, pendingProduct.id));
-      sheetStatus.textContent = `${pendingProduct.name} is in the customer library. It can be placed in ${levelLabel}, so choose one of those levels inside ${activeLayerLabel}.`;
+      sheetStatus.textContent = `${pendingProduct.name} is selected in Customer Library. It can be placed in ${levelLabel}, and you can check the spray boxes for ${activeLayerLabel} directly in the sheet planner.`;
       if (adjustLabelsButton) {
         adjustLabelsButton.hidden = true;
       }
@@ -2911,6 +2976,8 @@
     const ownedItems = state.customerLibrary
       .map((catalogId) => getCatalogItem(catalogId))
       .filter(Boolean);
+    const selectedBottle = getSelectedBottle();
+    const activeCatalogId = selectedBottle ? selectedBottle.catalogId : state.activeLibraryCatalogId;
 
     if (state.openLibraryLevelPickerId && !ownedItems.some((item) => item.id === state.openLibraryLevelPickerId)) {
       state.openLibraryLevelPickerId = null;
@@ -2933,17 +3000,23 @@
                 .map((item) => {
                   const allowedLevels = getProductAllowedLevels(item, item.id);
                   const isPopoverOpen = state.openLibraryLevelPickerId === item.id;
+                  const isActiveProduct = activeCatalogId === item.id;
+                  const activeSummary = allowedLevels.length > 0 ? `${getLevelDescription(allowedLevels)} selected` : "No levels selected";
 
                   return `
-                  <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}${isPopoverOpen ? " is-level-open" : ""}" data-library-level-shell="${escapeHtml(item.id)}">
+                  <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}${isPopoverOpen ? " is-level-open" : ""}${isActiveProduct ? " is-active-product" : ""}" data-library-level-shell="${escapeHtml(item.id)}">
                     <button class="panel-mini-action panel-mini-action-danger owned-card-remove" type="button" data-remove-library-product="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.name)} from customer library">Remove</button>
-                    <button class="owned-card-select" type="button" draggable="true" data-library-product-id="${escapeHtml(item.id)}">
+                    <button class="owned-card-select" type="button" draggable="true" data-library-product-id="${escapeHtml(item.id)}" aria-pressed="${isActiveProduct ? "true" : "false"}">
                       ${renderBottleVisual(item, "library-owned-bottle")}
                       <span class="owned-card-copy">
                         <strong>${escapeHtml(item.name)}</strong>
-                        <span class="product-level-badges product-level-badges-library-current" aria-label="Selected layering levels">
-                          ${renderProductLevelBadges(item, item.id, "product-level-badge product-level-badge-library-current")}
-                        </span>
+                        <span class="owned-card-hint">${isActiveProduct ? "Use the planner below to choose spray areas." : "Select this product, then choose spray areas below."}</span>
+                      </span>
+                    </button>
+                    <button class="owned-card-levels-trigger" type="button" data-open-level-picker="${escapeHtml(item.id)}" aria-expanded="${isPopoverOpen ? "true" : "false"}" aria-label="Choose Head, Heart, or Base for ${escapeHtml(item.name)}">
+                      <span class="owned-card-levels-label">Layering levels</span>
+                      <span class="product-level-badges product-level-badges-library-current" aria-label="${escapeHtml(activeSummary)}">
+                        ${renderProductLevelBadges(item, item.id, "product-level-badge product-level-badge-library-current")}
                       </span>
                     </button>
                     ${isPopoverOpen ? `
@@ -2975,7 +3048,7 @@
 
     customerLibraryPanel.querySelectorAll("[data-library-product-id]").forEach((button) => {
       button.addEventListener("click", function () {
-        openLibraryLevelPicker(button.getAttribute("data-library-product-id"));
+        setPendingCatalog(button.getAttribute("data-library-product-id"));
       });
 
       button.addEventListener("dragstart", function (event) {
@@ -2999,6 +3072,12 @@
     customerLibraryPanel.querySelectorAll("[data-remove-library-product]").forEach((button) => {
       button.addEventListener("click", function () {
         removeCatalogFromLibrary(button.getAttribute("data-remove-library-product"));
+      });
+    });
+
+    customerLibraryPanel.querySelectorAll("[data-open-level-picker]").forEach((button) => {
+      button.addEventListener("click", function () {
+        openLibraryLevelPicker(button.getAttribute("data-open-level-picker"));
       });
     });
 
@@ -3118,6 +3197,7 @@
       zoneLayoutVersion: sheet.zoneLayoutVersion || "",
       isAdjustingLabels: false,
       selectedBottleId: null,
+      activeLibraryCatalogId: null,
       pendingCatalogId: null,
       currentSheetId: sheet.id || null,
     };
@@ -3397,6 +3477,7 @@
   state.layers = buildDefaultLayers();
   state.activeLayerId = state.layers[0].id;
   state.customerLibrary = [];
+  state.activeLibraryCatalogId = null;
   syncBottleSeed();
   syncFormFields();
   syncSheetPaperLock();
