@@ -19,6 +19,21 @@
     { key: "Body Lotion", label: "Body Cream", iconClass: "type-body-lotion" },
   ];
 
+  const PLANNER_NOTES = [
+    {
+      level: "high",
+      text: "Apply your perfume to the head zone — behind the neck, lightly through the hair, across the shoulders — allowing a soft aura to form around you. This is the first impression, the part of the scent that moves with air and light.",
+    },
+    {
+      level: "middle",
+      text: "Use the heart zone — the chest, arms, or abdomen — for the perfumes you want to live closest to you. Here, the fragrance warms with your own rhythm, unfolding slowly throughout the day and becoming part of your natural presence.",
+    },
+    {
+      level: "low",
+      text: "Reserve the base zone — hips, behind the knees, or calves — for the perfumes you wish to release with subtle intention. These areas build warmth gradually, letting the scent rise in a quiet, continuous trail that feels personal, intimate, and entirely your own.",
+    },
+  ];
+
   const COLLECTION_PRIMARY_LEVELS = {
     bianca: "high",
     amber: "middle",
@@ -1517,6 +1532,10 @@
     return String(label || "").replace(/^Spray\s+/i, "").trim();
   }
 
+  function getPlannerAreaLabel(label) {
+    return String(label || "").trim();
+  }
+
   function getBottleChipZoneLabel(label) {
     const compact = getCompactZoneLabel(label);
     if (!compact) {
@@ -2845,10 +2864,11 @@
         const selected = Boolean(activeBottle && activeBottle.zones.includes(zone.id));
         const isAllowed = allowedLevels.includes(group.level);
         const productName = hasPlannerProduct && isAllowed ? activeProduct.name : "";
+        const areaLabel = getPlannerAreaLabel(zone.label);
 
         return `
           <div class="zone-planner-overlay-row zone-planner-overlay-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
-            <span class="zone-planner-overlay-area-gap" aria-hidden="true"></span>
+            <span class="zone-planner-overlay-area" title="${escapeHtml(areaLabel)}">${escapeHtml(areaLabel)}</span>
             <span class="zone-planner-overlay-product${productName ? "" : " is-empty"}" title="${productName}">${escapeHtml(productName)}</span>
             ${PLANNER_TYPE_COLUMNS.map((column) => {
               const isProductTypeColumn = hasPlannerProduct && activePlannerType === column.key;
@@ -2906,6 +2926,13 @@
             </div>
             <div class="zone-planner-overlay-rows">
               ${plannerRows.join("")}
+            </div>
+            <div class="zone-planner-overlay-notes" aria-hidden="true">
+              ${PLANNER_NOTES.map((note) => `
+                <div class="zone-planner-overlay-note zone-planner-overlay-note--${escapeHtml(note.level)}">
+                  <p>${escapeHtml(note.text)}</p>
+                </div>
+              `).join("")}
             </div>
           </div>
         </div>

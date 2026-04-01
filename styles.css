@@ -1750,8 +1750,25 @@ input {
   opacity: 0.84;
 }
 
-.zone-planner-overlay-area-gap {
-  display: block;
+.zone-planner-overlay-area {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  justify-self: stretch;
+  min-height: 52%;
+  margin: 0 5.2%;
+  padding: 0 0.45cqi;
+  background: rgba(251, 249, 244, 0.998);
+  color: rgba(47, 35, 26, 0.94);
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(4.4px, 0.62cqi, 6.2px);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: 0.003em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 0 0 0.1cqi rgba(251, 249, 244, 0.998);
 }
 
 .zone-planner-overlay-product {
@@ -1759,20 +1776,20 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 50%;
-  margin: 0 6.75%;
-  padding: 0 0.2cqi;
+  min-height: 54%;
+  margin: 0 5.4%;
+  padding: 0 0.3cqi;
   background: rgba(251, 249, 244, 0.998);
-  color: rgba(44, 32, 24, 0.92);
+  color: rgba(42, 30, 22, 0.96);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.32px, 0.495cqi, 4.78px);
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: clamp(4.9px, 0.7cqi, 7px);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: 0.015em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 0 0 0.08cqi rgba(251, 249, 244, 0.998);
+  box-shadow: 0 0 0 0.12cqi rgba(251, 249, 244, 0.998);
 }
 
 .zone-planner-overlay-product.is-empty {
@@ -1831,6 +1848,37 @@ input {
   border-right: 1.5px solid rgba(86, 63, 49, 0.92);
   border-bottom: 1.5px solid rgba(86, 63, 49, 0.92);
   transform: translate(-50%, -50%) rotate(41deg);
+}
+
+.zone-planner-overlay-notes {
+  position: absolute;
+  left: 81.9%;
+  top: 37.7%;
+  width: 14.1%;
+  height: 55.6%;
+  display: grid;
+  grid-template-rows: 3fr 2fr 4fr;
+  gap: 1.9%;
+}
+
+.zone-planner-overlay-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0.45cqi 0.55cqi;
+  background: rgba(251, 249, 244, 0.995);
+  box-shadow: 0 0 0 0.14cqi rgba(251, 249, 244, 0.995);
+}
+
+.zone-planner-overlay-note p {
+  margin: 0;
+  color: rgba(42, 30, 22, 0.94);
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(5px, 0.67cqi, 6.7px);
+  line-height: 1.18;
+  font-weight: 600;
+  letter-spacing: 0.004em;
+  text-align: center;
 }
 
 .zone-plan-groups {
