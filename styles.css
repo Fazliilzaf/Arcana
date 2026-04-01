@@ -1731,10 +1731,10 @@ input {
 
 .zone-planner-overlay-rows {
   position: absolute;
-  left: 39.2%;
-  top: 37.44%;
-  width: 43.72%;
-  height: 60.38%;
+  left: 39.14%;
+  top: 37.32%;
+  width: 43.88%;
+  height: 60.56%;
   display: grid;
   grid-template-rows: repeat(9, 1fr);
   gap: 0;
@@ -1755,20 +1755,21 @@ input {
   align-items: center;
   justify-content: flex-start;
   justify-self: stretch;
-  min-height: 49%;
-  margin: 0 4.6% 0 5.6%;
-  padding: 0 0.3cqi 0 0.26cqi;
+  min-height: 48.5%;
+  margin: 0 4.55% 0 5.48%;
+  padding: 0 0.28cqi 0 0.24cqi;
   background: rgba(251, 249, 244, 0.998);
   color: rgba(47, 35, 26, 0.94);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.2px, 0.59cqi, 5.9px);
-  line-height: 1;
+  font-size: clamp(4.08px, 0.575cqi, 5.72px);
+  line-height: 0.98;
   font-weight: 500;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: 0 0 0 0.1cqi rgba(251, 249, 244, 0.998);
+  transform: translateY(-0.03cqi);
 }
 
 .zone-planner-overlay-product {
@@ -1776,20 +1777,21 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 50%;
-  margin: 0 5.1%;
-  padding: 0 0.22cqi;
+  min-height: 49%;
+  margin: 0 5%;
+  padding: 0 0.18cqi;
   background: rgba(251, 249, 244, 0.998);
   color: rgba(42, 30, 22, 0.96);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.55px, 0.65cqi, 6.2px);
-  line-height: 1;
-  font-weight: 600;
-  letter-spacing: 0.004em;
+  font-size: clamp(4.42px, 0.63cqi, 6.02px);
+  line-height: 0.98;
+  font-weight: 550;
+  letter-spacing: 0.002em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: 0 0 0 0.12cqi rgba(251, 249, 244, 0.998);
+  transform: translateY(-0.03cqi);
 }
 
 .zone-planner-overlay-product.is-empty {
@@ -1852,20 +1854,20 @@ input {
 
 .zone-planner-overlay-notes {
   position: absolute;
-  left: 82.05%;
-  top: 37.82%;
-  width: 13.4%;
-  height: 55.15%;
+  left: 82.14%;
+  top: 37.7%;
+  width: 13.08%;
+  height: 55.32%;
   display: grid;
   grid-template-rows: 3fr 2fr 4fr;
-  gap: 1.55%;
+  gap: 1.42%;
 }
 
 .zone-planner-overlay-note {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 0.3cqi 0.38cqi;
+  padding: 0.26cqi 0.34cqi;
   background: rgba(251, 249, 244, 0.995);
   box-shadow: 0 0 0 0.14cqi rgba(251, 249, 244, 0.995);
 }
@@ -1874,8 +1876,8 @@ input {
   margin: 0;
   color: rgba(42, 30, 22, 0.94);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.7px, 0.61cqi, 5.95px);
-  line-height: 1.12;
+  font-size: clamp(4.58px, 0.595cqi, 5.78px);
+  line-height: 1.08;
   font-weight: 500;
   letter-spacing: 0;
   text-align: center;
