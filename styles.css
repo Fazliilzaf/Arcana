@@ -1765,20 +1765,20 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 62%;
-  margin: 0 3.4%;
-  padding: 0 0.32cqi;
-  background: rgba(250, 247, 241, 0.985);
-  color: rgba(37, 27, 20, 0.98);
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: transparent;
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(5.4px, 0.76cqi, 7.4px);
-  line-height: 1.02;
-  font-weight: 600;
+  font-size: clamp(4px, 0.58cqi, 5.5px);
+  line-height: 1;
+  font-weight: 500;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 0 0 0.14cqi rgba(250, 247, 241, 0.985);
+  box-shadow: none;
   transform: none;
 }
 
