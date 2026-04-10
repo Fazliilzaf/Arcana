@@ -1780,17 +1780,18 @@ input {
   margin: 0;
   padding: 0;
   background: transparent;
-  color: rgba(69, 56, 45, 0.88);
+  color: rgba(61, 48, 38, 0.94);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(7.5px, 1.02cqi, 10px);
-  line-height: 1.02;
-  font-weight: 550;
+  font-size: clamp(8.2px, 1.12cqi, 11px);
+  line-height: 1.06;
+  font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: none;
   transform: none;
+  text-shadow: 0 0 0.5px rgba(255, 255, 255, 0.22);
 }
 
 .zone-planner-overlay-product.is-empty {
