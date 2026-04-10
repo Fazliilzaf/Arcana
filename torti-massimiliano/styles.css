@@ -1751,25 +1751,13 @@ input {
 }
 
 .zone-planner-overlay-area {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
   justify-self: stretch;
-  min-height: 48.2%;
-  margin: 0 4.46% 0 5.3%;
-  padding: 0 0.24cqi 0 0.2cqi;
-  background: rgba(251, 249, 244, 0.998);
-  color: rgba(47, 35, 26, 0.94);
-  font-family: "Cormorant Garamond", serif;
-  font-size: clamp(3.92px, 0.558cqi, 5.5px);
-  line-height: 0.98;
-  font-weight: 500;
-  letter-spacing: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: 0 0 0 0.1cqi rgba(251, 249, 244, 0.998);
-  transform: translateY(-0.065cqi);
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: transparent;
 }
 
 .zone-planner-overlay-product {
@@ -1777,21 +1765,21 @@ input {
   align-items: center;
   justify-content: center;
   justify-self: stretch;
-  min-height: 48.6%;
-  margin: 0 4.88%;
-  padding: 0 0.12cqi;
-  background: rgba(251, 249, 244, 0.998);
-  color: rgba(42, 30, 22, 0.96);
+  min-height: 62%;
+  margin: 0 3.4%;
+  padding: 0 0.32cqi;
+  background: rgba(250, 247, 241, 0.985);
+  color: rgba(37, 27, 20, 0.98);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.26px, 0.61cqi, 5.82px);
-  line-height: 0.98;
-  font-weight: 520;
+  font-size: clamp(5.4px, 0.76cqi, 7.4px);
+  line-height: 1.02;
+  font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 0 0 0.12cqi rgba(251, 249, 244, 0.998);
-  transform: translateY(-0.065cqi);
+  box-shadow: 0 0 0 0.14cqi rgba(250, 247, 241, 0.985);
+  transform: none;
 }
 
 .zone-planner-overlay-product.is-empty {
@@ -1850,37 +1838,6 @@ input {
   border-right: 1.5px solid rgba(86, 63, 49, 0.92);
   border-bottom: 1.5px solid rgba(86, 63, 49, 0.92);
   transform: translate(-50%, -50%) rotate(41deg);
-}
-
-.zone-planner-overlay-notes {
-  position: absolute;
-  left: 82.24%;
-  top: 37.48%;
-  width: 12.78%;
-  height: 55.54%;
-  display: grid;
-  grid-template-rows: 3fr 2fr 4fr;
-  gap: 1.28%;
-}
-
-.zone-planner-overlay-note {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 0.21cqi 0.26cqi;
-  background: rgba(251, 249, 244, 0.995);
-  box-shadow: 0 0 0 0.14cqi rgba(251, 249, 244, 0.995);
-}
-
-.zone-planner-overlay-note p {
-  margin: 0;
-  color: rgba(42, 30, 22, 0.94);
-  font-family: "Cormorant Garamond", serif;
-  font-size: clamp(4.38px, 0.57cqi, 5.52px);
-  line-height: 1.04;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-align: center;
 }
 
 .zone-plan-groups {

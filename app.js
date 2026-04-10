@@ -2863,12 +2863,11 @@
       group.zones.map((zone) => {
         const selected = Boolean(activeBottle && activeBottle.zones.includes(zone.id));
         const isAllowed = allowedLevels.includes(group.level);
-        const productName = hasPlannerProduct && isAllowed ? activeProduct.name : "";
-        const areaLabel = getPlannerAreaLabel(zone.label);
+        const productName = hasPlannerProduct && isAllowed && selected ? activeProduct.name : "";
 
         return `
           <div class="zone-planner-overlay-row zone-planner-overlay-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
-            <span class="zone-planner-overlay-area" title="${escapeHtml(areaLabel)}">${escapeHtml(areaLabel)}</span>
+            <span class="zone-planner-overlay-area" aria-hidden="true"></span>
             <span class="zone-planner-overlay-product${productName ? "" : " is-empty"}" title="${productName}">${escapeHtml(productName)}</span>
             ${PLANNER_TYPE_COLUMNS.map((column) => {
               const isProductTypeColumn = hasPlannerProduct && activePlannerType === column.key;
@@ -2926,13 +2925,6 @@
             </div>
             <div class="zone-planner-overlay-rows">
               ${plannerRows.join("")}
-            </div>
-            <div class="zone-planner-overlay-notes" aria-hidden="true">
-              ${PLANNER_NOTES.map((note) => `
-                <div class="zone-planner-overlay-note zone-planner-overlay-note--${escapeHtml(note.level)}">
-                  <p>${escapeHtml(note.text)}</p>
-                </div>
-              `).join("")}
             </div>
           </div>
         </div>
