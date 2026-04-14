@@ -1865,12 +1865,12 @@ input {
   justify-self: stretch;
   min-height: 100%;
   margin: 0;
-  padding: 0;
-  background: transparent;
-  color: rgba(61, 48, 38, 0.94);
+  padding: 0 0.18em;
+  background: rgba(255, 252, 248, 0.98);
+  color: transparent;
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(8.2px, 1.12cqi, 11px);
-  line-height: 1.06;
+  font-size: clamp(8px, 1.02cqi, 10px);
+  line-height: 1.04;
   font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
@@ -1878,11 +1878,15 @@ input {
   text-overflow: ellipsis;
   box-shadow: none;
   transform: none;
-  opacity: 0;
+  opacity: 1;
 }
 
 .zone-planner-overlay-product.is-empty {
   color: transparent;
+}
+
+.zone-planner-overlay-row.is-selected .zone-planner-overlay-product.is-visible {
+  color: rgba(61, 48, 38, 0.98);
 }
 
 .zone-planner-overlay-cell {
