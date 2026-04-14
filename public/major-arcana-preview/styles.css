@@ -16302,30 +16302,6 @@ button {
   margin-top: 0;
 }
 
-.queue-history-list[data-queue-list-mode="mailbox"] {
-  gap: 12px;
-  margin-top: 6px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  overflow-x: hidden;
-  overflow-y: auto;
-  height: 0;
-}
-
-.queue-history-list[data-queue-list-mode="mailbox"] > .thread-card {
-}
-
-.queue-history-list[data-queue-list-mode="mailbox"] > .thread-card {
-  margin: 0;
-}
-
-.queue-history-list[data-queue-list-mode="mailbox"] > .thread-card + .thread-card {
-  border-top: 0;
-}
-
 .queue-history-item {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
