@@ -2866,13 +2866,12 @@
       group.zones.map((zone) => {
         const selected = Boolean(activeBottle && activeBottle.zones.includes(zone.id));
         const isAllowed = allowedLevels.includes(group.level);
-        const productName = hasPlannerProduct && isAllowed && selected ? activeProduct.name : "";
         const areaLabel = getPlannerAreaLabel(zone.label);
 
         return `
           <div class="zone-planner-overlay-row zone-planner-overlay-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
             <span class="zone-planner-overlay-area" aria-hidden="true">${escapeHtml(areaLabel)}</span>
-            <span class="zone-planner-overlay-product${productName ? " is-visible" : " is-empty"}" title="${productName}">${escapeHtml(productName)}</span>
+            <span class="zone-planner-overlay-product" aria-hidden="true"></span>
             ${PLANNER_TYPE_COLUMNS.map((column) => {
               const isProductTypeColumn = hasPlannerProduct && activePlannerType === column.key;
 
@@ -2918,7 +2917,7 @@
     selectedBottlePanel.innerHTML = `
       <div class="zone-editor-card">
         <div class="zone-planner-reference" aria-label="Layering planner">
-          <img class="zone-planner-reference-image" src="./assets/figma-planner-node-3-2-white-sheet.png" alt="" aria-hidden="true" />
+          <img class="zone-planner-reference-image" src="./assets/figma-planner-node-3-2-no-middle-text.png" alt="" aria-hidden="true" />
           <div class="zone-planner-overlay">
             <div class="visually-hidden">
               <h3>The Art of Layering</h3>
