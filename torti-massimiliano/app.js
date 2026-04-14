@@ -3132,7 +3132,7 @@
                   const allowedLevels = getProductAllowedLevels(item, item.id);
                   const isPopoverOpen = state.openLibraryLevelPickerId === item.id;
                   const isActiveProduct = activeCatalogId === item.id;
-                  const activeSummary = allowedLevels.length > 0 ? `${getLevelDescription(allowedLevels)} selected` : "No levels selected";
+                  const activeSummary = allowedLevels.length > 0 ? getLevelDescription(allowedLevels) : "No levels selected";
                   const matchingBottles = getBottlesForCatalog(item.id);
                   const bottleChipLabels = getBottleChipLabels(matchingBottles);
                   const hasPlacedBottles = matchingBottles.length > 0;
@@ -3149,8 +3149,8 @@
                     </button>
                     <button class="owned-card-levels-trigger" type="button" data-open-level-picker="${escapeHtml(item.id)}" aria-expanded="${isPopoverOpen ? "true" : "false"}" aria-label="Choose Head, Heart, or Base for ${escapeHtml(item.name)}">
                       <span class="owned-card-levels-label">Layering levels</span>
-                      <span class="product-level-badges product-level-badges-library-current" aria-label="${escapeHtml(activeSummary)}">
-                        ${renderProductLevelBadges(item, item.id, "product-level-badge product-level-badge-library-current")}
+                      <span class="owned-card-levels-summary" aria-label="${escapeHtml(activeSummary)}">
+                        ${escapeHtml(activeSummary)}
                       </span>
                     </button>
                     ${hasPlacedBottles ? `
