@@ -2871,7 +2871,7 @@
         return `
           <div class="zone-planner-overlay-row zone-planner-overlay-row--${escapeHtml(group.level)}${selected ? " is-selected" : ""}${!isAllowed ? " is-disabled" : ""}">
             <span class="zone-planner-overlay-area" aria-hidden="true">${escapeHtml(areaLabel)}</span>
-            <span class="zone-planner-overlay-product" aria-hidden="true"></span>
+            <span class="zone-planner-overlay-product${selected ? " is-visible" : ""}" aria-hidden="true">${selected ? escapeHtml(activeProduct.name) : ""}</span>
             ${PLANNER_TYPE_COLUMNS.map((column) => {
               const isProductTypeColumn = hasPlannerProduct && activePlannerType === column.key;
 

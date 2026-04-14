@@ -1754,13 +1754,13 @@ input {
 }
 
 .sheet-app.is-reference-planner-active {
-  width: min(calc(100% - 32px), 1480px);
+  width: min(calc(100% - 24px), 1600px);
 }
 
 .zone-editor-card {
   position: relative;
   overflow: visible;
-  max-width: 780px;
+  max-width: 940px;
   margin: 0 auto;
   padding: 0;
   border: 0;
@@ -1770,7 +1770,7 @@ input {
 
 .zone-planner-reference {
   position: relative;
-  width: min(100%, 780px);
+  width: min(100%, 940px);
   margin: 0 auto;
   aspect-ratio: 1159 / 829;
   container-type: inline-size;
@@ -1880,26 +1880,24 @@ input {
   margin: 0;
   padding: 0;
   background: transparent;
-  color: transparent;
+  color: rgba(73, 58, 45, 0.94);
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(8px, 1.02cqi, 10px);
-  line-height: 1.04;
-  font-weight: 600;
+  font-size: clamp(9px, 1.14cqi, 12px);
+  line-height: 1.08;
+  font-weight: 700;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: none;
   transform: none;
+  opacity: 0;
+  pointer-events: none;
+  text-shadow: 0 0 0.35px rgba(73, 58, 45, 0.45);
+}
+
+.zone-planner-overlay-product.is-visible {
   opacity: 1;
-}
-
-.zone-planner-overlay-product.is-empty {
-  color: transparent;
-}
-
-.zone-planner-overlay-row.is-selected .zone-planner-overlay-product.is-visible {
-  color: rgba(61, 48, 38, 0.98);
 }
 
 .zone-planner-overlay-cell {
@@ -1932,8 +1930,10 @@ input {
 
 .zone-planner-overlay-checkbox {
   position: relative;
-  width: clamp(12px, 1.72cqi, 16px);
-  height: clamp(9px, 1.18cqi, 11px);
+  display: grid;
+  place-items: center;
+  width: clamp(18px, 2.25cqi, 24px);
+  height: clamp(14px, 1.72cqi, 18px);
   border: 0;
   background: transparent;
   box-shadow: none;
@@ -1948,12 +1948,12 @@ input {
   content: "";
   position: absolute;
   left: 50%;
-  top: 46%;
-  width: 30%;
-  height: 56%;
-  border-right: 1.5px solid rgba(86, 63, 49, 0.92);
-  border-bottom: 1.5px solid rgba(86, 63, 49, 0.92);
-  transform: translate(-50%, -50%) rotate(41deg);
+  top: 50%;
+  width: 36%;
+  height: 62%;
+  border-right: 2px solid rgba(86, 63, 49, 0.94);
+  border-bottom: 2px solid rgba(86, 63, 49, 0.94);
+  transform: translate(-50%, -58%) rotate(42deg);
 }
 
 .zone-plan-groups {
