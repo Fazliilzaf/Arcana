@@ -519,38 +519,34 @@ input {
 
 .owned-card-levels-trigger {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   align-content: start;
   justify-items: start;
   width: calc(100% - 62px);
   margin-left: 62px;
-  padding: 9px 12px 10px;
-  border: 1px solid var(--line-soft);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow:
-    0 6px 16px rgba(75, 53, 37, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
 .owned-card-levels-trigger:hover {
-  border-color: rgba(88, 63, 46, 0.16);
+  opacity: 0.92;
 }
 
 .owned-card-levels-trigger[aria-expanded="true"] {
-  border-color: rgba(88, 63, 46, 0.24);
-  box-shadow:
-    0 10px 22px rgba(75, 53, 37, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  opacity: 1;
 }
 
 .owned-card-levels-label {
   color: var(--muted);
-  font-size: 0.56rem;
-  letter-spacing: 0.16em;
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -560,7 +556,7 @@ input {
   min-width: 0;
   width: 100%;
   color: var(--ink);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.08;
   font-weight: 700;
   letter-spacing: 0.01em;
@@ -637,7 +633,7 @@ input {
 .library-level-popover {
   position: absolute;
   left: 64px;
-  top: calc(100% - 6px);
+  top: calc(100% - 2px);
   z-index: 12;
   display: grid;
   gap: 10px;
