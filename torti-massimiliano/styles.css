@@ -450,10 +450,14 @@ input {
   max-width: 220px;
   position: relative;
   align-content: start;
-  gap: 10px;
+  gap: 0;
   padding: 14px;
   text-align: left;
   overflow: visible;
+}
+
+.owned-card-main {
+  display: block;
 }
 
 .owned-card-select {
@@ -506,25 +510,32 @@ input {
 
 .owned-card-copy {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   align-content: start;
 }
 
 .owned-card-hint {
   color: var(--muted);
-  font-size: 0.62rem;
-  line-height: 1.35;
+  font-size: 0.64rem;
+  line-height: 1.32;
+}
+
+.owned-card-meta {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
 }
 
 .owned-card-levels-trigger {
   display: grid;
-  gap: 4px;
-  align-content: start;
-  justify-items: start;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   margin-left: 0;
-  margin-top: 4px;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -545,15 +556,17 @@ input {
 
 .owned-card-levels-label {
   color: var(--muted);
-  font-size: 0.5rem;
+  font-size: 0.58rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .owned-card-levels-summary {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: nowrap;
   gap: 5px;
   min-width: 0;
@@ -607,13 +620,13 @@ input {
 .owned-card-placed {
   display: grid;
   gap: 6px;
-  width: calc(100% - 62px);
-  margin-left: 62px;
+  width: 100%;
+  margin-left: 0;
 }
 
 .owned-card-placed-label {
   color: var(--muted);
-  font-size: 0.54rem;
+  font-size: 0.56rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
@@ -2116,7 +2129,7 @@ input {
 
 .product-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   cursor: grab;
 }
@@ -2133,6 +2146,8 @@ input {
 
 .product-copy {
   min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .product-copy strong {
@@ -2143,7 +2158,7 @@ input {
 }
 
 .product-copy p {
-  margin: 5px 0 0;
+  margin: 0;
   font-size: 0.79rem;
   line-height: 1.45;
 }
@@ -2157,14 +2172,13 @@ input {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   font-weight: 700;
+  margin-top: 2px;
 }
 
 .product-card-flags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .product-level-badges {
