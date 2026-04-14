@@ -2214,7 +2214,7 @@
       if (queueHistoryModeBadgeNode) {
         queueHistoryModeBadgeNode.hidden = !isMailboxView;
         queueHistoryModeBadgeNode.textContent = isMailboxView
-          ? "Alla mejl"
+          ? "Alla mejl · full mailboxvy"
           : "Historik · vald tråd";
       }
       if (queuePrimaryLaneTag) queuePrimaryLaneTag.hidden = isOpen;
