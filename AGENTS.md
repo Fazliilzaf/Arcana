@@ -7,6 +7,15 @@
 - Keep changes focused on the stated goal.
 - Do not add fluff, placeholder features, or unrelated polish.
 
+## Model and reasoning budget
+- Default to cost-aware operation for routine work.
+- Treat `GPT-5.4-Mini` with `Medel` reasoning as the standard default for everyday analysis, screenshots, smaller bug fixes, HTML/CSS passes, and narrow implementation work.
+- Treat `GPT-5.4` with `Medel` reasoning as the normal upgrade for important CCO code passes that need stronger reliability.
+- Use `GPT-5.4` with `Hög` or `Extra hög` reasoning only for architecture work, hard regressions across multiple layers, major refactors, or unusually ambiguous debugging.
+- Do not assume the most expensive mode by default.
+- For advanced passes, explicitly tell the user at the start of ASK MODE when a model/reasoning upgrade is recommended before substantial work begins.
+- Do not ask for an upgrade unless the task complexity materially justifies it.
+
 ## Preservation rule
 - Preserve existing working functionality by default.
 - Treat the current `/cco-next` implementation as the baseline from figma.
@@ -53,6 +62,10 @@ After code changes always run:
 - `npm run lint:no-bypass`
 - `npm run test:unit`
 - `ARCANA_AI_PROVIDER=fallback ARCANA_GRAPH_READ_ENABLED=false ARCANA_GRAPH_SEND_ENABLED=false npm run smoke:local`
+
+## Screenshots
+- After every completed task with a visual or UI result, always capture and share at least one current screenshot of the relevant state before closing the task.
+- If a task has no visual surface, say that explicitly instead of forcing a screenshot.
 
 # Arcana UI Rules
 

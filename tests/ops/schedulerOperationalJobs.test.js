@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const { createScheduler } = require('../../src/ops/scheduler');
 const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
+const { createCcoCustomerStore } = require('../../src/ops/ccoCustomerStore');
 const { createCcoHistoryStore } = require('../../src/ops/ccoHistoryStore');
 const { createStateBackup } = require('../../src/ops/stateBackup');
 
@@ -413,6 +414,10 @@ test('scheduler cco_history_sync värmer senaste fönstret och backfillar bakåt
     const ccoHistoryStore = await createCcoHistoryStore({
       filePath: path.join(tmpDir, 'cco-history.json'),
     });
+    const ccoCustomerStore = await createCcoCustomerStore({
+      filePath: path.join(tmpDir, 'cco-customers.json'),
+      historyStore: ccoHistoryStore,
+    });
     const baseNowMs = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
     const graphCalls = [];
@@ -422,6 +427,7 @@ test('scheduler cco_history_sync värmer senaste fönstret och backfillar bakåt
       authStore: createBaseAuthStore(),
       templateStore: createBaseTemplateStore(),
       ccoHistoryStore,
+      ccoCustomerStore,
       graphReadConnector: {
         async fetchInboxSnapshot(options = {}) {
           graphCalls.push({
@@ -470,7 +476,13 @@ test('scheduler cco_history_sync värmer senaste fönstret och backfillar bakåt
     assert.equal(firstRun.result.complete, false);
     assert.equal(firstRun.result.backfillPerformedCount, 2);
     assert.equal(firstRun.result.customerReplyMaterializedCount, 0);
+    assert.equal(firstRun.result.customerStateWriteBack.attempted, false);
     assert.equal(graphCalls.length, 4);
+
+    await assert.rejects(
+      fs.readFile(path.join(tmpDir, 'cco-customers.json'), 'utf8'),
+      (error) => error && error.code === 'ENOENT'
+    );
 
     const secondRun = await scheduler.runJob('cco_history_sync', {
       trigger: 'manual',
@@ -486,7 +498,40 @@ test('scheduler cco_history_sync värmer senaste fönstret och backfillar bakåt
     assert.equal(secondRun.result.complete, true);
     assert.equal(secondRun.result.completeMailboxCount, 2);
     assert.equal(secondRun.result.customerReplyMaterializedCount, 0);
+    assert.equal(secondRun.result.customerStateWriteBack.attempted, true);
+    assert.equal(secondRun.result.customerStateWriteBack.changed, true);
     assert.equal(graphCalls.length, 8);
+
+    const secondCustomerStateRaw = JSON.parse(
+      await fs.readFile(path.join(tmpDir, 'cco-customers.json'), 'utf8')
+    );
+    assert.ok(
+      Object.keys(secondCustomerStateRaw.tenants?.['tenant-a']?.customerState?.identityByKey || {})
+        .length > 0
+    );
+    assert.ok(
+      Object.keys(
+        secondCustomerStateRaw.tenants?.['tenant-a']?.customerState?.primaryEmailByKey || {}
+      ).length > 0
+    );
+
+    const secondCustomerStateRawText = await fs.readFile(
+      path.join(tmpDir, 'cco-customers.json'),
+      'utf8'
+    );
+    const thirdRun = await scheduler.runJob('cco_history_sync', {
+      trigger: 'manual',
+      tenantId: 'tenant-a',
+      actorUserId: 'owner-1',
+    });
+    assert.equal(thirdRun.ok, true);
+    assert.equal(thirdRun.result.customerStateWriteBack.attempted, true);
+    assert.equal(thirdRun.result.customerStateWriteBack.changed, false);
+    const thirdCustomerStateRawText = await fs.readFile(
+      path.join(tmpDir, 'cco-customers.json'),
+      'utf8'
+    );
+    assert.equal(thirdCustomerStateRawText, secondCustomerStateRawText);
 
     const konsMessages = await ccoHistoryStore.listMailboxMessages({
       tenantId: 'tenant-a',

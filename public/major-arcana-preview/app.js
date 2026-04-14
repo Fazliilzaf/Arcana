@@ -19,6 +19,7 @@
   const noteShell = document.getElementById("note-shell");
   const scheduleShell = document.getElementById("schedule-shell");
   const laterShell = document.getElementById("later-shell");
+  const laterContext = document.querySelector("[data-later-context]");
   const mailboxOptionsContainer = document.querySelector(".mailbox-options");
   const laterStatus = document.querySelector("[data-later-status]");
   const sentStatus = document.querySelector("[data-sent-status]");
@@ -100,9 +101,26 @@
     document.querySelectorAll("[data-mailbox-admin-close]")
   );
   const mailboxAdminList = document.querySelector("[data-mailbox-admin-list]");
+  const mailboxAdminFormTitle = document.querySelector("[data-mailbox-admin-form-title]");
+  const mailboxAdminResetButton = document.querySelector("[data-mailbox-admin-reset]");
   const mailboxAdminNameInput = document.querySelector("[data-mailbox-admin-name]");
   const mailboxAdminEmailInput = document.querySelector("[data-mailbox-admin-email]");
   const mailboxAdminOwnerSelect = document.querySelector("[data-mailbox-admin-owner]");
+  const mailboxAdminSignatureNameInput = document.querySelector(
+    "[data-mailbox-admin-signature-name]"
+  );
+  const mailboxAdminSignatureFullNameInput = document.querySelector(
+    "[data-mailbox-admin-signature-full-name]"
+  );
+  const mailboxAdminSignatureTitleInput = document.querySelector(
+    "[data-mailbox-admin-signature-title]"
+  );
+  const mailboxAdminSignatureEditor = document.querySelector(
+    "[data-mailbox-admin-signature-editor]"
+  );
+  const mailboxAdminSignatureButtons = Array.from(
+    document.querySelectorAll("[data-mailbox-signature-command]")
+  );
   const mailboxAdminFeedback = document.querySelector("[data-mailbox-admin-feedback]");
   const mailboxAdminSaveButton = document.querySelector("[data-mailbox-admin-save]");
   const noteModeShell = document.getElementById("note-mode-shell");
@@ -253,6 +271,7 @@
   const PREVIEW_THREAD_OPS = window.MajorArcanaPreviewThreadOps;
   const PREVIEW_ACTION_ENGINE = window.MajorArcanaPreviewActionEngine;
   const PREVIEW_WORKSPACE_STATE = window.MajorArcanaPreviewWorkspaceState;
+  const PREVIEW_REENTRY_STATE = window.MajorArcanaPreviewReentryState;
   const PREVIEW_FOCUS_INTEL_RENDERERS = window.MajorArcanaPreviewFocusIntelRenderers;
   const PREVIEW_QUEUE_RENDERERS = window.MajorArcanaPreviewQueueRenderers;
   const PREVIEW_OVERLAY_RENDERERS = window.MajorArcanaPreviewOverlayRenderers;
@@ -276,6 +295,11 @@
 
   if (!PREVIEW_WORKSPACE_STATE) {
     console.error("Major Arcana preview workspace-state saknas.");
+    return;
+  }
+
+  if (!PREVIEW_REENTRY_STATE) {
+    console.error("Major Arcana preview reentry-state saknas.");
     return;
   }
 
@@ -317,7 +341,11 @@
     QUEUE_ACTIONS,
     QUEUE_LANE_LABELS,
     QUEUE_LANE_ORDER,
+    STUDIO_TRUTH_PRIMARY,
     VISIBILITY_LABELS,
+    FOCUS_TRUTH_PRIMARY,
+    WORKLIST_TRUTH_PRIMARY,
+    WORKLIST_TRUTH_VIEW,
   } = PREVIEW_CONFIG;
 
   const openButtons = document.querySelectorAll("[data-studio-open]");
@@ -353,8 +381,28 @@
   const conversationCollapseButton = document.querySelector(".conversation-collapse");
   const conversationHistory = document.getElementById("focus-conversation-history");
   const resizeHandles = Array.from(document.querySelectorAll("[data-resize-handle]"));
-  const queueContent = document.querySelector(".thread-stack");
+  const queueContent = document.querySelector("[data-runtime-legacy-queue]");
   const queueTitle = document.querySelector("[data-queue-title]");
+  const truthWorklistLaunchButton = document.querySelector("[data-truth-worklist-launch]");
+  const truthWorklistShell = document.querySelector("[data-truth-worklist-shell]");
+  const truthWorklistCloseButtons = Array.from(
+    document.querySelectorAll("[data-truth-worklist-close]")
+  );
+  const truthWorklistMeta = document.querySelector("[data-truth-worklist-meta]");
+  const truthWorklistSummary = document.querySelector("[data-truth-worklist-summary]");
+  const truthWorklistStatus = document.querySelector("[data-truth-worklist-status]");
+  const truthWorklistControls = document.querySelector("[data-truth-worklist-controls]");
+  const truthWorklistGuidance = document.querySelector("[data-truth-worklist-guidance]");
+  const truthWorklistMailboxes = document.querySelector("[data-truth-worklist-mailboxes]");
+  const truthWorklistRows = document.querySelector("[data-truth-worklist-rows]");
+  const truthWorklistReadoutLink = document.querySelector("[data-truth-worklist-readout]");
+  const truthWorklistRelayNote = document.querySelector("[data-truth-worklist-relay-note]");
+  const truthWorklistPageButtons = Array.from(
+    document.querySelectorAll("[data-truth-worklist-page-button]")
+  );
+  const truthWorklistPagePanels = Array.from(
+    document.querySelectorAll("[data-truth-worklist-page-panel]")
+  );
   const queueSummaryFocus = document.querySelector('[data-queue-summary="focus"]');
   const queueSummaryActNow = document.querySelector('[data-queue-summary="act-now"]');
   const queueSummarySprint = document.querySelector('[data-queue-summary="sprint"]');
@@ -363,24 +411,115 @@
   const queueActiveLaneLabel = document.querySelector("[data-queue-active-lane-label]");
   const queueLaneCountNodes = Array.from(document.querySelectorAll("[data-queue-lane-count]"));
   const queueLaneButtons = Array.from(document.querySelectorAll("[data-queue-lane]"));
+  const queuePrimaryLaneButtons = Array.from(
+    document.querySelectorAll(".queue-lane-quickstrip [data-queue-lane]")
+  );
+  const queueSecondarySignalCountNodes = Array.from(
+    document.querySelectorAll("[data-queue-secondary-count]")
+  );
+  const queueFeedCountNodes = Array.from(document.querySelectorAll("[data-queue-feed-count]"));
+  const queueViewJumpButtons = Array.from(document.querySelectorAll("[data-queue-view-jump]"));
+  const queueScopeStrip = document.querySelector(".queue-scope-strip");
   const queueCollapsedList = document.querySelector(".collapsed-list");
+  const queueCategoryToggleButton = document.querySelector("[data-queue-category-toggle]");
   const queueHistoryShell = document.querySelector("[data-queue-history-shell]");
   const queueHistoryToggle = document.querySelector("[data-queue-history-toggle]");
   const queueHistoryPanel = document.querySelector("[data-queue-history-panel]");
   const queueHistoryHead = document.querySelector(".queue-history-head");
   const queueHistoryList = document.querySelector("[data-queue-history-list]");
   const queueHistoryMeta = document.querySelector("[data-queue-history-meta]");
+  const queueHistoryCompleteButton = document.querySelector("[data-queue-history-complete]");
+  const queueHistoryDeleteButton = document.querySelector("[data-queue-history-delete]");
   const queueHistoryCount = document.querySelector("[data-queue-history-count]");
   const queueHistoryLoadMoreButton = document.querySelector("[data-queue-history-load-more]");
+  const queueQuickLaneStrip = document.querySelector(".queue-lane-quickstrip");
+  const queueMailboxScopeLabel = document.querySelector("[data-queue-mailbox-scope-label]");
+  const queueMailboxScopeCount = document.querySelector("[data-queue-mailbox-scope-count]");
   const mailboxTriggerLabel = document.querySelector("[data-mailbox-trigger-label]");
+  const mailboxTrigger =
+    mailboxTriggerLabel && typeof mailboxTriggerLabel.closest === "function"
+      ? mailboxTriggerLabel.closest(".mailbox-trigger")
+      : document.querySelector(".queue-bottom-row .mailbox-trigger");
   const ownerTriggerLabel = document.querySelector("[data-owner-trigger-label]");
   const mailboxMenuGrid = document.querySelector("[data-mailbox-menu-grid]");
+  const mailboxMenuToggle = document.getElementById("mailbox-menu-toggle");
   const ownerMenuGrid = document.querySelector("[data-owner-menu-grid]");
+  const ownerMenuNote = document.querySelector("[data-owner-menu-note]");
+  const LEGACY_RUNTIME_MAILBOX_EMAILS = Object.freeze({
+    contact: "contact@hairtpclinic.com",
+    kontakt: "contact@hairtpclinic.com",
+    egzona: "egzona@hairtpclinic.com",
+    fazli: "fazli@hairtpclinic.com",
+    consult: "kons@hairtpclinic.com",
+    kons: "kons@hairtpclinic.com",
+    info: "info@hairtpclinic.com",
+    market: "marknad@hairtpclinic.com",
+    marknad: "marknad@hairtpclinic.com",
+    receipt: "receipt@hairtpclinic.com",
+    kvitto: "receipt@hairtpclinic.com",
+  });
+  const MAILBOX_TONE_CLASS_BY_TOKEN = Object.freeze({
+    egzona: "mailbox-option-egzona",
+    contact: "mailbox-option-contact",
+    kontakt: "mailbox-option-contact",
+    fazli: "mailbox-option-fazli",
+    receipt: "mailbox-option-receipt",
+    kvitto: "mailbox-option-receipt",
+    info: "mailbox-option-info",
+    consult: "mailbox-option-consult",
+    kons: "mailbox-option-consult",
+    market: "mailbox-option-market",
+    marknad: "mailbox-option-market",
+  });
+  const MAILBOX_TONE_CLASS_FALLBACKS = Object.freeze([
+    "mailbox-option-egzona",
+    "mailbox-option-contact",
+    "mailbox-option-fazli",
+    "mailbox-option-receipt",
+    "mailbox-option-info",
+    "mailbox-option-consult",
+    "mailbox-option-market",
+  ]);
+  const LEGACY_RUNTIME_MAILBOXES = Object.freeze(
+    mailboxMenuGrid
+      ? Array.from(mailboxMenuGrid.querySelectorAll(".mailbox-option"))
+          .filter((node) => !node.classList.contains("mailbox-option-add"))
+          .map((node, index) => {
+            const toneClass = Array.from(node.classList).find(
+              (className) =>
+                className.startsWith("mailbox-option-") &&
+                className !== "mailbox-option" &&
+                className !== "mailbox-option-add" &&
+                className !== "mailbox-option-custom"
+            );
+            const label = asText(
+              node.querySelector(".mailbox-option-name")?.textContent,
+              `Mailbox ${index + 1}`
+            );
+            const scopeId = toneClass ? toneClass.replace("mailbox-option-", "") : label;
+            const id = normalizeMailboxId(scopeId);
+            return {
+              id,
+              label,
+              email: resolveRuntimeMailboxPresetEmail(scopeId || label || id),
+              owner: "Preset",
+              custom: false,
+              order: index,
+              toneClass: toneClass || "",
+            };
+          })
+      : []
+  );
   const ownerMenuToggle = document.getElementById("owner-menu-toggle");
+  const mailboxDropdowns = Array.from(document.querySelectorAll(".mailbox-dropdown"));
   const focusTitle = document.getElementById("focus-title");
+  const focusTabs = document.querySelector(".focus-tabs");
   const focusStatusLine = document.querySelector("[data-focus-status-line]");
+  const focusSignals = document.querySelector("[data-focus-signals]");
   const focusBadgeRow = document.querySelector("[data-focus-badge-row]");
   const focusConversationSection = document.querySelector("[data-focus-conversation]");
+  const focusConversationLayout = document.querySelector("[data-focus-conversation-layout]");
+  const focusWorkrail = document.querySelector("[data-focus-workrail]");
   const focusCustomerHero = document.querySelector("[data-focus-customer-hero]");
   const focusCustomerSummary = document.querySelector("[data-focus-customer-summary]");
   const focusCustomerStats = document.querySelector("[data-focus-customer-stats]");
@@ -389,13 +528,107 @@
   const focusCustomerHistoryDescription = document.querySelector(
     "[data-focus-customer-history-description]"
   );
+  const focusCustomerHistoryState = document.querySelector("[data-focus-customer-history-state]");
+  const focusCustomerHistoryListState = document.querySelector(
+    "[data-focus-customer-history-list-state]"
+  );
+  const focusCustomerHistoryListStateCopy = document.querySelector(
+    "[data-focus-customer-history-list-state-copy]"
+  );
+  const focusIntelPrimary = document.querySelector(".focus-intel-primary");
+  const focusIntelPrimaryBody = document.querySelector("[data-intel-primary-body]");
   const focusIntelTitle = document.getElementById("focus-intel-title");
   const intelDateButton = document.querySelector("[data-intel-date]");
   const intelCustomer = document.querySelector("[data-intel-customer]");
   const intelGrid = document.querySelector("[data-intel-grid]");
+  const focusIntelReason = document.querySelector(".focus-intel-reason");
   const intelReasonCopy = document.querySelector("[data-intel-reason-copy]");
-  const intelPanelOverview = document.querySelector('[data-intel-panel-group="overview"]');
-  const intelPanelAi = document.querySelector('[data-intel-panel-group="ai"]');
+  const intelPanelCustomer = document.querySelector('[data-intel-panel-group="customer"]');
+  const focusIntelPanels = document.querySelector(".focus-intel-panels");
+
+  function getMailboxDropdownParts(source) {
+    const dropdown =
+      source instanceof Element
+        ? source.closest(".mailbox-dropdown")
+        : null;
+    if (!dropdown) return null;
+    const toggle = dropdown.querySelector(".mailbox-menu-toggle");
+    const trigger = dropdown.querySelector(".mailbox-trigger");
+    const menu = dropdown.querySelector(".mailbox-menu");
+    if (!toggle || !trigger || !menu) return null;
+    return { dropdown, toggle, trigger, menu };
+  }
+
+  function clearMailboxDropdownOverlay(menu) {
+    if (!menu) return;
+    menu.style.removeProperty("--mailbox-menu-left");
+    menu.style.removeProperty("--mailbox-menu-top");
+    menu.style.removeProperty("--mailbox-menu-width");
+    menu.style.removeProperty("--mailbox-menu-max-height");
+  }
+
+  function syncMailboxDropdownOverlay(source) {
+    const parts = getMailboxDropdownParts(source);
+    if (!parts) return;
+    const { dropdown, toggle, trigger, menu } = parts;
+    if (!toggle.checked) {
+      clearMailboxDropdownOverlay(menu);
+      return;
+    }
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const viewportPadding = 16;
+    const menuGap = 10;
+    const isOwnerDropdown = dropdown.classList.contains("owner-dropdown");
+    const baseWidth = isOwnerDropdown ? 196 : 296;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const desiredWidth = Math.min(
+      Math.max(baseWidth, Math.round(triggerRect.width)),
+      Math.max(180, viewportWidth - viewportPadding * 2)
+    );
+    const preferredLeft = isOwnerDropdown
+      ? triggerRect.right - desiredWidth
+      : triggerRect.left;
+    const left = Math.min(
+      Math.max(viewportPadding, Math.round(preferredLeft)),
+      Math.max(viewportPadding, viewportWidth - viewportPadding - desiredWidth)
+    );
+
+    const naturalHeight = Math.max(180, Math.min(menu.scrollHeight + 18, 520));
+    const spaceBelow = viewportHeight - triggerRect.bottom - menuGap - viewportPadding;
+    const spaceAbove = triggerRect.top - menuGap - viewportPadding;
+    let maxHeight = Math.max(160, Math.min(naturalHeight, spaceBelow));
+    let top = Math.round(triggerRect.bottom + menuGap);
+    if (spaceBelow < 180 && spaceAbove > spaceBelow) {
+      maxHeight = Math.max(160, Math.min(naturalHeight, spaceAbove));
+      top = Math.max(viewportPadding, Math.round(triggerRect.top - menuGap - maxHeight));
+    }
+
+    menu.style.setProperty("--mailbox-menu-left", `${left}px`);
+    menu.style.setProperty("--mailbox-menu-top", `${top}px`);
+    menu.style.setProperty("--mailbox-menu-width", `${Math.round(desiredWidth)}px`);
+    menu.style.setProperty("--mailbox-menu-max-height", `${Math.round(maxHeight)}px`);
+  }
+
+  function syncOpenMailboxDropdownOverlays() {
+    mailboxDropdowns.forEach((dropdown) => {
+      syncMailboxDropdownOverlay(dropdown);
+    });
+  }
+
+  function closeMailboxDropdowns({ exceptToggle = null } = {}) {
+    mailboxDropdowns.forEach((dropdown) => {
+      const parts = getMailboxDropdownParts(dropdown);
+      if (!parts) return;
+      const { toggle, menu } = parts;
+      if (exceptToggle && toggle === exceptToggle) return;
+      toggle.checked = false;
+      clearMailboxDropdownOverlay(menu);
+    });
+  }
+  const intelPanelHistory = document.querySelector('[data-intel-panel-group="history"]');
+  const intelPanelSignals = document.querySelector('[data-intel-panel-group="signals"]');
   const intelPanelMedicine = document.querySelector('[data-intel-panel-group="medicine"]');
   const intelPanelTeam = document.querySelector('[data-intel-panel-group="team"]');
   const intelPanelActions = document.querySelector('[data-intel-panel-group="actions"]');
@@ -495,6 +728,13 @@
   const analyticsCoachingAction = document.querySelector("[data-analytics-coaching-action]");
   const analyticsCoachingCopy = document.querySelector(".analytics-coaching-copy p");
   const analyticsCoachingLabel = document.querySelector(".analytics-coaching-copy span");
+  const analyticsTrustNotes = {
+    team: document.querySelector('[data-analytics-trust-note="team"]'),
+    self: document.querySelector('[data-analytics-trust-note="self"]'),
+    leaderboard: document.querySelector('[data-analytics-trust-note="leaderboard"]'),
+    templates: document.querySelector('[data-analytics-trust-note="templates"]'),
+    coaching: document.querySelector('[data-analytics-trust-note="coaching"]'),
+  };
   const automationVersionCards = Array.from(
     document.querySelectorAll("[data-automation-version]")
   );
@@ -505,7 +745,9 @@
     document.querySelectorAll("[data-automation-version-action]")
   );
   const automationStatus = document.querySelector("[data-automation-status]");
-  const automationRunButton = document.querySelector(".automation-run-button");
+  const automationRunButton = document.querySelector(
+    '[data-automation-primary-action="run"]'
+  );
   const automationSaveButton = document.querySelector(".automation-save-button");
   const automationRail = document.querySelector(".automation-rail");
   const automationRailToggle = document.querySelector("[data-automation-rail-toggle]");
@@ -559,6 +801,13 @@
   const automationAutopilotFootCards = Array.from(
     document.querySelectorAll(".automation-autopilot-foot-card")
   );
+  const automationTrustNotes = {
+    global: document.querySelector('[data-automation-trust-note="global"]'),
+    analysis: document.querySelector('[data-automation-trust-note="analysis"]'),
+    testing: document.querySelector('[data-automation-trust-note="testing"]'),
+    versioner: document.querySelector('[data-automation-trust-note="versioner"]'),
+    autopilot: document.querySelector('[data-automation-trust-note="autopilot"]'),
+  };
   const automationTitleHeading = document.getElementById("automation-title");
   const automationAnalysisTitle = document.querySelector(".automation-analysis-title h2");
   const automationTemplatesTitle = document.querySelector(".automation-templates-title h2");
@@ -598,6 +847,8 @@
   const studioCustomerMood = document.querySelector("[data-studio-customer-mood]");
   const studioCustomerEmail = document.querySelector("[data-studio-customer-email]");
   const studioCustomerPhone = document.querySelector("[data-studio-customer-phone]");
+  const studioSourceLockLabel = document.querySelector("[data-studio-source-lock-label]");
+  const studioSourceLockNote = document.querySelector("[data-studio-source-lock-note]");
   const studioNextActionTitle = document.querySelector("[data-studio-next-action-title]");
   const studioNextActionNote = document.querySelector("[data-studio-next-action-note]");
   const studioPrimarySuggestion = document.querySelector("[data-studio-primary-suggestion]");
@@ -630,6 +881,7 @@
   const studioIncomingLabel = document.querySelector("[data-studio-incoming-label]");
   const studioIncomingBody = document.querySelector("[data-studio-incoming-body]");
   const studioTemplateButtons = Array.from(document.querySelectorAll("[data-studio-template]"));
+  const studioComposeFromSelect = document.querySelector("[data-studio-compose-from]");
   const studioComposeToInput = document.querySelector("[data-studio-compose-to]");
   const studioComposeSubjectInput = document.querySelector("[data-studio-compose-subject]");
   const studioEditorRecipient = document.querySelector("[data-studio-editor-recipient]");
@@ -1510,16 +1762,14 @@
       identitySuggestionsLoading: false,
       authRequired: false,
       error: "",
-      duplicateMetric: 3,
+      duplicateMetric: 0,
       mergedInto: {},
       dismissedSuggestionIds: [],
       acceptedSuggestionIds: [],
       identitySuggestionGroups: {},
-      directory: cloneJson(CUSTOMER_DIRECTORY),
-      details: cloneJson(CUSTOMER_PROFILE_DETAILS),
-      profileCounts: Object.fromEntries(
-        Object.entries(CUSTOMER_DIRECTORY).map(([key, item]) => [key, item.profileCount])
-      ),
+      directory: {},
+      details: {},
+      profileCounts: {},
       liveHydratedThreadIds: [],
       splitModalOpen: false,
       splitSourceKey: "",
@@ -1585,6 +1835,7 @@
     return {
       loading: false,
       loaded: false,
+      authRequired: false,
       partial: false,
       error: "",
       lastLoadedAt: "",
@@ -1670,10 +1921,12 @@
     later: {
       option: "one_hour",
       bulkSelectionKeys: [],
+      contextThreadId: "",
     },
     studio: {
       mode: "reply",
       threadId: "",
+      replyContextThreadId: "",
       composeMailboxId: "",
       composeTo: "",
       composeSubject: "",
@@ -1683,11 +1936,19 @@
       activeTrackKey: "booking",
       activeToneKey: "professional",
       activeRefineKey: "",
-      selectedSignatureId: "contact",
+      selectedSignatureId: "fazli",
       sending: false,
       savingDraft: false,
       deleting: false,
       previewing: false,
+      truthDriven: false,
+      truthLabel: "",
+      truthWaveLabel: "",
+      truthDetail: "",
+      truthSourceMailboxId: "",
+      truthSourceMailboxLabel: "",
+      truthSenderLocked: false,
+      truthFallbackReason: "",
     },
     noteMode: {
       open: false,
@@ -1695,8 +1956,9 @@
     },
     moreMenuOpen: false,
     mailboxAdminOpen: false,
+    mailboxAdminEditingId: "",
     view: "conversations",
-    selectedCustomerIdentity: "johan",
+    selectedCustomerIdentity: "",
     selectedAnalyticsPeriod: "week",
     analyticsRuntime: createAnalyticsRuntime(),
     integrationsRuntime: createIntegrationsRuntime(),
@@ -1716,14 +1978,12 @@
     customerSearch: "",
     customerFilter: "alla kunder",
     customerSuggestionsHidden: false,
-    customerBatchSelection: ["johan", "emma"],
-    customerPrimaryEmailByKey: Object.fromEntries(
-      Object.entries(CUSTOMER_PROFILE_DETAILS).map(([key, detail]) => [key, detail.emails[0] || ""])
-    ),
+    customerBatchSelection: [],
+    customerPrimaryEmailByKey: {},
     customerSettings: { ...DEFAULT_CUSTOMER_SETTINGS },
     customerMergeModalOpen: false,
     customerSettingsOpen: false,
-    customerMergePrimaryKey: "johan",
+    customerMergePrimaryKey: "",
     customerMergeOptions: {
       emails: true,
       phones: true,
@@ -1760,6 +2020,12 @@
       profileName: "Ditt namn",
       profileEmail: "din.email@hairtp.com",
       deleteRequestedAt: "",
+      mailFoundationDefaults: {
+        senderMailboxId: "",
+        composeSenderMailboxId: "",
+        replySenderMailboxId: "",
+        signatureProfileId: "",
+      },
       toggles: {
         ai_prediction: true,
         metrics: true,
@@ -1823,13 +2089,19 @@
     selectedShowcaseFeature: "command_palette",
     runtime: {
       loading: false,
+      loaded: false,
+      mode: "",
       live: false,
       authRequired: false,
       offline: false,
+      offlineWorkingSetSource: "",
+      offlineWorkingSetMeta: "",
       error: "",
       threads: [],
       mailboxes: [],
+      mailboxCapabilities: [],
       selectedMailboxIds: [],
+      mailboxScopePinned: false,
       selectedOwnerKey: "all",
       activeLaneId: "all",
       orderedLaneIds: [...QUEUE_LANE_ORDER],
@@ -1841,23 +2113,134 @@
       historyRangeFilter: "all",
       selectedThreadId: "",
       historyExpanded: true,
+      reentry: {
+        snapshot: null,
+        capturedAt: "",
+        reason: "",
+        outcome: {
+          status: "fallback_to_default",
+          restoredAt: "",
+          reason: "init",
+          exactMatch: false,
+          comparedFields: [],
+          matchedFields: [],
+          fallbackFields: [],
+        },
+      },
       historyDeleting: false,
       deletingThreadId: "",
       preferredMailboxId: "kons@hairtpclinic.com",
       defaultSenderMailbox: "contact@hairtpclinic.com",
-      defaultSignatureProfile: "contact",
+      defaultSignatureProfile: "fazli",
       sendEnabled: false,
       deleteEnabled: false,
       lastSyncAt: "",
+      mailboxDiagnostics: {
+        lastLoadAt: "",
+        phase: "idle",
+        requestedMailboxIds: [],
+        rawWorklist: {
+          totalRows: 0,
+          mailboxCounts: [],
+          sampleTitles: [],
+        },
+        mergedWorklist: {
+          totalRows: 0,
+          mailboxCounts: [],
+          sampleTitles: [],
+        },
+        liveThreads: {
+          count: 0,
+          mailboxCounts: [],
+          samples: [],
+        },
+        legacyThreads: {
+          count: 0,
+          mailboxCounts: [],
+          samples: [],
+        },
+        historyMessages: {
+          count: 0,
+          mailboxCounts: [],
+        },
+        truthPrimary: {
+          configuredMailboxIds: [],
+          activeMailboxIds: [],
+          rowCount: 0,
+        },
+        error: "",
+        offlineWorkingSetSource: "",
+        offlineWorkingSetMeta: "",
+      },
+      truthPrimaryLegacyThreads: [],
+      liveHydratedThreadIds: [],
+      queueInlinePanel: {
+        open: false,
+        laneId: "",
+        feedKey: "",
+      },
+      queueCategoriesCompact: false,
       queueHistory: {
         open: false,
         loading: false,
         loaded: false,
         error: "",
         items: [],
+        selectedConversationId: "",
         limit: 24,
         hasMore: false,
         scopeKey: "",
+      },
+      truthWorklistView: {
+        hidden:
+          WORKLIST_TRUTH_VIEW?.enabled === true
+            ? (() => {
+                try {
+                  const hiddenValue = window.localStorage.getItem(
+                    "cco.truthWorklistView.hidden"
+                  );
+                  if (hiddenValue === "1") return true;
+                } catch (error) {
+                  console.warn("Truth Worklist View kunde inte lasa lokal preferens.", error);
+                }
+                return WORKLIST_TRUTH_VIEW?.defaultOpen === false;
+              })()
+            : true,
+        loading: false,
+        loaded: false,
+        authRequired: false,
+        error: "",
+        scopeKey: "",
+        scopeMode: "",
+        mailboxIds: [],
+        payload: null,
+        localFilter: "all",
+        localSort: "latest",
+        page: "overview",
+        relay: null,
+      },
+      truthPrimaryCutover: {
+        enabled: false,
+        configuredMailboxIds: [],
+        activeMailboxIds: [],
+        fallbackReason: "",
+        lastAppliedAt: "",
+      },
+      focusTruthPrimary: {
+        enabled: false,
+        configuredMailboxIds: [],
+        activeMailboxIds: [],
+        fallbackReason: "",
+        readOnly: FOCUS_TRUTH_PRIMARY?.readOnly !== false,
+        lastAppliedAt: "",
+      },
+      studioTruthPrimary: {
+        enabled: false,
+        configuredMailboxIds: [],
+        activeMailboxIds: [],
+        fallbackReason: "",
+        replyOnly: STUDIO_TRUTH_PRIMARY?.replyOnly !== false,
+        lastAppliedAt: "",
       },
     },
   };
@@ -1869,40 +2252,110 @@
   let activeResizeCleanup = null;
   let pendingMailFeedDeleteTimer = null;
   let queueHistoryRequestSequence = 0;
+  let truthWorklistRequestSequence = 0;
   const CCO_OPERATIONAL_START_MAILBOX = "kons@hairtpclinic.com";
   const CCO_DEFAULT_REPLY_SENDER = "contact@hairtpclinic.com";
-  const CCO_DEFAULT_SIGNATURE_PROFILE = "contact";
+  const CCO_DEFAULT_SIGNATURE_PROFILE = "fazli";
+  const CUSTOM_MAILBOXES_STORAGE_KEY = "cco.customMailboxes.v1";
+  const CCO_SIGNATURE_PUBLIC_BASE_URL = "https://arcana.hairtpclinic.se";
+  const CCO_HAIR_TP_SIGNATURE_LOGO_URL =
+    "https://img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png";
+  const CCO_APPROVED_FAZLI_SIGNATURE_HTML = `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html;charset=utf-8"/></head><body><table id="zs-output-sig" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse; width:516px;"><tbody><tr><td style="padding: 0px !important; width: inherit; height: inherit;"><table id="inner-table" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding-bottom: 16px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#4A4946;display:inline;">Bästa hälsningar,</span></p></td></tr></tbody></table></td></tr><tr><td style="padding: 0px !important; width: inherit; height: inherit;"><table id="inner-table" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td width="75" style="padding-right: 16px; width: inherit; height: inherit;"><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; line-height: 0px; padding-right: 1px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><img height="94" width="75" alt="" border="0" src="https://img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png"></p></td></tr></tbody></table></td><td style="border-collapse: collapse; background-color: rgb(215, 202, 193); width: 3px; vertical-align: super; padding: 0px !important; height: inherit;"></td><td style="border-collapse: collapse; padding-right: 16px; width: inherit; height: inherit;"></td><td style="padding: 0px !important; width: inherit; height: inherit;"><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 700; padding-bottom: 6px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:700;color:#C2AA9C;display:inline;">Fazli Krasniqi</span></p></td></tr><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 700; padding-bottom: 4px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:700;color:#303030;display:inline;">Hårspecialist | Hårtransplantationer & PRP-injektioner</span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span><a target="_blank" rel="nofollow" href="tel:031881166" style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;text-decoration:none;"> 031-88 11 66&nbsp; </a></span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span><a target="_blank" rel="nofollow" href="mailto:contact@hairtpclinic.com" style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;text-decoration:none;"> contact@hairtpclinic.com </a></span></p></td></tr><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding-bottom: 8px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;">Vasaplatsen 2, 411 34 Göteborg</span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="padding-right: 10px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://hairtpclinic.se/"><img height="24" width="24" alt="Visit website" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M4%2012h16%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M12%203.5c2.6%202.5%204%205.34%204%208.5s-1.4%206-4%208.5c-2.6-2.5-4-5.34-4-8.5s1.4-6%204-8.5Z%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%20stroke-linejoin%3D%22round%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding-right: 10px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://www.instagram.com/hairtpclinic/"><img height="24" width="24" alt="Visit instagram" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Crect%20x%3D%224.5%22%20y%3D%224.5%22%20width%3D%2215%22%20height%3D%2215%22%20rx%3D%224%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.3%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2216.7%22%20cy%3D%227.3%22%20r%3D%221.15%22%20fill%3D%22%23B9A89D%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://www.facebook.com/hairtpclinic/"><img height="24" width="24" alt="Visit facebook" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Cpath%20d%3D%22M13.2%2020v-7h2.35l.45-2.7H13.2V8.6c0-.95.4-1.6%201.8-1.6H16V4.55c-.4-.05-1.15-.15-2.2-.15-2.2%200-3.7%201.35-3.7%203.8v2.1H7.75V13h2.35v7h3.1Z%22%20fill%3D%22%23B9A89D%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding: 0px !important; width: inherit; height: inherit;"></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td style="border-collapse: collapse; padding-bottom: 16px; width: inherit; height: inherit;"><span></span></td></tr></tbody></table></body></html>`;
+  function rewriteApprovedSignatureAssetUrls(html = "", { publicBaseUrl = CCO_SIGNATURE_PUBLIC_BASE_URL } = {}) {
+    const normalizedBaseUrl = asText(publicBaseUrl).replace(/\/+$/, "");
+    const assetBaseUrl = normalizedBaseUrl || CCO_SIGNATURE_PUBLIC_BASE_URL;
+    return asText(html)
+      .replace(
+        /https:\/\/img2\.gimm\.io\/9e99c2fb-11b4-402b-8a43-6022ede8aa2b\/image\.png/gi,
+        CCO_HAIR_TP_SIGNATURE_LOGO_URL
+      )
+      .replace(/https?:\/\/(?:127\.0\.0\.1|localhost):3000(?=\/assets\/hair-tp-clinic\/)/gi, assetBaseUrl);
+  }
+  function buildApprovedFazliSignatureHtml({ publicBaseUrl = CCO_SIGNATURE_PUBLIC_BASE_URL } = {}) {
+    return rewriteApprovedSignatureAssetUrls(CCO_APPROVED_FAZLI_SIGNATURE_HTML, {
+      publicBaseUrl,
+    });
+  }
+  function buildApprovedEgzonaSignatureHtml({ publicBaseUrl = CCO_SIGNATURE_PUBLIC_BASE_URL } = {}) {
+    const egzonaHtml = CCO_APPROVED_FAZLI_SIGNATURE_HTML
+      .replace("Fazli Krasniqi", "Egzona Krasniqi")
+      .replace("mailto:contact@hairtpclinic.com", "mailto:egzona@hairtpclinic.com")
+      .replace(" contact@hairtpclinic.com ", " egzona@hairtpclinic.com ");
+    return rewriteApprovedSignatureAssetUrls(egzonaHtml, {
+      publicBaseUrl,
+    });
+  }
+  const TRUTH_WORKLIST_VIEW_STORAGE_KEY = "cco.truthWorklistView.hidden";
+  const TRUTH_PRIMARY_WORKLIST_DISABLE_STORAGE_KEY =
+    typeof WORKLIST_TRUTH_PRIMARY?.disableStorageKey === "string" &&
+    WORKLIST_TRUTH_PRIMARY.disableStorageKey.trim()
+      ? WORKLIST_TRUTH_PRIMARY.disableStorageKey.trim()
+      : "cco.truthPrimaryWorklist.disabled";
+  const TRUTH_PRIMARY_FOCUS_DISABLE_STORAGE_KEY =
+    typeof FOCUS_TRUTH_PRIMARY?.disableStorageKey === "string" &&
+    FOCUS_TRUTH_PRIMARY.disableStorageKey.trim()
+      ? FOCUS_TRUTH_PRIMARY.disableStorageKey.trim()
+      : "cco.truthPrimaryFocus.disabled";
+  const TRUTH_PRIMARY_STUDIO_DISABLE_STORAGE_KEY =
+    typeof STUDIO_TRUTH_PRIMARY?.disableStorageKey === "string" &&
+    STUDIO_TRUTH_PRIMARY.disableStorageKey.trim()
+      ? STUDIO_TRUTH_PRIMARY.disableStorageKey.trim()
+      : "cco.truthPrimaryStudio.disabled";
 
   const STUDIO_SIGNATURE_PROFILES = Object.freeze([
     {
-      id: "contact",
-      aliases: ["contact", "sara"],
-      label: "Contact",
-      fullName: "Hair TP Clinic",
-      title: "Patientservice",
-      email: "contact@hairtpclinic.com",
-      phone: "031-81 11 66",
+      id: "fazli",
+      aliases: ["fazli"],
+      source: "static",
+      label: "Fazli",
+      fullName: "Fazli Krasniqi",
+      title: "Hårspecialist | Hårtransplantationer & PRP-injektioner",
+      email: "fazli@hairtpclinic.com",
+      displayEmail: "contact@hairtpclinic.com",
+      html: buildApprovedFazliSignatureHtml(),
+      senderMailboxId: "fazli@hairtpclinic.com",
+      phone: "031-88 11 66",
     },
     {
       id: "egzona",
       aliases: ["egzona"],
+      source: "static",
       label: "Egzona",
       fullName: "Egzona Krasniqi",
-      title: "Hårspecialist",
+      title: "Hårspecialist | Hårtransplantationer & PRP-injektioner",
       email: "egzona@hairtpclinic.com",
-      phone: "031-81 11 66",
+      displayEmail: "egzona@hairtpclinic.com",
+      html: buildApprovedEgzonaSignatureHtml(),
+      senderMailboxId: "egzona@hairtpclinic.com",
+      phone: "031-88 11 66",
+    },
+  ]);
+  const DEFAULT_CUSTOM_MAILBOX_SIGNATURE_PRESETS = Object.freeze([
+    {
+      id: "egzona",
+      email: "egzona@hairtpclinic.com",
+      label: "Egzona",
+      owner: "Egzona",
+      signature: {
+        label: "Egzona",
+        fullName: "Egzona Krasniqi",
+        title: "Hårspecialist | Hårtransplantationer & PRP-injektioner",
+        html: buildApprovedEgzonaSignatureHtml(),
+      },
     },
     {
       id: "fazli",
-      aliases: ["fazli"],
-      label: "Fazli",
-      fullName: "Fazli Krasniqi",
-      title: "Clinic owner",
       email: "fazli@hairtpclinic.com",
-      phone: "031-81 11 66",
+      label: "Fazli",
+      owner: "Fazli",
+      signature: {
+        label: "Fazli",
+        fullName: "Fazli Krasniqi",
+        title: "Hårspecialist | Hårtransplantationer & PRP-injektioner",
+        html: buildApprovedFazliSignatureHtml(),
+      },
     },
   ]);
-
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
   function normalizeText(value) {
@@ -1936,14 +2389,14 @@
 
   function getOperationalImportMailboxId() {
     const selectedMailboxIds = asArray(state.runtime.selectedMailboxIds)
-      .map(normalizeMailboxId)
+      .map((mailboxId) => canonicalizeRuntimeMailboxId(mailboxId))
       .filter(Boolean);
     return selectedMailboxIds[0] || getPreferredOperationalMailboxId();
   }
 
   function getRequestedRuntimeMailboxIds({ includePreferredFallback = true } = {}) {
     const selectedMailboxIds = asArray(state.runtime.selectedMailboxIds)
-      .map(normalizeMailboxId)
+      .map((mailboxId) => canonicalizeRuntimeMailboxId(mailboxId))
       .filter(Boolean);
     if (selectedMailboxIds.length) {
       return selectedMailboxIds;
@@ -2018,15 +2471,1365 @@
     return normalizeKey(asText(value));
   }
 
+  function resolveRuntimeMailboxPresetEmail(value = "") {
+    const normalizedValue = normalizeMailboxId(value);
+    if (!normalizedValue) return "";
+    return LEGACY_RUNTIME_MAILBOX_EMAILS[normalizedValue] || "";
+  }
+
+  function deriveMailboxToneClass(mailbox = {}) {
+    const explicitToneClass = asText(mailbox?.toneClass);
+    if (explicitToneClass) return explicitToneClass;
+    const tokens = getMailboxIdentityTokens(mailbox);
+    for (const token of tokens) {
+      if (MAILBOX_TONE_CLASS_BY_TOKEN[token]) {
+        return MAILBOX_TONE_CLASS_BY_TOKEN[token];
+      }
+    }
+    const seedSource = asText(mailbox?.email || mailbox?.label || mailbox?.id);
+    if (!seedSource) return MAILBOX_TONE_CLASS_FALLBACKS[0];
+    let hash = 0;
+    for (let index = 0; index < seedSource.length; index += 1) {
+      hash = (hash * 31 + seedSource.charCodeAt(index)) | 0;
+    }
+    return MAILBOX_TONE_CLASS_FALLBACKS[Math.abs(hash) % MAILBOX_TONE_CLASS_FALLBACKS.length];
+  }
+
+  function buildDefaultMailboxSignatureHtml({
+    label = "",
+    email = "",
+    fullName = "",
+    title = "",
+  } = {}) {
+    const approvedMailboxTokens = new Set([
+      "fazli",
+      "fazli krasniqi",
+      "fazli@hairtpclinic.com",
+      "egzona",
+      "egzona krasniqi",
+      "egzona@hairtpclinic.com",
+    ]);
+    const mailboxTokens = [
+      normalizeKey(label),
+      normalizeKey(fullName),
+      normalizeMailboxId(email),
+      normalizeMailboxId(email).split("@")[0],
+    ].filter(Boolean);
+    const isApprovedMailbox = mailboxTokens.some((token) => approvedMailboxTokens.has(token));
+    if (!isApprovedMailbox) {
+      return "";
+    }
+    const resolvedName = asText(fullName || label);
+    const titleLine = asText(title).replace(
+      /\bHårspecialist\s+[Ii]\s+Hårtransplantationer\s*&\s*PRP-injektioner\b/i,
+      "Hårspecialist | Hårtransplantationer & PRP-injektioner"
+    );
+    const emailLine = asText(email).toLowerCase();
+    if (!resolvedName || !titleLine || !emailLine) {
+      return "";
+    }
+    const variantHtml = CCO_APPROVED_FAZLI_SIGNATURE_HTML
+      .replace("Fazli Krasniqi", resolvedName)
+      .replace("mailto:contact@hairtpclinic.com", `mailto:${emailLine}`)
+      .replace(" contact@hairtpclinic.com ", ` ${emailLine} `)
+      .replace(
+        "Hårspecialist | Hårtransplantationer & PRP-injektioner",
+        titleLine
+      );
+    return rewriteApprovedSignatureAssetUrls(variantHtml, {
+      publicBaseUrl: CCO_SIGNATURE_PUBLIC_BASE_URL,
+    });
+  }
+
+  function buildMailboxAdminSignatureSeedHtml() {
+    return buildDefaultMailboxSignatureHtml({
+      label: normalizeText(mailboxAdminNameInput?.value),
+      email: normalizeText(mailboxAdminEmailInput?.value).toLowerCase(),
+      fullName: normalizeText(mailboxAdminSignatureFullNameInput?.value),
+      title: normalizeText(mailboxAdminSignatureTitleInput?.value),
+    });
+  }
+
+  function sanitizeMailboxSignatureHtml(html = "") {
+    if (!mailboxAdminSignatureEditor?.ownerDocument) {
+      return String(html || "").trim();
+    }
+    const template = mailboxAdminSignatureEditor.ownerDocument.createElement("template");
+    template.innerHTML = String(html || "");
+    const absoluteSignatureUrl = (value = "", { allowMailto = false } = {}) => {
+      const normalizedValue = normalizeText(value);
+      if (!normalizedValue) return "";
+      if (allowMailto && /^mailto:/i.test(normalizedValue)) return normalizedValue;
+      if (/^https?:\/\/(?:127\.0\.0\.1|localhost):3000(?=\/assets\/hair-tp-clinic\/)/i.test(normalizedValue)) {
+        return normalizedValue.replace(
+          /^https?:\/\/(?:127\.0\.0\.1|localhost):3000/i,
+          CCO_SIGNATURE_PUBLIC_BASE_URL
+        );
+      }
+      if (/^https?:/i.test(normalizedValue)) return normalizedValue;
+      if (normalizedValue.startsWith("/")) {
+        return `${CCO_SIGNATURE_PUBLIC_BASE_URL}${normalizedValue}`;
+      }
+      return "";
+    };
+    const sanitizeSignatureStyle = (value = "") =>
+      String(value || "")
+        .replace(/javascript:/gi, "")
+        .replace(/vbscript:/gi, "")
+        .replace(/expression\s*\([^)]*\)/gi, "")
+        .replace(/@import/gi, "")
+        .replace(/behavior\s*:/gi, "")
+        .trim();
+    const allowedTags = new Set([
+      "A",
+      "B",
+      "BR",
+      "DIV",
+      "EM",
+      "I",
+      "IMG",
+      "LI",
+      "OL",
+      "P",
+      "SPAN",
+      "STRONG",
+      "TABLE",
+      "TBODY",
+      "TD",
+      "TR",
+      "U",
+      "UL",
+    ]);
+    Array.from(template.content.querySelectorAll("*")).forEach((node) => {
+      if (!allowedTags.has(node.tagName)) {
+        const fragment = mailboxAdminSignatureEditor.ownerDocument.createDocumentFragment();
+        while (node.firstChild) {
+          fragment.appendChild(node.firstChild);
+        }
+        node.replaceWith(fragment);
+        return;
+      }
+      Array.from(node.attributes).forEach((attribute) => {
+        const attributeName = attribute.name.toLowerCase();
+        const isAllowedHref = node.tagName === "A" && attributeName === "href";
+        const isAllowedSrc = node.tagName === "IMG" && attributeName === "src";
+        const isAllowedAlt = node.tagName === "IMG" && attributeName === "alt";
+        const isAllowedDimension =
+          node.tagName === "IMG" && (attributeName === "width" || attributeName === "height");
+        const isAllowedStyle = attributeName === "style";
+        const isAllowedTableMeta =
+          node.tagName === "TABLE" &&
+          (attributeName === "cellpadding" ||
+            attributeName === "cellspacing" ||
+            attributeName === "border" ||
+            attributeName === "role");
+        const isAllowedTableSpan =
+          node.tagName === "TD" && (attributeName === "colspan" || attributeName === "rowspan");
+        if (
+          !isAllowedHref &&
+          !isAllowedSrc &&
+          !isAllowedAlt &&
+          !isAllowedDimension &&
+          !isAllowedStyle &&
+          !isAllowedTableMeta &&
+          !isAllowedTableSpan
+        ) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+      if (node.tagName === "A") {
+        const href = absoluteSignatureUrl(node.getAttribute("href"), { allowMailto: true });
+        if (!href) {
+          node.removeAttribute("href");
+        } else {
+          node.setAttribute("href", href);
+          node.setAttribute("target", "_blank");
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+      }
+      if (node.tagName === "IMG") {
+        const src = absoluteSignatureUrl(node.getAttribute("src"));
+        if (!src) {
+          node.remove();
+          return;
+        }
+        node.setAttribute("src", src);
+        const width = normalizeText(node.getAttribute("width"));
+        const height = normalizeText(node.getAttribute("height"));
+        if (width && !/^\d{1,4}$/.test(width)) node.removeAttribute("width");
+        if (height && !/^\d{1,4}$/.test(height)) node.removeAttribute("height");
+      }
+      if (node.hasAttribute("style")) {
+        const safeStyle = sanitizeSignatureStyle(node.getAttribute("style"));
+        if (safeStyle) {
+          node.setAttribute("style", safeStyle);
+        } else {
+          node.removeAttribute("style");
+        }
+      }
+    });
+    return template.innerHTML.trim();
+  }
+
+  function sanitizeConversationHtmlForDisplay(html = "") {
+    const documentObject = typeof document !== "undefined" ? document : null;
+    const rawHtml = asText(html).trim();
+    if (!documentObject || !rawHtml) return "";
+    const isHairTpSignatureHtml =
+      /hairtpclinic\.com|Hair TP Clinic|Hårspecialist|Vasaplatsen/i.test(rawHtml);
+
+    const extractConversationTextFromHtml = (value = "") =>
+      asText(value)
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<\/tr>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\r/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+    const visibleText = extractConversationTextFromHtml(rawHtml)
+      .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+      .replace(
+        /^Vissa\s+som\s+har\s+f[aå]tt\s+det\s+h[aä]r\s+meddelandet\s+f[aå]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i,
+        ""
+      )
+      .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+      .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+      .replace(/^Get more done with apps like Word\.?\s*/i, "")
+      .replace(/^Learn why this is important\.?\s*/i, "")
+      .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+      .replace(/^Read more about why this is important\.?\s*/i, "")
+      .trim();
+    if (!visibleText || isRuntimePlaceholderLine(visibleText)) return "";
+
+    const template = documentObject.createElement("template");
+    template.innerHTML = rawHtml;
+
+    const dropNodeTags = new Set([
+      "BLOCKQUOTE",
+      "BUTTON",
+      "CANVAS",
+      "EMBED",
+      "FORM",
+      "HEAD",
+      "IFRAME",
+      "INPUT",
+      "META",
+      "NOSCRIPT",
+      "OBJECT",
+      "SCRIPT",
+      "SELECT",
+      "STYLE",
+      "SVG",
+      "TEXTAREA",
+      "TITLE",
+      "VIDEO",
+      "AUDIO",
+      "SOURCE",
+      "LINK",
+    ]);
+    const allowedTags = new Set([
+      "A",
+      "B",
+      "BR",
+      "DIV",
+      "EM",
+      "I",
+      "IMG",
+      "LI",
+      "OL",
+      "P",
+      "SPAN",
+      "STRONG",
+      "TABLE",
+      "TBODY",
+      "TD",
+      "TR",
+      "U",
+      "UL",
+    ]);
+    const allowedStyleProperties = new Set([
+      "background",
+      "background-color",
+      "border",
+      "border-bottom",
+      "border-left",
+      "border-radius",
+      "border-right",
+      "border-top",
+      "color",
+      "display",
+      "font-family",
+      "font-size",
+      "font-style",
+      "font-weight",
+      "height",
+      "line-height",
+      "margin",
+      "margin-bottom",
+      "margin-left",
+      "margin-right",
+      "margin-top",
+      "max-height",
+      "max-width",
+      "padding",
+      "padding-bottom",
+      "padding-left",
+      "padding-right",
+      "padding-top",
+      "text-align",
+      "text-decoration",
+      "vertical-align",
+      "white-space",
+      "width",
+    ]);
+
+    const sanitizeHtmlUrl = (value = "", { allowMailto = false, allowDataImage = false } = {}) => {
+      const normalizedValue = normalizeText(value);
+      if (!normalizedValue) return "";
+      if (/^https?:/i.test(normalizedValue)) return normalizedValue;
+      if (allowMailto && /^mailto:/i.test(normalizedValue)) return normalizedValue;
+      if (allowDataImage && /^data:image\//i.test(normalizedValue)) return normalizedValue;
+      return "";
+    };
+
+    const resolveConversationDisplayUrl = (value = "") => {
+      const normalizedValue = sanitizeHtmlUrl(value, { allowMailto: true });
+      if (!normalizedValue) return "";
+      try {
+        const parsedUrl = new URL(normalizedValue);
+        if (/safelinks\.protection\.outlook\.com$/i.test(parsedUrl.hostname)) {
+          const embeddedUrl = parsedUrl.searchParams.get("url");
+          if (embeddedUrl) {
+            const decodedUrl = sanitizeHtmlUrl(decodeURIComponent(embeddedUrl), {
+              allowMailto: true,
+            });
+            if (decodedUrl) return decodedUrl;
+          }
+        }
+      } catch (_error) {
+        return normalizedValue;
+      }
+      return normalizedValue;
+    };
+
+    const buildConversationCompactLinkLabel = (href = "", text = "") => {
+      const visibleText = normalizeText(text);
+      const looksRawUrl =
+        /https?:\/\/|www\.|safelinks\.protection\.outlook\.com/i.test(visibleText) ||
+        (visibleText.length >= 96 && /[/?=&_-]/.test(visibleText));
+      if (!looksRawUrl) return "";
+      const displayUrl = resolveConversationDisplayUrl(href) || visibleText;
+      if (/^mailto:/i.test(displayUrl)) return "Öppna e-postlänk";
+      try {
+        const parsedUrl = new URL(displayUrl);
+        const host = normalizeText(parsedUrl.hostname).replace(/^www\./i, "");
+        if (host) return `Öppna länk (${host})`;
+      } catch (_error) {
+        return "Öppna länk";
+      }
+      return "Öppna länk";
+    };
+
+    const convertConversationLengthToPx = (value = 0, unit = "px") => {
+      const numericValue = Number.parseFloat(value);
+      if (!Number.isFinite(numericValue)) return 0;
+      switch (String(unit || "").toLowerCase()) {
+        case "pt":
+          return numericValue * (4 / 3);
+        case "em":
+        case "rem":
+          return numericValue * 16;
+        default:
+          return numericValue;
+      }
+    };
+
+    const clampConversationLengthToken = (
+      value = "",
+      {
+        minPx = 0,
+        maxPx = 520,
+        allowPercent = false,
+        percentMax = 100,
+        allowAuto = false,
+        allowUnitless = false,
+        unitlessMin = 0,
+        unitlessMax = 2,
+      } = {}
+    ) => {
+      const normalizedValue = normalizeText(value).toLowerCase();
+      if (!normalizedValue) return "";
+      if (allowAuto && normalizedValue === "auto") return "auto";
+      if (allowPercent && /^-?\d+(?:\.\d+)?%$/.test(normalizedValue)) {
+        const percentValue = Number.parseFloat(normalizedValue);
+        if (!Number.isFinite(percentValue)) return "";
+        return `${Math.max(0, Math.min(percentMax, percentValue))}%`;
+      }
+      if (allowUnitless && /^-?\d+(?:\.\d+)?$/.test(normalizedValue)) {
+        const unitlessValue = Number.parseFloat(normalizedValue);
+        if (!Number.isFinite(unitlessValue)) return "";
+        const clampedValue = Math.max(unitlessMin, Math.min(unitlessMax, unitlessValue));
+        return Number.isInteger(clampedValue)
+          ? String(clampedValue)
+          : clampedValue.toFixed(2).replace(/\.?0+$/, "");
+      }
+      const lengthMatch = normalizedValue.match(/^(-?\d+(?:\.\d+)?)(px|pt|em|rem)$/i);
+      if (!lengthMatch) return "";
+      const pixelValue = convertConversationLengthToPx(lengthMatch[1], lengthMatch[2]);
+      if (!Number.isFinite(pixelValue)) return "";
+      const clampedValue = Math.max(minPx, Math.min(maxPx, pixelValue));
+      const serializedValue = Number.isInteger(clampedValue)
+        ? String(clampedValue)
+        : clampedValue.toFixed(2).replace(/\.?0+$/, "");
+      return `${serializedValue}px`;
+    };
+
+    const clampConversationSpacingValue = (value = "", { maxPx = 18 } = {}) => {
+      const tokens = normalizeText(value).split(/\s+/).filter(Boolean);
+      if (!tokens.length || tokens.length > 4) return "";
+      const clampedTokens = tokens
+        .map((token) =>
+          clampConversationLengthToken(token, {
+            minPx: 0,
+            maxPx,
+            allowAuto: true,
+          })
+        )
+        .filter(Boolean);
+      return clampedTokens.length === tokens.length ? clampedTokens.join(" ") : "";
+    };
+
+    const normalizeConversationDisplayValue = (value = "") => {
+      const normalizedValue = normalizeText(value).toLowerCase();
+      return new Set([
+        "block",
+        "inline",
+        "inline-block",
+        "table",
+        "table-row",
+        "table-cell",
+      ]).has(normalizedValue)
+        ? normalizedValue
+        : "";
+    };
+
+    const normalizeConversationEnumValue = (value = "", allowedValues = []) => {
+      const normalizedValue = normalizeText(value).toLowerCase();
+      return allowedValues.includes(normalizedValue) ? normalizedValue : "";
+    };
+
+    const normalizeConversationFontWeight = (value = "") => {
+      const normalizedValue = normalizeText(value).toLowerCase();
+      if (["normal", "bold", "bolder"].includes(normalizedValue)) return normalizedValue;
+      if (!/^\d{3}$/.test(normalizedValue)) return "";
+      const numericValue = Number.parseInt(normalizedValue, 10);
+      if (!Number.isFinite(numericValue)) return "";
+      return String(Math.max(400, Math.min(700, numericValue)));
+    };
+
+    const normalizeConversationFillValue = (value = "") => {
+      const normalizedValue = normalizeText(value);
+      if (
+        !normalizedValue ||
+        /url\s*\(|gradient\s*\(|javascript:|vbscript:|expression\s*\(/i.test(
+          normalizedValue
+        )
+      ) {
+        return "";
+      }
+      return normalizedValue.slice(0, 120);
+    };
+
+    const normalizeConversationStyleValue = (property = "", value = "") => {
+      const normalizedValue = normalizeText(value);
+      if (!normalizedValue) return "";
+      switch (property) {
+        case "font-size":
+          return clampConversationLengthToken(normalizedValue, {
+            minPx: 11,
+            maxPx: 18,
+          });
+        case "line-height":
+          return clampConversationLengthToken(normalizedValue, {
+            minPx: 15,
+            maxPx: 24,
+            allowUnitless: true,
+            unitlessMin: 1.25,
+            unitlessMax: 1.7,
+          });
+        case "margin":
+        case "margin-top":
+        case "margin-right":
+        case "margin-bottom":
+        case "margin-left":
+          return clampConversationSpacingValue(normalizedValue, { maxPx: 16 });
+        case "padding":
+        case "padding-top":
+        case "padding-right":
+        case "padding-bottom":
+        case "padding-left":
+          return clampConversationSpacingValue(normalizedValue, { maxPx: 18 });
+        case "width":
+        case "max-width":
+          return clampConversationLengthToken(normalizedValue, {
+            minPx: 0,
+            maxPx: 520,
+            allowPercent: true,
+            percentMax: 100,
+            allowAuto: true,
+          });
+        case "height":
+        case "max-height":
+          return "";
+        case "display":
+          return normalizeConversationDisplayValue(normalizedValue);
+        case "white-space":
+          return normalizeConversationEnumValue(normalizedValue, [
+            "normal",
+            "nowrap",
+            "pre",
+            "pre-wrap",
+            "pre-line",
+          ]);
+        case "text-align":
+          return normalizeConversationEnumValue(normalizedValue, [
+            "left",
+            "right",
+            "center",
+            "justify",
+          ]);
+        case "vertical-align":
+          return normalizeConversationEnumValue(normalizedValue, [
+            "top",
+            "middle",
+            "bottom",
+            "baseline",
+          ]);
+        case "font-weight":
+          return normalizeConversationFontWeight(normalizedValue);
+        case "font-family":
+          return normalizedValue.slice(0, 160);
+        case "background":
+        case "background-color":
+          return normalizeConversationFillValue(normalizedValue);
+        default:
+          return normalizedValue.slice(0, 160);
+      }
+    };
+
+    const sanitizeConversationStyle = (value = "") =>
+      String(value || "")
+        .split(";")
+        .map((rule) => rule.trim())
+        .filter(Boolean)
+        .map((rule) => {
+          const [property, ...rest] = rule.split(":");
+          const normalizedProperty = normalizeText(property).toLowerCase();
+          if (!allowedStyleProperties.has(normalizedProperty)) return "";
+          const normalizedValue = rest.join(":").trim();
+          if (
+            !normalizedValue ||
+            /javascript:|vbscript:|expression\s*\(|url\s*\(\s*['"]?\s*javascript:/i.test(
+              normalizedValue
+            )
+          ) {
+            return "";
+          }
+          const safeValue = normalizeConversationStyleValue(normalizedProperty, normalizedValue);
+          return safeValue ? `${normalizedProperty}:${safeValue}` : "";
+        })
+        .filter(Boolean)
+        .join(";");
+
+    const parseConversationPixelDimension = (value = "") => {
+      const normalizedValue = normalizeText(value).toLowerCase();
+      if (!normalizedValue) return 0;
+      const match = normalizedValue.match(/^(\d+(?:\.\d+)?)(?:px)?$/);
+      if (!match) return 0;
+      const parsedValue = Number.parseFloat(match[1]);
+      return Number.isFinite(parsedValue) ? parsedValue : 0;
+    };
+
+    const readConversationStyleToken = (style = "", property = "") => {
+      const normalizedProperty = normalizeText(property).toLowerCase();
+      if (!normalizedProperty) return "";
+      const rules = String(style || "")
+        .split(";")
+        .map((rule) => rule.trim())
+        .filter(Boolean);
+      for (const rule of rules) {
+        const [candidateProperty, ...rest] = rule.split(":");
+        if (normalizeText(candidateProperty).toLowerCase() !== normalizedProperty) continue;
+        return normalizeText(rest.join(":"));
+      }
+      return "";
+    };
+
+    const isConversationZeroWidthStyle = (style = "") =>
+      /(?:^|;)\s*(?:max-width|width):0px(?:;|$)/i.test(asText(style));
+
+    const looksConversationNearWhite = (value = "") =>
+      /(?:^#fff(?:fff)?$|^rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)$)/i.test(
+        normalizeText(value).toLowerCase()
+      );
+
+    const resolveConversationImageDimension = (node, property = "width") => {
+      if (!node || typeof node.getAttribute !== "function") return 0;
+      const directValue = parseConversationPixelDimension(node.getAttribute(property));
+      if (directValue > 0) return directValue;
+      const inlineStyle = node.getAttribute("style");
+      return parseConversationPixelDimension(
+        readConversationStyleToken(inlineStyle, property) ||
+          readConversationStyleToken(
+            inlineStyle,
+            property === "width" ? "max-width" : "max-height"
+          )
+      );
+    };
+
+    const shouldDropConversationImage = (node) => {
+      if (!node || node.tagName !== "IMG") return false;
+      const src = normalizeText(node.getAttribute("src"));
+      const alt = normalizeText(node.getAttribute("alt"));
+      const title = normalizeText(node.getAttribute("title"));
+      const width = resolveConversationImageDimension(node, "width");
+      const height = resolveConversationImageDimension(node, "height");
+      const isUnlabeled = !alt && !title;
+      const looksTiny = (width > 0 && width <= 6) || (height > 0 && height <= 6);
+      const looksSpacerRatio =
+        width > 0 &&
+        height > 0 &&
+        Math.min(width, height) <= 8 &&
+        Math.max(width, height) >= 48;
+      const looksTrackingPixel =
+        /^data:image\/gif/i.test(src) &&
+        ((width > 0 && width <= 24) || (height > 0 && height <= 24) || (!width && !height));
+      const looksSpacerAsset = /(?:spacer|tracking|pixel)/i.test(src);
+      return isUnlabeled && (looksTiny || looksSpacerRatio || looksTrackingPixel || looksSpacerAsset);
+    };
+
+    const looksConversationHiddenPreheaderNode = (node) => {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+      const style = asText(node.getAttribute("style"));
+      const text = normalizeText(node.textContent || "");
+      if (!text || node.querySelector("img, table, ul, ol")) return false;
+      const fontSize = parseConversationPixelDimension(readConversationStyleToken(style, "font-size"));
+      const lineHeight = parseConversationPixelDimension(
+        readConversationStyleToken(style, "line-height")
+      );
+      const color = readConversationStyleToken(style, "color");
+      const invisibleCharCount = (asText(node.textContent).match(/[\u200B-\u200F\u2060\uFEFF]/g) || [])
+        .length;
+      return (
+        isConversationZeroWidthStyle(style) &&
+        (fontSize === 0 || fontSize <= 11) &&
+        (lineHeight === 0 || lineHeight <= 15) &&
+        (looksConversationNearWhite(color) || invisibleCharCount >= 8 || text.length >= 120)
+      );
+    };
+
+    const looksConversationGhostWrapperNode = (node) => {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+      const style = asText(node.getAttribute("style"));
+      if (!isConversationZeroWidthStyle(style)) return false;
+      const text = normalizeText(node.textContent || "");
+      return !text;
+    };
+
+    const compactConversationFallbackUrlNode = (node) => {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.querySelector("img, table, ul, ol")) return;
+      const anchors = Array.from(node.querySelectorAll("a[href]"));
+      anchors.forEach((anchorNode) => {
+        const href = asText(anchorNode.getAttribute("href"));
+        const visibleText = normalizeText(anchorNode.textContent || "");
+        const compactLabel = buildConversationCompactLinkLabel(href, visibleText);
+        if (!compactLabel) return;
+        anchorNode.textContent = compactLabel;
+        anchorNode.classList.add("conversation-html-link-fallback");
+        anchorNode.setAttribute("title", compactLabel);
+      });
+    };
+
+    const compactConversationRawUrlTextNode = (node) => {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+      if (node.querySelector("img, table, ul, ol, a[href]")) return;
+      if (node.children.length > 0) return;
+      const rawText = asText(node.textContent);
+      if (!/https?:\/\//i.test(rawText)) return;
+      const urlMatches = Array.from(rawText.matchAll(/https?:\/\/[^\s<>"']+/gi));
+      if (urlMatches.length !== 1) return;
+      const [urlMatch] = urlMatches;
+      const rawUrl = asText(urlMatch?.[0]);
+      if (rawUrl.length < 72) return;
+      const compactLabel = buildConversationCompactLinkLabel(rawUrl, rawUrl);
+      const href = resolveConversationDisplayUrl(rawUrl) || sanitizeHtmlUrl(rawUrl, { allowMailto: true });
+      if (!compactLabel || !href) return;
+      const beforeText = rawText.slice(0, urlMatch.index);
+      const afterText = rawText.slice((urlMatch.index || 0) + rawUrl.length);
+      const fragment = documentObject.createDocumentFragment();
+      if (beforeText) fragment.appendChild(documentObject.createTextNode(beforeText));
+      const anchorNode = documentObject.createElement("a");
+      anchorNode.setAttribute("href", href);
+      anchorNode.setAttribute("target", "_blank");
+      anchorNode.setAttribute("rel", "noopener noreferrer");
+      anchorNode.className = "conversation-html-link-fallback";
+      anchorNode.textContent = compactLabel;
+      anchorNode.setAttribute("title", compactLabel);
+      fragment.appendChild(anchorNode);
+      if (afterText) fragment.appendChild(documentObject.createTextNode(afterText));
+      node.replaceChildren(fragment);
+    };
+
+    const isConversationWhitespaceTextNode = (node) =>
+      node?.nodeType === Node.TEXT_NODE && !normalizeText(node.textContent || "");
+
+    const trimConversationBreakEdges = (node) => {
+      if (!node) return;
+      while (node.firstChild) {
+        const firstChild = node.firstChild;
+        if (isConversationWhitespaceTextNode(firstChild)) {
+          firstChild.remove();
+          continue;
+        }
+        if (firstChild.nodeType === Node.ELEMENT_NODE && firstChild.tagName === "BR") {
+          firstChild.remove();
+          continue;
+        }
+        break;
+      }
+      while (node.lastChild) {
+        const lastChild = node.lastChild;
+        if (isConversationWhitespaceTextNode(lastChild)) {
+          lastChild.remove();
+          continue;
+        }
+        if (lastChild.nodeType === Node.ELEMENT_NODE && lastChild.tagName === "BR") {
+          lastChild.remove();
+          continue;
+        }
+        break;
+      }
+    };
+
+    const collapseConversationBreakRuns = (node, maxBreaks = 2) => {
+      if (!node) return;
+      let consecutiveBreaks = 0;
+      Array.from(node.childNodes).forEach((childNode) => {
+        if (isConversationWhitespaceTextNode(childNode)) {
+          childNode.remove();
+          return;
+        }
+        if (childNode.nodeType === Node.ELEMENT_NODE && childNode.tagName === "BR") {
+          consecutiveBreaks += 1;
+          if (consecutiveBreaks > maxBreaks) {
+            childNode.remove();
+          }
+          return;
+        }
+        consecutiveBreaks = 0;
+      });
+    };
+
+    Array.from(template.content.querySelectorAll("*")).forEach((node) => {
+      if (dropNodeTags.has(node.tagName)) {
+        node.remove();
+        return;
+      }
+      if (!allowedTags.has(node.tagName)) {
+        const fragment = documentObject.createDocumentFragment();
+        while (node.firstChild) {
+          fragment.appendChild(node.firstChild);
+        }
+        node.replaceWith(fragment);
+        return;
+      }
+
+      Array.from(node.attributes).forEach((attribute) => {
+        const attributeName = attribute.name.toLowerCase();
+        const isAllowedHref = node.tagName === "A" && attributeName === "href";
+        const isAllowedSrc = node.tagName === "IMG" && attributeName === "src";
+        const isAllowedAlt = node.tagName === "IMG" && attributeName === "alt";
+        const isAllowedTitle =
+          (node.tagName === "IMG" || node.tagName === "A") && attributeName === "title";
+        const isAllowedDimension =
+          node.tagName === "IMG" && (attributeName === "width" || attributeName === "height");
+        const isAllowedStyle = attributeName === "style";
+        const isAllowedAlign =
+          (node.tagName === "DIV" ||
+            node.tagName === "P" ||
+            node.tagName === "TABLE" ||
+            node.tagName === "TD" ||
+            node.tagName === "TR") &&
+          (attributeName === "align" || attributeName === "valign");
+        const isAllowedTableMeta =
+          node.tagName === "TABLE" &&
+          (attributeName === "cellpadding" ||
+            attributeName === "cellspacing" ||
+            attributeName === "border" ||
+            attributeName === "role");
+        const isAllowedTableSpan =
+          node.tagName === "TD" && (attributeName === "colspan" || attributeName === "rowspan");
+        if (
+          !isAllowedHref &&
+          !isAllowedSrc &&
+          !isAllowedAlt &&
+          !isAllowedTitle &&
+          !isAllowedDimension &&
+          !isAllowedStyle &&
+          !isAllowedAlign &&
+          !isAllowedTableMeta &&
+          !isAllowedTableSpan
+        ) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+
+      if (node.tagName === "A") {
+        const href = sanitizeHtmlUrl(node.getAttribute("href"), { allowMailto: true });
+        if (!href) {
+          const fragment = documentObject.createDocumentFragment();
+          while (node.firstChild) {
+            fragment.appendChild(node.firstChild);
+          }
+          node.replaceWith(fragment);
+          return;
+        }
+        node.setAttribute("href", href);
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+        const compactLabel = buildConversationCompactLinkLabel(href, node.textContent || "");
+        if (compactLabel) {
+          node.textContent = compactLabel;
+          node.classList.add("conversation-html-link-fallback");
+          node.setAttribute("title", compactLabel);
+        }
+      }
+
+      if (node.tagName === "IMG") {
+        if (shouldDropConversationImage(node)) {
+          node.remove();
+          return;
+        }
+        const rawSrc = node.getAttribute("src");
+        const rawSrcText = asText(rawSrc);
+        const rawWidth = Number(normalizeText(node.getAttribute("width")));
+        const rawHeight = Number(normalizeText(node.getAttribute("height")));
+        const resolvedSrc =
+          isHairTpSignatureHtml &&
+          rawWidth === 75 &&
+          rawHeight === 94
+            ? CCO_HAIR_TP_SIGNATURE_LOGO_URL
+            : rawSrc;
+        const src = sanitizeHtmlUrl(resolvedSrc, { allowDataImage: true });
+        if (!src) {
+          const alt = normalizeText(node.getAttribute("alt"));
+          if (alt) {
+            const fallback = documentObject.createElement("span");
+            fallback.className = "conversation-html-image-fallback";
+            fallback.textContent = alt;
+            node.replaceWith(fallback);
+          } else {
+            node.remove();
+          }
+          return;
+        }
+        node.setAttribute("src", src);
+        node.classList.add("conversation-html-image");
+        const width = normalizeText(node.getAttribute("width"));
+        const height = normalizeText(node.getAttribute("height"));
+        if (width && !/^\d{1,4}$/.test(width)) node.removeAttribute("width");
+        if (height && !/^\d{1,4}$/.test(height)) node.removeAttribute("height");
+        node.setAttribute("loading", "lazy");
+        node.setAttribute("decoding", "async");
+        node.setAttribute("referrerpolicy", "no-referrer");
+      }
+
+      if (node.hasAttribute("style")) {
+        const safeStyle = sanitizeConversationStyle(node.getAttribute("style"));
+        if (safeStyle) {
+          node.setAttribute("style", safeStyle);
+        } else {
+          node.removeAttribute("style");
+        }
+      }
+
+      if (node.tagName === "TABLE") {
+        node.classList.add("conversation-html-structured-block");
+      }
+    });
+
+    Array.from(template.content.querySelectorAll("*")).forEach((node) => {
+      if (looksConversationHiddenPreheaderNode(node) || looksConversationGhostWrapperNode(node)) {
+        node.remove();
+        return;
+      }
+      compactConversationFallbackUrlNode(node);
+      compactConversationRawUrlTextNode(node);
+    });
+
+    Array.from(template.content.querySelectorAll("p,div,td,span,li")).forEach((node) => {
+      trimConversationBreakEdges(node);
+      const maxBreaks =
+        node.tagName === "TD" || node.tagName === "DIV"
+          ? 1
+          : 2;
+      collapseConversationBreakRuns(node, maxBreaks);
+    });
+
+    Array.from(template.content.querySelectorAll("p,div,span,td,tr,tbody,table,li")).forEach((node) => {
+      if (node.querySelector("img, a, ul, ol")) return;
+      const text = normalizeText(node.textContent || "");
+      if (
+        !text ||
+        /^(?:Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från|You\s+don['’]t\s+often\s+get\s+email\s+from|Learn why this is important|L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt|Read more about why this is important)/i.test(
+          text
+        ) ||
+        /^(?:Från|From):/i.test(text) ||
+        /^[\s_—–-]{6,}$/.test(text)
+      ) {
+        node.remove();
+      }
+    });
+
+    const identityFooterCue =
+      /(?:B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Skickat från Outlook för Mac|Sent from Outlook for Mac|Hair TP Clinic|@[A-Z0-9._%+-]+|https?:\/\/|www\.|\+?\d[\d\s().-]{5,})/i;
+    Array.from(template.content.querySelectorAll("p,div,td,span")).forEach((node) => {
+      const text = normalizeText(node.textContent || "");
+      if (!text || text.length > 240) return;
+      if (!identityFooterCue.test(text) && !node.querySelector("img, a")) return;
+      node.classList.add("conversation-html-footer-fragment");
+    });
+
+    const sanitizedHtml = template.innerHTML.trim();
+    if (!sanitizedHtml) return "";
+
+    const sanitizedText = extractConversationTextFromHtml(sanitizedHtml);
+    if (
+      !sanitizedText ||
+      isRuntimePlaceholderLine(sanitizedText) ||
+      /(?:^|\n)(?:Från|From):|(?:^|\n)(?:Datum|Date):|(?:^|\n)(?:Till|To):|(?:^|\n)(?:Ämne|Subject):/i.test(
+        sanitizedText
+      )
+    ) {
+      return "";
+    }
+
+    const hasRichMarkupCue = /<img\b|<table\b|<a\b|style=/i.test(sanitizedHtml);
+    const richBlockCount = (
+      sanitizedHtml.match(/<(?:table|tr|td|p|div|li|ul|ol|img|a)\b/gi) || []
+    ).length;
+    const hasIdentityCue =
+      /(?:B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Mvh|Skickat från Outlook för Mac|Sent from Outlook for Mac|Hair TP Clinic|@[A-Z0-9._%+-]+|\d{2,4}[- ]?\d{2,}|www\.|https?:\/\/)/i.test(
+        sanitizedText
+      ) || /<img\b/i.test(sanitizedHtml);
+    const hasStructuredBodyCue =
+      sanitizedText.length >= 180 ||
+      (/<table\b/i.test(sanitizedHtml) && sanitizedText.length >= 48) ||
+      (/<img\b/i.test(sanitizedHtml) && sanitizedText.length >= 32) ||
+      (/<a\b/i.test(sanitizedHtml) && sanitizedText.length >= 80) ||
+      (richBlockCount >= 6 && sanitizedText.length >= 48);
+    if (!hasRichMarkupCue || (!hasIdentityCue && !hasStructuredBodyCue)) return "";
+
+    return sanitizedHtml;
+  }
+
+  function normalizeMailboxSignatureDraft(signature = {}, mailbox = {}) {
+    const label = asText(mailbox.label || mailbox.name || deriveMailboxLabel(mailbox.email), "Mailbox");
+    const email = asText(mailbox.email).toLowerCase();
+    const signatureLabel = asText(
+      signature?.label || signature?.name,
+      `${label} signatur`
+    );
+    const fullName = asText(signature?.fullName || signature?.displayName || "");
+    const title = asText(signature?.title || signature?.line || "");
+    const approvedMailboxTokens = new Set([
+      "fazli",
+      "fazli krasniqi",
+      "fazli@hairtpclinic.com",
+      "egzona",
+      "egzona krasniqi",
+      "egzona@hairtpclinic.com",
+    ]);
+    const mailboxTokens = [normalizeKey(label), normalizeKey(fullName), normalizeMailboxId(email)]
+      .filter(Boolean)
+      .concat(normalizeMailboxId(email).split("@")[0] || [])
+      .filter(Boolean);
+    const isApprovedMailbox = mailboxTokens.some((token) => approvedMailboxTokens.has(token));
+    const html = isApprovedMailbox
+      ? sanitizeMailboxSignatureHtml(signature?.html || signature?.body || "") ||
+        buildDefaultMailboxSignatureHtml({
+          label,
+          email,
+          fullName,
+          title,
+        })
+      : "";
+    return {
+      label: signatureLabel,
+      fullName,
+      title,
+      html,
+    };
+  }
+
+  function getCustomMailboxSignatureLabel(mailbox = {}) {
+    const normalizedMailbox = normalizeCustomMailboxDefinition(mailbox);
+    return asText(normalizedMailbox?.signature?.label);
+  }
+
+  function buildStudioSignatureProfileFromMailbox(mailbox = {}, index = 0) {
+    const normalizedMailbox = normalizeCustomMailboxDefinition(mailbox, index);
+    if (!normalizedMailbox) return null;
+    const signature = normalizedMailbox.signature || normalizeMailboxSignatureDraft({}, normalizedMailbox);
+    const email = normalizeMailboxId(normalizedMailbox.email);
+    const label = asText(signature?.label, normalizedMailbox.label || titleCaseMailbox(email));
+    const fullName = asText(signature?.fullName, normalizedMailbox.label || label || "Mailbox");
+    const title = asText(signature?.title);
+    const signatureId = asText(
+      `mailbox-signature:${normalizeMailboxId(normalizedMailbox.id || email || label)}`,
+      ""
+    );
+    if (!signatureId) return null;
+    return {
+      id: signatureId,
+      aliases: Array.from(
+        new Set(
+          [
+            signatureId,
+            normalizedMailbox.id,
+            normalizedMailbox.email,
+            label,
+            fullName,
+            normalizeMailboxId(normalizedMailbox.email).split("@")[0],
+          ]
+            .map((value) => normalizeKey(value))
+            .filter(Boolean)
+        )
+      ),
+      source: "mailbox_admin",
+      label,
+      fullName,
+      title,
+      email,
+      html: asText(signature?.html),
+      senderMailboxId: email,
+      phone: "031-88 11 66",
+      mailboxId: normalizedMailbox.id,
+    };
+  }
+
+  function getStudioSignatureProfileIdentityTokens(profile = {}) {
+    const senderMailboxId = normalizeMailboxId(profile?.senderMailboxId || profile?.email);
+    const email = normalizeMailboxId(profile?.email || senderMailboxId);
+    const mailboxId = normalizeMailboxId(profile?.mailboxId || senderMailboxId);
+    const localPart = normalizeMailboxId((email || senderMailboxId).split("@")[0]);
+    return Array.from(
+      new Set(
+        [
+          normalizeKey(profile?.id),
+          normalizeKey(profile?.label),
+          normalizeKey(profile?.fullName),
+          email,
+          senderMailboxId,
+          mailboxId,
+          localPart,
+          ...asArray(profile?.aliases).map((alias) => normalizeKey(alias)),
+        ].filter(Boolean)
+      )
+    );
+  }
+
+  function getStudioAvailableSignatureProfiles() {
+    const profiles = [];
+    const seenTokens = new Set();
+    const isApprovedStudioSignatureProfile = (profile = null) =>
+      ["fazli", "egzona"].includes(normalizeKey(profile?.id || profile?.key));
+    const addProfile = (profile = null) => {
+      if (!profile || typeof profile !== "object") return;
+      const normalizedProfile = {
+        ...profile,
+        email: normalizeMailboxId(profile.email || profile.senderMailboxId),
+        senderMailboxId: normalizeMailboxId(profile.senderMailboxId || profile.email),
+        html: asText(profile.html),
+      };
+      if (!isApprovedStudioSignatureProfile(normalizedProfile)) return;
+      const identityTokens = getStudioSignatureProfileIdentityTokens(normalizedProfile);
+      if (!identityTokens.length || identityTokens.some((token) => seenTokens.has(token))) {
+        return;
+      }
+      identityTokens.forEach((token) => seenTokens.add(token));
+      profiles.push(normalizedProfile);
+    };
+    asArray(state.customMailboxes).forEach((mailbox, index) => {
+      addProfile(buildStudioSignatureProfileFromMailbox(mailbox, index));
+    });
+    STUDIO_SIGNATURE_PROFILES.forEach((profile) => {
+      addProfile(profile);
+    });
+    return profiles;
+  }
+
+  function getMailboxIdentityTokens(mailbox = {}) {
+    const values = [mailbox.id, mailbox.email, mailbox.label];
+    const tokens = new Set();
+    values.forEach((value) => {
+      const normalized = normalizeMailboxId(value);
+      if (!normalized) return;
+      tokens.add(normalized);
+      if (normalized.includes("@")) {
+        const localPart = normalizeMailboxId(normalized.split("@")[0]);
+        if (localPart) tokens.add(localPart);
+      }
+    });
+    return Array.from(tokens);
+  }
+
+  function isDefaultCustomMailboxSignaturePreset(mailbox = {}) {
+    const requestedTokens = new Set(
+      getMailboxIdentityTokens(mailbox)
+        .map((token) => normalizeMailboxId(token))
+        .filter(Boolean)
+    );
+    if (!requestedTokens.size) return false;
+    return DEFAULT_CUSTOM_MAILBOX_SIGNATURE_PRESETS.some((preset) =>
+      getMailboxIdentityTokens(preset).some((token) =>
+        requestedTokens.has(normalizeMailboxId(token))
+      )
+    );
+  }
+
+  function finalizeRuntimeMailboxSurface(mailbox = {}) {
+    const hasLiveSource = mailbox.hasLiveSource === true;
+    const localSignatureDefinition =
+      mailbox.localSignatureDefinition && typeof mailbox.localSignatureDefinition === "object"
+        ? normalizeCustomMailboxDefinition(mailbox.localSignatureDefinition)
+        : !hasLiveSource && mailbox.custom
+          ? normalizeCustomMailboxDefinition(mailbox)
+          : null;
+    const hasLocalSignatureDefinition = Boolean(localSignatureDefinition);
+    const localSignatureSeeded = localSignatureDefinition?.seeded === true;
+    const localSignatureLabel = asText(
+      localSignatureDefinition?.signature?.label || mailbox.signature?.label
+    );
+    const isCustomMailbox = !hasLiveSource;
+    return {
+      ...mailbox,
+      custom: isCustomMailbox,
+      hasLiveSource,
+      localSignatureDefinition,
+      hasLocalSignatureDefinition,
+      localSignatureSeeded,
+      localSignatureLabel,
+      statusLabel: isCustomMailbox ? "Custom" : "Live",
+      surfaceKind: isCustomMailbox
+        ? "custom_mailbox"
+        : hasLocalSignatureDefinition
+          ? "live_mailbox_with_local_signature"
+          : "live_mailbox",
+      adminEditable: isCustomMailbox || hasLocalSignatureDefinition,
+      adminRemovable:
+        isCustomMailbox || (hasLocalSignatureDefinition && hasLiveSource && !localSignatureSeeded),
+      adminEditLabel:
+        hasLiveSource && hasLocalSignatureDefinition ? "Redigera signatur" : "Redigera",
+      adminRemoveLabel:
+        hasLiveSource && hasLocalSignatureDefinition ? "Ta bort signatur" : "Ta bort",
+      ownerCopy: hasLiveSource
+        ? `Källa: ${asText(mailbox.owner, "Live")}`
+        : `Ägare: ${asText(mailbox.owner, "Team")}`,
+      signatureCopy: localSignatureLabel
+        ? `${hasLiveSource ? "Lokal signatur" : "Signatur"}: ${localSignatureLabel}`
+        : hasLiveSource
+          ? "Signatur: Liveprofil"
+          : "Ingen lokal signatur",
+      showLivePill: hasLiveSource,
+    };
+  }
+
+  function findExistingMailboxKey(mergedMailboxes, mailbox) {
+    const mailboxTokens = new Set(getMailboxIdentityTokens(mailbox));
+    if (!mailboxTokens.size) return "";
+    for (const [key, entry] of mergedMailboxes.entries()) {
+      const entryTokens = Array.isArray(entry.identityTokens)
+        ? entry.identityTokens
+        : getMailboxIdentityTokens(entry);
+      if (entryTokens.some((token) => mailboxTokens.has(token))) {
+        return key;
+      }
+    }
+    return "";
+  }
+
+  function getRuntimeMailboxCanonicalId(mailbox = {}) {
+    return normalizeMailboxId(
+      mailbox?.email ||
+        resolveRuntimeMailboxPresetEmail(mailbox?.id || mailbox?.label) ||
+        mailbox?.id ||
+        mailbox?.label ||
+        ""
+    );
+  }
+
+  function findRuntimeMailboxByScopeId(mailboxId = "", collection = getAvailableRuntimeMailboxes()) {
+    const normalizedMailboxId = normalizeMailboxId(mailboxId);
+    if (!normalizedMailboxId) return null;
+    return (
+      asArray(collection).find((mailbox) =>
+        getMailboxIdentityTokens(mailbox).some(
+          (token) => normalizeMailboxId(token) === normalizedMailboxId
+        )
+      ) || null
+    );
+  }
+
+  function canonicalizeRuntimeMailboxId(mailboxId = "", collection = getAvailableRuntimeMailboxes()) {
+    const normalizedMailboxId = normalizeMailboxId(mailboxId);
+    if (!normalizedMailboxId) return "";
+    const runtimeMailbox = findRuntimeMailboxByScopeId(normalizedMailboxId, collection);
+    return getRuntimeMailboxCanonicalId(runtimeMailbox || { id: normalizedMailboxId });
+  }
+
+  function getCanonicalAvailableRuntimeMailboxIds() {
+    return Array.from(
+      new Set(
+        getAvailableRuntimeMailboxes()
+          .map((mailbox) => canonicalizeRuntimeMailboxId(mailbox.email || mailbox.id))
+          .filter(Boolean)
+      )
+    );
+  }
+
   const workspaceSourceOfTruth = PREVIEW_WORKSPACE_STATE.createWorkspaceStateApi({
     AUX_VIEWS,
     QUEUE_LANE_ORDER,
     asArray,
     asText,
+    canonicalizeMailboxId: canonicalizeRuntimeMailboxId,
     normalizeKey,
     normalizeMailboxId,
     state,
   });
+
+  const runtimeReentryState = PREVIEW_REENTRY_STATE.createRuntimeReentryStateApi({
+    asArray,
+    asText,
+    canonicalizeRuntimeMailboxId,
+    getRuntimeLeftColumnState,
+    normalizeKey,
+    normalizeMailboxId,
+    state,
+    workspaceSourceOfTruth,
+    windowObject: window,
+  });
+
+  function captureRuntimeReentrySnapshot(reason = "state_change") {
+    if (!runtimeReentryState || typeof runtimeReentryState.captureRuntimeReentrySnapshot !== "function") {
+      return null;
+    }
+    return runtimeReentryState.captureRuntimeReentrySnapshot({ reason });
+  }
+
+  function restoreRuntimeReentrySnapshot(reason = "restore", options = {}) {
+    if (!runtimeReentryState || typeof runtimeReentryState.restoreRuntimeReentrySnapshot !== "function") {
+      return null;
+    }
+    return runtimeReentryState.restoreRuntimeReentrySnapshot({ reason, ...options });
+  }
+
+  function getRuntimeReentrySnapshot() {
+    return typeof runtimeReentryState?.getRuntimeReentrySnapshot === "function"
+      ? runtimeReentryState.getRuntimeReentrySnapshot()
+      : null;
+  }
+
+  function debugRuntimeReentrySnapshot(label = "reentry") {
+    if (!runtimeReentryState || typeof runtimeReentryState.debugReentrySnapshot !== "function") {
+      return null;
+    }
+    return runtimeReentryState.debugReentrySnapshot(label);
+  }
+
+  function getRuntimeReentryOutcome() {
+    return typeof runtimeReentryState?.getRuntimeReentryOutcome === "function"
+      ? runtimeReentryState.getRuntimeReentryOutcome()
+      : null;
+  }
+
+  const initialRuntimeReentrySnapshot = getRuntimeReentrySnapshot();
+  let runtimeReentryBootstrapTimer = null;
+  let runtimeReentryBootstrapApplied = false;
+  const tryApplyRuntimeReentryBootstrap = () => {
+    if (runtimeReentryBootstrapApplied) return;
+    if (!getRuntimeReentrySnapshot()) return;
+    if (!normalizeText(getAdminToken())) return;
+    runtimeReentryBootstrapApplied = true;
+    if (runtimeReentryBootstrapTimer) {
+      window.clearInterval(runtimeReentryBootstrapTimer);
+      runtimeReentryBootstrapTimer = null;
+    }
+    restoreRuntimeReentrySnapshot("bootstrap", { scopeMode: "hint_only" });
+  };
+  if (initialRuntimeReentrySnapshot) {
+    tryApplyRuntimeReentryBootstrap();
+    if (!runtimeReentryBootstrapApplied) {
+      runtimeReentryBootstrapTimer = window.setInterval(tryApplyRuntimeReentryBootstrap, 250);
+      window.addEventListener(
+        "beforeunload",
+        () => {
+          if (runtimeReentryBootstrapTimer) {
+            window.clearInterval(runtimeReentryBootstrapTimer);
+            runtimeReentryBootstrapTimer = null;
+          }
+        },
+        { once: true }
+      );
+    }
+  }
+
+  function hasMeaningfulRuntimeReentryState() {
+    const selectedMailboxIds = asArray(workspaceSourceOfTruth.getSelectedMailboxIds()).filter(
+      Boolean
+    );
+    return Boolean(
+      asText(workspaceSourceOfTruth.getSelectedThreadId()) ||
+        selectedMailboxIds.length ||
+        state.runtime.queueHistory?.open ||
+        asText(state.runtime.queueHistory?.selectedConversationId) ||
+        state.runtime.queueInlinePanel?.open ||
+        normalizeKey(state.runtime.activeLaneId || "all") !== "all" ||
+        normalizeKey(state.runtime.selectedOwnerKey || "all") !== "all" ||
+        normalizeKey(state.runtime.activeFocusSection || "conversation") !== "conversation" ||
+        state.runtime.historyExpanded !== true ||
+        asText(state.runtime.historySearch) ||
+        normalizeKey(state.runtime.historyMailboxFilter || "all") !== "all" ||
+        normalizeKey(state.runtime.historyResultTypeFilter || "all") !== "all" ||
+        normalizeKey(state.runtime.historyRangeFilter || "all") !== "all" ||
+        state.runtime.live === true ||
+        state.runtime.offline === true
+    );
+  }
 
   function asNumber(value, fallback = 0) {
     const parsed = Number(value);
@@ -2054,11 +3857,66 @@
     return `${prefix}-${Date.now()}`;
   }
 
-  function getAdminToken() {
+  function isLocalPreviewHost() {
     try {
-      return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+      const host = normalizeText(
+        window.location?.hostname || window.location?.host || ""
+      )
+        .split(":")[0]
+        .toLowerCase();
+      return ["localhost", "127.0.0.1", "::1"].includes(host);
     } catch {
-      return "";
+      return false;
+    }
+  }
+
+  function getAdminToken() {
+    const readTokenFromStorage = (storage) => {
+      try {
+        return normalizeText(storage?.getItem?.(ADMIN_TOKEN_STORAGE_KEY) || "");
+      } catch {
+        return "";
+      }
+    };
+
+    const localToken = readTokenFromStorage(window.localStorage);
+    if (localToken) return localToken;
+
+    const sessionToken = readTokenFromStorage(window.sessionStorage);
+    if (sessionToken) return sessionToken;
+
+    if (typeof isLocalPreviewHost === "function" && isLocalPreviewHost()) {
+      return "__preview_local__";
+    }
+
+    return "";
+  }
+
+  function clearAdminToken() {
+    const clearTokenFromStorage = (storage) => {
+      try {
+        storage?.removeItem?.(ADMIN_TOKEN_STORAGE_KEY);
+      } catch {}
+    };
+
+    clearTokenFromStorage(window.localStorage);
+    clearTokenFromStorage(window.sessionStorage);
+  }
+
+  async function waitForTruthWorklistAuthToken({ timeoutMs = 1800, intervalMs = 60 } = {}) {
+    const timeout = Math.max(0, Number(timeoutMs) || 0);
+    const interval = Math.max(20, Number(intervalMs) || 60);
+    const deadline = Date.now() + timeout;
+
+    while (true) {
+      const adminToken = normalizeText(getAdminToken());
+      if (adminToken) return adminToken;
+      if (Date.now() >= deadline) {
+        return typeof isLocalPreviewHost === "function" && isLocalPreviewHost()
+          ? "__preview_local__"
+          : "";
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, interval));
     }
   }
 
@@ -2165,6 +4023,217 @@
     return localPart.charAt(0).toUpperCase() + localPart.slice(1);
   }
 
+  function getRuntimeMode() {
+    const normalizedMode = normalizeKey(state.runtime?.mode || "");
+    if (normalizedMode) return normalizedMode;
+    if (state.runtime?.authRequired) return "auth_required";
+    if (state.runtime?.live) return "live";
+    if (state.runtime?.offline) return "offline_history";
+    if (normalizeText(state.runtime?.error)) return "runtime_error";
+    return "live";
+  }
+
+  function buildRuntimeMailboxCapabilities(graph = {}) {
+    const signatureProfiles = asArray(graph?.signatureProfiles);
+    const runtimeMode =
+      normalizeKey(graph?.runtimeMode || (graph?.readEnabled === true ? "live" : "offline_history")) ||
+      "runtime_error";
+    const explicitCapabilities = asArray(graph?.mailboxCapabilities)
+      .map((capability, index) => {
+        const mailboxId = normalizeMailboxId(capability?.email || capability?.id || "");
+        if (!mailboxId) return null;
+        const signatureProfileId = normalizeKey(capability?.signatureProfileId || "");
+        const signatureProfile =
+          signatureProfiles.find((profile) => normalizeKey(profile?.key) === signatureProfileId) || null;
+        return {
+          id: mailboxId,
+          email: mailboxId,
+          label: asText(capability?.label, titleCaseMailbox(mailboxId)),
+          runtimeMode,
+          readAvailable: capability?.readAvailable === true,
+          sendAvailable: capability?.sendAvailable === true,
+          deleteAvailable: capability?.deleteAvailable === true,
+          senderAvailable: capability?.senderAvailable === true,
+          signatureProfileId,
+          signatureProfileAvailable: capability?.signatureProfileAvailable === true,
+          signatureProfileLabel: asText(
+            capability?.signatureProfileLabel,
+            signatureProfile ? titleCaseMailbox(signatureProfile.senderMailboxId) : ""
+          ),
+          order: Number.isFinite(Number(capability?.order)) ? Number(capability.order) : index,
+        };
+      })
+      .filter(Boolean);
+    if (explicitCapabilities.length) {
+      return explicitCapabilities;
+    }
+    const normalizedAllowlistMailboxIds = asArray(graph?.allowlistMailboxIds)
+      .map(normalizeMailboxId)
+      .filter(Boolean);
+    const normalizedSenderMailboxOptions = asArray(graph?.senderMailboxOptions)
+      .map(normalizeMailboxId)
+      .filter(Boolean);
+    const allowlistTokens = new Set(
+      normalizedAllowlistMailboxIds.flatMap((mailboxId) => {
+        const localPart = mailboxId.includes("@")
+          ? normalizeMailboxId(mailboxId.split("@")[0])
+          : "";
+        return localPart && localPart !== mailboxId ? [mailboxId, localPart] : [mailboxId];
+      })
+    );
+    const senderTokens = new Set(
+      normalizedSenderMailboxOptions.flatMap((mailboxId) => {
+        const localPart = mailboxId.includes("@")
+          ? normalizeMailboxId(mailboxId.split("@")[0])
+          : "";
+        return localPart && localPart !== mailboxId ? [mailboxId, localPart] : [mailboxId];
+      })
+    );
+    const signatureProfilesByMailbox = new Map(
+      signatureProfiles
+        .map((profile) => {
+          const mailboxId = normalizeMailboxId(profile?.senderMailboxId);
+          if (!mailboxId) return null;
+          return [mailboxId, profile];
+        })
+        .filter(Boolean)
+    );
+    const candidateMailboxIds = Array.from(
+      new Set([
+        normalizeMailboxId(graph?.defaultSenderMailbox),
+        ...normalizedAllowlistMailboxIds,
+        ...normalizedSenderMailboxOptions,
+        ...signatureProfiles.map((profile) => normalizeMailboxId(profile?.senderMailboxId)),
+      ])
+    ).filter(Boolean);
+
+    return candidateMailboxIds.map((mailboxId, index) => {
+      const localPart = mailboxId.includes("@")
+        ? normalizeMailboxId(mailboxId.split("@")[0])
+        : "";
+      const signatureProfile =
+        signatureProfilesByMailbox.get(mailboxId) ||
+        signatureProfiles.find((profile) => normalizeKey(profile?.key) === localPart) ||
+        null;
+      const senderAvailable = senderTokens.has(mailboxId) || (localPart && senderTokens.has(localPart));
+      const readAvailable =
+        graph?.readEnabled === true &&
+        (!allowlistTokens.size || allowlistTokens.has(mailboxId) || (localPart && allowlistTokens.has(localPart)));
+      return {
+        id: mailboxId,
+        email: mailboxId,
+        label: titleCaseMailbox(mailboxId),
+        runtimeMode,
+        readAvailable,
+        sendAvailable: graph?.sendEnabled === true && senderAvailable,
+        deleteAvailable: graph?.deleteEnabled === true && senderAvailable,
+        senderAvailable,
+        signatureProfileId: normalizeKey(signatureProfile?.key || ""),
+        signatureProfileAvailable: Boolean(signatureProfile),
+        signatureProfileLabel: signatureProfile ? titleCaseMailbox(signatureProfile.senderMailboxId) : "",
+        order: index,
+      };
+    });
+  }
+
+  function getRuntimeMailboxCapability(mailboxId = "") {
+    const normalizedMailboxId = normalizeMailboxId(mailboxId);
+    if (!normalizedMailboxId) return null;
+    const requestedTokens = new Set(
+      getMailboxIdentityTokens({
+        id: normalizedMailboxId,
+        email: normalizedMailboxId,
+        label: titleCaseMailbox(normalizedMailboxId),
+      }).map(normalizeMailboxId)
+    );
+    return (
+      asArray(state.runtime.mailboxCapabilities).find((capability) =>
+        getMailboxIdentityTokens(capability).some((token) => requestedTokens.has(normalizeMailboxId(token)))
+      ) || null
+    );
+  }
+
+  function getRuntimeMailboxCapabilityMeta(mailboxId = "", { includeDelete = false } = {}) {
+    const capability = getRuntimeMailboxCapability(mailboxId);
+    const customMailbox = findCustomMailboxDefinition(mailboxId);
+    const localSignatureLabel = asText(customMailbox?.signature?.label);
+    const runtimeMode = getRuntimeMode();
+    const parts = [];
+    const writeBlockedByMode = runtimeMode === "auth_required" || runtimeMode === "offline_history";
+    const sendModeBlockedCopy =
+      runtimeMode === "auth_required" ? "Skicka: auth-låst" : "Skicka: spärrad i läsläge";
+    const deleteModeBlockedCopy =
+      runtimeMode === "auth_required" ? "Radera: auth-låst" : "Radera: spärrad i läsläge";
+    const requestedTokens = new Set(
+      getMailboxIdentityTokens({
+        id: mailboxId,
+        email: mailboxId,
+        label: titleCaseMailbox(mailboxId),
+      })
+        .map(normalizeMailboxId)
+        .filter(Boolean)
+    );
+    const matchedAvailableMailbox =
+      !capability && runtimeMode === "live"
+        ? getAvailableRuntimeMailboxes().find((mailbox) =>
+            getMailboxIdentityTokens(mailbox).some((token) =>
+              requestedTokens.has(normalizeMailboxId(token))
+            )
+          ) || null
+        : null;
+    const inferredProfileBlocked = !capability && runtimeMode === "live" && Boolean(matchedAvailableMailbox);
+    const mailboxPolicyBlocked =
+      capability?.senderAvailable === false ||
+      (capability?.sendAvailable !== true && capability?.signatureProfileAvailable === false) ||
+      inferredProfileBlocked;
+    const sendBlockedCopy = inferredProfileBlocked
+      ? "Skicka: spärrad i nuvarande profil"
+      : "Skicka: spärrad för egen mailbox";
+    const deleteBlockedCopy = inferredProfileBlocked
+      ? "Radera: spärrad i nuvarande profil"
+      : "Radera: spärrad för egen mailbox";
+    const signatureBlockedCopy = inferredProfileBlocked
+      ? "Signatur: profil saknas i nuvarande läge"
+      : "Signatur: egen profil saknas";
+    if (runtimeMode === "auth_required") {
+      parts.push("Läs: auth-låst");
+    } else if (runtimeMode === "offline_history") {
+      parts.push("Läs: offline historik · läsläge");
+    } else {
+      parts.push(capability?.readAvailable ? "Läs: livekälla" : "Läs: spärrad");
+    }
+    parts.push(
+      writeBlockedByMode
+        ? sendModeBlockedCopy
+        : capability?.sendAvailable
+        ? "Skicka: aktiv"
+        : mailboxPolicyBlocked
+          ? sendBlockedCopy
+          : "Skicka: spärrad"
+    );
+    if (includeDelete) {
+      parts.push(
+        writeBlockedByMode
+          ? deleteModeBlockedCopy
+          : capability?.deleteAvailable
+          ? "Radera: aktiv"
+          : mailboxPolicyBlocked
+            ? deleteBlockedCopy
+            : "Radera: spärrad"
+      );
+    }
+    parts.push(
+      capability?.signatureProfileAvailable
+        ? `Signatur: ${capability.signatureProfileLabel || titleCaseMailbox(mailboxId)}`
+        : localSignatureLabel
+          ? `Signatur: ${localSignatureLabel}`
+        : mailboxPolicyBlocked
+          ? signatureBlockedCopy
+          : "Signatur: saknas"
+    );
+    return parts.join(" · ");
+  }
+
   function formatRuntimeDateTime(value, options) {
     const iso = toIso(value);
     if (!iso) return "";
@@ -2219,6 +4288,60 @@
     });
   }
 
+  function deriveFollowUpAgingState(row = {}) {
+    const dueIso = toIso(row?.followUpDueAt || row?.followUpSuggestedAt);
+    const lastOutboundIso = toIso(row?.lastOutboundAt);
+    const waitingOn = normalizeKey(row?.waitingOn);
+    const statusLabel = normalizeKey(row?.statusLabel);
+    const nextActionLabel = normalizeKey(row?.nextActionLabel);
+    const workflowLane = normalizeKey(row?.workflowLane);
+    const waitingForCustomer =
+      waitingOn === "customer" ||
+      statusLabel === "besvarad" ||
+      nextActionLabel === "invanta_svar" ||
+      nextActionLabel === "folj_upp_snart" ||
+      nextActionLabel === "folj_upp_nu" ||
+      nextActionLabel.includes("uppfolj") ||
+      workflowLane === "waiting_reply";
+    const buildState = (label = "", actionLabel = "", tone = "", detail = "") => ({
+      label,
+      actionLabel,
+      tone,
+      detail,
+    });
+
+    if (dueIso) {
+      const diffHours = (Date.parse(dueIso) - Date.now()) / (60 * 60 * 1000);
+      if (diffHours <= 0) {
+        return buildState("Följ upp nu", "Följ upp nu", "urgent", "Planerad uppföljning har passerat.");
+      }
+      if (diffHours <= 12) {
+        return buildState(
+          `${Math.max(1, Math.round(diffHours))}h kvar`,
+          "Följ upp snart",
+          "warning",
+          "Uppföljning närmar sig."
+        );
+      }
+      return buildState("", "", "", "");
+    }
+
+    if (waitingForCustomer && lastOutboundIso) {
+      const diffHours = (Date.now() - Date.parse(lastOutboundIso)) / (60 * 60 * 1000);
+      if (diffHours >= 72) {
+        return buildState("72h inaktiv", "Följ upp nu", "urgent", "Kunden har inte svarat.");
+      }
+      if (diffHours >= 48) {
+        return buildState("48h inaktiv", "Följ upp nu", "urgent", "Kunden har inte svarat.");
+      }
+      if (diffHours >= 24) {
+        return buildState("24h inaktiv", "Följ upp snart", "warning", "Kunden väntar på nästa steg.");
+      }
+    }
+
+    return buildState("", "", "", "");
+  }
+
   function extractEmail(value) {
     const match = asText(value).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
     return match ? match[0].toLowerCase() : "";
@@ -2235,15 +4358,279 @@
   }
 
   function getRuntimeCustomerName(row) {
+    const extractRuntimeEmail = (value = "") => {
+      const match = asText(value).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+      return match ? match[0].toLowerCase() : "";
+    };
+    const extractRuntimePreviewTextFromHtml = (value = "") => {
+      const html = asText(value).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    const humanizeRuntimeTechnicalSender = (value = "") => {
+      const email = extractRuntimeEmail(value);
+      if (!email) return "";
+      const [localPart = "", domainPart = ""] = email.split("@");
+      const normalizedLocalPart = normalizeKey(localPart);
+      const genericLocalParts = new Set([
+        "info",
+        "support",
+        "contact",
+        "kontakt",
+        "hello",
+        "mail",
+        "mailer",
+        "news",
+        "newsletter",
+        "noreply",
+        "no-reply",
+        "reply",
+        "service",
+        "team",
+        "admin",
+        "booking",
+        "bokning",
+        "order",
+        "orders",
+        "receipt",
+        "receipts",
+      ]);
+      const technicalDomainParts = new Set([
+        "app",
+        "cdn",
+        "email",
+        "img",
+        "image",
+        "mail",
+        "mailer",
+        "news",
+        "newsletter",
+        "noreply",
+        "no-reply",
+        "reply",
+        "support",
+        "kontakt",
+        "contact",
+        "www",
+      ]);
+      const titleCaseParts = (parts = []) =>
+        parts
+          .map((part) => asText(part).trim())
+          .filter(Boolean)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+
+      if (!genericLocalParts.has(normalizedLocalPart)) {
+        return titleCaseParts(localPart.split(/[._+-]+/g));
+      }
+
+      const domainTokens = domainPart.split(".").filter(Boolean);
+      if (domainTokens.length >= 2) {
+        const suffix = domainTokens[domainTokens.length - 1];
+        const baseTokens = domainTokens.slice(0, -1).filter(Boolean);
+        const meaningfulBase =
+          [...baseTokens]
+            .reverse()
+            .find((part) => {
+              const normalizedPart = normalizeKey(part);
+              return (
+                normalizedPart &&
+                normalizedPart.length > 1 &&
+                !technicalDomainParts.has(normalizedPart)
+              );
+            }) || baseTokens[baseTokens.length - 1];
+        if (meaningfulBase) {
+          return titleCaseParts([meaningfulBase, suffix]);
+        }
+      }
+
+      return titleCaseParts(localPart.split(/[._+-]+/g));
+    };
+    const extractRuntimeSenderNameFromText = (value = "") => {
+      const text = extractRuntimePreviewTextFromHtml(value);
+      if (!text) return "";
+      const matchers = [
+        /\bFrån:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrom:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrån:\s*([^\n]+?)\s+(?:Datum:|Date:|Till:|To:|Ämne:|Subject:)/i,
+        /\bFrom:\s*([^\n]+?)\s+(?:Date:|To:|Subject:)/i,
+      ];
+      for (const matcher of matchers) {
+        const candidate = asText(text.match(matcher)?.[1]).trim();
+        if (
+          candidate &&
+          !looksLikeMailboxIdentity(candidate) &&
+          !isRuntimeUnknownCustomerName(candidate)
+        ) {
+          return candidate
+            .replace(/\s+\|\s+Hair TP Clinic.*$/i, "")
+            .replace(/\s+\|\s+.*$/i, "")
+            .trim();
+        }
+      }
+      return "";
+    };
+    const subjectDerivedCustomerName = deriveRuntimeCustomerNameFromSubject(
+      row?.displaySubject || row?.subject || row?.summary || row?.title
+    );
     const candidates = [
       row?.customerSummary?.customerName,
       row?.customerName,
       row?.senderName,
       row?.senderDisplayName,
       row?.sender,
+      row?.counterpart,
+      row?.counterpartyName,
+      row?.fromName,
+      row?.contactName,
+      row?.latestMessage?.senderName,
+      row?.latestMessage?.fromName,
+      row?.latestMessage?.contactName,
+      row?.conversation?.senderName,
+      row?.conversation?.fromName,
+      row?.conversation?.contactName,
+      extractRuntimeSenderNameFromText(row?.latestInboundPreview),
+      extractRuntimeSenderNameFromText(row?.preview),
+      extractRuntimeSenderNameFromText(row?.systemPreview),
+      extractRuntimeSenderNameFromText(row?.latestPreview),
+      extractRuntimeSenderNameFromText(row?.bodyPreview),
+      extractRuntimeSenderNameFromText(row?.detail),
+      extractRuntimeSenderNameFromText(row?.summary),
+      extractRuntimeSenderNameFromText(row?.body),
+      extractRuntimeSenderNameFromText(row?.bodyHtml),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.preview),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.bodyPreview),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.detail),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.summary),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.body),
+      extractRuntimeSenderNameFromText(row?.latestMessage?.bodyHtml),
+      extractRuntimeSenderNameFromText(row?.conversation?.preview),
+      extractRuntimeSenderNameFromText(row?.conversation?.bodyPreview),
+      extractRuntimeSenderNameFromText(row?.conversation?.detail),
+      extractRuntimeSenderNameFromText(row?.conversation?.summary),
+      extractRuntimeSenderNameFromText(row?.conversation?.body),
+      extractRuntimeSenderNameFromText(row?.conversation?.bodyHtml),
+      subjectDerivedCustomerName,
     ].map((value) => asText(value)).filter(Boolean);
-    const preferred = candidates.find((value) => !looksLikeMailboxIdentity(value));
-    return preferred || candidates[0] || "Okänd kund";
+    const isTechnicalSenderIdentity = (value = "") =>
+      Boolean(extractRuntimeEmail(value)) || looksLikeMailboxIdentity(value);
+    const preferred = candidates.find(
+      (value) =>
+        !isTechnicalSenderIdentity(value) && !isRuntimeUnknownCustomerName(value)
+    );
+    const nonMailboxFallback = candidates.find(
+      (value) => !isTechnicalSenderIdentity(value)
+    );
+    const humanizedEmailFallback = candidates
+      .map((value) => humanizeRuntimeTechnicalSender(value))
+      .find(Boolean);
+    return preferred || nonMailboxFallback || humanizedEmailFallback || candidates[0] || "Okänd kund";
+  }
+
+  function getRuntimeCustomerNameFromFeedEntries(feedEntries = [], fallback = "") {
+    const extractRuntimePreviewTextFromHtml = (value = "") => {
+      const html = asText(value).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    const extractRuntimeSenderNameFromText = (value = "") => {
+      const text = extractRuntimePreviewTextFromHtml(value);
+      if (!text) return "";
+      const matchers = [
+        /\bFrån:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrom:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrån:\s*([^\n]+?)\s+(?:Datum:|Date:|Till:|To:|Ämne:|Subject:)/i,
+        /\bFrom:\s*([^\n]+?)\s+(?:Date:|To:|Subject:)/i,
+      ];
+      for (const matcher of matchers) {
+        const candidate = asText(text.match(matcher)?.[1]).trim();
+        if (
+          candidate &&
+          !looksLikeMailboxIdentity(candidate) &&
+          !isRuntimeUnknownCustomerName(candidate)
+        ) {
+          return candidate
+            .replace(/\s+\|\s+Hair TP Clinic.*$/i, "")
+            .replace(/\s+\|\s+.*$/i, "")
+            .trim();
+        }
+      }
+      return "";
+    };
+    const candidates = asArray(feedEntries)
+      .filter((entry) => normalizeKey(entry?.direction || "inbound") !== "outbound")
+      .flatMap((entry) => [
+        entry?.senderName,
+        entry?.fromName,
+        entry?.contactName,
+        entry?.counterpart,
+        entry?.counterpartyName,
+        entry?.customerName,
+        entry?.mailDocument?.from?.name,
+        entry?.mailDocument?.sender?.name,
+        extractRuntimeSenderNameFromText(entry?.mailThreadMessage?.presentation?.previewText),
+        extractRuntimeSenderNameFromText(entry?.mailThreadMessage?.presentation?.conversationText),
+        extractRuntimeSenderNameFromText(entry?.mailThreadMessage?.primaryBody?.text),
+        extractRuntimeSenderNameFromText(entry?.mailDocument?.previewText),
+        extractRuntimeSenderNameFromText(entry?.mailDocument?.primaryBodyText),
+        extractRuntimeSenderNameFromText(entry?.preview),
+        extractRuntimeSenderNameFromText(entry?.bodyPreview),
+        extractRuntimeSenderNameFromText(entry?.detail),
+        extractRuntimeSenderNameFromText(entry?.summary),
+        extractRuntimeSenderNameFromText(entry?.body),
+        extractRuntimeSenderNameFromText(entry?.bodyHtml),
+      ])
+      .map((value) => asText(value).trim())
+      .filter(Boolean);
+    const preferred = candidates.find(
+      (value) => !looksLikeMailboxIdentity(value) && !isRuntimeUnknownCustomerName(value)
+    );
+    const nonMailboxFallback = candidates.find((value) => !looksLikeMailboxIdentity(value));
+    return preferred || nonMailboxFallback || asText(fallback);
   }
 
   function extractCustomerEmail(row) {
@@ -2524,8 +4911,44 @@
       profileName: "Ditt namn",
       profileEmail: "din.email@hairtp.com",
       deleteRequestedAt: "",
+      mailFoundationDefaults: {
+        senderMailboxId: "",
+        composeSenderMailboxId: "",
+        replySenderMailboxId: "",
+        signatureProfileId: "",
+      },
       toggles: Object.fromEntries(SETTINGS_TOGGLE_KEYS.map((key) => [key, false])),
     };
+  }
+
+  function normalizeMailFoundationDefaults(defaults = {}) {
+    return {
+      senderMailboxId: normalizeMailboxId(defaults?.senderMailboxId || defaults?.defaultSenderMailboxId),
+      composeSenderMailboxId: normalizeMailboxId(defaults?.composeSenderMailboxId),
+      replySenderMailboxId: normalizeMailboxId(defaults?.replySenderMailboxId),
+      signatureProfileId: normalizeKey(
+        defaults?.signatureProfileId || defaults?.defaultSignatureProfileId
+      ),
+    };
+  }
+
+  function serializeCustomMailboxesForSettings(customMailboxes = state.customMailboxes) {
+    return asArray(customMailboxes)
+      .map((mailbox, index) => normalizeCustomMailboxDefinition(mailbox, index))
+      .filter(Boolean)
+      .map((mailbox) => ({
+        id: mailbox.id,
+        email: mailbox.email,
+        label: mailbox.label,
+        owner: mailbox.owner,
+        toneClass: mailbox.toneClass,
+        signature: {
+          label: mailbox.signature?.label || "",
+          fullName: mailbox.signature?.fullName || "",
+          title: mailbox.signature?.title || "",
+          html: mailbox.signature?.html || "",
+        },
+      }));
   }
 
   function createMacroCardFromRecord(record, fallbackIndex = 0) {
@@ -2608,15 +5031,39 @@
       profileName: asText(settings?.profileName, defaults.profileName),
       profileEmail: asText(settings?.profileEmail, defaults.profileEmail),
       deleteRequestedAt: asText(settings?.deleteRequestedAt),
+      mailFoundationDefaults: normalizeMailFoundationDefaults(settings?.mailFoundation?.defaults),
+      mailFoundationCustomMailboxes: asArray(settings?.mailFoundation?.customMailboxes),
       toggles,
     };
   }
 
-  function buildSettingsPayloadFromState() {
+  function buildSettingsPayloadFromState({
+    customMailboxes = null,
+    mailFoundationDefaults = null,
+  } = {}) {
     const toggles = {};
     Object.entries(SETTINGS_TOGGLE_KEY_MAP).forEach(([uiKey, apiKey]) => {
       toggles[apiKey] = Boolean(state.settingsRuntime.toggles[uiKey]);
     });
+    const normalizedMailFoundationDefaults = normalizeMailFoundationDefaults(
+      mailFoundationDefaults || state.settingsRuntime.mailFoundationDefaults || {}
+    );
+    const senderMailboxId = normalizeMailboxId(
+      normalizedMailFoundationDefaults.senderMailboxId ||
+        normalizedMailFoundationDefaults.composeSenderMailboxId ||
+        state.runtime.defaultSenderMailbox
+    );
+    const composeSenderMailboxId = normalizeMailboxId(
+      normalizedMailFoundationDefaults.composeSenderMailboxId || senderMailboxId
+    );
+    const replySenderMailboxId = normalizeMailboxId(
+      normalizedMailFoundationDefaults.replySenderMailboxId || senderMailboxId
+    );
+    const signatureProfileId = normalizeKey(
+      normalizedMailFoundationDefaults.signatureProfileId ||
+        state.runtime.defaultSignatureProfile ||
+        CCO_DEFAULT_SIGNATURE_PROFILE
+    );
     return {
       theme: state.settingsRuntime.choices.theme,
       density: state.settingsRuntime.choices.density,
@@ -2630,6 +5077,17 @@
         order: section.order,
       })),
       toggles,
+      mailFoundation: {
+        defaults: {
+          senderMailboxId,
+          composeSenderMailboxId,
+          replySenderMailboxId,
+          signatureProfileId,
+        },
+        customMailboxes: serializeCustomMailboxesForSettings(
+          customMailboxes || state.customMailboxes
+        ),
+      },
     };
   }
 
@@ -2640,10 +5098,24 @@
     state.settingsRuntime.profileName = mapped.profileName;
     state.settingsRuntime.profileEmail = mapped.profileEmail;
     state.settingsRuntime.deleteRequestedAt = mapped.deleteRequestedAt;
+    state.settingsRuntime.mailFoundationDefaults = {
+      ...state.settingsRuntime.mailFoundationDefaults,
+      ...mapped.mailFoundationDefaults,
+    };
     state.settingsRuntime.toggles = {
       ...state.settingsRuntime.toggles,
       ...mapped.toggles,
     };
+    if (
+      nextState?.mailFoundation &&
+      Object.prototype.hasOwnProperty.call(nextState.mailFoundation, "customMailboxes")
+    ) {
+      state.customMailboxes = mergeDefaultCustomMailboxDefinitions([
+        ...mapped.mailFoundationCustomMailboxes,
+        ...asArray(state.customMailboxes),
+      ]);
+      persistCustomMailboxes();
+    }
   }
 
   function isConciseRuntimeValue(value, { maxChars = 32, maxWords = 4 } = {}) {
@@ -2664,38 +5136,341 @@
     return `${trimmed.slice(0, maxChars - 1).trimEnd()}…`;
   }
 
+  function normalizeRuntimeDisplaySubject(value, fallback = "") {
+    const raw = normalizeText(value).replace(/\s+/g, " ");
+    if (!raw) return fallback;
+
+    const normalizedRaw = normalizeKey(raw.replace(/[()]/g, ""));
+    if (normalizedRaw === "utan ämne" || normalizedRaw === "utan amne") {
+      return fallback;
+    }
+
+    let cleaned = raw;
+    const technicalPrefixPattern =
+      /(cco|qa|live|telefon|phone|test|verification|verify|sandbox|preview|t\d{2}:\d{2}:\d{2}(?:\.\d+)?z)/i;
+
+    while (cleaned.startsWith("[")) {
+      const prefixEnd = cleaned.lastIndexOf("]");
+      if (prefixEnd <= 0 || prefixEnd > 120) break;
+      const prefix = cleaned.slice(0, prefixEnd + 1);
+      if (!technicalPrefixPattern.test(prefix)) break;
+      cleaned = cleaned.slice(prefixEnd + 1).trim();
+    }
+
+    cleaned = cleaned
+      .replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi, "")
+      .replace(/\bT\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\-:|]+/g, "")
+      .trim();
+
+    if (!cleaned) return fallback || raw;
+    return compactRuntimeCopy(cleaned, fallback || raw, 78);
+  }
+
+  function isRuntimePlaceholderLine(value) {
+    const normalized = normalizeText(value)
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[()]/g, "")
+      .replace(/\.+$/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (!normalized) return true;
+    if (
+      normalized.includes("du_far_inte_ofta_e_post") ||
+      normalized.includes("power_up_your_productivity_with_microsoft_365") ||
+      normalized.includes("get_more_done_with_apps_like_word") ||
+      normalized.includes("mailbox_truth_i_wave") ||
+      normalized.includes("raden_kommer_fran_mailbox_truth_i_wave") ||
+      normalized.includes("unread_inbound_and_needs_reply_lases_fran_mailbox_truth_i_wave")
+    ) {
+      return true;
+    }
+    return [
+      "aktiv_trad",
+      "active_thread",
+      "ingen_forhandsvisning_tillganglig",
+      "ingen_preview_tillganglig",
+      "ingen_senaste_kundsignal_annu",
+      "okand_avsandare",
+      "okand_kund",
+      "unknown_customer",
+      "unknown_sender",
+      "utan_amne",
+    ].includes(normalized);
+  }
+
+  function classifyRuntimeRowFamily(row = {}) {
+    const haystack = [
+      row?.displaySubject,
+      row?.subject,
+      row?.title,
+      row?.customerName,
+      row?.senderName,
+      row?.senderDisplayName,
+      row?.sender,
+      row?.latestInboundPreview,
+      row?.preview,
+      row?.systemPreview,
+      row?.latestPreview,
+      row?.bodyPreview,
+      row?.detail,
+      row?.summary,
+      row?.customerSummary?.lastCaseSummary,
+      row?.intent,
+      row?.intentLabel,
+    ]
+      .map((value) =>
+        normalizeText(value)
+          .normalize("NFKD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+      )
+      .filter(Boolean)
+      .join(" ");
+
+    if (
+      /\b(?:slack|mentioned you in|qa reply|cco-next live send inspect|verification|verify|sandbox|fixture|teams?)\b/i.test(
+        haystack
+      )
+    ) {
+      return "notification/system_notice";
+    }
+
+    if (
+      /\b(?:ny bokning|booking request|bokadirekt|cliento|getaccept|behandlingsavtal|dokumentet|dokument|signeringsmail|verifieringsmail)\b/i.test(
+        haystack
+      ) ||
+      normalizeKey(row?.intent || row?.intentLabel) === "booking_request"
+    ) {
+      return "booking_system_mail";
+    }
+
+    return "human_mail";
+  }
+
+  function isRuntimeUnknownCustomerName(value) {
+    const normalized = normalizeText(value)
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    return [
+      "okand_avsandare",
+      "okand_kund",
+      "unknown",
+      "unknown_customer",
+      "unknown_sender",
+    ].includes(normalized);
+  }
+
+  function deriveRuntimeCustomerNameFromSubject(value) {
+    const subject = normalizeRuntimeDisplaySubject(value, "");
+    if (!subject || isRuntimePlaceholderLine(subject)) return "";
+    const contactFormMatch = subject.match(/^(.+?)\s+kontaktformul[aä]r\b/i);
+    const candidate = asText(contactFormMatch?.[1]).trim();
+    if (candidate) {
+      if (looksLikeMailboxIdentity(candidate) || isRuntimeUnknownCustomerName(candidate)) return "";
+      if (/\b(?:qa|cco|live|test|inspect|reply|send|telefon|phone|mailbox)\b/i.test(candidate)) {
+        return "";
+      }
+      return compactRuntimeCopy(candidate, "", 42);
+    }
+    if (/\b(?:qa|cco|live|test|inspect|reply|send|telefon|phone|mailbox|verify|verification)\b/i.test(subject)) {
+      return compactRuntimeCopy(subject, "", 54);
+    }
+    return "";
+  }
+
+  function buildRuntimeDisplaySubject(row, customerName) {
+    const mailboxLabel = titleCaseMailbox(
+      asText(row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName)
+    );
+    const normalizedSubject = normalizeRuntimeDisplaySubject(row?.subject, "");
+    if (
+      normalizedSubject &&
+      !isRuntimePlaceholderLine(normalizedSubject) &&
+      normalizeKey(normalizedSubject) === normalizeKey(customerName)
+    ) {
+      return normalizedSubject;
+    }
+    if (
+      normalizedSubject &&
+      !isRuntimePlaceholderLine(normalizedSubject) &&
+      normalizeKey(normalizedSubject) !== normalizeKey(customerName)
+    ) {
+      return normalizedSubject;
+    }
+    if (
+      normalizeText(customerName) &&
+      !looksLikeMailboxIdentity(customerName) &&
+      !isRuntimeUnknownCustomerName(customerName)
+    ) {
+      return `Konversation med ${customerName}`;
+    }
+    if (mailboxLabel) return `Nytt inkommande mejl i ${mailboxLabel}`;
+    return "Nytt inkommande mejl";
+  }
+
+  function mapRuntimeDisplayOwnerLabel(value) {
+    const owner = asText(value);
+    if (!owner) return "Ej tilldelad";
+    const normalizedOwner = normalizeKey(owner);
+    if (normalizedOwner === "oägd" || normalizedOwner === "unassigned") {
+      return "Ej tilldelad";
+    }
+    return owner;
+  }
+
+  function mapRuntimeDisplayEngagementLabel(score) {
+    if (score >= 0.76) return "Hög aktivitet";
+    if (score >= 0.5) return "Stabil aktivitet";
+    if (score >= 0.3) return "Låg aktivitet";
+    return "Ny kontakt";
+  }
+
   function countWords(value) {
     return normalizeText(value).split(/\s+/).filter(Boolean).length;
   }
 
-  function getStudioSignatureProfile(signatureId = "") {
+  function resolveStudioSignatureProfile(signatureId = "") {
     const normalizedId = normalizeKey(signatureId);
     const matchesProfile = (profile, targetId) => {
       if (!profile || typeof profile !== "object") return false;
       const normalizedTargetId = normalizeKey(targetId);
       if (!normalizedTargetId) return false;
       if (normalizeKey(profile.id) === normalizedTargetId) return true;
+      if (normalizeMailboxId(profile.email) === normalizeMailboxId(targetId)) return true;
+      const mailboxLocalPart = normalizeMailboxId(asText(profile.email).split("@")[0]);
+      if (mailboxLocalPart && mailboxLocalPart === normalizeMailboxId(targetId)) return true;
       const aliases = Array.isArray(profile.aliases) ? profile.aliases : [];
       return aliases.some((alias) => normalizeKey(alias) === normalizedTargetId);
     };
+    return getStudioAvailableSignatureProfiles().find((profile) => matchesProfile(profile, normalizedId)) || null;
+  }
+
+  function getStudioSignatureProfile(signatureId = "") {
+    const normalizedId = normalizeKey(signatureId);
     const normalizedDefaultId = normalizeKey(
       state.runtime.defaultSignatureProfile || CCO_DEFAULT_SIGNATURE_PROFILE
     );
     return (
-      STUDIO_SIGNATURE_PROFILES.find((profile) => matchesProfile(profile, normalizedId)) ||
-      STUDIO_SIGNATURE_PROFILES.find((profile) => matchesProfile(profile, normalizedDefaultId)) ||
-      STUDIO_SIGNATURE_PROFILES[0]
+      resolveStudioSignatureProfile(normalizedId) ||
+      resolveStudioSignatureProfile(normalizedDefaultId) ||
+      getStudioAvailableSignatureProfiles().find((profile) =>
+        ["fazli", "egzona"].includes(normalizeKey(profile?.id || profile?.key))
+      ) ||
+      getStudioAvailableSignatureProfiles()[0]
     );
+  }
+
+  function getStudioOperatorSignatureProfile() {
+    const operatorMailboxId = normalizeMailboxId(state.settingsRuntime?.profileEmail || "");
+    if (!operatorMailboxId) return null;
+    return resolveStudioSignatureProfile(operatorMailboxId);
+  }
+
+  function getStudioReplyDefaultSignatureProfile(thread = null) {
+    const sourceMailboxId = getStudioSourceMailboxId(thread);
+    const runtimeCapabilityProfileId = normalizeKey(
+      getRuntimeMailboxCapability(sourceMailboxId)?.signatureProfileId || ""
+    );
+    const operatorSignatureProfile = getStudioOperatorSignatureProfile();
+    const mailboxSignatureProfile =
+      resolveStudioSignatureProfile(runtimeCapabilityProfileId) ||
+      resolveStudioSignatureProfile(sourceMailboxId) ||
+      getStudioSignatureProfile(state.runtime.defaultSignatureProfile || CCO_DEFAULT_SIGNATURE_PROFILE);
+    if (operatorSignatureProfile) return operatorSignatureProfile;
+    return mailboxSignatureProfile;
+  }
+
+  function getStudioSignatureProfiles() {
+    return getStudioAvailableSignatureProfiles().map((profile) => ({
+      id: profile.id,
+      label: profile.label,
+      email: profile.email,
+      fullName: profile.fullName,
+      title: profile.title,
+      html: asText(profile.html),
+      senderMailboxId: profile.senderMailboxId,
+      source: profile.source || "static",
+    }));
+  }
+
+  function getStudioDefaultSenderMailboxId(thread = null, { composeMode = false } = {}) {
+    if (!composeMode) {
+      const sourceMailboxId = normalizeMailboxId(getStudioSourceMailboxId(thread));
+      if (sourceMailboxId) return sourceMailboxId;
+    }
+    const runtimeDefaultSender = normalizeMailboxId(state.runtime.defaultSenderMailbox);
+    if (runtimeDefaultSender) return runtimeDefaultSender;
+    const sourceMailboxId = normalizeMailboxId(getStudioSourceMailboxId(thread));
+    if (sourceMailboxId) return sourceMailboxId;
+    return normalizeMailboxId(CCO_DEFAULT_REPLY_SENDER);
   }
 
   function getStudioSenderMailboxId(signatureId = "", thread = null) {
     const signatureProfile = getStudioSignatureProfile(signatureId);
     return normalizeMailboxId(
-      signatureProfile?.email ||
-        state.runtime.defaultSenderMailbox ||
-        thread?.mailboxAddress ||
+      getStudioDefaultSenderMailboxId(thread, { composeMode: !thread }) ||
+        signatureProfile?.senderMailboxId ||
+        signatureProfile?.email ||
         CCO_DEFAULT_REPLY_SENDER
     );
+  }
+
+  function getStudioSenderMailboxOptions() {
+    const seen = new Set();
+    const options = [];
+    getAvailableRuntimeMailboxes().forEach((mailbox, index) => {
+      const canonicalId = canonicalizeRuntimeMailboxId(mailbox?.email || mailbox?.id || mailbox?.label);
+      if (!canonicalId || seen.has(canonicalId)) return;
+      const capability = getRuntimeMailboxCapability(canonicalId);
+      const senderAvailable = capability
+        ? capability.senderAvailable === true || capability.sendAvailable === true
+        : false;
+      if (!senderAvailable) return;
+      seen.add(canonicalId);
+      options.push({
+        id: canonicalId,
+        email: canonicalId,
+        label: asText(mailbox?.label, titleCaseMailbox(canonicalId)),
+        order: Number.isFinite(Number(mailbox?.order)) ? Number(mailbox.order) : index,
+      });
+    });
+    if (!options.length) {
+      const fallbackId = getStudioDefaultSenderMailboxId(null, { composeMode: true });
+      return [
+        {
+          id: fallbackId,
+          email: fallbackId,
+          label: getStudioSourceMailboxLabel(fallbackId),
+          order: 0,
+        },
+      ];
+    }
+    return options.sort((left, right) => left.order - right.order);
+  }
+
+  function getStudioSignatureOverride(signatureId = "", senderMailboxId = "") {
+    const signatureProfile = getStudioSignatureProfile(signatureId);
+    if (!signatureProfile || normalizeKey(signatureProfile.source) !== "mailbox_admin") {
+      return null;
+    }
+    return {
+      key: signatureProfile.id,
+      label: asText(signatureProfile.label, "Signatur"),
+      fullName: asText(signatureProfile.fullName, signatureProfile.label || "Mailbox"),
+      title: asText(signatureProfile.title),
+      html: asText(signatureProfile.html),
+      email: normalizeMailboxId(signatureProfile.email || signatureProfile.senderMailboxId),
+      senderMailboxId: normalizeMailboxId(
+        senderMailboxId || signatureProfile.senderMailboxId || signatureProfile.email
+      ),
+    };
   }
 
   function getStudioSourceMailboxId(thread = null) {
@@ -2708,9 +5483,7 @@
 
   function getStudioSourceMailboxLabel(mailboxId = "") {
     const normalizedMailboxId = normalizeMailboxId(mailboxId);
-    const runtimeMailbox = getAvailableRuntimeMailboxes().find(
-      (mailbox) => normalizeMailboxId(mailbox.id || mailbox.email) === normalizedMailboxId
-    );
+    const runtimeMailbox = findRuntimeMailboxByScopeId(normalizedMailboxId);
     if (runtimeMailbox) {
       return asText(runtimeMailbox.label, runtimeMailbox.email || runtimeMailbox.id);
     }
@@ -2720,6 +5493,28 @@
   function getStudioFirstName(thread) {
     const firstName = asText(thread?.customerName).split(/\s+/).filter(Boolean)[0];
     return firstName || "kunden";
+  }
+
+  function toTitleCaseWord(value) {
+    const text = asText(value);
+    if (!text) return "";
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+  }
+
+  function getStudioComposeGreetingName(recipientValue = "") {
+    const recipient = normalizeText(recipientValue);
+    if (!recipient) return "";
+    if (recipient.includes("@")) {
+      const localPart = recipient.split("@")[0];
+      const alias = localPart.split(/[._-]+/).filter(Boolean)[0];
+      return toTitleCaseWord(alias);
+    }
+    return toTitleCaseWord(recipient.split(/\s+/).filter(Boolean)[0]);
+  }
+
+  function getStudioComposeGreeting(recipientValue = "") {
+    const recipientName = getStudioComposeGreetingName(recipientValue);
+    return recipientName ? `Hej ${recipientName},` : "Hej,";
   }
 
   function getStudioDraftModes(thread) {
@@ -2841,12 +5636,6 @@
     if (normalizedRefine === "shorter" && draftModes.short) {
       return draftModes.short;
     }
-    if (normalizedRefine === "warmer") {
-      return buildStudioToneDraft(thread, baseDraft, "warm");
-    }
-    if (normalizedRefine === "professional") {
-      return buildStudioToneDraft(thread, baseDraft, "professional");
-    }
     if (normalizedRefine === "sharper") {
       return `${baseDraft}\n\nBekräfta gärna i samma svar så låser jag nästa steg direkt.`;
     }
@@ -2859,6 +5648,207 @@
         .join("\n\n");
     }
     return baseDraft;
+  }
+
+  function buildComposeTemplateDraft(templateKey, recipientValue = "") {
+    const greeting = getStudioComposeGreeting(recipientValue);
+    const normalizedTemplate = normalizeKey(templateKey);
+    if (normalizedTemplate === "suggest_times") {
+      return `${greeting}\n\nTack för att du hörde av dig till Hair TP Clinic.\n\nHär kommer tre tider som vi kan erbjuda just nu:\n\n• Fredag 09:00\n• Måndag 10:30\n• Onsdag 14:00\n\nSvara gärna med den tid som passar bäst så bekräftar jag direkt.`;
+    }
+    if (normalizedTemplate === "send_pricing") {
+      return `${greeting}\n\nTack för ditt intresse.\n\nHär kommer en tydlig prisöversikt för nästa steg.\n\nOm du vill kan jag också skicka ett konkret bokningsförslag direkt i samma mejltråd.`;
+    }
+    if (normalizedTemplate === "ask_more_info") {
+      return `${greeting}\n\nTack för ditt meddelande.\n\nFör att hjälpa dig vidare behöver jag gärna lite mer information om vad det gäller och vilka tider som passar bäst.\n\nNär jag har det kan jag ge dig ett tydligt nästa steg direkt.`;
+    }
+    return `${greeting}\n\nTack för att du hörde av dig.\n\nJag hjälper dig gärna vidare och återkommer med ett tydligt nästa steg så snart jag har rätt underlag på plats.`;
+  }
+
+  function buildComposeTrackDraft(trackKey, recipientValue = "") {
+    const greeting = getStudioComposeGreeting(recipientValue);
+    const normalizedTrack = normalizeKey(trackKey || "booking");
+    if (normalizedTrack === "follow_up") {
+      return `${greeting}\n\nJag följer upp för att hålla tempot i dialogen och hjälpa dig vidare utan dröjsmål.\n\nSvara gärna direkt med det som passar bäst för dig så tar jag nästa steg direkt.`;
+    }
+    if (normalizedTrack === "holding") {
+      return `${greeting}\n\nTack för ditt tålamod.\n\nJag har ditt ärende aktivt uppe och återkommer med ett tydligt besked så snart allt är bekräftat.`;
+    }
+    if (normalizedTrack === "medical") {
+      return `${greeting}\n\nTack för din fråga.\n\nJag vill säkerställa att du får ett korrekt och tryggt svar, så jag stämmer av detta med kliniken och återkommer med ett tydligt besked.`;
+    }
+    if (normalizedTrack === "pricing") {
+      return `${greeting}\n\nTack för ditt intresse.\n\nJag hjälper dig gärna vidare med prisbild och nästa steg, och kan också skicka ett konkret bokningsförslag om du vill.`;
+    }
+    if (normalizedTrack === "admin") {
+      return `${greeting}\n\nTack för ditt meddelande.\n\nJag hjälper dig vidare med den administrativa delen och återkommer direkt om något behöver kompletteras.`;
+    }
+    return `${greeting}\n\nTack för att du hörde av dig till Hair TP Clinic.\n\nJag hjälper dig gärna vidare med bokning och nästa steg.`;
+  }
+
+  function buildComposeDecisionSupportDraft(currentDraft, recipientValue = "") {
+    const greeting = getStudioComposeGreeting(recipientValue);
+    const body = normalizeText(currentDraft) || buildComposeTrackDraft("booking", recipientValue);
+    const clearStep = "Svara gärna med det alternativ som passar bäst";
+    if (normalizeKey(body).includes(normalizeKey(clearStep))) {
+      return body;
+    }
+    if (!normalizeText(body)) {
+      return `${greeting}\n\n${clearStep} så tar jag nästa steg direkt.`;
+    }
+    return `${body}\n\n${clearStep} så tar jag nästa steg direkt.`;
+  }
+
+  function buildComposeToneDraft(currentDraft, toneKey, recipientValue = "") {
+    const greeting = getStudioComposeGreeting(recipientValue);
+    const normalizedTone = normalizeKey(toneKey || "professional");
+    const baseDraft = normalizeText(currentDraft) || buildComposeTrackDraft("booking", recipientValue);
+    if (normalizedTone === "solution_focus") {
+      return `${baseDraft}\n\nSvara gärna med det alternativ som passar bäst så hjälper jag dig vidare utan dröjsmål.`;
+    }
+    if (normalizedTone === "decision_support") {
+      return buildComposeDecisionSupportDraft(baseDraft, recipientValue);
+    }
+    if (normalizedTone === "warm") {
+      const bodyWithoutGreeting = baseDraft.replace(/^hej[^\n]*,\s*/i, "").trim();
+      return `${greeting}\n\nTack för att du hörde av dig.\n\n${bodyWithoutGreeting}`;
+    }
+    if (normalizedTone === "professional" && !normalizeText(currentDraft)) {
+      return buildComposeTrackDraft("booking", recipientValue);
+    }
+    return baseDraft;
+  }
+
+  function buildComposeRefinedDraft(currentDraft, refineKey, recipientValue = "") {
+    const normalizedRefine = normalizeKey(refineKey || "");
+    const baseDraft = normalizeText(currentDraft) || buildComposeTrackDraft("booking", recipientValue);
+    if (normalizedRefine === "sharper") {
+      return `${baseDraft}\n\nBekräfta gärna i samma svar så tar jag nästa steg direkt.`;
+    }
+    if (normalizedRefine === "shorter") {
+      return baseDraft
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+        .join("\n\n");
+    }
+    return baseDraft;
+  }
+
+  function getStudioTemplateLabel(templateKey = "") {
+    const normalizedTemplate = normalizeKey(templateKey);
+    if (normalizedTemplate === "confirm_booking") return "Bekräfta bokning";
+    if (normalizedTemplate === "suggest_times") return "Föreslå tider";
+    if (normalizedTemplate === "send_pricing") return "Skicka prislista";
+    if (normalizedTemplate === "ask_more_info") return "Be om info";
+    return "";
+  }
+
+  function getStudioTrackLabel(trackKey = "") {
+    const normalizedTrack = normalizeKey(trackKey);
+    if (normalizedTrack === "booking") return "Bokning";
+    if (normalizedTrack === "follow_up") return "Uppföljning";
+    if (normalizedTrack === "holding") return "Mellanbesked";
+    if (normalizedTrack === "medical") return "Medicinsk";
+    if (normalizedTrack === "pricing") return "Pris/trygghet";
+    if (normalizedTrack === "admin") return "Admin";
+    return "";
+  }
+
+  function getStudioToneLabel(toneKey = "") {
+    const normalizedTone = normalizeKey(toneKey);
+    if (normalizedTone === "professional") return "Professionell";
+    if (normalizedTone === "warm") return "Varm";
+    if (normalizedTone === "solution_focus") return "Lösningsfokus";
+    if (normalizedTone === "decision_support") return "Beslutsstöd";
+    return "";
+  }
+
+  function getStudioRefineLabel(refineKey = "") {
+    const normalizedRefine = normalizeKey(refineKey);
+    if (normalizedRefine === "shorter") return "Kortare";
+    if (normalizedRefine === "sharper") return "Skarpare";
+    return "";
+  }
+
+  function buildStudioSelectionSummary(thread, studioState, isComposeMode = false) {
+    if (!studioState) return "";
+    const summaryParts = [];
+    const studioTruthState =
+      !isComposeMode && thread ? getRuntimeStudioTruthState(thread) : null;
+    if (studioTruthState?.truthDriven) {
+      summaryParts.push(
+        `${studioTruthState.label || "Truth-driven studio"} · ${
+          studioTruthState.waveLabel || "Wave 1"
+        }`
+      );
+      if (studioTruthState.sourceMailboxLabel) {
+        summaryParts.push(`Källa: ${studioTruthState.sourceMailboxLabel}`);
+      }
+      summaryParts.push("Reply-context: låst");
+    } else if (studioTruthState?.inConfiguredScope && studioTruthState?.waveLabel) {
+      summaryParts.push(studioTruthState.waveLabel);
+    }
+    if (!isComposeMode && isOfflineHistoryContextThread(thread)) {
+      summaryParts.push("Läge: Offline historik");
+    }
+    const signatureLabel = getStudioSignatureProfile(studioState.selectedSignatureId).label;
+    if (signatureLabel) {
+      summaryParts.push(`Signatur: ${signatureLabel}`);
+    }
+    const trackLabel = getStudioTrackLabel(
+      studioState.activeTrackKey || (thread ? inferStudioTrackKey(thread) : "admin")
+    );
+    if (trackLabel) {
+      summaryParts.push(`Spår: ${trackLabel}`);
+    }
+    const toneLabel = getStudioToneLabel(studioState.activeToneKey || "professional");
+    if (toneLabel) {
+      summaryParts.push(`Ton: ${toneLabel}`);
+    }
+    const templateLabel = getStudioTemplateLabel(studioState.activeTemplateKey);
+    if (templateLabel) {
+      summaryParts.push(`Mall: ${templateLabel}`);
+    }
+    const refineLabel = getStudioRefineLabel(studioState.activeRefineKey);
+    if (refineLabel) {
+      summaryParts.push(`Finjustera: ${refineLabel}`);
+    }
+    if (!summaryParts.length && isComposeMode) {
+      return "Studion är redo för nytt mejl.";
+    }
+    return summaryParts.join(" · ");
+  }
+
+  function applyTruthPrimaryStudioState(studioState, thread = null) {
+    if (!studioState || !thread || normalizeKey(studioState.mode) === "compose") {
+      return studioState;
+    }
+    const studioTruthState = getRuntimeStudioTruthState(thread);
+    studioState.truthDriven = studioTruthState.truthDriven === true;
+    studioState.truthLabel = asText(studioTruthState.label);
+    studioState.truthWaveLabel = asText(studioTruthState.waveLabel);
+    studioState.truthDetail = asText(studioTruthState.detail);
+    studioState.truthSourceMailboxId = asText(studioTruthState.sourceMailboxId);
+    studioState.truthSourceMailboxLabel = asText(studioTruthState.sourceMailboxLabel);
+    studioState.truthSenderLocked = studioTruthState.senderLocked === true;
+    studioState.truthFallbackReason = asText(studioTruthState.detail);
+    studioState.replyContextThreadId = asText(
+      studioTruthState.replyContextThreadId || thread?.id
+    );
+    if (studioTruthState.truthDriven) {
+      studioState.selectedSignatureId = asText(
+        studioTruthState.selectedSignatureId,
+        studioState.selectedSignatureId
+      );
+      studioState.composeMailboxId = asText(
+        studioTruthState.sourceMailboxId,
+        getStudioSenderMailboxId(studioState.selectedSignatureId, thread)
+      );
+      studioState.mode = "reply";
+    }
+    return studioState;
   }
 
   function evaluateStudioPolicy(thread, draftBody) {
@@ -2970,63 +5960,900 @@
   }
 
   function buildFeedIndex(data) {
-    const index = new Map();
+    const byConversationId = new Map();
+    const bySemanticKey = new Map();
     const entries = [...asArray(data?.inboundFeed), ...asArray(data?.outboundFeed)];
     entries.forEach((entry) => {
       const conversationId = asText(entry?.conversationId);
-      if (!conversationId) return;
-      const current = index.get(conversationId) || [];
-      current.push(entry);
-      index.set(conversationId, current);
+      if (conversationId) {
+        const current = byConversationId.get(conversationId) || [];
+        current.push(entry);
+        byConversationId.set(conversationId, current);
+      }
+
+      const semanticKey = buildRuntimeRowSemanticKey({
+        mailboxAddress: entry?.mailboxAddress,
+        mailboxId: entry?.mailboxId,
+        userPrincipalName: entry?.userPrincipalName,
+        subject: entry?.normalizedSubject || entry?.subject || entry?.summary || entry?.title,
+        customerName:
+          entry?.counterpart ||
+          entry?.counterpartyName ||
+          entry?.senderName ||
+          entry?.fromName ||
+          entry?.customerName,
+      });
+      if (semanticKey) {
+        const current = bySemanticKey.get(semanticKey) || [];
+        current.push(entry);
+        bySemanticKey.set(semanticKey, current);
+      }
     });
-    index.forEach((items) => {
+    byConversationId.forEach((items) => {
       items.sort(
         (left, right) => Date.parse(String(right?.sentAt || "")) - Date.parse(String(left?.sentAt || ""))
       );
     });
-    return index;
+    bySemanticKey.forEach((items) => {
+      items.sort(
+        (left, right) => Date.parse(String(right?.sentAt || "")) - Date.parse(String(left?.sentAt || ""))
+      );
+    });
+    return {
+      byConversationId,
+      bySemanticKey,
+    };
   }
 
-  function buildPreviewMessages(row, feedEntries) {
-    const customerName = getRuntimeCustomerName(row);
+  function getFeedEntriesForRuntimeRow(row, feedLookup = null) {
+    const byConversationId =
+      feedLookup && feedLookup.byConversationId instanceof Map
+        ? feedLookup.byConversationId
+        : new Map();
+    const bySemanticKey =
+      feedLookup && feedLookup.bySemanticKey instanceof Map
+        ? feedLookup.bySemanticKey
+        : new Map();
+
+    const directEntries = byConversationId.get(asText(row?.conversationId)) || [];
+    if (directEntries.length) return directEntries;
+    if (getUsableRuntimeRowPreview(row)) return [];
+
+    const semanticKey = buildRuntimeRowSemanticKey(row);
+    if (!semanticKey) return [];
+    return bySemanticKey.get(semanticKey) || [];
+  }
+
+  function getClientMailAssetFamily(asset = {}) {
+    const canonicalFamily = normalizeKey(asset?.family);
+    if (
+      canonicalFamily === "attachment" ||
+      canonicalFamily === "inline" ||
+      canonicalFamily === "external"
+    ) {
+      return canonicalFamily;
+    }
+    const disposition = normalizeKey(asset?.disposition);
+    const kind = normalizeKey(asset?.kind);
+    const contentType = asText(asset?.contentType).trim().toLowerCase();
+    const renderState = normalizeKey(asset?.render?.state);
+    const renderMode = normalizeKey(asset?.render?.mode);
+    if (renderState === "external_https" || renderMode === "external_url") {
+      return "external";
+    }
+    if (disposition === "attachment") return "attachment";
+    if (disposition === "inline" && (kind === "image" || contentType.startsWith("image/"))) {
+      return "inline";
+    }
+    if (disposition === "inline") return "inline";
+    if (kind === "attachment") return "attachment";
+    return "inline";
+  }
+
+  function buildClientAttachmentAssetFromMetadata(
+    attachment = {},
+    { messageId = "", graphMessageId = "", sourceStore = "" } = {},
+    index = 0
+  ) {
+    const attachmentId = asText(attachment?.id, attachment?.attachmentId).trim();
+    const contentId = asText(attachment?.contentId).trim();
+    const name = asText(attachment?.name).trim();
+    const contentType = asText(attachment?.contentType).trim().toLowerCase();
+    const assetSourceType = asText(
+      attachment?.sourceType,
+      attachment?.["@odata.type"],
+      "graph_file_attachment"
+    ).trim();
+    const isInline = attachment?.isInline === true;
+    const hasContentBytes =
+      attachment?.contentBytesAvailable === true || Boolean(asText(attachment?.contentBytes).trim());
+    const resolvedMessageId = asText(messageId).trim();
+    const resolvedGraphMessageId = asText(graphMessageId, resolvedMessageId).trim();
+    const assetId = asText(
+      attachment?.assetId,
+      attachmentId,
+      contentId,
+      name,
+      `${isInline ? "inline" : "attachment"}-${
+        resolvedMessageId || resolvedGraphMessageId || "message"
+      }-${index + 1}`
+    ).trim();
+    if (!assetId) return null;
+    return {
+      assetId,
+      messageId: resolvedMessageId || null,
+      graphMessageId: resolvedGraphMessageId || null,
+      sourceStore: asText(sourceStore, "client_preview_runtime") || "client_preview_runtime",
+      family: isInline ? "inline" : "attachment",
+      kind:
+        isInline || contentType.startsWith("image/")
+          ? "image"
+          : normalizeKey(attachment?.kind) === "attachment"
+            ? "attachment"
+            : "attachment",
+      disposition: isInline ? "inline" : "attachment",
+      sourceType: assetSourceType || "graph_file_attachment",
+      attachmentId: attachmentId || null,
+      name: name || null,
+      contentType: contentType || null,
+      contentId: contentId || null,
+      size: Math.max(0, asNumber(attachment?.size, 0)),
+      render: {
+        state: isInline
+          ? hasContentBytes
+            ? "attachment_content_available"
+            : contentId
+              ? "cid_attachment_metadata_only"
+              : "inline_attachment_metadata_only"
+          : "not_renderable",
+        mode: isInline
+          ? hasContentBytes
+            ? "attachment_content"
+            : "cid_pending"
+          : "none",
+        safe: isInline && hasContentBytes,
+        externalUrl: null,
+      },
+      download: {
+        state: attachmentId ? "graph_attachment" : "unavailable",
+        available: Boolean(attachmentId),
+        attachmentId: attachmentId || null,
+      },
+      references: [],
+    };
+  }
+
+  function ensureClientMailDocumentAssetTruth(
+    message = {},
+    { sourceStore = "client_preview_runtime" } = {}
+  ) {
+    const mailDocument =
+      message?.mailDocument && typeof message.mailDocument === "object"
+        ? message.mailDocument
+        : null;
+    if (!mailDocument) return null;
+
+    const resolvedSourceStore =
+      asText(mailDocument?.sourceStore, sourceStore, "client_preview_runtime") ||
+      "client_preview_runtime";
+    const resolvedMessageId = asText(mailDocument?.messageId, asText(message?.messageId)).trim();
+    const resolvedGraphMessageId = asText(
+      mailDocument?.graphMessageId,
+      asText(message?.graphMessageId, resolvedMessageId)
+    ).trim();
+    const existingAssets = asArray(mailDocument?.assets);
+    const legacyAssets = existingAssets.length
+      ? []
+      : [...asArray(mailDocument?.attachments), ...asArray(mailDocument?.inlineAssets)];
+    const synthesizedAttachmentAssets = asArray(message?.attachments)
+      .map((attachment, index) =>
+        buildClientAttachmentAssetFromMetadata(
+          attachment,
+          {
+            messageId: resolvedMessageId,
+            graphMessageId: resolvedGraphMessageId,
+            sourceStore: resolvedSourceStore,
+          },
+          index
+        )
+      )
+      .filter(Boolean);
+
+    const mergedAssets = [];
+    const seenAssets = new Set();
+    const pushUniqueAsset = (asset) => {
+      if (!asset || typeof asset !== "object") return;
+      const assetId = asText(
+        asset?.assetId,
+        asset?.attachmentId,
+        asset?.contentId,
+        asset?.name,
+        asset?.download?.attachmentId
+      ).trim();
+      if (!assetId || seenAssets.has(assetId)) return;
+      seenAssets.add(assetId);
+      mergedAssets.push(asset);
+    };
+
+    existingAssets.forEach(pushUniqueAsset);
+    legacyAssets.forEach(pushUniqueAsset);
+    synthesizedAttachmentAssets.forEach(pushUniqueAsset);
+
+    const familyCounts = mergedAssets.reduce(
+      (summary, asset) => {
+        const family = getClientMailAssetFamily(asset);
+        if (family === "attachment" || family === "inline" || family === "external") {
+          summary[family] += 1;
+        }
+        return summary;
+      },
+      { attachment: 0, inline: 0, external: 0 }
+    );
+    const attachmentAssets = mergedAssets.filter(
+      (asset) => getClientMailAssetFamily(asset) === "attachment"
+    );
+    const inlineAssets = mergedAssets.filter((asset) => getClientMailAssetFamily(asset) === "inline");
+    const renderableInlineCount = inlineAssets.filter((asset) => asset?.render?.safe === true).length;
+    const declaredHasAttachments =
+      mailDocument?.declaredHasAttachments === true ||
+      message?.hasAttachments === true ||
+      mailDocument?.hasAttachments === true;
+    const hasAttachmentMetadata = attachmentAssets.length > 0;
+    const assetSummary = {
+      ...(mailDocument?.assetSummary && typeof mailDocument.assetSummary === "object"
+        ? mailDocument.assetSummary
+        : {}),
+      assetCount: Math.max(
+        asNumber(mailDocument?.assetSummary?.assetCount, 0),
+        mergedAssets.length,
+        familyCounts.attachment + familyCounts.inline + familyCounts.external
+      ),
+      familyCounts: {
+        attachment: Math.max(
+          asNumber(mailDocument?.assetSummary?.familyCounts?.attachment, 0),
+          familyCounts.attachment
+        ),
+        inline: Math.max(
+          asNumber(mailDocument?.assetSummary?.familyCounts?.inline, 0),
+          familyCounts.inline
+        ),
+        external: Math.max(
+          asNumber(mailDocument?.assetSummary?.familyCounts?.external, 0),
+          familyCounts.external
+        ),
+      },
+      renderableInlineCount: Math.max(
+        asNumber(mailDocument?.assetSummary?.renderableInlineCount, 0),
+        renderableInlineCount
+      ),
+      metadataAttachmentCount: attachmentAssets.length,
+      declaredHasAttachments,
+      declaredHasAttachmentsWithoutMetadata:
+        declaredHasAttachments === true && hasAttachmentMetadata === false,
+    };
+    const assetRegistry = mergedAssets.reduce(
+      (registry, asset) => {
+        const assetId = asText(asset?.assetId).trim();
+        if (assetId) registry[assetId] = asset;
+        return registry;
+      },
+      mailDocument?.assetRegistry && typeof mailDocument.assetRegistry === "object"
+        ? { ...mailDocument.assetRegistry }
+        : {}
+    );
+
+    const attachmentTruthCarried =
+      synthesizedAttachmentAssets.length > 0 ||
+      mergedAssets.length !== existingAssets.length ||
+      attachmentAssets.length !== asArray(mailDocument?.attachments).length ||
+      inlineAssets.length !== asArray(mailDocument?.inlineAssets).length ||
+      assetSummary.assetCount !== asNumber(mailDocument?.assetSummary?.assetCount, 0) ||
+      assetSummary.familyCounts.attachment !==
+        asNumber(mailDocument?.assetSummary?.familyCounts?.attachment, 0) ||
+      assetSummary.familyCounts.inline !==
+        asNumber(mailDocument?.assetSummary?.familyCounts?.inline, 0) ||
+      assetSummary.familyCounts.external !==
+        asNumber(mailDocument?.assetSummary?.familyCounts?.external, 0) ||
+      hasAttachmentMetadata !== (mailDocument?.hasAttachments === true) ||
+      declaredHasAttachments !== (mailDocument?.declaredHasAttachments === true);
+
+    if (!attachmentTruthCarried) return mailDocument;
+
+    return {
+      ...mailDocument,
+      sourceStore: resolvedSourceStore,
+      declaredHasAttachments,
+      hasAttachments: hasAttachmentMetadata,
+      assets: mergedAssets,
+      attachments: attachmentAssets,
+      inlineAssets,
+      assetRegistry,
+      assetSummary,
+    };
+  }
+
+  function buildPreviewMessages(row, feedEntries, threadDocument = null) {
+    const getMailThreadMessage = (entry = {}) =>
+      buildClientMailThreadMessageFromEntry(entry, {
+        sourceStore: "client_preview_runtime",
+      });
+    const getMailDocument = (entry = {}) =>
+      typeof ensureClientMailDocumentAssetTruth === "function"
+        ? ensureClientMailDocumentAssetTruth(entry, {
+            sourceStore: "client_preview_runtime",
+          })
+        : entry && typeof entry.mailDocument === "object"
+          ? entry.mailDocument
+          : null;
+    const getMailThreadPreviewText = (entry = {}) =>
+      asText(getMailThreadMessage(entry)?.presentation?.previewText);
+    const getMailThreadConversationText = (entry = {}) =>
+      asText(getMailThreadMessage(entry)?.presentation?.conversationText);
+    const getMailThreadConversationHtml = (entry = {}) =>
+      asText(getMailThreadMessage(entry)?.presentation?.conversationHtml);
+    const getMailThreadPrimaryBodyHtml = (entry = {}) =>
+      asText(getMailThreadMessage(entry)?.primaryBody?.html);
+    const getMailThreadPrimaryBodyText = (entry = {}) =>
+      asText(getMailThreadMessage(entry)?.primaryBody?.text);
+    const getMailDocumentPreviewText = (entry = {}) =>
+      asText(getMailDocument(entry)?.previewText);
+    const getMailDocumentPrimaryBodyText = (entry = {}) =>
+      asText(getMailDocument(entry)?.primaryBodyText);
+    const getMailDocumentPrimaryBodyHtml = (entry = {}) =>
+      getMailDocument(entry)?.primaryBodyHtml;
+    const getMailDocumentMimePreferredBodyText = (entry = {}) =>
+      asText(getMailDocument(entry)?.mime?.parsed?.body?.preferredText);
+    const getMailDocumentMimePreferredBodyHtml = (entry = {}) =>
+      asText(getMailDocument(entry)?.mime?.parsed?.body?.preferredHtml);
+    const getMailDocumentMimePreviewText = (entry = {}) =>
+      asText(
+        getMailDocumentMimePreferredBodyText(entry),
+        extractPreviewTextFromHtml(getMailDocumentMimePreferredBodyHtml(entry))
+      );
+    const hasRichMailThreadBody = (entry = {}) =>
+      Boolean(
+        asText(
+          getMailThreadPrimaryBodyText(entry),
+          getMailThreadPrimaryBodyHtml(entry),
+          getMailThreadConversationText(entry),
+          getMailThreadConversationHtml(entry)
+        ).trim()
+      );
+    const getPreferredFoundationPreviewText = (entry = {}) =>
+      asText(
+        hasRichMailThreadBody(entry) ? getMailThreadPreviewText(entry) : "",
+        getMailDocumentMimePreviewText(entry),
+        getMailThreadPreviewText(entry),
+        getMailThreadPrimaryBodyText(entry),
+        getMailDocumentPreviewText(entry),
+        getMailDocumentPrimaryBodyText(entry)
+      );
+    const extractPreviewTextFromHtml = (value = "") => {
+      const html = asText(value).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    const extractConversationTextFromHtml = (value = "") => {
+      const html = asText(value).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<\/tr>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\r/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    };
+    const sanitizePreviewText = (value = "") =>
+      asText(value)
+        .replace(/\s+/g, " ")
+        .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+        .replace(
+          /^Vissa\s+som\s+har\s+f[aå]tt\s+det\s+h[aä]r\s+meddelandet\s+f[aå]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i,
+          ""
+        )
+        .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+        .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+        .replace(/^Get more done with apps like Word\.?\s*/i, "")
+        .replace(/^Learn why this is important\.?\s*/i, "")
+        .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+        .replace(/^Read more about why this is important\.?\s*/i, "")
+        .replace(/^[\s_—–-]{6,}/, "")
+        .trim();
+    const sanitizeConversationText = (value = "") =>
+      asText(value)
+        .replace(/\r/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    const stripProviderNoiseFromConversation = (value = "") =>
+      sanitizeConversationText(value)
+        .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+        .replace(
+          /^Vissa\s+som\s+har\s+f[aå]tt\s+det\s+h[aä]r\s+meddelandet\s+f[aå]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i,
+          ""
+        )
+        .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+        .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+        .replace(/^Get more done with apps like Word\.?\s*/i, "")
+        .replace(/^Learn why this is important\.?\s*/i, "")
+        .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+        .replace(/^Read more about why this is important\.?\s*/i, "")
+        .replace(/^[\s_—–-]{6,}/, "")
+        .trim();
+    const stripContactFormPreamble = (value = "") =>
+      stripProviderNoiseFromConversation(value)
+        .replace(
+          /^(?:Från:\s*[^\n]+(?:\n| +))?(?:E-post:\s*[^\n]+(?:\n| +))?(?:Telefon:\s*[^\n]+(?:\n| +))?(?:Hur kan vi hjälpa dig\?|How can we help you\?)\s*/i,
+          ""
+        )
+        .trim();
+    const signatureMarkerPattern =
+      /^(?:B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Mvh|Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone)\b/i;
+    const stripQuotedReplyChain = (value = "") => {
+      let cleaned = stripContactFormPreamble(value);
+      cleaned = cleaned.replace(
+        /\s+(Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone)\s+(?=(?:Från|From):)/gi,
+        "\n$1\n"
+      );
+      cleaned = cleaned.replace(
+        /(\n(?:Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone))\n(?:Från|From):[\s\S]*$/i,
+        "$1"
+      );
+      const quotedReplyMatchers = [
+        /(?:^|\s)(?:\d{1,2}\s+\S.+?\bskrev\b.+:)[\s\S]*$/i,
+        /(?:^|\s)(?:\S+\s+\d{1,2}\s+\S.+?\bskrev\b.+:)[\s\S]*$/i,
+        /(?:^|\s)On\s+.+?\bwrote:\s*[\s\S]*$/i,
+        /\n(?:Från|From):\s*.+?(?:Datum|Date):\s*.+?(?:Till|To):\s*.+?(?:Ämne|Subject):\s*[\s\S]*$/i,
+        /(?:^|\s)_{10,}[\s\S]*$/i,
+        /(?:^|\s)(?:Från|From):\s*[\s\S]*$/i,
+      ];
+      for (const matcher of quotedReplyMatchers) {
+        const match = cleaned.match(matcher);
+        if (match && typeof match.index === "number" && match.index > 24) {
+          cleaned = cleaned.slice(0, match.index).trim();
+          break;
+        }
+      }
+      return cleaned
+        .replace(
+          /\n(?:m[aå]n(?:dag)?|tis(?:dag)?|ons(?:dag)?|tor(?:sdag)?|fre(?:dag)?|l[öo]r(?:dag)?|s[öo]n(?:dag)?)\.?$/i,
+          ""
+        )
+        .trim();
+    };
+    const ensureConversationSignatureIdentity = (value = "", entry = {}) => {
+      const lines = sanitizeConversationText(value)
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (!lines.length) return "";
+      const signatureIndex = lines.findIndex(
+        (line, index) => index > 0 && signatureMarkerPattern.test(line)
+      );
+      if (signatureIndex < 0) return lines.join("\n").trim();
+      const tailLines = lines.slice(signatureIndex + 1);
+      const hasIdentityTail = tailLines.some(
+        (line) =>
+          /@|\bHair TP Clinic\b|\bClinic\b|\bAB\b|\bSamordnare\b|\bHårspecialist\b|\bKonsultationsteam\b|\d{2,4}[- ]?\d{2,}/i.test(
+            line
+          ) ||
+          (/^[A-ZÅÄÖ][\wÀ-ÿ'’.-]+(?:\s+[A-ZÅÄÖ][\wÀ-ÿ'’.-]+){0,3}$/.test(line) &&
+            !/^(?:m[aå]n(?:dag)?|tis(?:dag)?|ons(?:dag)?|tor(?:sdag)?|fre(?:dag)?|l[öo]r(?:dag)?|s[öo]n(?:dag)?)\.?$/i.test(
+              line
+            ))
+      );
+      if (hasIdentityTail) return lines.join("\n").trim();
+      const metadataIdentity = [entry?.fromName, entry?.senderName]
+        .map((candidate) => asText(candidate).trim())
+        .find(
+          (candidate) =>
+            candidate &&
+            !isRuntimeUnknownCustomerName(candidate) &&
+            !looksLikeMailboxIdentity(candidate) &&
+            !signatureMarkerPattern.test(candidate)
+        );
+      if (!metadataIdentity) return lines.join("\n").trim();
+      return [...lines, metadataIdentity].join("\n").trim();
+    };
+    const insertConversationSignatureBreaks = (value = "", entry = {}) =>
+      ensureConversationSignatureIdentity(
+        stripQuotedReplyChain(value)
+          .replace(
+            /([.!?])\s+(B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Mvh|Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone)\b/gi,
+            "$1\n\n$2"
+          )
+          .replace(
+            /\s+(B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Mvh)\b/gi,
+            "\n\n$1"
+          )
+          .replace(
+            /\b(MVH|Mvh)\s+(?=(?:m[aå]n(?:dag)?|tis(?:dag)?|ons(?:dag)?|tor(?:sdag)?|fre(?:dag)?|l[öo]r(?:dag)?|s[öo]n(?:dag)?|[A-ZÅÄÖ][\wÀ-ÿ'’.-]+))/gi,
+            "$1\n"
+          )
+          .replace(/\s+(\/\s*[A-ZÅÄÖ][\wÀ-ÿ'’.-]+)/g, "\n$1")
+          .replace(
+            /\n(?:m[aå]n(?:dag)?|tis(?:dag)?|ons(?:dag)?|tor(?:sdag)?|fre(?:dag)?|l[öo]r(?:dag)?|s[öo]n(?:dag)?)\.?$/i,
+            ""
+          )
+          .replace(/\n{3,}/g, "\n\n")
+          .trim(),
+        entry
+      );
+    const clampConversationText = (value = "", { maxChars = 520, maxLines = 7 } = {}) => {
+      const sourceLines = sanitizeConversationText(value)
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (!sourceLines.length) return "";
+      const signatureIndex = sourceLines.findIndex(
+        (line, index) =>
+          index > 0 &&
+          /^(?:B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone)\b/i.test(
+            line
+          )
+      );
+      const joinLines = (lines = []) => lines.filter(Boolean).join("\n").trim();
+      const trimWithEllipsis = (text = "", max = maxChars) => {
+        const normalized = sanitizeConversationText(text);
+        if (normalized.length <= max) return normalized;
+        return `${normalized.slice(0, max - 1).trimEnd()}…`;
+      };
+      if (
+        sourceLines.length <= maxLines &&
+        joinLines(sourceLines).length <= maxChars
+      ) {
+        return joinLines(sourceLines);
+      }
+      if (signatureIndex > 0) {
+        const bodyLines = sourceLines.slice(0, signatureIndex);
+        const signatureLines = sourceLines.slice(signatureIndex, signatureIndex + 4);
+        const visibleBody = [];
+        for (const line of bodyLines) {
+          const nextBody = joinLines([...visibleBody, line]);
+          if (visibleBody.length >= Math.max(1, maxLines - 3) || nextBody.length > 340) break;
+          visibleBody.push(line);
+        }
+        const composed = joinLines([
+          ...visibleBody,
+          visibleBody.length && signatureLines.length ? "" : null,
+          ...signatureLines,
+        ]);
+        return trimWithEllipsis(composed);
+      }
+      return trimWithEllipsis(joinLines(sourceLines.slice(0, maxLines)));
+    };
+    const buildConversationBody = (entry = {}, fallbackText = "") => {
+      const rawCandidates = [
+        getMailThreadConversationText(entry),
+        getMailThreadPrimaryBodyText(entry),
+        getMailDocumentMimePreferredBodyText(entry),
+        getMailDocumentPrimaryBodyText(entry),
+        extractConversationTextFromHtml(getMailDocumentPrimaryBodyHtml(entry)),
+        extractConversationTextFromHtml(getMailDocumentMimePreferredBodyHtml(entry)),
+        extractConversationTextFromHtml(entry?.bodyHtml),
+        entry?.body,
+        entry?.detail,
+        entry?.summary,
+        entry?.bodyPreview,
+        entry?.preview,
+      ];
+      for (const candidate of rawCandidates) {
+        const cleaned = clampConversationText(insertConversationSignatureBreaks(candidate, entry));
+        if (cleaned && !isRuntimePlaceholderLine(cleaned)) {
+          return cleaned;
+        }
+      }
+      const fallback = clampConversationText(insertConversationSignatureBreaks(fallbackText, entry));
+      return fallback && !isRuntimePlaceholderLine(fallback) ? fallback : "";
+    };
+    const buildConversationBodyHtml = (entry = {}) => {
+      const rawHtml = [
+        getMailThreadPrimaryBodyHtml(entry),
+        getMailThreadConversationHtml(entry),
+        getMailDocumentMimePreferredBodyHtml(entry),
+        getMailDocumentPrimaryBodyHtml(entry),
+        entry?.bodyHtml,
+      ]
+        .map((value) => asText(value).trim())
+        .find(Boolean);
+      if (!rawHtml) return "";
+      const normalizedConversation = clampConversationText(
+        insertConversationSignatureBreaks(extractConversationTextFromHtml(rawHtml), entry)
+      );
+      return normalizedConversation && !isRuntimePlaceholderLine(normalizedConversation)
+        ? rawHtml
+        : "";
+    };
+    const rowCustomerName = getRuntimeCustomerName(row);
     const mailboxLabel = titleCaseMailbox(
       asText(row.mailboxAddress || row.mailboxId || row.userPrincipalName || "kons@hairtpclinic.com")
     );
-    const entries = feedEntries.length
+    const canonicalThreadMessages = asArray(threadDocument?.messages).filter(
+      (message) => message && typeof message === "object"
+    );
+    const feedEntriesByMessageId = new Map(
+      asArray(feedEntries)
+        .map((entry) => [asText(entry?.messageId), entry])
+        .filter((item) => item[0])
+    );
+    const canonicalEntries = canonicalThreadMessages.map((mailThreadMessage, index) => {
+      const matchedEntry =
+        feedEntriesByMessageId.get(asText(mailThreadMessage?.messageId)) || {};
+      const matchedMailDocument = getMailDocument(matchedEntry);
+      const canonicalPreviewEntry = {
+        ...matchedEntry,
+        mailThreadMessage,
+        mailDocument: matchedMailDocument,
+      };
+      return {
+        ...matchedEntry,
+        messageId: asText(
+          mailThreadMessage?.messageId,
+          asText(matchedEntry?.messageId, `${row.conversationId}:${index}`)
+        ),
+        direction:
+          normalizeKey(mailThreadMessage?.direction) === "outbound"
+            ? "outbound"
+            : normalizeKey(matchedEntry?.direction) === "outbound"
+              ? "outbound"
+              : "inbound",
+        sentAt: asText(mailThreadMessage?.sentAt, asText(matchedEntry?.sentAt)),
+        subject: asText(mailThreadMessage?.subject, asText(matchedEntry?.subject, row?.subject)),
+        bodyPreview: asText(
+          getPreferredFoundationPreviewText(canonicalPreviewEntry),
+          asText(matchedEntry?.bodyPreview, asText(matchedMailDocument?.previewText))
+        ),
+        preview: asText(
+          getPreferredFoundationPreviewText(canonicalPreviewEntry),
+          asText(matchedEntry?.preview, asText(matchedMailDocument?.previewText))
+        ),
+        body: asText(
+          mailThreadMessage?.primaryBody?.text,
+          asText(
+            matchedMailDocument?.mime?.parsed?.body?.preferredText,
+            asText(matchedEntry?.body, asText(matchedMailDocument?.primaryBodyText))
+          )
+        ),
+        bodyHtml: asText(
+          mailThreadMessage?.primaryBody?.html,
+          asText(
+            matchedMailDocument?.mime?.parsed?.body?.preferredHtml,
+            asText(
+              mailThreadMessage?.presentation?.conversationHtml,
+              asText(matchedEntry?.bodyHtml, asText(matchedMailDocument?.primaryBodyHtml))
+            )
+          )
+        ),
+        detail: asText(matchedEntry?.detail),
+        summary: asText(matchedEntry?.summary),
+        fromName: asText(matchedEntry?.fromName),
+        senderName: asText(matchedEntry?.senderName),
+        mailThreadMessage,
+        mailDocument: matchedMailDocument,
+      };
+    });
+    const entries = canonicalEntries.length
+      ? canonicalEntries
+      : feedEntries.length
       ? feedEntries
       : [
           {
             messageId: row.messageId,
             direction: "inbound",
             sentAt: row.lastInboundAt || row.lastOutboundAt,
-            preview: row.latestInboundPreview,
+            bodyHtml: asText(
+              row?.latestMessage?.bodyHtml,
+              asText(row?.conversation?.bodyHtml, asText(row?.bodyHtml))
+            ),
+            preview: [
+              row.latestInboundPreview,
+              row.preview,
+              row.systemPreview,
+              row.latestPreview,
+              row.bodyPreview,
+              row.detail,
+              row.summary,
+              row.latestMessage?.preview,
+              row.latestMessage?.bodyPreview,
+              extractPreviewTextFromHtml(row.latestMessage?.bodyHtml),
+              row.latestMessage?.body,
+              row.latestMessage?.detail,
+              row.latestMessage?.summary,
+              row.conversation?.preview,
+              row.conversation?.bodyPreview,
+              extractPreviewTextFromHtml(row.conversation?.bodyHtml),
+              row.conversation?.detail,
+              row.conversation?.summary,
+              extractPreviewTextFromHtml(row.bodyHtml),
+              row.customerSummary?.lastCaseSummary,
+            ]
+              .map((value) => sanitizePreviewText(value))
+              .find((value) => value && !isRuntimePlaceholderLine(value)),
           },
         ];
-    return entries.slice(0, 8).map((entry, index) => ({
-      id: asText(entry?.messageId, `${row.conversationId}:${index}`),
-      author:
-        normalizeKey(entry?.direction) === "outbound"
-          ? mailboxLabel
-          : customerName,
-      role: normalizeKey(entry?.direction) === "outbound" ? "staff" : "customer",
-      time: formatConversationTime(entry?.sentAt),
-      recordedAt: toIso(entry?.sentAt),
-      body:
-        asText(entry?.preview) ||
-        (normalizeKey(entry?.direction) === "outbound"
-          ? "Svar skickades från kliniken."
-          : "Ingen förhandsvisning tillgänglig."),
-      latest: index === 0,
-    }));
+    const customerName = getRuntimeCustomerNameFromFeedEntries(entries, rowCustomerName);
+    return entries.slice(0, 8).map((entry, index) => {
+      const mailThreadMessage = getMailThreadMessage(entry);
+      const mailDocument = getMailDocument(entry);
+      return {
+        author:
+          normalizeKey(entry?.direction) === "outbound"
+            ? (() => {
+                const outboundAuthor = [entry?.fromName, entry?.senderName]
+                  .map((value) => asText(value).trim())
+                  .find(
+                    (value) =>
+                      value &&
+                      !isRuntimeUnknownCustomerName(value) &&
+                      !looksLikeMailboxIdentity(value) &&
+                      normalizeKey(value) !== normalizeKey(customerName)
+                  );
+                return compactRuntimeCopy(outboundAuthor, mailboxLabel, 54);
+              })()
+            : compactRuntimeCopy(
+                getRuntimeCustomerNameFromFeedEntries([entry], customerName),
+                customerName,
+                42
+              ),
+        id: asText(entry?.messageId, `${row.conversationId}:${index}`),
+        role: normalizeKey(entry?.direction) === "outbound" ? "staff" : "customer",
+        time: formatConversationTime(entry?.sentAt),
+        recordedAt: toIso(entry?.sentAt),
+        mailboxId: asText(entry?.mailboxAddress, asText(entry?.mailboxId)),
+        fromName: asText(entry?.fromName),
+        senderName: asText(entry?.senderName),
+        preview: asText(entry?.preview),
+        bodyPreview: asText(entry?.bodyPreview),
+        detail: asText(entry?.detail),
+        summary: asText(entry?.summary),
+        body:
+          [
+            getPreferredFoundationPreviewText(entry),
+            getMailThreadPrimaryBodyText(entry),
+            getMailDocumentMimePreferredBodyText(entry),
+            extractPreviewTextFromHtml(getMailDocumentMimePreferredBodyHtml(entry)),
+            getMailDocumentPreviewText(entry),
+            getMailDocumentPrimaryBodyText(entry),
+            extractPreviewTextFromHtml(getMailDocumentPrimaryBodyHtml(entry)),
+            entry?.preview,
+            entry?.bodyPreview,
+            extractPreviewTextFromHtml(entry?.bodyHtml),
+            entry?.body,
+            entry?.detail,
+            entry?.summary,
+          ]
+            .map((value) => sanitizePreviewText(value))
+            .find((value) => value && !isRuntimePlaceholderLine(value)) ||
+          (normalizeKey(entry?.direction) === "outbound"
+            ? "Svar skickades från kliniken."
+            : "Ingen förhandsvisning tillgänglig."),
+        conversationBody: buildConversationBody(
+          entry,
+          [
+            getMailThreadConversationText(entry),
+            getMailThreadPreviewText(entry),
+            getMailDocumentPrimaryBodyText(entry),
+            getMailDocumentPreviewText(entry),
+            entry?.bodyPreview,
+            entry?.preview,
+            entry?.detail,
+            entry?.summary,
+          ]
+            .map((value) => sanitizePreviewText(value))
+            .find((value) => value && !isRuntimePlaceholderLine(value))
+        ),
+        conversationBodyHtml: buildConversationBodyHtml(entry),
+        mailThreadMessage,
+        mailDocument,
+        latest: index === 0,
+      };
+    });
   }
 
   function buildHistoryEvents(row, feedEntries) {
+    const extractPreviewTextFromHtml = (value = "") => {
+      const html = asText(value).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    const sanitizePreviewText = (value = "") =>
+      asText(value)
+        .replace(/\s+/g, " ")
+        .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+        .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+        .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+        .replace(/^Get more done with apps like Word\.?\s*/i, "")
+        .replace(/^Learn why this is important\.?\s*/i, "")
+        .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+        .replace(/^Read more about why this is important\.?\s*/i, "")
+        .replace(/^[\s_—–-]{6,}/, "")
+        .trim();
     return (feedEntries.length ? feedEntries : [])
       .slice(0, 8)
       .map((entry) => ({
         title: normalizeKey(entry?.direction) === "outbound" ? "E-post skickat" : "E-post mottaget",
         description: asText(entry?.subject, asText(row?.subject, "Tråduppdatering")),
-        detail: asText(entry?.preview, "Ingen förhandsvisning tillgänglig."),
+        detail:
+          [
+            entry?.preview,
+            entry?.bodyPreview,
+            extractPreviewTextFromHtml(entry?.bodyHtml),
+            entry?.body,
+            entry?.detail,
+            entry?.summary,
+          ]
+            .map((value) => sanitizePreviewText(value))
+            .find((value) => value && !isRuntimePlaceholderLine(value)) ||
+          "Ingen förhandsvisning tillgänglig.",
         time: formatConversationTime(entry?.sentAt),
         recordedAt: toIso(entry?.sentAt),
         conversationId: asText(entry?.conversationId, asText(row?.conversationId)),
@@ -3065,6 +6892,86 @@
     return Array.from(new Set(tags));
   }
 
+  function derivePrimaryRuntimeLane(row) {
+    const workflowLane = normalizeKey(row?.workflowLane);
+    const priorityLevel = normalizeKey(row?.priorityLevel);
+    const slaStatus = normalizeKey(row?.slaStatus);
+    const bookingState = normalizeKey(row?.bookingState);
+    const waitingOn = normalizeKey(row?.waitingOn);
+    const reviewFlagCandidates = [
+      row?.reviewRequired,
+      row?.needsReview,
+      row?.manualReviewRequired,
+      row?.latestOutcome?.reviewRequired,
+      row?.latestReplyDraft?.reviewRequired,
+    ];
+    const reviewDecisionCandidates = [
+      row?.risk?.decision,
+      row?.latestOutcome?.risk?.decision,
+      row?.latestReplyDraft?.risk?.decision,
+      row?.latestReplySuggestion?.risk?.decision,
+      row?.customerSummary?.risk?.decision,
+      row?.deliveryMode,
+      row?.latestOutcome?.deliveryMode,
+      row?.latestReplyDraft?.deliveryMode,
+    ]
+      .map((value) => normalizeKey(value))
+      .filter(Boolean);
+    if (
+      reviewFlagCandidates.some((value) => value === true) ||
+      reviewDecisionCandidates.some(
+        (value) => value === "review_required" || value === "manual_review_required"
+      )
+    ) {
+      return "review";
+    }
+    if (normalizeKey(row?.intent) === "unclear" || normalizeKey(row?.intent) === "oklart") {
+      return "unclear";
+    }
+    if (workflowLane === "medical_review" || row?.needsMedicalReview === true) {
+      return "medical";
+    }
+    if (workflowLane === "booking_ready" || bookingState.includes("ready")) {
+      return "bookable";
+    }
+    if (workflowLane === "admin_low") {
+      return "admin";
+    }
+    if (workflowLane === "waiting_reply" || waitingOn === "customer") {
+      return "later";
+    }
+    if (slaStatus === "breach" || workflowLane === "action_now") {
+      return "act-now";
+    }
+    if (["critical", "high"].includes(priorityLevel)) {
+      return "sprint";
+    }
+    return "all";
+  }
+
+  function getThreadPrimaryLaneId(thread) {
+    const explicitPrimaryLane = normalizeKey(thread?.primaryLaneId || "");
+    if (!explicitPrimaryLane || explicitPrimaryLane === "all") {
+      if (isManualReviewRuntimeThread(thread)) return "review";
+      if (isUnclearRuntimeThread(thread)) return "unclear";
+      if (asArray(thread?.tags).includes("medical")) return "medical";
+      if (asArray(thread?.tags).includes("bookable")) return "bookable";
+      if (asArray(thread?.tags).includes("admin")) return "admin";
+      if (isLaterRuntimeThread(thread)) return "later";
+      if (asArray(thread?.tags).includes("act-now")) return "act-now";
+      if (asArray(thread?.tags).includes("sprint")) return "sprint";
+      return "all";
+    }
+    return explicitPrimaryLane;
+  }
+
+  function normalizePrimaryQueueLaneId(laneId) {
+    const normalizedLane = normalizeKey(laneId || "all");
+    return normalizedLane === "all" || QUEUE_LANE_ORDER.includes(normalizedLane)
+      ? normalizedLane
+      : "all";
+  }
+
   function buildRuntimeSummaryCards(row, thread) {
     const latestInbound = row?.lastInboundAt ? formatConversationTime(row.lastInboundAt) : "Ingen inkommande ännu";
     const latestOutbound = row?.lastOutboundAt ? formatConversationTime(row.lastOutboundAt) : "Inte besvarad ännu";
@@ -3079,50 +6986,101 @@
       110
     );
     return {
-      overview: [
+      customer: [
         {
-          chip: "Historiksignal",
+          chip: "Bra att tänka på nu",
           tone: "violet",
+          provenance: {
+            label: "Live kundkontext",
+            tone: "derived",
+            detail: "Härledd från livekällor: tempoprofil, livscykel och kundmönster sammanställs från runtime och kökontext.",
+          },
           lines: [
-            historySummary || compactRuntimeCopy(row?.customerSummary?.lastCaseSummary, "Ingen historiksignal registrerad ännu.", 110),
-            historyActionCue || compactRuntimeCopy(row?.recommendedAction, "Håll svaret konkret och tydligt.", 110),
-            `${thread.mailboxesLabel} · ${Math.max(1, asNumber(row?.customerSummary?.historyMessageCount, row?.customerSummary?.interactionCount || 1))} mail`,
+            `Arbeta så här: ${historyActionCue || "Led kunden med ett tydligt nästa steg i samma svar."}`,
+            `Tempo: ${humanizeCode(row?.tempoProfile, "Reflekterande")}`,
+            `Kundläge: ${thread.lifecycleLabel} · ${thread.displayEngagementLabel || thread.engagementLabel}`,
           ],
         },
         {
-          chip: "Trender & patterns",
+          chip: "Kundläge",
+          tone: "blue",
+          provenance: {
+            label: "Relationsbild",
+            tone: "system",
+            detail: "Visar den sammanhangsbild som operatören behöver för att svara rätt, inte arbetsplanen i sig.",
+          },
+          lines: [
+            compactRuntimeCopy(
+              row?.customerSummary?.lastCaseSummary,
+              "Ingen kundsammanfattning tillgänglig ännu.",
+              110
+            ),
+            `Kontaktväg: ${thread.mailboxesLabel || thread.mailboxLabel}`,
+            `Nu väntar vi på: ${thread.waitingLabel}`,
+          ],
+        },
+      ],
+      history: [
+        {
+          chip: "Historikmönster",
           tone: "violet",
+          provenance: {
+            label: "Historiksignal",
+            tone: "system",
+            detail: "Livekälla i valt mailboxscope: bygger på tidigare kundinteraktioner för den valda kunden.",
+          },
+          lines: [
+            `Historiken visar: ${
+              historySummary ||
+              compactRuntimeCopy(row?.customerSummary?.lastCaseSummary, "Ingen historiksignal registrerad ännu.", 110)
+            }`,
+            `Betyder nu: ${
+              historyActionCue ||
+              compactRuntimeCopy(row?.recommendedAction, "Håll svaret konkret och tydligt.", 110)
+            }`,
+            `${Math.max(1, asNumber(row?.customerSummary?.historyMessageCount, row?.customerSummary?.interactionCount || 1))} mail i ${thread.mailboxesLabel}`,
+          ],
+        },
+        {
+          chip: "Senaste kontakt",
+          tone: "blue",
+          provenance: {
+            label: "Livekontext",
+            tone: "system",
+            detail: "Livekälla: visar senast kända kommunikationsstatus för den valda tråden.",
+          },
+          lines: [
+            `Senaste inkommande: ${latestInbound}`,
+            `Senaste utgående: ${latestOutbound}`,
+            `Senaste kundrad: ${compactRuntimeCopy(row?.latestInboundPreview, "Ingen preview tillgänglig.", 92)}`,
+          ],
+        },
+      ],
+      signals: [
+        {
+          chip: "Prioriteringssignal",
+          tone: "green",
+          provenance: {
+            label: "AI + regelmotor",
+            tone: "ai",
+            detail: "Härledd från AI-stöd och systemregler i runtime, inte från ett separat operatörsbeslut.",
+          },
           lines: [
             row?.priorityReasons?.[0]
               ? `Prioritetsskäl: ${formatPriorityReason(row.priorityReasons[0])}`
               : "Inget prioritetsskäl registrerat ännu",
-            `Tempoprofil: ${humanizeCode(row?.tempoProfile, "Reflekterande")}`,
-            `Livscykel: ${thread.lifecycleLabel}`,
-          ],
-        },
-        {
-          chip: "Kommunikationshistorik",
-          tone: "blue",
-          lines: [
-            `Senaste inkommande: ${latestInbound}`,
-            `Senaste utgående: ${latestOutbound}`,
-            `Mailbox: ${thread.mailboxLabel}`,
-          ],
-        },
-        {
-          chip: "AI-insikter",
-          tone: "green",
-          lines: [
             `Nästa steg: ${thread.nextActionLabel}`,
             thread.followUpLabel ? `Uppföljning: ${thread.followUpLabel}` : `Väntar på: ${thread.waitingLabel}`,
-            `Riskbild: ${thread.riskLabel}`,
           ],
         },
-      ],
-      ai: [
         {
           chip: "Svarssignal",
           tone: "violet",
+          provenance: {
+            label: "AI-signal",
+            tone: "ai",
+            detail: "Härledd från AI-stöd i runtime. Ton, CTA och konfidens är vägledning, inte livekommando.",
+          },
           lines: [
             `Ton: ${humanizeCode(row?.tone, "Neutral")}`,
             `CTA-intensitet: ${humanizeCode(row?.ctaIntensity, "Normal")}`,
@@ -3132,6 +7090,11 @@
         {
           chip: "Utkast & tempo",
           tone: "blue",
+          provenance: {
+            label: "Härledd rekommendation",
+            tone: "derived",
+            detail: "Härledd från livekontext och reply-signaler för den valda tråden.",
+          },
           lines: [
             compactRuntimeCopy(row?.recommendedAction, "Granska tråden och svara tydligt.", 110),
             compactRuntimeCopy(row?.followUpTimingReason?.[0], "Ingen separat timing-signal just nu.", 110),
@@ -3143,6 +7106,11 @@
         {
           chip: "Medicinsk kontext",
           tone: "green",
+          provenance: {
+            label: "Systemstatus",
+            tone: "system",
+            detail: "Livekälla: medicinska signaler hämtas från registrerad risk- och behandlingskontext.",
+          },
           lines: [
             humanizeCode(row?.dominantRisk, "Ingen dominant risk"),
             compactRuntimeCopy(row?.riskStackExplanation, "Ingen medicinsk spärr registrerad.", 110),
@@ -3154,6 +7122,11 @@
         {
           chip: "Teamläge",
           tone: "blue",
+          provenance: {
+            label: "Live teamstatus",
+            tone: "system",
+            detail: "Livekälla: ägare och väntläge kommer från aktiv tråd- och teamkontext.",
+          },
           lines: [
             `Ägare: ${thread.ownerLabel}`,
             `Väntar på: ${thread.waitingLabel}`,
@@ -3186,13 +7159,25 @@
         label: titleCaseMailbox(safeEmail),
       });
     });
+    asArray(metadata?.mailboxCapabilities).forEach((capability) => {
+      const safeEmail = asText(capability?.email || capability?.id).toLowerCase();
+      if (!safeEmail) return;
+      entries.set(safeEmail, {
+        ...(entries.get(safeEmail) || {}),
+        ...capability,
+        id: normalizeMailboxId(capability?.id || safeEmail),
+        email: safeEmail,
+        label: asText(capability?.label, titleCaseMailbox(safeEmail)),
+      });
+    });
     rows.forEach((row) => {
       const email = asText(row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName).toLowerCase();
-      if (!email || entries.has(email)) return;
+      if (!email) return;
       entries.set(email, {
-        id: email,
+        ...(entries.get(email) || {}),
+        id: normalizeMailboxId(email),
         email,
-        label: titleCaseMailbox(email),
+        label: asText(entries.get(email)?.label, titleCaseMailbox(email)),
       });
     });
     return Array.from(entries.values());
@@ -3203,27 +7188,68 @@
     [...asArray(data?.inboundFeed), ...asArray(data?.outboundFeed)].forEach((entry) => {
       const conversationId = asText(entry?.conversationId);
       if (!conversationId || rowsByConversation.has(conversationId)) return;
+      const mailThreadMessage =
+        entry?.mailThreadMessage && typeof entry.mailThreadMessage === "object"
+          ? entry.mailThreadMessage
+          : null;
+      const mailDocument =
+        entry?.mailDocument && typeof entry.mailDocument === "object"
+          ? entry.mailDocument
+          : null;
+      const entryPreview = asText(
+        mailThreadMessage?.presentation?.previewText,
+        asText(
+          mailThreadMessage?.presentation?.conversationText,
+          asText(
+            mailThreadMessage?.primaryBody?.text,
+            asText(
+              mailDocument?.previewText,
+              asText(mailDocument?.primaryBodyText, asText(entry?.preview))
+            )
+          )
+        )
+      );
+      const rawSenderLabel = asText(
+        entry?.counterpart,
+        asText(
+          entry?.counterpartyName,
+          asText(entry?.senderName, asText(mailDocument?.from?.name, "Okänd kund"))
+        )
+      );
+      const senderEmail = extractEmail(rawSenderLabel);
+      const senderLabel =
+        senderEmail && normalizeKey(rawSenderLabel) === normalizeKey(senderEmail)
+          ? humanizeHistoryCounterpartyEmail(senderEmail) || rawSenderLabel
+          : rawSenderLabel;
       rowsByConversation.set(conversationId, {
         conversationId,
-        messageId: asText(entry?.messageId),
-        mailboxId: asText(entry?.mailboxAddress),
-        mailboxAddress: asText(entry?.mailboxAddress),
-        userPrincipalName: asText(entry?.mailboxAddress),
-        subject: asText(entry?.subject, "(utan ämne)"),
-        sender: asText(entry?.counterpart, "Okänd kund"),
-        latestInboundPreview: asText(entry?.preview),
+        messageId: asText(entry?.messageId, asText(mailDocument?.messageId)),
+        mailboxId: asText(entry?.mailboxAddress, asText(mailDocument?.mailboxAddress)),
+        mailboxAddress: asText(
+          entry?.mailboxAddress,
+          asText(mailDocument?.mailboxAddress)
+        ),
+        userPrincipalName: asText(
+          entry?.mailboxAddress,
+          asText(mailDocument?.mailboxAddress)
+        ),
+        subject: asText(mailDocument?.subject, asText(entry?.subject, "(utan ämne)")),
+        sender: senderLabel,
+        latestInboundPreview: entryPreview,
         lastInboundAt: normalizeKey(entry?.direction) === "inbound" ? asText(entry?.sentAt) : "",
         lastOutboundAt: normalizeKey(entry?.direction) === "outbound" ? asText(entry?.sentAt) : "",
         slaStatus: "safe",
         priorityLevel: "medium",
         waitingOn: normalizeKey(entry?.direction) === "inbound" ? "owner" : "customer",
+        hasUnreadInbound:
+          normalizeKey(entry?.direction) === "inbound" && entry?.isRead === false,
         intent: "unclear",
         customerSummary: {
-          customerName: asText(entry?.counterpart, "Okänd kund"),
+          customerName: senderLabel,
           lifecycleStatus: "active_dialogue",
           interactionCount: 1,
           engagementScore: 0.35,
-          lastCaseSummary: asText(entry?.preview),
+          lastCaseSummary: entryPreview,
         },
         recommendedAction: "Granska konversation",
         riskStackExplanation: "Ingen dominant risk identifierad.",
@@ -3235,21 +7261,97 @@
   function humanizeHistoryCounterpartyEmail(value) {
     const email = extractEmail(value);
     if (!email) return "";
-    return email
-      .split("@")[0]
-      .split(/[._+-]+/g)
-      .filter(Boolean)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" ");
+    const [localPart = "", domainPart = ""] = email.split("@");
+    const normalizedLocalPart = normalizeKey(localPart);
+    const genericLocalParts = new Set([
+      "info",
+      "support",
+      "contact",
+      "kontakt",
+      "hello",
+      "mail",
+      "mailer",
+      "news",
+      "newsletter",
+      "noreply",
+      "no-reply",
+      "reply",
+      "service",
+      "team",
+      "admin",
+      "booking",
+      "bokning",
+      "order",
+      "orders",
+      "receipt",
+      "receipts",
+    ]);
+    const technicalDomainParts = new Set([
+      "app",
+      "cdn",
+      "email",
+      "img",
+      "image",
+      "mail",
+      "mailer",
+      "news",
+      "newsletter",
+      "noreply",
+      "no-reply",
+      "reply",
+      "support",
+      "kontakt",
+      "contact",
+      "www",
+    ]);
+    const titleCaseParts = (parts = []) =>
+      parts
+        .map((part) => asText(part).trim())
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+
+    if (!genericLocalParts.has(normalizedLocalPart)) {
+      return titleCaseParts(localPart.split(/[._+-]+/g));
+    }
+
+    const domainTokens = domainPart.split(".").filter(Boolean);
+    if (domainTokens.length >= 2) {
+      const suffix = domainTokens[domainTokens.length - 1];
+      const baseTokens = domainTokens.slice(0, -1).filter(Boolean);
+      const meaningfulBase =
+        [...baseTokens]
+          .reverse()
+          .find((part) => {
+            const normalizedPart = normalizeKey(part);
+            return (
+              normalizedPart &&
+              normalizedPart.length > 1 &&
+              !technicalDomainParts.has(normalizedPart)
+            );
+          }) || baseTokens[baseTokens.length - 1];
+      if (meaningfulBase) {
+        return titleCaseParts([meaningfulBase, suffix]);
+      }
+    }
+
+    return titleCaseParts(localPart.split(/[._+-]+/g));
   }
 
   function buildHistoryConversationKey(message = {}) {
-    const conversationId = asText(message?.conversationId);
-    if (conversationId) return conversationId;
     const mailboxId = asText(
       message?.mailboxId || message?.mailboxAddress || message?.userPrincipalName,
       "kons@hairtpclinic.com"
     ).toLowerCase();
+    const mailboxConversationId = asText(message?.mailboxConversationId);
+    if (mailboxConversationId) return mailboxConversationId;
+    const conversationId = asText(message?.conversationId);
+    if (conversationId) {
+      if (mailboxId && !conversationId.includes(":")) {
+        return `${mailboxId}:${conversationId}`;
+      }
+      return conversationId;
+    }
     const customerEmail =
       extractEmail(
         message?.customerEmail ||
@@ -3268,18 +7370,695 @@
     return asArray(messages)
       .slice()
       .sort(compareHistoryEventsDesc)
-      .map((message) => ({
-        messageId: asText(message?.messageId),
-        conversationId: buildHistoryConversationKey(message),
-        mailboxAddress: asText(
-          message?.mailboxId || message?.mailboxAddress || message?.userPrincipalName,
-          "kons@hairtpclinic.com"
+      .map((message) => {
+        const mailThreadMessage = buildClientMailThreadMessageFromEntry(message, {
+          sourceStore: "client_history_runtime",
+        });
+        const mailDocument =
+          typeof ensureClientMailDocumentAssetTruth === "function"
+            ? ensureClientMailDocumentAssetTruth(message, {
+                sourceStore: "client_history_runtime",
+              })
+            : message?.mailDocument && typeof message.mailDocument === "object"
+              ? message.mailDocument
+              : null;
+        return {
+          messageId: asText(message?.messageId, asText(mailDocument?.messageId)),
+          conversationId: buildHistoryConversationKey(message),
+          mailboxAddress: asText(
+            message?.mailboxId ||
+              message?.mailboxAddress ||
+              message?.userPrincipalName ||
+              mailDocument?.mailboxAddress ||
+              mailDocument?.mailboxId ||
+              mailDocument?.userPrincipalName,
+            "kons@hairtpclinic.com"
+          ),
+          fromName: asText(
+            message?.fromName,
+            asText(
+              mailDocument?.from?.name,
+              normalizeKey(message?.direction) === "outbound"
+                ? asText(message?.senderName)
+                : asText(message?.counterpartyName)
+            )
+          ),
+          senderName: asText(
+            message?.senderName,
+            asText(mailDocument?.from?.name, asText(message?.fromName))
+          ),
+          sentAt: toIso(asText(message?.sentAt, asText(mailDocument?.sentAt))),
+          preview: [
+            mailThreadMessage?.presentation?.previewText,
+            mailThreadMessage?.presentation?.conversationText,
+            mailThreadMessage?.primaryBody?.text,
+            mailDocument?.previewText,
+            mailDocument?.primaryBodyText,
+            message?.bodyPreview,
+            message?.body,
+            message?.detail,
+            message?.summary,
+          ]
+            .map((value) => asText(value))
+            .find((value) => value && !isRuntimePlaceholderLine(value)),
+          bodyPreview: asText(
+            mailThreadMessage?.presentation?.previewText,
+            asText(mailDocument?.previewText, asText(message?.bodyPreview))
+          ),
+          body: asText(
+            mailThreadMessage?.presentation?.conversationText,
+            asText(mailThreadMessage?.primaryBody?.text, asText(mailDocument?.primaryBodyText, asText(message?.body)))
+          ),
+          detail: asText(message?.detail),
+          summary: asText(message?.summary),
+          bodyHtml: asText(
+            mailThreadMessage?.presentation?.conversationHtml,
+            asText(mailDocument?.primaryBodyHtml, asText(message?.bodyHtml))
+          ),
+          subject: asText(mailDocument?.subject, asText(message?.subject, "(utan ämne)")),
+          direction: normalizeKey(message?.direction) === "outbound" ? "outbound" : "inbound",
+          isRead: typeof message?.isRead === "boolean" ? message.isRead : null,
+          mailThreadMessage,
+          mailDocument,
+        };
+      });
+  }
+
+  function buildClientMailThreadMessageFromEntry(
+    message = {},
+    { sourceStore = "client_preview_runtime" } = {}
+  ) {
+    const existing =
+      message?.mailThreadMessage && typeof message.mailThreadMessage === "object"
+        ? message.mailThreadMessage
+        : null;
+    const mailDocument =
+      typeof ensureClientMailDocumentAssetTruth === "function"
+        ? ensureClientMailDocumentAssetTruth(message, { sourceStore })
+        : message?.mailDocument && typeof message.mailDocument === "object"
+          ? message.mailDocument
+          : null;
+    if (!mailDocument) return existing;
+
+    const extractPlainTextFromHtml = (value = "") =>
+      asText(value)
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/(?:p|div|li|tr|table|ul|ol|section|article|header|footer|blockquote)>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\r/g, "")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .trim();
+    const pickText = (...candidates) => {
+      for (const candidate of candidates) {
+        const value =
+          typeof candidate === "string"
+            ? candidate.trim()
+            : candidate === undefined || candidate === null
+              ? ""
+              : String(candidate).trim();
+        if (value) return value;
+      }
+      return "";
+    };
+    const normalizeConversationText = (value = "") =>
+      asText(value)
+        .replace(/\r/g, "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    const splitPlainTextSections = (value = "") => {
+      const systemPatterns = [
+        /^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i,
+        /^Vissa\s+som\s+har\s+f[aå]tt\s+det\s+h[aä]r\s+meddelandet\s+f[aå]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i,
+        /^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i,
+        /^Power up your productivity with Microsoft 365\.?\s*/i,
+        /^Get more done with apps like Word\.?\s*/i,
+        /^Learn why this is important\.?\s*/i,
+        /^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i,
+        /^Read more about why this is important\.?\s*/i,
+      ];
+      const quotedPatterns = [
+        /(?:^|\n)(?:\d{1,2}\s+\S.+?\bskrev\b.+:)[\s\S]*$/i,
+        /(?:^|\n)(?:\S+\s+\d{1,2}\s+\S.+?\bskrev\b.+:)[\s\S]*$/i,
+        /(?:^|\n)On\s+.+?\bwrote:\s*[\s\S]*$/i,
+        /\n(?:Från|From):\s*.+?(?:Datum|Date):\s*.+?(?:Till|To):\s*.+?(?:Ämne|Subject):\s*[\s\S]*$/i,
+        /(?:^|\n)_{10,}[\s\S]*$/i,
+        /(?:^|\n)(?:Från|From):\s*[\s\S]*$/i,
+      ];
+      const signaturePattern =
+        /^(?:B[aä]sta hälsningar|Med vänlig hälsning|Vänliga hälsningar|Best regards|Regards|Hälsningar|MVH|Mvh|Skickat från Outlook för Mac|Skickat från min iPhone|Sent from Outlook for Mac|Sent from my iPhone)\b/i;
+
+      let remaining = normalizeConversationText(value);
+      const systemBlocks = [];
+      let changed = true;
+      while (remaining && changed) {
+        changed = false;
+        for (const pattern of systemPatterns) {
+          const match = remaining.match(pattern);
+          if (!match || match.index !== 0) continue;
+          const blockText = normalizeConversationText(match[0]);
+          if (blockText) {
+            systemBlocks.push({
+              kind: "system_block",
+              role: "provider_notice",
+              text: blockText,
+              html: null,
+            });
+          }
+          remaining = normalizeConversationText(remaining.slice(match[0].length));
+          changed = true;
+          break;
+        }
+      }
+
+      let quotedText = "";
+      for (const pattern of quotedPatterns) {
+        const match = remaining.match(pattern);
+        if (!match || typeof match.index !== "number" || match.index <= 24) continue;
+        quotedText = normalizeConversationText(match[0]);
+        remaining = normalizeConversationText(remaining.slice(0, match.index));
+        break;
+      }
+
+      const lines = normalizeConversationText(remaining)
+        .split(/\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      let signatureBlock = null;
+      const signatureIndex = lines.findIndex(
+        (line, index) => index > 0 && signaturePattern.test(line)
+      );
+      const primaryLines =
+        signatureIndex >= 0 ? lines.slice(0, signatureIndex) : lines;
+      const signatureLines =
+        signatureIndex >= 0 ? lines.slice(signatureIndex) : [];
+      if (signatureLines.length) {
+        signatureBlock = {
+          kind: "signature_block",
+          role: "signature",
+          text: signatureLines.join("\n").trim(),
+          html: null,
+        };
+      }
+      return {
+        primaryText: primaryLines.join("\n").trim(),
+        signatureBlock,
+        quotedBlocks: quotedText
+          ? [
+              {
+                kind: "quoted_block",
+                role: "reply_chain",
+                text: quotedText,
+                html: null,
+              },
+            ]
+          : [],
+        systemBlocks,
+      };
+    };
+    const mergeUniqueIds = (left = [], right = []) =>
+      Array.from(
+        new Set(
+          [...asArray(left), ...asArray(right)]
+            .map((value) => asText(value).trim())
+            .filter(Boolean)
+        )
+      );
+
+    const mimePreferredKind = normalizeKey(
+      mailDocument?.fidelity?.mimePreferredBodyKind ||
+        mailDocument?.mime?.parsed?.preferredBodyKind
+    );
+    const mimePreferredBodyHtml = pickText(mailDocument?.mime?.parsed?.body?.preferredHtml);
+    const mimePreferredBodyText = normalizeConversationText(
+      pickText(
+        mailDocument?.mime?.parsed?.body?.preferredText,
+        extractPlainTextFromHtml(mimePreferredBodyHtml)
+      )
+    );
+    const primaryBodyHtml = pickText(
+      mimePreferredBodyHtml,
+      mailDocument?.primaryBodyHtml,
+      message?.bodyHtml
+    );
+    const fallbackText = normalizeConversationText(
+      pickText(
+        mimePreferredBodyText,
+        mailDocument?.primaryBodyText,
+        extractPlainTextFromHtml(primaryBodyHtml),
+        message?.body,
+        message?.detail,
+        message?.summary
+      )
+    );
+    const sections = splitPlainTextSections(fallbackText);
+    const primaryBodyText = pickText(
+      mimePreferredBodyText,
+      sections?.primaryText,
+      fallbackText,
+      mailDocument?.previewText,
+      message?.bodyPreview,
+      message?.preview
+    );
+    const signatureBlock =
+      sections?.signatureBlock && asText(sections.signatureBlock.text).trim()
+        ? sections.signatureBlock
+        : null;
+    const quotedBlocks = asArray(sections?.quotedBlocks);
+    const systemBlocks = asArray(sections?.systemBlocks);
+    const conversationText = [primaryBodyText, asText(signatureBlock?.text).trim()]
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+    const direction =
+      normalizeKey(mailDocument?.direction || message?.direction) === "outbound"
+        ? "outbound"
+        : "inbound";
+    const role = direction === "outbound" ? "staff" : "customer";
+    const derived = {
+      version: asText(existing?.version, "phase_3_client_derived"),
+      kind: "mail_thread_message",
+      sourceStore: asText(
+        mailDocument?.sourceStore,
+        asText(existing?.sourceStore, asText(sourceStore, "client_preview_runtime"))
+      ),
+      messageId: asText(mailDocument?.messageId, asText(message?.messageId)) || null,
+      graphMessageId:
+        asText(mailDocument?.graphMessageId, asText(message?.graphMessageId)) || null,
+      conversationId:
+        asText(mailDocument?.conversationId, asText(message?.conversationId)) || null,
+      mailboxId:
+        asText(
+          mailDocument?.mailboxId,
+          asText(message?.mailboxId, asText(message?.mailboxAddress))
+        ) || null,
+      direction,
+      role,
+      sentAt: asText(mailDocument?.sentAt, asText(message?.sentAt)) || null,
+      subject: asText(mailDocument?.subject, asText(message?.subject, "(utan ämne)")),
+      previewText: pickText(
+        mimePreferredBodyText,
+        mailDocument?.previewText,
+        extractPlainTextFromHtml(primaryBodyHtml),
+        message?.bodyPreview,
+        message?.preview
+      ),
+      sourceDepth: asText(
+        mailDocument?.sourceDepth,
+        primaryBodyHtml ? "html" : primaryBodyText ? "text" : "empty"
+      ),
+      mimeAvailable:
+        mailDocument?.mimeAvailable === true || mailDocument?.mime?.available === true,
+      mimeBacked:
+        mailDocument?.mimeBacked === true || mailDocument?.mime?.mimeBacked === true,
+      mime:
+        mailDocument?.mime && typeof mailDocument.mime === "object"
+          ? mailDocument.mime
+          : null,
+      primaryBody: {
+        text: primaryBodyText || "",
+        html: primaryBodyHtml || null,
+      },
+      quotedBlocks,
+      signatureBlock,
+      systemBlocks,
+      contentSections: {
+        mode: primaryBodyHtml ? "html_fallback" : primaryBodyText ? "text_fallback" : "empty",
+        source:
+          mailDocument?.mimeBacked === true || mailDocument?.mime?.mimeBacked === true
+            ? "mime_backed"
+            : primaryBodyHtml
+              ? "html"
+              : primaryBodyText
+                ? "text"
+                : "empty",
+        diagnostics:
+          existing?.contentSections &&
+          typeof existing.contentSections.diagnostics === "object"
+            ? existing.contentSections.diagnostics
+            : {
+                blockCount: 0,
+                htmlSectioned: false,
+              },
+        mimePreferredBodyKind: mimePreferredKind || "empty",
+      },
+      assets: {
+        assetCount: Math.max(
+          asNumber(existing?.assets?.assetCount, 0),
+          asNumber(mailDocument?.assetSummary?.assetCount, asArray(mailDocument?.assets).length)
         ),
-        sentAt: toIso(message?.sentAt),
-        preview: asText(message?.bodyPreview),
-        subject: asText(message?.subject, "(utan ämne)"),
-        direction: normalizeKey(message?.direction) === "outbound" ? "outbound" : "inbound",
-      }));
+        familyCounts: {
+          attachment: Math.max(
+            asNumber(existing?.assets?.familyCounts?.attachment, 0),
+            asNumber(mailDocument?.assetSummary?.familyCounts?.attachment, 0)
+          ),
+          inline: Math.max(
+            asNumber(existing?.assets?.familyCounts?.inline, 0),
+            asNumber(mailDocument?.assetSummary?.familyCounts?.inline, 0)
+          ),
+          external: Math.max(
+            asNumber(existing?.assets?.familyCounts?.external, 0),
+            asNumber(mailDocument?.assetSummary?.familyCounts?.external, 0)
+          ),
+        },
+        attachmentIds: mergeUniqueIds(
+          asArray(existing?.assets?.attachmentIds),
+          asArray(mailDocument?.attachments).map((asset) =>
+            asText(asset?.assetId, asText(asset?.attachmentId, asText(asset?.id)))
+          )
+        ),
+        inlineAssetIds: mergeUniqueIds(
+          asArray(existing?.assets?.inlineAssetIds),
+          asArray(mailDocument?.inlineAssets).map((asset) =>
+            asText(asset?.assetId, asText(asset?.attachmentId, asText(asset?.id)))
+          )
+        ),
+        mimeInlineAssetCount: Math.max(
+          asNumber(existing?.assets?.mimeInlineAssetCount, 0),
+          asArray(mailDocument?.mime?.parsed?.assets?.inlineAssets).length
+        ),
+        mimeAttachmentCount: Math.max(
+          asNumber(existing?.assets?.mimeAttachmentCount, 0),
+          asArray(mailDocument?.mime?.parsed?.assets?.attachments).length
+        ),
+      },
+      presentation: {
+        previewText: pickText(
+          mimePreferredBodyText,
+          mailDocument?.previewText,
+          extractPlainTextFromHtml(primaryBodyHtml),
+          message?.bodyPreview,
+          message?.preview
+        ),
+        conversationText:
+          conversationText || asText(message?.body, asText(message?.bodyPreview)),
+        conversationHtml: primaryBodyHtml || null,
+      },
+    };
+
+    if (!existing) return derived;
+
+    const existingPrimaryBodyText = asText(existing?.primaryBody?.text).trim();
+    const existingPrimaryBodyHtml = asText(existing?.primaryBody?.html).trim();
+    const existingConversationText = asText(
+      existing?.presentation?.conversationText
+    ).trim();
+    const existingConversationHtml = asText(
+      existing?.presentation?.conversationHtml
+    ).trim();
+    const existingPreviewText = asText(
+      existing?.presentation?.previewText,
+      existing?.previewText
+    ).trim();
+    const existingHasBody =
+      Boolean(existingPrimaryBodyText || existingPrimaryBodyHtml) ||
+      Boolean(existingConversationText || existingConversationHtml);
+    const existingHasSecondarySections =
+      Boolean(asText(existing?.signatureBlock?.text).trim()) ||
+      asArray(existing?.quotedBlocks).some((block) => asText(block?.text).trim()) ||
+      asArray(existing?.systemBlocks).some((block) => asText(block?.text).trim());
+    const derivedHasBody = Boolean(
+      asText(derived?.primaryBody?.text).trim() ||
+        asText(derived?.primaryBody?.html).trim() ||
+        asText(derived?.presentation?.conversationText).trim() ||
+        asText(derived?.presentation?.conversationHtml).trim()
+    );
+    const derivedHasPreview = Boolean(
+      asText(derived?.presentation?.previewText, derived?.previewText).trim()
+    );
+    const shouldPreferDerived =
+      (derived?.mimeBacked === true &&
+        existing?.mimeBacked !== true &&
+        Boolean(asText(derived?.primaryBody?.html).trim()) &&
+        !Boolean(existingPrimaryBodyHtml)) ||
+      (!existingHasBody && derivedHasBody) ||
+      (!existingHasBody &&
+        !existingHasSecondarySections &&
+        !existingPreviewText &&
+        derivedHasPreview);
+    const existingSignatureText = asText(existing?.signatureBlock?.text).trim();
+    const derivedSignatureText = asText(derived?.signatureBlock?.text).trim();
+    const mergedSignatureTruth = {
+      ...(derived?.signatureBlock?.truth && typeof derived.signatureBlock.truth === "object"
+        ? derived.signatureBlock.truth
+        : {}),
+      ...(existing?.signatureBlock?.truth && typeof existing.signatureBlock.truth === "object"
+        ? existing.signatureBlock.truth
+        : {}),
+    };
+    const mergedSignatureBlock =
+      existingSignatureText || derivedSignatureText
+        ? {
+            ...(derived?.signatureBlock && typeof derived.signatureBlock === "object"
+              ? derived.signatureBlock
+              : {}),
+            ...(existing?.signatureBlock && typeof existing.signatureBlock === "object"
+              ? existing.signatureBlock
+              : {}),
+            text: asText(
+              shouldPreferDerived ? derived?.signatureBlock?.text : existing?.signatureBlock?.text,
+              existing?.signatureBlock?.text,
+              derived?.signatureBlock?.text
+            ),
+            html:
+              asText(
+                shouldPreferDerived ? derived?.signatureBlock?.html : existing?.signatureBlock?.html,
+                existing?.signatureBlock?.html,
+                derived?.signatureBlock?.html
+              ) || null,
+            truth:
+              Object.keys(mergedSignatureTruth).length > 0 ? mergedSignatureTruth : null,
+          }
+        : null;
+
+    return {
+      ...existing,
+      version: asText(existing?.version, derived.version),
+      kind: "mail_thread_message",
+      sourceStore: asText(
+        shouldPreferDerived ? derived.sourceStore : existing?.sourceStore,
+        derived.sourceStore
+      ),
+      messageId: asText(existing?.messageId, derived.messageId),
+      graphMessageId: asText(existing?.graphMessageId, derived.graphMessageId),
+      conversationId: asText(existing?.conversationId, derived.conversationId),
+      mailboxId: asText(existing?.mailboxId, derived.mailboxId),
+      direction: asText(existing?.direction, derived.direction),
+      role: asText(existing?.role, derived.role),
+      sentAt: asText(existing?.sentAt, derived.sentAt),
+      subject: asText(existing?.subject, derived.subject),
+      previewText: asText(
+        shouldPreferDerived ? derived.previewText : existing?.previewText,
+        existing?.previewText,
+        derived.previewText
+      ),
+      sourceDepth: asText(
+        shouldPreferDerived ? derived.sourceDepth : existing?.sourceDepth,
+        existing?.sourceDepth,
+        derived.sourceDepth
+      ),
+      mimeAvailable: existing?.mimeAvailable === true || derived.mimeAvailable === true,
+      mimeBacked:
+        existing?.mimeBacked === true ||
+        (shouldPreferDerived && derived.mimeBacked === true),
+      mime:
+        existing?.mime && typeof existing.mime === "object" ? existing.mime : derived.mime,
+      primaryBody: {
+        text: asText(
+          shouldPreferDerived ? derived?.primaryBody?.text : existing?.primaryBody?.text,
+          existing?.primaryBody?.text,
+          derived?.primaryBody?.text
+        ),
+        html:
+          asText(
+            shouldPreferDerived ? derived?.primaryBody?.html : existing?.primaryBody?.html,
+            existing?.primaryBody?.html,
+            derived?.primaryBody?.html
+          ) || null,
+      },
+      quotedBlocks: asArray(existing?.quotedBlocks).length
+        ? existing.quotedBlocks
+        : derived.quotedBlocks,
+      signatureBlock: mergedSignatureBlock,
+      systemBlocks: asArray(existing?.systemBlocks).length
+        ? existing.systemBlocks
+        : derived.systemBlocks,
+      contentSections: {
+        ...(derived?.contentSections && typeof derived.contentSections === "object"
+          ? derived.contentSections
+          : {}),
+        ...(existing?.contentSections && typeof existing.contentSections === "object"
+          ? existing.contentSections
+          : {}),
+        mode: asText(
+          shouldPreferDerived ? derived?.contentSections?.mode : existing?.contentSections?.mode,
+          existing?.contentSections?.mode,
+          derived?.contentSections?.mode,
+          "empty"
+        ),
+        source: asText(
+          shouldPreferDerived ? derived?.contentSections?.source : existing?.contentSections?.source,
+          existing?.contentSections?.source,
+          derived?.contentSections?.source,
+          "empty"
+        ),
+        mimePreferredBodyKind: asText(
+          shouldPreferDerived
+            ? derived?.contentSections?.mimePreferredBodyKind
+            : existing?.contentSections?.mimePreferredBodyKind,
+          existing?.contentSections?.mimePreferredBodyKind,
+          derived?.contentSections?.mimePreferredBodyKind,
+          "empty"
+        ),
+      },
+      assets: {
+        assetCount: Math.max(
+          asNumber(existing?.assets?.assetCount, 0),
+          asNumber(derived?.assets?.assetCount, 0)
+        ),
+        familyCounts: {
+          attachment: Math.max(
+            asNumber(existing?.assets?.familyCounts?.attachment, 0),
+            asNumber(derived?.assets?.familyCounts?.attachment, 0)
+          ),
+          inline: Math.max(
+            asNumber(existing?.assets?.familyCounts?.inline, 0),
+            asNumber(derived?.assets?.familyCounts?.inline, 0)
+          ),
+          external: Math.max(
+            asNumber(existing?.assets?.familyCounts?.external, 0),
+            asNumber(derived?.assets?.familyCounts?.external, 0)
+          ),
+        },
+        attachmentIds: mergeUniqueIds(
+          asArray(existing?.assets?.attachmentIds),
+          asArray(derived?.assets?.attachmentIds)
+        ),
+        inlineAssetIds: mergeUniqueIds(
+          asArray(existing?.assets?.inlineAssetIds),
+          asArray(derived?.assets?.inlineAssetIds)
+        ),
+        mimeInlineAssetCount: Math.max(
+          asNumber(existing?.assets?.mimeInlineAssetCount, 0),
+          asNumber(derived?.assets?.mimeInlineAssetCount, 0)
+        ),
+        mimeAttachmentCount: Math.max(
+          asNumber(existing?.assets?.mimeAttachmentCount, 0),
+          asNumber(derived?.assets?.mimeAttachmentCount, 0)
+        ),
+      },
+      presentation: {
+        previewText: asText(
+          shouldPreferDerived
+            ? derived?.presentation?.previewText
+            : existing?.presentation?.previewText,
+          existing?.presentation?.previewText,
+          derived?.presentation?.previewText
+        ),
+        conversationText: asText(
+          shouldPreferDerived
+            ? derived?.presentation?.conversationText
+            : existing?.presentation?.conversationText,
+          existing?.presentation?.conversationText,
+          derived?.presentation?.conversationText
+        ),
+        conversationHtml:
+          asText(
+            shouldPreferDerived
+              ? derived?.presentation?.conversationHtml
+              : existing?.presentation?.conversationHtml,
+            existing?.presentation?.conversationHtml,
+            derived?.presentation?.conversationHtml
+          ) || null,
+      },
+    };
+  }
+
+  function buildClientThreadDocumentFromPreviewMessages(
+    messages = [],
+    { conversationId = "", customerEmail = "", sourceStore = "" } = {}
+  ) {
+    const canonicalEntries = asArray(messages)
+      .map((message) => {
+        const mailThreadMessage = buildClientMailThreadMessageFromEntry(message, {
+          sourceStore,
+        });
+        if (!mailThreadMessage) return null;
+        return {
+          ...message,
+          mailThreadMessage,
+        };
+      })
+      .filter(Boolean);
+    const canonicalMessages = canonicalEntries
+      .map((message) => message.mailThreadMessage)
+      .filter(Boolean)
+      .slice()
+      .sort((left, right) => String(right?.sentAt || "").localeCompare(String(left?.sentAt || "")));
+    if (!canonicalMessages.length) return null;
+    const firstEntry = canonicalEntries[0] || null;
+    const firstMailDocument =
+      firstEntry?.mailDocument && typeof firstEntry.mailDocument === "object"
+        ? firstEntry.mailDocument
+        : null;
+    return {
+      version: asText(canonicalMessages[0]?.version, "phase_3"),
+      kind: "mail_thread_document",
+      sourceStore: asText(
+        canonicalMessages[0]?.sourceStore,
+        asText(firstMailDocument?.sourceStore, asText(sourceStore, "client_preview_runtime"))
+      ),
+      conversationId:
+        asText(
+          conversationId,
+          asText(canonicalMessages[0]?.conversationId, asText(firstEntry?.conversationId))
+        ) || null,
+      customerEmail: asText(customerEmail) || null,
+      messageCount: canonicalMessages.length,
+      latestMessageId: asText(canonicalMessages[0]?.messageId) || null,
+      hasQuotedContent: canonicalMessages.some(
+        (message) => asArray(message?.quotedBlocks).length > 0
+      ),
+      hasSignatureBlocks: canonicalMessages.some((message) =>
+        asText(message?.signatureBlock?.text).trim()
+      ),
+      hasSystemBlocks: canonicalMessages.some(
+        (message) => asArray(message?.systemBlocks).length > 0
+      ),
+      messages: canonicalMessages,
+    };
+  }
+
+  function buildClientThreadDocumentFromHistoryMessages(
+    messages = [],
+    { conversationId = "", customerEmail = "" } = {}
+  ) {
+    return buildClientThreadDocumentFromPreviewMessages(messages, {
+      conversationId,
+      customerEmail,
+      sourceStore: "client_history_runtime",
+    });
   }
 
   function extractHistoryCustomerEmail(messages = [], mailboxIds = []) {
@@ -3306,14 +8085,70 @@
   }
 
   function deriveHistoryCustomerName(messages = [], mailboxIds = []) {
+    const extractHistoryText = (value = "") =>
+      asText(value)
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/\s+/g, " ")
+        .trim();
+    const extractHistorySenderName = (value = "") => {
+      const text = extractHistoryText(value);
+      if (!text) return "";
+      const matchers = [
+        /\bFrån:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrom:\s*([^<\n]+?)\s*<[^>\n]+>/i,
+        /\bFrån:\s*([^\n]+?)\s+(?:Datum:|Date:|Till:|To:|Ämne:|Subject:)/i,
+        /\bFrom:\s*([^\n]+?)\s+(?:Date:|To:|Subject:)/i,
+      ];
+      for (const matcher of matchers) {
+        const candidate = asText(text.match(matcher)?.[1]).trim();
+        if (
+          candidate &&
+          !looksLikeMailboxIdentity(candidate) &&
+          !isRuntimeUnknownCustomerName(candidate)
+        ) {
+          return candidate
+            .replace(/\s+\|\s+Hair TP Clinic.*$/i, "")
+            .replace(/\s+\|\s+.*$/i, "")
+            .trim();
+        }
+      }
+      return "";
+    };
     for (const message of asArray(messages)) {
       const candidate =
         normalizeKey(message?.direction) === "outbound"
           ? asText(message?.counterpartyName)
           : asText(message?.senderName);
-      if (candidate && !looksLikeMailboxIdentity(candidate)) {
+      if (
+        candidate &&
+        !looksLikeMailboxIdentity(candidate) &&
+        !isRuntimeUnknownCustomerName(candidate)
+      ) {
         return candidate;
       }
+      const textDerivedCandidate = [
+        extractHistorySenderName(message?.bodyPreview),
+        extractHistorySenderName(message?.body),
+        extractHistorySenderName(message?.detail),
+        extractHistorySenderName(message?.summary),
+        extractHistorySenderName(message?.bodyHtml),
+      ].find(Boolean);
+      if (textDerivedCandidate) return textDerivedCandidate;
+      const subjectFallback = deriveRuntimeCustomerNameFromSubject(
+        message?.subject || message?.normalizedSubject
+      );
+      if (subjectFallback) return subjectFallback;
     }
     return humanizeHistoryCounterpartyEmail(
       extractHistoryCustomerEmail(messages, mailboxIds)
@@ -3401,7 +8236,11 @@
     followUpDueAt = "",
   } = {}) {
     if (liveRow) {
-      return deriveRuntimeTags(liveRow);
+      const liveTags = asArray(liveRow?.tags)
+        .map((tag) => normalizeKey(tag))
+        .filter(Boolean);
+      const derivedTags = deriveRuntimeTags(liveRow);
+      return Array.from(new Set([...liveTags, ...derivedTags]));
     }
     const tags = ["all"];
     const normalizedActionType = normalizeKey(latestAction?.actionType || "");
@@ -3431,6 +8270,146 @@
     return Array.from(new Set(tags));
   }
 
+  function getMailFoundationPreviewCandidates(value = {}) {
+    const normalizeFoundationRole = (message = {}) => {
+      const explicitRole = asText(message?.role).trim().toLowerCase();
+      if (explicitRole) return explicitRole;
+      return normalizeKey(message?.direction) === "outbound" ? "staff" : "customer";
+    };
+    const collectThreadMessageCandidates = (message = null) => {
+      if (!message || typeof message !== "object") return [];
+      return [
+        message?.presentation?.previewText,
+        message?.presentation?.conversationText,
+        message?.primaryBody?.text,
+      ].filter((candidate) => asText(candidate).trim());
+    };
+    const collectMailDocumentCandidates = (document = null) => {
+      if (!document || typeof document !== "object") return [];
+      return [document?.previewText, document?.primaryBodyText].filter((candidate) =>
+        asText(candidate).trim()
+      );
+    };
+    const collectThreadDocumentCandidates = (threadDocument = null) => {
+      const messages = asArray(threadDocument?.messages);
+      if (!messages.length) return [];
+      const preferredMessage =
+        messages.find((message) => {
+          return (
+            normalizeFoundationRole(message) === "customer" &&
+            collectThreadMessageCandidates(message).length > 0
+          );
+        }) ||
+        messages.find((message) => collectThreadMessageCandidates(message).length > 0) ||
+        null;
+      return collectThreadMessageCandidates(preferredMessage);
+    };
+
+    return [
+      ...collectThreadDocumentCandidates(value?.threadDocument),
+      ...collectThreadMessageCandidates(value?.mailThreadMessage),
+      ...collectMailDocumentCandidates(value?.mailDocument),
+      ...collectThreadMessageCandidates(value?.latestMessage?.mailThreadMessage),
+      ...collectMailDocumentCandidates(value?.latestMessage?.mailDocument),
+      ...collectThreadMessageCandidates(value?.conversation?.mailThreadMessage),
+      ...collectMailDocumentCandidates(value?.conversation?.mailDocument),
+    ];
+  }
+
+  function resolveRuntimePreviewText(value = {}, { additionalCandidates = [], fallback = "" } = {}) {
+    const extractPreviewTextFromHtml = (input = "") => {
+      const html = asText(input).trim();
+      if (!html) return "";
+      return html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/div>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li\b[^>]*>/gi, "• ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+          const parsed = Number.parseInt(code, 16);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/&#([0-9]+);/g, (_, code) => {
+          const parsed = Number.parseInt(code, 10);
+          return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+        })
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+    const sanitizePreviewText = (input = "") =>
+      asText(input)
+        .replace(/\s+/g, " ")
+        .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+        .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+        .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+        .replace(/^Get more done with apps like Word\.?\s*/i, "")
+        .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+        .replace(/^Read more about why this is important\.?\s*/i, "")
+        .replace(/^[\s_—–-]{6,}/, "")
+        .trim();
+
+    return (
+      [
+        ...asArray(additionalCandidates),
+        ...getMailFoundationPreviewCandidates(value?.latestInbound),
+        ...getMailFoundationPreviewCandidates(value),
+        value?.latestInbound?.bodyPreview,
+        value?.latestInbound?.body,
+        value?.latestInbound?.detail,
+        value?.latestInbound?.summary,
+        value?.latestInboundPreview,
+        value?.preview,
+        value?.systemPreview,
+        value?.latestPreview,
+        value?.bodyPreview,
+        value?.detail,
+        value?.summary,
+        value?.latestMessage?.preview,
+        value?.latestMessage?.bodyPreview,
+        extractPreviewTextFromHtml(value?.latestMessage?.bodyHtml),
+        value?.latestMessage?.body,
+        value?.latestMessage?.detail,
+        value?.latestMessage?.summary,
+        value?.conversation?.preview,
+        value?.conversation?.bodyPreview,
+        extractPreviewTextFromHtml(value?.conversation?.bodyHtml),
+        value?.conversation?.detail,
+        value?.conversation?.summary,
+        extractPreviewTextFromHtml(value?.bodyHtml),
+        value?.customerSummary?.lastCaseSummary,
+      ]
+        .map((candidate) => sanitizePreviewText(candidate))
+      .find((candidate) => candidate && !isRuntimePlaceholderLine(candidate)) || asText(fallback)
+    );
+  }
+
+  function cloneIdentityEnvelope(value = null) {
+    const safeValue = value && typeof value === "object" ? value : {};
+    const customerIdentity = asObject(safeValue.customerIdentity || safeValue.identity);
+    const hardConflictSignals = asArray(safeValue.hardConflictSignals).filter(
+      (item) => item !== null && item !== undefined
+    );
+    const mergeReviewDecisionsByPairId = asObject(safeValue.mergeReviewDecisionsByPairId);
+    const identityProvenance = asObject(safeValue.identityProvenance || safeValue.provenance);
+
+    return {
+      customerIdentity: Object.keys(customerIdentity).length ? cloneJson(customerIdentity) : null,
+      hardConflictSignals: hardConflictSignals.length ? cloneJson(hardConflictSignals) : [],
+      mergeReviewDecisionsByPairId: Object.keys(mergeReviewDecisionsByPairId).length
+        ? cloneJson(mergeReviewDecisionsByPairId)
+        : {},
+      identityProvenance: Object.keys(identityProvenance).length ? cloneJson(identityProvenance) : null,
+    };
+  }
+
   function buildHistoryBackedRuntimeRow({
     conversationId,
     messages = [],
@@ -3452,6 +8431,104 @@
     const latestOutcome = sortedEvents.find(
       (event) => normalizeKey(event?.resultType) === "outcome"
     );
+    const identityEnvelope = (() => {
+      const cloneEnvelope = (candidate) => {
+        const safeCandidate = candidate && typeof candidate === "object" ? candidate : {};
+        const customerIdentity =
+          safeCandidate.customerIdentity && typeof safeCandidate.customerIdentity === "object"
+            ? safeCandidate.customerIdentity
+            : safeCandidate.identity && typeof safeCandidate.identity === "object"
+              ? safeCandidate.identity
+              : null;
+        const hardConflictSignals = Array.isArray(safeCandidate.hardConflictSignals)
+          ? safeCandidate.hardConflictSignals.filter((item) => item !== null && item !== undefined)
+          : [];
+        const mergeReviewDecisionsByPairId =
+          safeCandidate.mergeReviewDecisionsByPairId &&
+          typeof safeCandidate.mergeReviewDecisionsByPairId === "object"
+            ? safeCandidate.mergeReviewDecisionsByPairId
+            : {};
+        const identityProvenance =
+          safeCandidate.identityProvenance && typeof safeCandidate.identityProvenance === "object"
+            ? safeCandidate.identityProvenance
+            : safeCandidate.provenance && typeof safeCandidate.provenance === "object"
+              ? safeCandidate.provenance
+              : null;
+        return {
+          customerIdentity: customerIdentity ? JSON.parse(JSON.stringify(customerIdentity)) : null,
+          hardConflictSignals: hardConflictSignals.length
+            ? JSON.parse(JSON.stringify(hardConflictSignals))
+            : [],
+          mergeReviewDecisionsByPairId: Object.keys(mergeReviewDecisionsByPairId).length
+            ? JSON.parse(JSON.stringify(mergeReviewDecisionsByPairId))
+            : {},
+          identityProvenance: identityProvenance
+            ? JSON.parse(JSON.stringify(identityProvenance))
+            : null,
+        };
+      };
+      const candidateSources = [
+        liveRow?.customerIdentity,
+        liveRow?.identity,
+        liveRow?.customerSummary?.customerIdentity,
+        liveRow?.customerSummary?.identity,
+        latestMessage?.customerIdentity,
+        latestMessage?.identity,
+        latestAction?.customerIdentity,
+        latestAction?.identity,
+        latestOutcome?.customerIdentity,
+        latestOutcome?.identity,
+      ];
+      for (const candidate of candidateSources) {
+        if (candidate && typeof candidate === "object") {
+          const carried = cloneEnvelope(candidate);
+          if (
+            carried.customerIdentity ||
+            carried.hardConflictSignals.length > 0 ||
+            Object.keys(carried.mergeReviewDecisionsByPairId || {}).length > 0 ||
+            carried.identityProvenance
+          ) {
+            return carried;
+          }
+        }
+      }
+      return cloneEnvelope(null);
+    })();
+    const customerIdentity =
+      identityEnvelope.customerIdentity ||
+      liveRow?.customerSummary?.customerIdentity ||
+      liveRow?.customerIdentity ||
+      latestMessage?.customerIdentity ||
+      latestAction?.customerIdentity ||
+      latestOutcome?.customerIdentity ||
+      null;
+    const hardConflictSignals =
+      identityEnvelope.hardConflictSignals?.length
+        ? identityEnvelope.hardConflictSignals
+        : liveRow?.customerSummary?.hardConflictSignals ||
+          liveRow?.hardConflictSignals ||
+          latestMessage?.hardConflictSignals ||
+          latestAction?.hardConflictSignals ||
+          latestOutcome?.hardConflictSignals ||
+          [];
+    const mergeReviewDecisionsByPairId =
+      identityEnvelope.mergeReviewDecisionsByPairId &&
+      Object.keys(identityEnvelope.mergeReviewDecisionsByPairId).length
+        ? identityEnvelope.mergeReviewDecisionsByPairId
+        : liveRow?.customerSummary?.mergeReviewDecisionsByPairId ||
+          liveRow?.mergeReviewDecisionsByPairId ||
+          latestMessage?.mergeReviewDecisionsByPairId ||
+          latestAction?.mergeReviewDecisionsByPairId ||
+          latestOutcome?.mergeReviewDecisionsByPairId ||
+          {};
+    const identityProvenance =
+      identityEnvelope.identityProvenance ||
+      liveRow?.customerSummary?.identityProvenance ||
+      liveRow?.identityProvenance ||
+      latestMessage?.identityProvenance ||
+      latestAction?.identityProvenance ||
+      latestOutcome?.identityProvenance ||
+      null;
     const mailboxIds = Array.from(
       new Set(
         sortedMessages
@@ -3461,17 +8538,23 @@
           .filter(Boolean)
       )
     );
+    const preferredMailboxAddress = asText(
+      liveRow?.mailboxAddress || liveRow?.mailboxId || liveRow?.userPrincipalName
+    ).toLowerCase();
     const mailboxAddress =
-      mailboxIds[0] ||
-      asText(liveRow?.mailboxAddress || liveRow?.mailboxId || liveRow?.userPrincipalName, "kons@hairtpclinic.com");
+      preferredMailboxAddress || mailboxIds[0] || "kons@hairtpclinic.com";
     const customerEmail =
       extractHistoryCustomerEmail(sortedMessages, mailboxIds) || extractCustomerEmail(liveRow || {});
     const customerName =
       deriveHistoryCustomerName(sortedMessages, mailboxIds) ||
       getRuntimeCustomerName(liveRow || {});
-    const latestPreview = asText(
-      latestInbound?.bodyPreview || latestMessage?.bodyPreview,
-      "Ingen förhandsvisning tillgänglig."
+    const latestPreview = resolveRuntimePreviewText(
+      {
+        ...(liveRow && typeof liveRow === "object" ? liveRow : {}),
+        latestInbound,
+        latestMessage,
+      },
+      { fallback: "Ingen förhandsvisning tillgänglig." }
     );
     const followUpDueAt = asText(
       liveRow?.followUpDueAt ||
@@ -3498,8 +8581,17 @@
       ...(liveRow?.customerSummary && typeof liveRow.customerSummary === "object"
         ? liveRow.customerSummary
         : {}),
+      customerKey: asText(
+        liveRow?.customerSummary?.customerKey ||
+          liveRow?.customerKey ||
+          customerEmail ||
+          ""
+      ),
       customerName,
-      customerKey: customerEmail || extractCustomerEmail(liveRow || {}),
+      customerIdentity,
+      hardConflictSignals,
+      mergeReviewDecisionsByPairId,
+      identityProvenance,
       lifecycleStatus: asText(
         liveRow?.customerSummary?.lifecycleStatus,
         followUpDueAt ? "follow_up_pending" : "active_dialogue"
@@ -3547,10 +8639,17 @@
       mailboxId: mailboxAddress,
       mailboxAddress,
       userPrincipalName: mailboxAddress,
+      customerKey: customerSummary.customerKey,
+      customerIdentity: customerSummary.customerIdentity,
+      hardConflictSignals: customerSummary.hardConflictSignals,
+      mergeReviewDecisionsByPairId: customerSummary.mergeReviewDecisionsByPairId,
+      identityProvenance: customerSummary.identityProvenance,
       subject: asText(latestMessage?.subject, asText(liveRow?.subject, "(utan ämne)")),
       sender: customerEmail || customerName,
       senderName: customerName,
       customerEmail,
+      preview: latestPreview,
+      bodyPreview: latestPreview,
       latestInboundPreview: latestPreview,
       lastInboundAt: asText(latestInbound?.sentAt, asText(liveRow?.lastInboundAt)),
       lastOutboundAt: asText(latestOutbound?.sentAt, asText(liveRow?.lastOutboundAt)),
@@ -3597,6 +8696,9 @@
             : ""
       ),
       bookingState: asText(liveRow?.bookingState),
+      hasUnreadInbound:
+        liveRow?.hasUnreadInbound === true ||
+        (normalizeKey(latestInbound?.direction) !== "outbound" && latestInbound?.isRead === false),
       isUnanswered:
         normalizeKey(latestMessage?.direction) !== "outbound" ||
         liveRow?.isUnanswered === true,
@@ -3609,6 +8711,16 @@
         asText(latestAction?.recordedAt)
       ),
       dominantRisk: asText(liveRow?.dominantRisk, asText(latestOutcome?.dominantRisk)),
+      rowFamily:
+        typeof classifyRuntimeRowFamily === "function"
+          ? classifyRuntimeRowFamily({
+              ...(liveRow && typeof liveRow === "object" ? liveRow : {}),
+              subject: asText(latestMessage?.subject, asText(liveRow?.subject, "(utan ämne)")),
+              latestInboundPreview: latestPreview,
+              mailboxAddress,
+              senderName: customerName,
+            })
+          : "human_mail",
       customerSummary,
     };
     baseRow.tags = deriveHistoryThreadTags({
@@ -3622,11 +8734,210 @@
     return baseRow;
   }
 
-  function buildRuntimeThread(row, { feedEntries = [], historyEvents = [] } = {}) {
-    const customerName = getRuntimeCustomerName(row);
+  function deriveRuntimeRelevantActivityAt(
+    row = {},
+    { canonicalMessages = [], historyEvents = [] } = {}
+  ) {
+    const candidateIsos = [
+      asText(canonicalMessages[0]?.sentAt),
+      asText(row?.lastActionTakenAt),
+      asText(row?.lastInboundAt),
+      asText(row?.lastOutboundAt),
+      asText(row?.latestMessageAt),
+      asText(row?.lastActivityAt),
+      ...asArray(historyEvents).map((event) =>
+        asText(event?.recordedAt || event?.ts || event?.sentAt)
+      ),
+    ]
+      .map((value) => toIso(value))
+      .filter(Boolean)
+      .sort((left, right) => right.localeCompare(left));
+    return candidateIsos[0] || "";
+  }
+
+  function resolveRuntimeFoundationState(
+    thread = null,
+    { threadDocument = null, messages = [] } = {}
+  ) {
+    const safeThread = thread && typeof thread === "object" ? thread : null;
+    const safeThreadDocument =
+      threadDocument && typeof threadDocument === "object"
+        ? threadDocument
+        : safeThread?.threadDocument && typeof safeThread.threadDocument === "object"
+          ? safeThread.threadDocument
+          : safeThread?.raw?.threadDocument && typeof safeThread.raw.threadDocument === "object"
+            ? safeThread.raw.threadDocument
+            : null;
+    const safeMessages = asArray(messages).length > 0 ? asArray(messages) : asArray(safeThread?.messages);
+    const existingFoundationState =
+      safeThread?.foundationState && typeof safeThread.foundationState === "object"
+        ? safeThread.foundationState
+        : null;
+
+    const normalizeResolvedFoundationState = (candidate = null) => {
+      if (!candidate || typeof candidate !== "object") return null;
+      const source = asText(candidate?.source);
+      const messageCount = asNumber(candidate?.messageCount, 0);
+      if (!normalizeKey(source) && messageCount <= 0) return null;
+      return {
+        source: source || "thread_document",
+        label: asText(candidate?.label, "Mail foundation"),
+        messageCount,
+        hasQuotedContent: candidate?.hasQuotedContent === true,
+        hasSignatureBlocks: candidate?.hasSignatureBlocks === true,
+        hasSystemBlocks: candidate?.hasSystemBlocks === true,
+        truthDriven: candidate?.truthDriven === true,
+        foundationDriven: candidate?.foundationDriven !== false,
+        fallbackDriven: candidate?.fallbackDriven === true ? true : false,
+      };
+    };
+
+    const resolvedExistingFoundationState = normalizeResolvedFoundationState(existingFoundationState);
+    if (resolvedExistingFoundationState) return resolvedExistingFoundationState;
+
+    const latestMessage =
+      safeMessages.find((message) => message?.latest === true) || safeMessages[0] || null;
+    const latestMailDocument =
+      latestMessage?.mailDocument && typeof latestMessage.mailDocument === "object"
+        ? latestMessage.mailDocument
+        : null;
+    const latestMailThreadMessage =
+      latestMessage?.mailThreadMessage && typeof latestMessage.mailThreadMessage === "object"
+        ? latestMessage.mailThreadMessage
+        : null;
+    const threadDocumentMessageCount = asArray(safeThreadDocument?.messages).length;
+    const messageCount = Math.max(threadDocumentMessageCount, safeMessages.length);
+    const source =
+      asText(safeThreadDocument?.sourceStore) ||
+      asText(safeThreadDocument?.source) ||
+      asText(latestMailDocument?.sourceStore) ||
+      asText(latestMailThreadMessage?.sourceStore) ||
+      "";
+    const hasCanonicalEvidence = Boolean(
+      (safeThreadDocument &&
+        (normalizeKey(source) || threadDocumentMessageCount > 0)) ||
+        (latestMailDocument &&
+          (normalizeKey(latestMailDocument?.sourceStore) ||
+            asText(latestMailDocument?.previewText).trim().length > 0 ||
+            asText(latestMailDocument?.primaryBodyText).trim().length > 0)) ||
+        (latestMailThreadMessage &&
+          (normalizeKey(latestMailThreadMessage?.sourceStore) ||
+            asText(latestMailThreadMessage?.presentation?.previewText).trim().length > 0 ||
+            asText(latestMailThreadMessage?.presentation?.conversationText).trim().length > 0 ||
+            asText(latestMailThreadMessage?.primaryBody?.text).trim().length > 0 ||
+            asText(latestMailThreadMessage?.primaryBody?.html).trim().length > 0))
+    );
+
+    if (!hasCanonicalEvidence) return null;
+
+    const hasQuotedContent =
+      safeThreadDocument?.hasQuotedContent === true ||
+      asArray(safeThreadDocument?.messages).some(
+        (message) =>
+          asArray(message?.quotedBlocks).length > 0 ||
+          asArray(message?.mailThreadMessage?.quotedBlocks).length > 0 ||
+          asArray(message?.mailDocument?.quotedBlocks).length > 0
+      );
+    const hasSignatureBlocks =
+      safeThreadDocument?.hasSignatureBlocks === true ||
+      asArray(safeThreadDocument?.messages).some(
+        (message) =>
+          asText(message?.signatureBlock?.html).trim().length > 0 ||
+          asText(message?.mailThreadMessage?.signatureBlock?.html).trim().length > 0
+      );
+    const hasSystemBlocks =
+      safeThreadDocument?.hasSystemBlocks === true ||
+      asArray(safeThreadDocument?.messages).some(
+        (message) =>
+          asArray(message?.systemBlocks).length > 0 ||
+          asArray(message?.mailThreadMessage?.systemBlocks).length > 0
+      );
+
+    return {
+      source: source || "thread_document",
+      label: "Mail foundation",
+      messageCount,
+      hasQuotedContent,
+      hasSignatureBlocks,
+      hasSystemBlocks,
+      truthDriven: false,
+      foundationDriven: true,
+      fallbackDriven: false,
+    };
+  }
+
+  function buildRuntimeThread(row, { feedEntries = [], historyEvents = [], threadDocument = null } = {}) {
+    const customerName = getRuntimeCustomerNameFromFeedEntries(feedEntries, getRuntimeCustomerName(row));
     const customerEmail = extractCustomerEmail(row);
+    const identityEnvelope = (() => {
+      const cloneEnvelope = (candidate) => {
+        const safeCandidate = candidate && typeof candidate === "object" ? candidate : {};
+        const customerIdentity =
+          safeCandidate.customerIdentity && typeof safeCandidate.customerIdentity === "object"
+            ? safeCandidate.customerIdentity
+            : safeCandidate.identity && typeof safeCandidate.identity === "object"
+              ? safeCandidate.identity
+              : null;
+        const hardConflictSignals = Array.isArray(safeCandidate.hardConflictSignals)
+          ? safeCandidate.hardConflictSignals.filter((item) => item !== null && item !== undefined)
+          : [];
+        const mergeReviewDecisionsByPairId =
+          safeCandidate.mergeReviewDecisionsByPairId &&
+          typeof safeCandidate.mergeReviewDecisionsByPairId === "object"
+            ? safeCandidate.mergeReviewDecisionsByPairId
+            : {};
+        const identityProvenance =
+          safeCandidate.identityProvenance && typeof safeCandidate.identityProvenance === "object"
+            ? safeCandidate.identityProvenance
+            : safeCandidate.provenance && typeof safeCandidate.provenance === "object"
+              ? safeCandidate.provenance
+              : null;
+        return {
+          customerIdentity: customerIdentity ? JSON.parse(JSON.stringify(customerIdentity)) : null,
+          hardConflictSignals: hardConflictSignals.length
+            ? JSON.parse(JSON.stringify(hardConflictSignals))
+            : [],
+          mergeReviewDecisionsByPairId: Object.keys(mergeReviewDecisionsByPairId).length
+            ? JSON.parse(JSON.stringify(mergeReviewDecisionsByPairId))
+            : {},
+          identityProvenance: identityProvenance
+            ? JSON.parse(JSON.stringify(identityProvenance))
+            : null,
+        };
+      };
+      const candidateSources = [
+        row?.customerIdentity,
+        row?.identity,
+        row?.customerSummary?.customerIdentity,
+        row?.customerSummary?.identity,
+        threadDocument?.customerIdentity,
+        threadDocument?.identity,
+      ];
+      for (const candidate of candidateSources) {
+        if (candidate && typeof candidate === "object") {
+          const carried = cloneEnvelope(candidate);
+          if (
+            carried.customerIdentity ||
+            carried.hardConflictSignals.length > 0 ||
+            Object.keys(carried.mergeReviewDecisionsByPairId || {}).length > 0 ||
+            carried.identityProvenance
+          ) {
+            return carried;
+          }
+        }
+      }
+      return cloneEnvelope(null);
+    })();
+    const customerKey = asText(
+      row?.customerKey ||
+        row?.customerSummary?.customerKey ||
+        identityEnvelope.customerIdentity?.canonicalCustomerId ||
+        identityEnvelope.customerIdentity?.canonicalContactId ||
+        ""
+    );
     const mailboxAddress = asText(row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName);
     const ownerName = asText(row?.owner, "Oägd");
+    const rawSubject = asText(row?.subject, "(utan ämne)");
     const lifecycleLabel = mapRuntimeLifecycleLabel(row);
     const waitingLabel = mapRuntimeWaitingLabel(row);
     const statusLabel = mapRuntimeStatusLabel(row);
@@ -3639,14 +8950,117 @@
     const followUpLabel = row?.followUpDueAt || row?.followUpSuggestedAt
       ? formatDueLabel(row?.followUpDueAt || row?.followUpSuggestedAt)
       : "";
-    const messages = buildPreviewMessages(row, feedEntries);
+    const followUpAgingState = deriveFollowUpAgingState(row);
+    const messages = buildPreviewMessages(row, feedEntries, threadDocument);
+    const resolvedThreadDocument =
+      threadDocument && typeof threadDocument === "object"
+        ? threadDocument
+        : buildClientThreadDocumentFromPreviewMessages(messages, {
+            conversationId: asText(row?.conversationId),
+            customerEmail,
+            sourceStore: "client_preview_runtime",
+          });
+    const canonicalThreadMessages = asArray(resolvedThreadDocument?.messages);
     const resolvedHistoryEvents = historyEvents.length
       ? historyEvents
       : buildHistoryEvents(row, feedEntries);
+    const latestRelevantActivityAt = deriveRuntimeRelevantActivityAt(row, {
+      canonicalMessages: canonicalThreadMessages,
+      historyEvents: resolvedHistoryEvents,
+    });
     const engagementScore = clamp(
       asNumber(row?.customerSummary?.engagementScore, 0.42),
       0,
       1
+    );
+    const displaySubject = buildRuntimeDisplaySubject({ ...row, subject: rawSubject }, customerName);
+    const displayOwnerLabel = mapRuntimeDisplayOwnerLabel(ownerName);
+    const displayEngagementLabel = mapRuntimeDisplayEngagementLabel(engagementScore);
+    const latestCustomerPreview = asText(
+      asArray(messages).find(
+        (message) =>
+          normalizeKey(message?.role) === "customer" &&
+          !isRuntimePlaceholderLine(message?.body)
+      )?.body
+    );
+    const latestCanonicalInboundPreview =
+      resolvedThreadDocument && typeof resolvedThreadDocument === "object"
+        ? [
+            asArray(messages).find(
+              (message) =>
+                normalizeKey(message?.role) === "customer" &&
+                !isRuntimePlaceholderLine(message?.body)
+            )?.body,
+            asArray(messages).find(
+              (message) =>
+                normalizeKey(message?.role) === "customer" &&
+                !isRuntimePlaceholderLine(message?.conversationBody)
+            )?.conversationBody,
+          ]
+            .map((value) =>
+              resolveRuntimePreviewText({}, { additionalCandidates: [value], fallback: "" })
+            )
+            .find((value) => value && !isRuntimePlaceholderLine(value))
+        : "";
+    const preview = resolveRuntimePreviewText(
+      {
+        ...row,
+        threadDocument: resolvedThreadDocument,
+      },
+      {
+        additionalCandidates: [latestCanonicalInboundPreview, latestCustomerPreview],
+        fallback: "Ingen förhandsvisning tillgänglig.",
+      }
+    );
+    const latestInboundPreview = preview;
+    const normalizedMessages = messages.map((message, index) => {
+      const nextMessage = { ...message };
+      if (
+        normalizeKey(nextMessage?.role) === "customer" &&
+        isRuntimeUnknownCustomerName(nextMessage?.author) &&
+        !isRuntimeUnknownCustomerName(customerName)
+      ) {
+        nextMessage.author = customerName;
+      }
+      if (
+        index === 0 &&
+        isRuntimePlaceholderLine(nextMessage?.body) &&
+        preview &&
+        !isRuntimePlaceholderLine(preview)
+      ) {
+        nextMessage.body = preview;
+      }
+      return nextMessage;
+    });
+    const foundationState = resolveRuntimeFoundationState(null, {
+      threadDocument: resolvedThreadDocument,
+      messages: normalizedMessages,
+    });
+    const rowFamily =
+      typeof classifyRuntimeRowFamily === "function"
+        ? classifyRuntimeRowFamily({
+            ...row,
+            preview,
+            latestInboundPreview: preview,
+          })
+        : "human_mail";
+    const nextActionSummary = compactRuntimeCopy(
+      row?.operatorCue ||
+        row?.customerSummary?.historySignalActionCue ||
+        followUpAgingState.detail ||
+        row?.customerSummary?.lastCaseSummary ||
+        preview,
+      "Granska tråden och ta nästa tydliga steg.",
+      124
+    );
+    const whyInFocus = compactRuntimeCopy(
+      row?.riskStackExplanation ||
+        row?.operatorCue ||
+        row?.customerSummary?.historySignalSummary ||
+        followUpAgingState.detail ||
+        preview,
+      "Aktiv konversation kräver uppföljning.",
+      124
     );
     const mailboxes = buildMailboxCatalog([row], {
       sourceMailboxIds:
@@ -3654,14 +9068,64 @@
           ? row.customerSummary.historyMailboxIds
           : [mailboxAddress],
     });
+    const mailboxProvenanceDetail = mailboxes.length > 1 ? mailboxes.map((item) => item.label).join(" · ") : "";
+    const mailboxProvenanceLabel = mailboxes.length > 1 ? `${mailboxes.length} mailboxar` : "";
+    const runtimeTags = Array.from(
+      new Set(
+        (
+          asArray(row?.tags).length > 0
+            ? asArray(row.tags).map((tag) => asText(tag).trim()).filter(Boolean)
+            : deriveRuntimeTags(row)
+        ).filter(Boolean)
+      )
+    );
+    if (followUpAgingState.label) {
+      runtimeTags.push("followup", "today");
+    }
     const thread = {
       id: asText(row?.conversationId),
-      subject: asText(row?.subject, "(utan ämne)"),
+      subject: rawSubject,
+      displaySubject,
       customerName,
       customerEmail,
+      customerKey,
+      customerIdentity:
+        identityEnvelope.customerIdentity ||
+        row?.customerSummary?.customerIdentity ||
+        row?.customerIdentity ||
+        threadDocument?.customerIdentity ||
+        threadDocument?.identity ||
+        null,
+      hardConflictSignals:
+        identityEnvelope.hardConflictSignals?.length
+          ? identityEnvelope.hardConflictSignals
+          : row?.customerSummary?.hardConflictSignals ||
+            row?.hardConflictSignals ||
+            threadDocument?.hardConflictSignals ||
+            [],
+      mergeReviewDecisionsByPairId:
+        identityEnvelope.mergeReviewDecisionsByPairId &&
+        Object.keys(identityEnvelope.mergeReviewDecisionsByPairId).length
+          ? identityEnvelope.mergeReviewDecisionsByPairId
+          : row?.customerSummary?.mergeReviewDecisionsByPairId ||
+            row?.mergeReviewDecisionsByPairId ||
+            threadDocument?.mergeReviewDecisionsByPairId ||
+            {},
+      identityProvenance:
+        identityEnvelope.identityProvenance ||
+        row?.customerSummary?.identityProvenance ||
+        row?.identityProvenance ||
+        threadDocument?.identityProvenance ||
+        threadDocument?.provenance ||
+        null,
+      crossMailboxProvenanceEvidence:
+        row?.crossMailboxProvenanceEvidence === true ||
+        asArray(row?.sourceRows).length > 1 ||
+        asArray(row?.sourceConversationIds).length > 1,
       mailboxAddress,
       mailboxLabel: titleCaseMailbox(mailboxAddress),
       ownerLabel: ownerName,
+      displayOwnerLabel,
       ownerKey:
         normalizeKey(ownerName) === "oägd" || !normalizeKey(ownerName)
           ? "unassigned"
@@ -3672,38 +9136,57 @@
       riskLabel,
       riskReason,
       followUpLabel,
-      preview: asText(
-        row?.latestInboundPreview,
-        "Ingen förhandsvisning tillgänglig."
+      followUpAgeLabel: followUpAgingState.label,
+      followUpAgeTone: followUpAgingState.tone,
+      followUpAgeDetail: followUpAgingState.detail,
+      followUpAgeActionLabel: followUpAgingState.actionLabel,
+      preview,
+      rowFamily,
+      lastActivityLabel: formatListTime(
+        latestRelevantActivityAt || row?.lastInboundAt || row?.lastOutboundAt
       ),
-      lastActivityLabel: formatListTime(row?.lastInboundAt || row?.lastOutboundAt),
-      lastActivityAt: toIso(row?.lastInboundAt || row?.lastOutboundAt),
-      unread: row?.isUnanswered === true,
+      lastActivityAt: toIso(
+        latestRelevantActivityAt || row?.lastInboundAt || row?.lastOutboundAt
+      ),
+      unread: row?.hasUnreadInbound === true,
+      isUnread: row?.hasUnreadInbound === true,
+      needsReply: row?.isUnanswered === true,
+      isVerificationThread: isVerificationRuntimeThread({
+        subject: rawSubject,
+        displaySubject,
+        preview,
+        whyInFocus,
+        nextActionSummary,
+        raw: row,
+      }),
       intentLabel: humanizeCode(row?.intent, "Oklart"),
       isVIP: engagementScore >= 0.75 || asNumber(row?.customerSummary?.caseCount, 0) >= 4,
       engagementLabel: `${Math.round(engagementScore * 100)}% engagemang`,
-      nextActionLabel: mapRuntimeNextActionLabel(row),
-      nextActionSummary: compactRuntimeCopy(
-        row?.operatorCue || row?.customerSummary?.historySignalActionCue || row?.customerSummary?.lastCaseSummary || row?.latestInboundPreview,
-        "Granska tråden och ta nästa tydliga steg.",
-        124
-      ),
-      whyInFocus: compactRuntimeCopy(
-        row?.riskStackExplanation || row?.operatorCue || row?.customerSummary?.historySignalSummary || row?.latestInboundPreview,
-        "Aktiv konversation kräver uppföljning.",
-        124
-      ),
-      tags:
-        asArray(row?.tags).length > 0
-          ? Array.from(new Set(asArray(row.tags).map(normalizeKey).filter(Boolean)))
-          : deriveRuntimeTags(row),
+      displayEngagementLabel,
+      displayCustomerMeta: `${displayEngagementLabel} · ${displayOwnerLabel}`,
+      nextActionLabel: followUpAgingState.actionLabel || mapRuntimeNextActionLabel(row),
+      nextActionSummary,
+      whyInFocus,
+      primaryLaneId: derivePrimaryRuntimeLane(row),
+      worklistSource: normalizeKey(row?.worklistSource || "legacy") || "legacy",
+      worklistSourceLabel: asText(row?.worklistSourceLabel),
+      worklistWave: normalizeKey(row?.worklistWave || ""),
+      worklistWaveLabel: asText(row?.worklistWaveLabel),
+      tags: runtimeTags,
       avatar: buildAvatarDataUri(customerName),
-      messages,
+      messages: normalizedMessages,
       historyEvents: resolvedHistoryEvents,
       historyMailboxOptions: mailboxes.map((item) => ({
         id: item.id,
         label: item.label,
       })),
+      mailboxProvenanceLabel,
+      mailboxProvenanceDetail,
+      threadDocument:
+        resolvedThreadDocument && typeof resolvedThreadDocument === "object"
+          ? resolvedThreadDocument
+          : null,
+      foundationState,
       raw: row,
       mailboxesLabel:
         mailboxes.length > 1
@@ -3716,31 +9199,229 @@
 
   function buildLiveThreads(data, options = {}) {
     const sourceRows = [...asArray(data?.conversationWorklist), ...asArray(data?.needsReplyToday)];
-    const uniqueRows = new Map();
-    sourceRows.forEach((row) => {
+    const customerMergeMap =
+      typeof state !== "undefined" &&
+      state &&
+      state.customerRuntime &&
+      typeof state.customerRuntime.mergedInto === "object"
+        ? state.customerRuntime.mergedInto
+        : {};
+    const toLiveConversationLookupKey = (value) =>
+      typeof normalizeRuntimeConversationId === "function"
+        ? normalizeRuntimeConversationId(value)
+        : asText(value).trim().toLowerCase();
+    const getRowActivityStamp = (row = {}) =>
+      [
+        asText(row?.lastActivityAt),
+        asText(row?.lastActionTakenAt),
+        asText(row?.lastInboundAt),
+        asText(row?.lastOutboundAt),
+        asText(row?.latestMessageAt),
+      ]
+        .map((value) => asText(value).trim())
+        .filter(Boolean)
+        .sort((left, right) => right.localeCompare(left))[0] || "";
+    const getCanonicalLiveCustomerKey = (row = {}) => {
+      const candidateKeys = [
+        row?.customerSummary?.customerKey,
+        row?.customerKey,
+        row?.customerIdentity?.canonicalCustomerId,
+        row?.customerIdentity?.canonicalContactId,
+        row?.identity?.canonicalCustomerId,
+        row?.identity?.canonicalContactId,
+        row?.customerEmail,
+        row?.customerName,
+      ];
+      for (const candidate of candidateKeys) {
+        const normalized = normalizeKey(asText(candidate));
+        if (!normalized) continue;
+        return normalizeKey(customerMergeMap[normalized] || normalized);
+      }
+      return "";
+    };
+    const buildLiveConversationKey = (row = {}) => {
+      const mailboxConversationId = asText(row?.mailboxConversationId);
+      if (mailboxConversationId) return mailboxConversationId;
       const conversationId = asText(row?.conversationId);
-      if (!conversationId || uniqueRows.has(conversationId)) return;
-      uniqueRows.set(conversationId, row);
+      if (conversationId) return conversationId;
+      return buildHistoryConversationKey(row);
+    };
+    const collectLiveConversationLookupKeys = (row = {}) =>
+      Array.from(
+        new Set(
+          [
+            buildLiveConversationKey(row),
+            asText(row?.conversationId),
+            asText(row?.mailboxConversationId),
+            buildHistoryConversationKey(row),
+          ]
+            .map((value) => toLiveConversationLookupKey(value))
+            .filter(Boolean)
+        )
+      );
+    const liveBuckets = new Map();
+    const bucketLookup = new Map();
+    const registerBucketLookupKey = (bucket, key) => {
+      const normalized = toLiveConversationLookupKey(key);
+      if (!normalized) return;
+      bucket.lookupKeys.add(normalized);
+      bucketLookup.set(normalized, bucket.groupKey);
+    };
+    const getBucketGroupKey = (row = {}) => {
+      const customerKey = getCanonicalLiveCustomerKey(row);
+      if (customerKey) return customerKey;
+      return toLiveConversationLookupKey(buildLiveConversationKey(row));
+    };
+    sourceRows.forEach((row) => {
+      const groupKey = getBucketGroupKey(row);
+      if (!groupKey) return;
+      const rowConversationKey = toLiveConversationLookupKey(buildLiveConversationKey(row));
+      let bucket = liveBuckets.get(groupKey);
+      if (!bucket) {
+        bucket = {
+          groupKey,
+          rows: [],
+          rowKeys: new Set(),
+          lookupKeys: new Set(),
+          primaryRow: null,
+        };
+        liveBuckets.set(groupKey, bucket);
+      }
+      if (rowConversationKey && !bucket.rowKeys.has(rowConversationKey)) {
+        bucket.rowKeys.add(rowConversationKey);
+        bucket.rows.push({ ...row });
+      }
+      const activityStamp = getRowActivityStamp(row);
+      const primaryStamp = getRowActivityStamp(bucket.primaryRow || {});
+      if (!bucket.primaryRow || activityStamp.localeCompare(primaryStamp) > 0) {
+        bucket.primaryRow = row;
+      }
+      collectLiveConversationLookupKeys(row).forEach((key) => registerBucketLookupKey(bucket, key));
+      registerBucketLookupKey(bucket, groupKey);
     });
-    const feedIndex = buildFeedIndex(data);
-    const liveRows = uniqueRows.size ? Array.from(uniqueRows.values()) : buildFallbackRowsFromFeed(data);
+    const feedLookup = buildFeedIndex(data);
+    const buildCombinedFeedEntriesForRows = (rows = []) => {
+      if (typeof getFeedEntriesForRuntimeRow !== "function") return [];
+      const entries = [];
+      const seen = new Set();
+      asArray(rows).forEach((row) => {
+        asArray(getFeedEntriesForRuntimeRow(row, feedLookup)).forEach((entry) => {
+          const key = toLiveConversationLookupKey(
+            asText(entry?.messageId || entry?.id || entry?.conversationId || entry?.conversationKey)
+          );
+          if (key && seen.has(key)) return;
+          if (key) seen.add(key);
+          entries.push(entry);
+        });
+      });
+      return entries;
+    };
+    const buildMergedBucketRow = (bucket = {}) => {
+      const primaryRow = bucket.primaryRow || bucket.rows[0] || {};
+      const bucketRows = asArray(bucket.rows);
+      const mergedTags = Array.from(
+        new Set(
+          bucketRows
+            .flatMap((row) =>
+              asArray(row?.tags).length > 0 ? asArray(row.tags) : deriveRuntimeTags(row)
+            )
+            .map((tag) => asText(tag).trim())
+            .filter(Boolean)
+        )
+      );
+      const sourceConversationIds = Array.from(
+        new Set(bucketRows.map((row) => asText(row?.conversationId)).filter(Boolean))
+      );
+      const sourceMailboxIds = Array.from(
+        new Set(
+          bucketRows
+            .flatMap((row) => [
+              asText(row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName),
+              ...asArray(row?.customerSummary?.historyMailboxIds),
+            ])
+            .map((value) => asText(value).trim())
+            .filter(Boolean)
+        )
+      );
+      const customerKey =
+        getCanonicalLiveCustomerKey(primaryRow) ||
+        asText(primaryRow?.customerSummary?.customerKey) ||
+        asText(primaryRow?.customerKey) ||
+        "";
+      return {
+        ...primaryRow,
+        conversationId: bucket.groupKey || asText(primaryRow?.conversationId),
+        mailboxConversationId: asText(
+          primaryRow?.mailboxConversationId,
+          bucket.groupKey || asText(primaryRow?.conversationId)
+        ),
+        sourceConversationId: asText(primaryRow?.conversationId),
+        sourceConversationIds,
+        sourceRows: bucketRows.map((row) => ({ ...row })),
+        conversationAliases: Array.from(bucket.lookupKeys),
+        customerSummary: {
+          ...(primaryRow?.customerSummary && typeof primaryRow.customerSummary === "object"
+            ? primaryRow.customerSummary
+            : {}),
+          customerKey,
+          historyMailboxIds:
+            sourceMailboxIds.length > 0
+              ? sourceMailboxIds
+              : asArray(primaryRow?.customerSummary?.historyMailboxIds),
+          interactionCount: Math.max(
+            Number(primaryRow?.customerSummary?.interactionCount || 0),
+            bucketRows.length,
+            1
+          ),
+          historyMessageCount: Math.max(
+            Number(primaryRow?.customerSummary?.historyMessageCount || 0),
+            bucketRows.length,
+            1
+          ),
+          caseCount: Math.max(Number(primaryRow?.customerSummary?.caseCount || 0), bucketRows.length, 1),
+        },
+        tags: mergedTags.length
+          ? mergedTags
+          : asArray(primaryRow?.tags).map((tag) => normalizeKey(tag)).filter(Boolean),
+        crossMailboxProvenanceEvidence:
+          bucketRows.length > 1 || sourceConversationIds.length > 1 ? true : false,
+      };
+    };
+    const liveRows = liveBuckets.size
+      ? Array.from(liveBuckets.values()).map((bucket) => buildMergedBucketRow(bucket))
+      : buildFallbackRowsFromFeed(data);
     const historyMessages = asArray(options?.historyMessages);
     const historyEvents = asArray(options?.historyEvents);
 
     if (!historyMessages.length) {
       return liveRows.map((row) =>
         buildRuntimeThread(row, {
-          feedEntries: feedIndex.get(asText(row?.conversationId)) || [],
+          feedEntries: buildCombinedFeedEntriesForRows(
+            asArray(row?.sourceRows).length ? row.sourceRows : [row]
+          ),
         })
       );
     }
 
-    const liveRowsByConversation = new Map(
-      liveRows.map((row) => [asText(row?.conversationId), row]).filter((entry) => entry[0])
-    );
+    const toConversationLookupKey = (value) =>
+      typeof normalizeRuntimeConversationId === "function"
+        ? normalizeRuntimeConversationId(value)
+        : asText(value).trim().toLowerCase();
+    const collectHistoryLookupKeys = (item = {}) =>
+      Array.from(
+        new Set(
+          [asText(item?.conversationId), buildHistoryConversationKey(item)]
+            .map((value) => toConversationLookupKey(value))
+            .filter(Boolean)
+        )
+      );
     const messagesByConversation = new Map();
     historyMessages.forEach((message) => {
-      const conversationId = buildHistoryConversationKey(message);
+      const historyLookupKeys = collectHistoryLookupKeys(message);
+      const matchedGroupKey =
+        historyLookupKeys.map((conversationId) => bucketLookup.get(conversationId)).find(Boolean) ||
+        "";
+      const conversationId = matchedGroupKey || historyLookupKeys[0];
       if (!conversationId) return;
       const current = messagesByConversation.get(conversationId) || [];
       current.push(message);
@@ -3748,7 +9429,11 @@
     });
     const eventsByConversation = new Map();
     historyEvents.forEach((event) => {
-      const conversationId = asText(event?.conversationId);
+      const historyLookupKeys = collectHistoryLookupKeys(event);
+      const matchedGroupKey =
+        historyLookupKeys.map((conversationId) => bucketLookup.get(conversationId)).find(Boolean) ||
+        "";
+      const conversationId = matchedGroupKey || historyLookupKeys[0];
       if (!conversationId) return;
       const current = eventsByConversation.get(conversationId) || [];
       current.push(event);
@@ -3758,39 +9443,633 @@
     const threads = [];
     const processedConversationIds = new Set();
 
-    messagesByConversation.forEach((messages, conversationId) => {
-      const row = buildHistoryBackedRuntimeRow({
-        conversationId,
-        messages,
-        events: eventsByConversation.get(conversationId) || [],
-        liveRow: liveRowsByConversation.get(conversationId) || null,
-      });
-      threads.push(
-        buildRuntimeThread(row, {
-          feedEntries: buildHistoryFeedEntries(messages),
-          historyEvents: buildHistoryRuntimeEvents(eventsByConversation.get(conversationId) || [], {
-            conversationId,
-            mailboxAddress: row.mailboxAddress,
-            mailboxLabel: titleCaseMailbox(row.mailboxAddress),
-          }),
-        })
-      );
-      processedConversationIds.add(conversationId);
-    });
-
     liveRows.forEach((row) => {
       const conversationId = asText(row?.conversationId);
       if (!conversationId || processedConversationIds.has(conversationId)) return;
-      threads.push(
-        buildRuntimeThread(row, {
-          feedEntries: feedIndex.get(conversationId) || [],
-        })
-      );
+      const matchingMessages = messagesByConversation.get(conversationId) || [];
+      const matchingEvents = eventsByConversation.get(conversationId) || [];
+      if (matchingMessages.length) {
+        const historyBackedRow = buildHistoryBackedRuntimeRow({
+          conversationId,
+          messages: matchingMessages,
+          events: matchingEvents,
+          liveRow: row,
+        });
+        const mergedHistoryTags = Array.from(
+          new Set(
+            [...asArray(row?.tags), ...asArray(historyBackedRow?.tags)]
+              .map((tag) => asText(tag).trim())
+              .filter(Boolean)
+          )
+        );
+        if (mergedHistoryTags.length > 0) {
+          historyBackedRow.tags = mergedHistoryTags;
+        }
+        historyBackedRow.crossMailboxProvenanceEvidence =
+          historyBackedRow.crossMailboxProvenanceEvidence === true ||
+          asArray(historyBackedRow?.sourceRows).length > 1 ||
+          asArray(historyBackedRow?.sourceConversationIds).length > 1;
+        const derivedThreadDocument = buildClientThreadDocumentFromHistoryMessages(
+          matchingMessages,
+          {
+            conversationId,
+            customerEmail: historyBackedRow?.customerEmail || row?.customerEmail || "",
+          }
+        );
+        threads.push(
+          buildRuntimeThread(historyBackedRow, {
+            feedEntries: buildHistoryFeedEntries(matchingMessages),
+            threadDocument: derivedThreadDocument,
+            historyEvents: buildHistoryRuntimeEvents(matchingEvents, {
+              conversationId,
+              mailboxAddress: historyBackedRow.mailboxAddress,
+              mailboxLabel: titleCaseMailbox(historyBackedRow.mailboxAddress),
+            }),
+          })
+        );
+      } else {
+        threads.push(
+          buildRuntimeThread(row, {
+            feedEntries: buildCombinedFeedEntriesForRows(
+              asArray(row?.sourceRows).length ? row.sourceRows : [row]
+            ),
+          })
+        );
+      }
+      processedConversationIds.add(conversationId);
+      asArray(row?.conversationAliases).forEach((alias) => processedConversationIds.add(alias));
     });
+
+    if (!liveRows.length) {
+      messagesByConversation.forEach((messages, conversationId) => {
+        if (processedConversationIds.has(conversationId)) return;
+        const row = buildHistoryBackedRuntimeRow({
+          conversationId,
+          messages,
+          events: eventsByConversation.get(conversationId) || [],
+          liveRow: null,
+        });
+        const derivedThreadDocument = buildClientThreadDocumentFromHistoryMessages(messages, {
+          conversationId,
+          customerEmail: row?.customerEmail || "",
+        });
+        threads.push(
+          buildRuntimeThread(row, {
+            feedEntries: buildHistoryFeedEntries(messages),
+            threadDocument: derivedThreadDocument,
+            historyEvents: buildHistoryRuntimeEvents(eventsByConversation.get(conversationId) || [], {
+              conversationId,
+              mailboxAddress: row.mailboxAddress,
+              mailboxLabel: titleCaseMailbox(row.mailboxAddress),
+            }),
+          })
+        );
+        processedConversationIds.add(conversationId);
+      });
+    }
 
     return threads.sort((left, right) =>
       String(right?.lastActivityAt || "").localeCompare(String(left?.lastActivityAt || ""))
     );
+  }
+
+  function hydrateRuntimeThreadWithHistoryPayload(thread, historyPayload = {}) {
+    const safeThread = thread && typeof thread === "object" ? thread : null;
+    if (!safeThread) return null;
+    const messages = asArray(historyPayload?.messages);
+    const events = asArray(historyPayload?.events);
+    if (!messages.length && !events.length) {
+      return safeThread;
+    }
+
+    const conversationId = asText(
+      safeThread.id,
+      asText(safeThread?.raw?.conversationId)
+    );
+    const liveRow =
+      safeThread?.raw && typeof safeThread.raw === "object" ? safeThread.raw : {};
+    const historyBackedRow = buildHistoryBackedRuntimeRow({
+      conversationId,
+      messages,
+      events,
+      liveRow,
+    });
+    const derivedThreadDocument = buildClientThreadDocumentFromHistoryMessages(messages, {
+      conversationId,
+      customerEmail: historyBackedRow?.customerEmail || safeThread?.customerEmail || "",
+    });
+
+    return buildRuntimeThread(historyBackedRow, {
+      feedEntries: buildHistoryFeedEntries(messages),
+      threadDocument:
+        historyPayload?.threadDocument && typeof historyPayload.threadDocument === "object"
+          ? historyPayload.threadDocument
+          : derivedThreadDocument,
+      historyEvents: buildHistoryRuntimeEvents(events, {
+        conversationId: historyBackedRow.conversationId || conversationId,
+        mailboxAddress: historyBackedRow.mailboxAddress || safeThread.mailboxAddress,
+        mailboxLabel: titleCaseMailbox(
+          historyBackedRow.mailboxAddress || safeThread.mailboxAddress
+        ),
+      }),
+    });
+  }
+
+  function isTruthPrimaryWorklistFeatureEnabled() {
+    if (WORKLIST_TRUTH_PRIMARY?.enabled !== true) return false;
+    try {
+      return window.localStorage.getItem(TRUTH_PRIMARY_WORKLIST_DISABLE_STORAGE_KEY) !== "1";
+    } catch {
+      return true;
+    }
+  }
+
+  function getTruthPrimaryConfiguredMailboxIds() {
+    return asArray(WORKLIST_TRUTH_PRIMARY?.mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+  }
+
+  function isTruthPrimaryFocusFeatureEnabled() {
+    if (FOCUS_TRUTH_PRIMARY?.enabled !== true) return false;
+    try {
+      return window.localStorage.getItem(TRUTH_PRIMARY_FOCUS_DISABLE_STORAGE_KEY) !== "1";
+    } catch {
+      return true;
+    }
+  }
+
+  function getTruthPrimaryFocusConfiguredMailboxIds() {
+    return asArray(FOCUS_TRUTH_PRIMARY?.mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+  }
+
+  function getTruthPrimaryFocusMailboxIds({ mailboxIds = [] } = {}) {
+    const configuredMailboxIds = new Set(getTruthPrimaryFocusConfiguredMailboxIds());
+    if (!configuredMailboxIds.size) return [];
+    const scopedMailboxIds = asArray(mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+    if (!scopedMailboxIds.length) {
+      return Array.from(configuredMailboxIds);
+    }
+    return scopedMailboxIds.filter((mailboxId) => configuredMailboxIds.has(mailboxId));
+  }
+
+  function isTruthPrimaryStudioFeatureEnabled() {
+    if (STUDIO_TRUTH_PRIMARY?.enabled !== true) return false;
+    try {
+      return window.localStorage.getItem(TRUTH_PRIMARY_STUDIO_DISABLE_STORAGE_KEY) !== "1";
+    } catch {
+      return true;
+    }
+  }
+
+  function getTruthPrimaryStudioConfiguredMailboxIds() {
+    return asArray(STUDIO_TRUTH_PRIMARY?.mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+  }
+
+  function getTruthPrimaryStudioMailboxIds({ mailboxIds = [] } = {}) {
+    const configuredMailboxIds = new Set(getTruthPrimaryStudioConfiguredMailboxIds());
+    if (!configuredMailboxIds.size) return [];
+    const scopedMailboxIds = asArray(mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+    if (!scopedMailboxIds.length) {
+      return Array.from(configuredMailboxIds);
+    }
+    return scopedMailboxIds.filter((mailboxId) => configuredMailboxIds.has(mailboxId));
+  }
+
+  function getTruthPrimaryWorklistMailboxIds({ mailboxIds = [] } = {}) {
+    if (!isTruthPrimaryWorklistFeatureEnabled()) return [];
+    const configuredMailboxIds = new Set(getTruthPrimaryConfiguredMailboxIds());
+    if (!configuredMailboxIds.size) return [];
+    const scopedMailboxIds = asArray(mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+    if (!scopedMailboxIds.length) {
+      return Array.from(configuredMailboxIds);
+    }
+    return scopedMailboxIds.filter((mailboxId) => configuredMailboxIds.has(mailboxId));
+  }
+
+  function buildTruthPrimaryWorklistConsumerHref(
+    mailboxIds = [],
+    limit = Number(WORKLIST_TRUTH_PRIMARY?.limit || 120)
+  ) {
+    return buildTruthWorklistConsumerHref(mailboxIds, Math.max(1, Number(limit || 120)));
+  }
+
+  function buildTruthPrimaryRuntimeRow(item = {}) {
+    const conversationId = asText(item?.conversation?.conversationId || item?.id);
+    const mailboxId = canonicalizeRuntimeMailboxId(
+      item?.mailbox?.mailboxId || item?.mailbox?.mailboxAddress
+    );
+    if (!conversationId || !mailboxId) return null;
+
+    const ownershipMailbox = canonicalizeRuntimeMailboxId(
+      item?.mailbox?.ownershipMailbox || mailboxId
+    );
+    const customerEmail = asText(item?.customer?.email).toLowerCase();
+    const customerName = asText(item?.customer?.name);
+    const latestPreview = resolveRuntimePreviewText(item, {
+      fallback: "Ingen förhandsvisning tillgänglig.",
+    });
+    const lane = normalizeKey(item?.lane || "all") === "act-now" ? "act-now" : "all";
+    const needsReply = item?.state?.needsReply === true;
+    const hasUnreadInbound = item?.state?.hasUnreadInbound === true;
+    const tags = ["all"];
+    if (lane === "act-now") tags.push("act-now");
+
+    return {
+      conversationId,
+      mailboxId,
+      mailboxAddress: mailboxId,
+      userPrincipalName: mailboxId,
+      subject: asText(item?.subject, "(utan ämne)"),
+      preview: latestPreview,
+      bodyPreview: latestPreview,
+      latestPreview,
+      systemPreview: latestPreview,
+      latestInboundPreview: latestPreview,
+      lastInboundAt: asText(item?.timing?.lastInboundAt),
+      lastOutboundAt: asText(item?.timing?.lastOutboundAt),
+      latestMessageAt: asText(item?.timing?.latestMessageAt),
+      hasUnreadInbound,
+      isUnanswered: needsReply,
+      waitingOn: needsReply ? "owner" : "",
+      owner: ownershipMailbox ? titleCaseMailbox(ownershipMailbox) : "Oägd",
+      intent: needsReply ? "needs_reply" : "active_dialogue",
+      recommendedAction: needsReply
+        ? "Svara kunden och ta nästa tydliga steg."
+        : "Granska senaste aktivitet i truth-driven arbetskö.",
+      recommendedActionLabel: needsReply ? "Svara nu" : "Granska tråden",
+      riskStackExplanation: hasUnreadInbound
+        ? "Unread inbound och needs reply läses från mailbox truth i wave 1."
+        : "Raden kommer från mailbox truth i wave 1.",
+      operatorCue: needsReply
+        ? "Truth-driven rad: svara kunden via worklisten."
+        : "Truth-driven rad: kontrollera senaste aktivitet.",
+      workflowLane: lane === "act-now" ? "action_now" : "",
+      bookingState: "",
+      priorityLevel: lane === "act-now" ? "medium" : "low",
+      slaStatus: lane === "act-now" ? "warning" : "safe",
+      dominantRisk: lane === "act-now" ? "warning" : "safe",
+      customerEmail,
+      sender: customerEmail || customerName,
+      senderName: customerName,
+      customerSummary: {
+        customerName,
+        customerKey: customerEmail,
+        lifecycleStatus: needsReply ? "awaiting_reply" : "active_dialogue",
+        interactionCount: Math.max(1, asNumber(item?.state?.messageCount, 1)),
+        historyMessageCount: Math.max(1, asNumber(item?.state?.messageCount, 1)),
+        historyMailboxIds: [mailboxId],
+        lastCaseSummary: latestPreview,
+        historySignalSummary: latestPreview,
+        historySignalActionCue: needsReply
+          ? "Svara kunden och håll nästa steg tydligt."
+          : "Granska senaste aktivitet i samma tråd.",
+        engagementScore: 0.42,
+        caseCount: 1,
+      },
+      tags,
+      rowFamily:
+        typeof classifyRuntimeRowFamily === "function"
+          ? classifyRuntimeRowFamily({
+              subject: asText(item?.subject, "(utan ämne)"),
+              customerName,
+              senderName: customerName,
+              preview: latestPreview,
+              latestInboundPreview: latestPreview,
+              intent: needsReply ? "needs_reply" : "active_dialogue",
+            })
+          : "human_mail",
+      worklistSource: "truth_primary",
+      worklistSourceLabel: "Truth primary",
+      worklistWave: "wave_1",
+      worklistWaveLabel: "Wave 1",
+      truthPrimaryMailbox: true,
+      truthConversationKey: asText(item?.conversation?.key || item?.id),
+    };
+  }
+
+  function getUsableRuntimeRowPreview(row = {}) {
+    return resolveRuntimePreviewText(row);
+  }
+
+  function buildRuntimeRowSemanticKey(row = {}) {
+    const mailboxId = canonicalizeRuntimeMailboxId(
+      row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName
+    );
+    const subject = normalizeKey(
+      normalizeRuntimeDisplaySubject(
+        row?.displaySubject || row?.subject || row?.summary || row?.title,
+        ""
+      )
+    );
+    if (!mailboxId || !subject) return "";
+    const customerName = normalizeKey(
+      getRuntimeCustomerName(row) ||
+        deriveRuntimeCustomerNameFromSubject(
+          row?.displaySubject || row?.subject || row?.summary || row?.title
+        )
+    );
+    return customerName
+      ? `${mailboxId}|${customerName}|${subject}`
+      : `${mailboxId}|${subject}`;
+  }
+
+  function mergeTruthPrimaryRuntimeRowWithLegacyRow(truthRow = {}, legacyRow = null) {
+    if (!legacyRow || typeof legacyRow !== "object") return truthRow;
+
+    const truthPreview = getUsableRuntimeRowPreview(truthRow);
+    const legacyPreview = getUsableRuntimeRowPreview(legacyRow);
+    const mergedPreview = truthPreview || legacyPreview;
+
+    const mergedRow = {
+      ...legacyRow,
+      ...truthRow,
+      sender: asText(truthRow?.sender, asText(legacyRow?.sender)),
+      senderName: asText(truthRow?.senderName, asText(legacyRow?.senderName)),
+      customerEmail: asText(truthRow?.customerEmail, asText(legacyRow?.customerEmail)),
+      detail: asText(truthRow?.detail, asText(legacyRow?.detail)),
+      summary: asText(truthRow?.summary, asText(legacyRow?.summary)),
+      bodyHtml: asText(truthRow?.bodyHtml, asText(legacyRow?.bodyHtml)),
+      latestMessage:
+        truthRow?.latestMessage && typeof truthRow.latestMessage === "object"
+          ? truthRow.latestMessage
+          : legacyRow?.latestMessage,
+      conversation:
+        truthRow?.conversation && typeof truthRow.conversation === "object"
+          ? truthRow.conversation
+          : legacyRow?.conversation,
+      customerSummary: {
+        ...(legacyRow?.customerSummary && typeof legacyRow.customerSummary === "object"
+          ? legacyRow.customerSummary
+          : {}),
+        ...(truthRow?.customerSummary && typeof truthRow.customerSummary === "object"
+          ? truthRow.customerSummary
+          : {}),
+      },
+    };
+
+    if (mergedPreview) {
+      mergedRow.preview = mergedPreview;
+      mergedRow.bodyPreview = mergedPreview;
+      mergedRow.latestPreview = mergedPreview;
+      mergedRow.systemPreview = mergedPreview;
+      mergedRow.latestInboundPreview = mergedPreview;
+    }
+
+    return mergedRow;
+  }
+
+  function mergeTruthPrimaryWorklistData(
+    legacyData = {},
+    truthPayload = null,
+    { truthPrimaryMailboxIds = [] } = {}
+  ) {
+    const truthPrimaryMailboxSet = new Set(
+      asArray(truthPrimaryMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+    );
+    if (!truthPrimaryMailboxSet.size || !truthPayload || typeof truthPayload !== "object") {
+      return legacyData;
+    }
+
+    const stripLegacyRows = (rows = []) =>
+      asArray(rows).filter((row) => {
+        const mailboxId = canonicalizeRuntimeMailboxId(
+          row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName
+        );
+        return !truthPrimaryMailboxSet.has(mailboxId);
+      });
+
+    const strippedLegacyRows = [
+      ...asArray(legacyData?.conversationWorklist),
+      ...asArray(legacyData?.needsReplyToday),
+    ].filter((row) => {
+      const mailboxId = canonicalizeRuntimeMailboxId(
+        row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName
+      );
+      return truthPrimaryMailboxSet.has(mailboxId);
+    });
+
+    const strippedLegacyRowsByConversationId = new Map();
+    const strippedLegacyRowsBySemanticKey = new Map();
+    strippedLegacyRows.forEach((row) => {
+      const conversationId = asText(row?.conversationId);
+      if (conversationId && !strippedLegacyRowsByConversationId.has(conversationId)) {
+        strippedLegacyRowsByConversationId.set(conversationId, row);
+      }
+      const semanticKey = buildRuntimeRowSemanticKey(row);
+      if (semanticKey && !strippedLegacyRowsBySemanticKey.has(semanticKey)) {
+        strippedLegacyRowsBySemanticKey.set(semanticKey, row);
+      }
+    });
+
+    const matchedLegacyRows = new Set();
+    const truthRows = asArray(truthPayload.rows)
+      .map((item) => buildTruthPrimaryRuntimeRow(item))
+      .filter(Boolean)
+      .filter((row) => truthPrimaryMailboxSet.has(canonicalizeRuntimeMailboxId(row.mailboxId)))
+      .map((row) => {
+        const legacyMatch =
+          strippedLegacyRowsByConversationId.get(asText(row?.conversationId)) ||
+          strippedLegacyRowsBySemanticKey.get(buildRuntimeRowSemanticKey(row)) ||
+          null;
+        if (legacyMatch) {
+          matchedLegacyRows.add(legacyMatch);
+        }
+        return mergeTruthPrimaryRuntimeRowWithLegacyRow(row, legacyMatch);
+      });
+
+    const preserveLegacyRows = (rows = []) =>
+      asArray(rows).filter((row) => {
+        const mailboxId = canonicalizeRuntimeMailboxId(
+          row?.mailboxAddress || row?.mailboxId || row?.userPrincipalName
+        );
+        if (!truthPrimaryMailboxSet.has(mailboxId)) return true;
+        return !matchedLegacyRows.has(row);
+      });
+
+    return {
+      ...legacyData,
+      conversationWorklist: [
+        ...preserveLegacyRows(legacyData?.conversationWorklist),
+        ...truthRows,
+      ],
+      needsReplyToday: preserveLegacyRows(legacyData?.needsReplyToday),
+      metadata: {
+        ...(legacyData?.metadata && typeof legacyData.metadata === "object"
+          ? legacyData.metadata
+          : {}),
+        truthPrimaryMailboxIds: Array.from(truthPrimaryMailboxSet),
+        truthPrimaryRowCount: truthRows.length,
+      },
+    };
+  }
+
+  function summarizeMailboxCountsForDiagnostics(items = [], mailboxResolver = null) {
+    const counts = new Map();
+    asArray(items).forEach((item) => {
+      const mailboxSource =
+        typeof mailboxResolver === "function"
+          ? mailboxResolver(item)
+          : item?.mailboxAddress ||
+            item?.mailboxId ||
+            item?.mailbox?.mailboxId ||
+            item?.mailbox?.ownershipMailbox ||
+            item?.userPrincipalName ||
+            item?.mailboxLabel;
+      const mailboxId = canonicalizeRuntimeMailboxId(mailboxSource);
+      if (!mailboxId) return;
+      const worklistSource =
+        normalizeKey(item?.worklistSource || item?.raw?.worklistSource || "legacy") || "legacy";
+      const current = counts.get(mailboxId) || {
+        mailboxId,
+        mailboxLabel: titleCaseMailbox(mailboxId),
+        count: 0,
+        truthPrimaryCount: 0,
+        legacyCount: 0,
+      };
+      current.count += 1;
+      if (worklistSource === "truth_primary") {
+        current.truthPrimaryCount += 1;
+      } else {
+        current.legacyCount += 1;
+      }
+      counts.set(mailboxId, current);
+    });
+    return Array.from(counts.values()).sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.mailboxId.localeCompare(right.mailboxId, "sv");
+    });
+  }
+
+  function summarizeRuntimeThreadForDiagnostics(thread) {
+    if (!thread || typeof thread !== "object") return null;
+    return {
+      id: asText(thread.id),
+      mailboxId: canonicalizeRuntimeMailboxId(thread.mailboxAddress || thread.mailboxLabel),
+      mailboxLabel: asText(thread.mailboxLabel, titleCaseMailbox(thread.mailboxAddress)),
+      customerName: asText(thread.customerName, "Okänd kund"),
+      subject: compactRuntimeCopy(thread.displaySubject || thread.subject, "Inget ämne", 92),
+      story: compactRuntimeCopy(
+        thread.preview || thread.systemPreview || thread.nextActionSummary,
+        "",
+        120
+      ),
+      ownerLabel: asText(thread.ownerLabel, "Ej tilldelad"),
+      primaryLaneId: getThreadPrimaryLaneId(thread),
+      worklistSource: normalizeKey(thread.worklistSource || thread.raw?.worklistSource || "legacy"),
+      selected:
+        runtimeConversationIdsMatch(thread.id, workspaceSourceOfTruth.getSelectedThreadId()) === true,
+    };
+  }
+
+  function buildRuntimeMailboxLoadDiagnostics({
+    phase = "idle",
+    requestedMailboxIds = [],
+    liveData = null,
+    mergedWorklistData = null,
+    threads = [],
+    legacyThreads = [],
+    historyPayload = null,
+    truthPrimaryPayload = null,
+    configuredTruthPrimaryMailboxIds = [],
+    activeTruthPrimaryMailboxIds = [],
+    error = "",
+    offlineWorkingSetSource = "",
+    offlineWorkingSetMeta = "",
+  } = {}) {
+    const rawRows = [
+      ...asArray(liveData?.conversationWorklist),
+      ...asArray(liveData?.needsReplyToday),
+    ];
+    const mergedRows = [
+      ...asArray(mergedWorklistData?.conversationWorklist),
+      ...asArray(mergedWorklistData?.needsReplyToday),
+    ];
+    const historyMessages = asArray(historyPayload?.messages);
+    const truthRows = asArray(truthPrimaryPayload?.rows);
+
+    return {
+      lastLoadAt: new Date().toISOString(),
+      phase,
+      requestedMailboxIds: asArray(requestedMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean),
+      rawWorklist: {
+        totalRows: rawRows.length,
+        mailboxCounts: summarizeMailboxCountsForDiagnostics(rawRows),
+        sampleTitles: rawRows
+          .slice(0, 6)
+          .map((row) =>
+            compactRuntimeCopy(
+              row?.subject || row?.summary || row?.title || row?.latestInboundPreview,
+              "",
+              88
+            )
+          )
+          .filter(Boolean),
+      },
+      mergedWorklist: {
+        totalRows: mergedRows.length,
+        mailboxCounts: summarizeMailboxCountsForDiagnostics(mergedRows),
+        sampleTitles: mergedRows
+          .slice(0, 6)
+          .map((row) =>
+            compactRuntimeCopy(
+              row?.subject || row?.summary || row?.title || row?.latestInboundPreview,
+              "",
+              88
+            )
+          )
+          .filter(Boolean),
+      },
+      liveThreads: {
+        count: asArray(threads).length,
+        mailboxCounts: summarizeMailboxCountsForDiagnostics(threads),
+        samples: asArray(threads)
+          .slice(0, 6)
+          .map((thread) => summarizeRuntimeThreadForDiagnostics(thread))
+          .filter(Boolean),
+      },
+      legacyThreads: {
+        count: asArray(legacyThreads).length,
+        mailboxCounts: summarizeMailboxCountsForDiagnostics(legacyThreads),
+        samples: asArray(legacyThreads)
+          .slice(0, 6)
+          .map((thread) => summarizeRuntimeThreadForDiagnostics(thread))
+          .filter(Boolean),
+      },
+      historyMessages: {
+        count: historyMessages.length,
+        mailboxCounts: summarizeMailboxCountsForDiagnostics(
+          historyMessages,
+          (message) => message?.mailboxId || message?.mailboxAddress || message?.userPrincipalName
+        ),
+      },
+      truthPrimary: {
+        configuredMailboxIds: asArray(configuredTruthPrimaryMailboxIds)
+          .map((value) => canonicalizeRuntimeMailboxId(value))
+          .filter(Boolean),
+        activeMailboxIds: asArray(activeTruthPrimaryMailboxIds)
+          .map((value) => canonicalizeRuntimeMailboxId(value))
+          .filter(Boolean),
+        rowCount: truthRows.length,
+      },
+      error: asText(error),
+      offlineWorkingSetSource: asText(offlineWorkingSetSource),
+      offlineWorkingSetMeta: asText(offlineWorkingSetMeta),
+    };
   }
 
   function buildStudioContextAiItems(thread) {
@@ -3854,7 +10133,7 @@
     if (!container) return;
     const rows = [
       { label: "Mailbox", value: thread?.mailboxLabel || "Okänd" },
-      { label: "Ägare", value: thread?.ownerLabel || "Oägd" },
+      { label: "Ägare", value: thread?.displayOwnerLabel || thread?.ownerLabel || "Ej tilldelad" },
       { label: "SLA", value: humanizeCode(thread?.raw?.slaStatus, "Stabil") },
       { label: "Kanal", value: "E-post" },
     ];
@@ -3880,7 +10159,7 @@
       },
       {
         title: "Behåll samma mailbox",
-        copy: `${thread?.mailboxLabel || "Mailbox"} · ${thread?.ownerLabel || "Oägd"}`,
+        copy: `${thread?.mailboxLabel || "Mailbox"} · ${thread?.displayOwnerLabel || thread?.ownerLabel || "Ej tilldelad"}`,
       },
     ];
     container.innerHTML = items
@@ -3904,10 +10183,14 @@
     const messages = asArray(thread?.messages)
       .filter(
         (entry) =>
-          normalizeText(entry?.body) ||
+          normalizeText(entry?.conversationBody || entry?.body) ||
           normalizeText(entry?.author) ||
           normalizeText(entry?.time)
       )
+      .map((entry) => ({
+        ...entry,
+        body: asText(entry?.conversationBody || entry?.body),
+      }))
       .slice(0, 6)
       .reverse();
 
@@ -3931,7 +10214,11 @@
     const messages = getStudioConversationMessages(thread);
     if (!thread) {
       studioIncomingBody.innerHTML =
-        '<article class="studio-conversation-message studio-conversation-message--empty"><p class="studio-conversation-message-text">Välj en live-tråd i arbetskön för att öppna konversationen i studion.</p></article>';
+        `<article class="studio-conversation-message studio-conversation-message--empty"><p class="studio-conversation-message-text">${escapeHtml(
+          isOfflineHistoryReadOnlyMode()
+            ? "Välj en historikruta i vänsterkolumnen för att öppna kundens historik i läsläge här."
+            : "Välj en live-tråd i arbetskön för att öppna konversationen i studion."
+        )}</p></article>`;
       return;
     }
 
@@ -3965,12 +10252,14 @@
 
   function createStudioState(thread) {
     const trackKey = inferStudioTrackKey(thread);
-    const selectedSignature = getStudioSignatureProfile(state.runtime.defaultSignatureProfile).id;
+    const selectedSignature = getStudioReplyDefaultSignatureProfile(thread).id;
     const baseDraft = buildStudioTrackDraft(thread, trackKey);
-    return {
+    const senderMailboxId = getStudioDefaultSenderMailboxId(thread);
+    return applyTruthPrimaryStudioState({
       mode: "reply",
       threadId: asText(thread?.id),
-      composeMailboxId: getStudioSourceMailboxId(thread),
+      replyContextThreadId: asText(thread?.id),
+      composeMailboxId: senderMailboxId,
       composeTo: getRuntimeCustomerEmail(thread),
       composeSubject: "",
       draftBody: baseDraft,
@@ -3984,24 +10273,37 @@
       savingDraft: false,
       deleting: false,
       previewing: false,
-    };
+      truthDriven: false,
+      truthLabel: "",
+      truthWaveLabel: "",
+      truthDetail: "",
+      truthSourceMailboxId: "",
+      truthSourceMailboxLabel: "",
+      truthSenderLocked: false,
+      truthFallbackReason: "",
+    }, thread);
   }
 
   function createComposeStudioState(thread = null) {
-    const selectedSignature = getStudioSignatureProfile(state.runtime.defaultSignatureProfile).id;
-    const composeTo = getRuntimeCustomerEmail(thread);
-    const firstName = thread ? getStudioFirstName(thread) : "";
-    const baseDraft = firstName ? `Hej ${firstName},\n\n` : "";
+    const operatorSignatureProfile = getStudioOperatorSignatureProfile();
+    const selectedSignature = (
+      operatorSignatureProfile ||
+      getStudioSignatureProfile(state.runtime.defaultSignatureProfile)
+    ).id;
+    const composeTo = "";
+    const baseDraft = "";
+    const senderMailboxId = getStudioDefaultSenderMailboxId(thread, { composeMode: true });
     return {
       mode: "compose",
-      threadId: asText(thread?.id),
-      composeMailboxId: getStudioSourceMailboxId(thread),
+      threadId: "",
+      replyContextThreadId: "",
+      composeMailboxId: senderMailboxId,
       composeTo,
       composeSubject: "",
       draftBody: baseDraft,
       baseDraftBody: baseDraft,
       activeTemplateKey: "",
-      activeTrackKey: thread ? inferStudioTrackKey(thread) : "admin",
+      activeTrackKey: "booking",
       activeToneKey: "professional",
       activeRefineKey: "",
       selectedSignatureId: selectedSignature,
@@ -4009,17 +10311,34 @@
       savingDraft: false,
       deleting: false,
       previewing: false,
+      truthDriven: false,
+      truthLabel: "",
+      truthWaveLabel: "",
+      truthDetail: "",
+      truthSourceMailboxId: "",
+      truthSourceMailboxLabel: "",
+      truthSenderLocked: false,
+      truthFallbackReason: "",
     };
   }
 
-  function prepareComposeStudioState(thread = getSelectedRuntimeThread()) {
+  function prepareComposeStudioState(thread = null) {
     state.studio = createComposeStudioState(thread);
     return state.studio;
   }
 
   function ensureStudioState(thread) {
     if (!thread) return null;
-    if (state.studio.threadId !== thread.id) {
+    const replyContextThreadId = asText(state.studio.replyContextThreadId);
+    const hasReplyContextMismatch =
+      normalizeKey(state.studio.mode) !== "compose" &&
+      replyContextThreadId &&
+      !runtimeConversationIdsMatch(replyContextThreadId, thread.id);
+    if (
+      normalizeKey(state.studio.mode) === "compose" ||
+      !runtimeConversationIdsMatch(state.studio.threadId, thread.id) ||
+      hasReplyContextMismatch
+    ) {
       state.studio = createStudioState(thread);
     }
     if (!normalizeText(state.studio.draftBody)) {
@@ -4027,11 +10346,16 @@
         state.studio.baseDraftBody ||
         buildStudioTrackDraft(thread, state.studio.activeTrackKey);
     }
-    state.studio.selectedSignatureId = getStudioSignatureProfile(
-      state.studio.selectedSignatureId
-    ).id;
+    const resolvedSignatureProfile =
+      resolveStudioSignatureProfile(state.studio.selectedSignatureId) ||
+      getStudioReplyDefaultSignatureProfile(thread);
+    state.studio.selectedSignatureId = resolvedSignatureProfile.id;
+    state.studio.composeMailboxId = canonicalizeRuntimeMailboxId(
+      state.studio.composeMailboxId || getStudioDefaultSenderMailboxId(thread)
+    );
     state.studio.mode = "reply";
-    return state.studio;
+    state.studio.replyContextThreadId = asText(thread?.id);
+    return applyTruthPrimaryStudioState(state.studio, thread);
   }
 
   function setStudioFeedback(message = "", tone = "") {
@@ -4077,6 +10401,7 @@
       canvas,
       contextButtons,
       destinationButtons,
+      laterContext,
       laterOptionButtons,
       mailboxAdminFeedback,
       mailboxAdminList,
@@ -4118,8 +10443,11 @@
       studioCustomerMood,
       studioCustomerName,
       studioCustomerPhone,
+      studioSourceLockLabel,
+      studioSourceLockNote,
       studioDeleteButton,
       studioDoneActionButton,
+      studioComposeFromSelect,
       studioComposeSubjectInput,
       studioComposeToInput,
       studioEditorInput,
@@ -4160,9 +10488,11 @@
     },
     helpers: {
       NOTE_MODE_PRESETS,
+      asArray,
       asText,
       buildAvatarDataUri,
       buildStudioContextAiItems,
+      buildStudioSelectionSummary,
       compactRuntimeCopy,
       countWords,
       ensureStudioState,
@@ -4170,7 +10500,15 @@
       evaluateStudioPolicy,
       getAvailableRuntimeMailboxes,
       getLatestCustomerMessage,
+      getRuntimeMailboxCapability,
+      getRuntimeMailboxCapabilityMeta,
+      getRuntimeStudioTruthState,
+      getRuntimeThreadById,
+      isOfflineHistoryContextThread,
       getSelectedRuntimeThread,
+      getRuntimeLeftColumnState,
+      getStudioSenderMailboxOptions,
+      getStudioSignatureProfiles,
       getStudioSignatureProfile,
       getStudioSourceMailboxLabel,
       humanizeCode,
@@ -4179,6 +10517,7 @@
       mapVisibilityValue,
       normalizeKey,
       normalizeText,
+      runtimeConversationIdsMatch,
       renderStudioContextAiList,
       renderStudioContextHistoryList,
       renderStudioContextPreferencesList,
@@ -4227,14 +10566,21 @@
     renderRuntimeIntel,
   } = PREVIEW_FOCUS_INTEL_RENDERERS.createFocusIntelRenderers({
     dom: {
+      focusTabs,
       focusBadgeRow,
       focusConversationSection,
+      focusConversationLayout,
+      focusSignals,
+      focusWorkrail,
       focusCustomerGrid,
       focusCustomerHero,
       focusCustomerHistoryCount,
       focusCustomerHistoryDescription,
       focusCustomerHistoryList,
       focusCustomerHistoryMeta,
+      focusCustomerHistoryState,
+      focusCustomerHistoryListState,
+      focusCustomerHistoryListStateCopy,
       focusCustomerHistoryReadoutButton,
       focusCustomerHistoryTitle,
       focusCustomerStats,
@@ -4256,14 +10602,20 @@
       focusNotesList,
       focusStatusLine,
       focusTitle,
+      focusIntelPrimary,
+      focusIntelPrimaryBody,
       focusIntelTitle,
       intelCustomer,
       intelDateButton,
       intelGrid,
+      focusIntelReason,
+      focusIntelPanels,
+      focusIntelTabs,
       intelPanelActions,
-      intelPanelAi,
+      intelPanelCustomer,
+      intelPanelHistory,
+      intelPanelSignals,
       intelPanelMedicine,
-      intelPanelOverview,
       intelPanelTeam,
       intelReasonCopy,
     },
@@ -4291,6 +10643,8 @@
       getThreadHistoryMailboxOptions,
       humanizeCode,
       initialsForName,
+      isOfflineHistoryContextThread,
+      isOfflineHistorySelectionActive,
       joinReadableList,
       normalizeKey,
       normalizeText,
@@ -4299,6 +10653,7 @@
       renderHistoryEventsList,
       renderHistoryFilterRow,
       resetRuntimeHistoryFilters,
+      sanitizeConversationHtmlForDisplay,
       setButtonBusy,
     },
     state,
@@ -4329,29 +10684,40 @@
       mailFeedUndoButtons,
       mailFeedViewButtons,
       ownerMenuGrid,
+      ownerMenuNote,
+      ownerMenuToggle,
       ownerTriggerLabel,
       queueActiveLaneLabel,
       queueCollapsedList,
       queueContent,
+      queueFeedCountNodes,
       queueHistoryCount,
       queueHistoryHead,
+      queueHistoryCompleteButton,
+      queueHistoryDeleteButton,
       queueHistoryList,
       queueHistoryLoadMoreButton,
       queueHistoryMeta,
       queueHistoryPanel,
       queueHistoryToggle,
+      queueQuickLaneStrip,
       queueLaneButtons,
       queueLaneCountNodes,
+      queueSecondarySignalCountNodes,
+      queueMailboxScopeCount,
+      queueMailboxScopeLabel,
       queuePrimaryLaneTag,
       queueSummaryActNow,
       queueSummaryFocus,
       queueSummaryRisk,
       queueSummarySprint,
       queueTitle,
+      queueViewJumpButtons,
       threadContextRows,
     },
     helpers: {
       MAIL_FEEDS,
+      QUEUE_ACTIONS,
       QUEUE_LANE_LABELS,
       asArray,
       asText,
@@ -4362,8 +10728,12 @@
       escapeHtml,
       getAvailableRuntimeMailboxes,
       getAvailableRuntimeOwners,
+      getOwnerScopeAvailability,
       getFilteredMailFeedItems,
       getFilteredRuntimeThreads,
+      getRuntimeMailboxCapabilityMeta,
+      getRuntimeLeftColumnState,
+      getQueueLaneThreads,
       getMailFeedRuntimeState,
       getMailFeedSelectedKeys,
       getMailboxScopedRuntimeThreads,
@@ -4371,11 +10741,15 @@
       getQueueScopedRuntimeThreads,
       getSelectedRuntimeMailboxScopeIds,
       getSelectedRuntimeThread,
+      hasRuntimeQueueThreads,
       isHandledRuntimeThread,
+      isManualReviewRuntimeThread,
       isLaterRuntimeThread,
       isSentRuntimeThread,
+      isUnclearRuntimeThread,
       normalizeKey,
       normalizeMailboxId,
+      runtimeConversationIdsMatch,
       threadContextDefinitions: THREAD_CONTEXT,
       toIso,
     },
@@ -4415,6 +10789,7 @@
       scheduleReminderSelect,
       scheduleTimeInput,
       studioDeleteButton,
+      studioShell,
       studioComposeSubjectInput,
       studioComposeToInput,
       studioEditorInput,
@@ -4439,9 +10814,16 @@
       getActiveNoteDraft,
       getAdminToken,
       getRuntimeCustomerEmail,
+      getRuntimeMailboxCapability,
+      getRuntimeFocusReadState,
+      getRuntimeStudioTruthState,
+      getRuntimeThreadById,
+      isOfflineHistoryContextThread,
+      getSelectedRuntimeFocusThread,
       getSelectedRuntimeThread,
       getStudioSenderMailboxId,
       getStudioSignatureProfile,
+      getStudioSignatureOverride,
       getStudioSourceMailboxId,
       loadBootstrapFeedback(mode, message = "") {
         if (mode === "loading") {
@@ -4492,6 +10874,7 @@
     buildIntelReadoutHref,
     buildReauthUrl,
     getSelectedRuntimeThread,
+    isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
     handleRuntimeHandledAction,
     laterStatus,
@@ -4518,6 +10901,8 @@
     handleWorkspaceDocumentClick,
     handleWorkspaceDocumentKeydown,
     initializeWorkspaceSurface,
+    requestRuntimeThreadHydration,
+    selectOfflineHistoryConversation,
     selectRuntimeThread,
   } = PREVIEW_DOM_LIVE_COMPOSITION.createDomLiveComposition({
     dom: {
@@ -4537,9 +10922,11 @@
       laterOptionButtons,
       mailboxAdminCloseButtons,
       mailboxAdminFeedback,
+      mailboxAdminResetButton,
       mailboxAdminList,
       mailboxAdminOpenButton,
       mailboxAdminSaveButton,
+      mailboxAdminSignatureButtons,
       mailboxMenuGrid,
       noteCloseButtons,
       noteFeedback,
@@ -4562,6 +10949,7 @@
       queueHistoryLoadMoreButton,
       queueHistoryToggle,
       queueLaneButtons,
+      queueViewJumpButtons,
       resizeHandles,
       scheduleCloseButtons,
       scheduleFeedback,
@@ -4569,6 +10957,7 @@
       scheduleSaveButton,
       studioDeleteButton,
       studioDoneActionButton,
+      studioComposeFromSelect,
       studioComposeSubjectInput,
       studioComposeToInput,
       studioEditorInput,
@@ -4597,6 +10986,7 @@
       apiRequest,
       applyFocusSection,
       applyLaterOption,
+      applyMailboxAdminSignatureCommand,
       applyNoteModePreset,
       applyStudioMode,
       applyStudioRefineSelection,
@@ -4606,10 +10996,15 @@
       applyTemplateToActiveDraft,
       asArray,
       asText,
+      buildRuntimeMailboxLoadDiagnostics,
+      buildRuntimeMailboxCapabilities,
       buildHistoryReadoutHref,
+      hydrateRuntimeThreadWithHistoryPayload,
       buildLiveThreads,
       buildMailboxCatalog,
       buildReauthUrl,
+      buildTruthPrimaryWorklistConsumerHref,
+      canonicalizeRuntimeMailboxId,
       createIdempotencyKey,
       decorateStaticPills,
       ensureCustomerRuntimeProfilesFromLive,
@@ -4617,11 +11012,29 @@
       ensureRuntimeSelection,
       ensureStudioState,
       getFilteredRuntimeThreads,
+      getMailFeedRuntimeThreads,
+      getAdminToken,
       getMailboxScopedRuntimeThreads,
       getOrderedQueueLaneIds,
+      getQueueLaneThreads,
+      getQueueScopedRuntimeThreads,
       getQueueHistoryScopeKey,
       getRequestedRuntimeMailboxIds,
+      getRuntimeFocusReadState,
+      getRuntimeStudioTruthState,
+      getTruthPrimaryStudioMailboxIds,
+      getTruthPrimaryFocusMailboxIds,
+      getTruthPrimaryWorklistMailboxIds,
+      reconcileRuntimeSelection,
+      getRuntimeLeftColumnState,
+      syncSelectedCustomerIdentityForThread,
+      getSelectedRuntimeThreadTruth,
+      getSelectedRuntimeFocusThread,
       getSelectedRuntimeThread,
+      hasMeaningfulRuntimeReentryState,
+      getStudioSenderMailboxId,
+      getStudioSignatureOverride,
+      getStudioSignatureProfiles,
       getStudioSignatureProfile,
       handleFocusHistoryDelete,
       handleMailboxAdminSave,
@@ -4633,15 +11046,20 @@
       handleStudioToolAction,
       inferStudioTrackKey,
       isAuthFailure,
+      isTruthPrimaryFocusFeatureEnabled,
+      isTruthPrimaryStudioFeatureEnabled,
       loadBootstrap,
       loadQueueHistory,
       normalizeCustomMailboxDefinition,
       normalizeKey,
       normalizeMailboxId,
       normalizeText,
+      mergeTruthPrimaryWorklistData,
+      runtimeConversationIdsMatch,
       normalizeVisibleRuntimeScope,
       normalizeWorkspaceState,
       openLaterDialog,
+      persistCustomMailboxes,
       readPxVariable,
       refreshCustomerIdentitySuggestions,
       removeTagFromActiveDraft,
@@ -4653,6 +11071,7 @@
       renderLaterOptions,
       renderNoteDestination,
       renderQuickActionRows,
+      renderQueueLaneShortcutRows,
       renderRuntimeConversationShell,
       renderRuntimeFocusConversation,
       renderQueueHistorySection,
@@ -4661,6 +11080,7 @@
       renderStudioShell,
       renderTemplateButtons,
       renderThreadContextRows,
+      resetMailboxAdminForm,
       resetRuntimeHistoryFilters,
       resetWorkspacePrefs,
       runtimeActionEngine,
@@ -4670,6 +11090,7 @@
       setContextCollapsed,
       setFeedback,
       setLaterOpen,
+      setMailboxAdminEditingMailbox,
       setMailboxAdminOpen,
       setNoteModeOpen,
       setNoteOpen,
@@ -4705,58 +11126,261 @@
       email,
       label,
       owner,
+      toneClass: deriveMailboxToneClass({
+        id,
+        email,
+        label,
+        toneClass: mailbox.toneClass,
+      }),
+      signature: normalizeMailboxSignatureDraft(mailbox.signature || mailbox, {
+        email,
+        label,
+      }),
       custom: true,
+      seeded: isDefaultCustomMailboxSignaturePreset({
+        id,
+        email,
+        label,
+      }),
     };
+  }
+
+  function buildDefaultCustomMailboxDefinitions() {
+    return DEFAULT_CUSTOM_MAILBOX_SIGNATURE_PRESETS.map((mailbox, index) =>
+      normalizeCustomMailboxDefinition(mailbox, index)
+    ).filter(Boolean);
+  }
+
+  function mergeDefaultCustomMailboxDefinitions(storedMailboxes = []) {
+    const defaultMailboxes = buildDefaultCustomMailboxDefinitions();
+    const normalizedStoredMailboxes = asArray(storedMailboxes)
+      .map((mailbox, index) => normalizeCustomMailboxDefinition(mailbox, index))
+      .filter(Boolean);
+    if (!normalizedStoredMailboxes.length) return defaultMailboxes;
+
+    const storedById = new Map();
+    const storedByEmail = new Map();
+    normalizedStoredMailboxes.forEach((mailbox) => {
+      const mailboxId = normalizeMailboxId(mailbox.id);
+      const email = normalizeMailboxId(mailbox.email);
+      if (mailboxId && !storedById.has(mailboxId)) {
+        storedById.set(mailboxId, mailbox);
+      }
+      if (email && !storedByEmail.has(email)) {
+        storedByEmail.set(email, mailbox);
+      }
+    });
+
+    const usedMailboxKeys = new Set();
+    const mergedMailboxes = defaultMailboxes.map((defaultMailbox, index) => {
+      const storedMailbox =
+        storedById.get(normalizeMailboxId(defaultMailbox.id)) ||
+        storedByEmail.get(normalizeMailboxId(defaultMailbox.email)) ||
+        null;
+      if (!storedMailbox) return defaultMailbox;
+
+      const storedMailboxId = normalizeMailboxId(storedMailbox.id);
+      const storedMailboxEmail = normalizeMailboxId(storedMailbox.email);
+      if (storedMailboxId) usedMailboxKeys.add(storedMailboxId);
+      if (storedMailboxEmail) usedMailboxKeys.add(storedMailboxEmail);
+
+      return normalizeCustomMailboxDefinition(
+        {
+          ...defaultMailbox,
+          ...storedMailbox,
+          signature: {
+            ...defaultMailbox.signature,
+            ...storedMailbox.signature,
+          },
+        },
+        index
+      );
+    });
+
+    normalizedStoredMailboxes.forEach((mailbox) => {
+      const mailboxId = normalizeMailboxId(mailbox.id);
+      const mailboxEmail = normalizeMailboxId(mailbox.email);
+      if (
+        (mailboxId && usedMailboxKeys.has(mailboxId)) ||
+        (mailboxEmail && usedMailboxKeys.has(mailboxEmail))
+      ) {
+        return;
+      }
+      mergedMailboxes.push(mailbox);
+    });
+
+    return mergedMailboxes;
+  }
+
+  function loadPersistedCustomMailboxes() {
+    try {
+      const rawValue = window.localStorage.getItem(CUSTOM_MAILBOXES_STORAGE_KEY);
+      if (!rawValue) return buildDefaultCustomMailboxDefinitions();
+      const parsed = JSON.parse(rawValue);
+      return mergeDefaultCustomMailboxDefinitions(parsed);
+    } catch {
+      return buildDefaultCustomMailboxDefinitions();
+    }
+  }
+
+  function persistCustomMailboxes() {
+    try {
+      const payload = serializeCustomMailboxesForSettings(state.customMailboxes);
+      window.localStorage.setItem(CUSTOM_MAILBOXES_STORAGE_KEY, JSON.stringify(payload));
+    } catch {}
+  }
+
+  state.customMailboxes = loadPersistedCustomMailboxes();
+  persistCustomMailboxes();
+
+  function findCustomMailboxDefinition(mailboxId = "") {
+    const requestedTokens = new Set(
+      getMailboxIdentityTokens({
+        id: mailboxId,
+        email: mailboxId,
+        label: mailboxId,
+      })
+        .map(normalizeMailboxId)
+        .filter(Boolean)
+    );
+    if (!requestedTokens.size) return null;
+    return (
+      asArray(state.customMailboxes)
+        .map((mailbox, index) => normalizeCustomMailboxDefinition(mailbox, index))
+        .find(
+          (mailbox) =>
+            mailbox &&
+            getMailboxIdentityTokens(mailbox).some((token) =>
+              requestedTokens.has(normalizeMailboxId(token))
+            )
+        ) || null
+    );
   }
 
   function getAvailableRuntimeMailboxes() {
     const merged = new Map();
 
+    LEGACY_RUNTIME_MAILBOXES.forEach((mailbox, index) => {
+      if (!mailbox?.id || merged.has(mailbox.id)) return;
+      merged.set(mailbox.id, {
+        ...mailbox,
+        order: index,
+        hasLiveSource: true,
+        liveSourceKind: "legacy_preset",
+        localSignatureDefinition: null,
+        identityTokens: getMailboxIdentityTokens(mailbox),
+      });
+    });
+
     asArray(state.runtime.mailboxes).forEach((mailbox, index) => {
       const id = normalizeMailboxId(mailbox?.id || mailbox?.email);
-      if (!id || merged.has(id)) return;
-      merged.set(id, {
+      if (!id) return;
+      const runtimeMailbox = {
+        ...(mailbox && typeof mailbox === "object" ? mailbox : {}),
         id,
-        email: asText(mailbox?.email).toLowerCase(),
+        email: asText(mailbox?.email || mailbox?.id).toLowerCase(),
         label: asText(mailbox?.label, titleCaseMailbox(mailbox?.email || mailbox?.id)),
-        owner: "Live",
-        custom: false,
-        order: index,
-      });
+        owner: asText(mailbox?.owner, "Live"),
+        custom: mailbox?.custom === true,
+        order: LEGACY_RUNTIME_MAILBOXES.length + index,
+        toneClass: asText(mailbox?.toneClass),
+        hasLiveSource: true,
+        liveSourceKind: "runtime",
+        localSignatureDefinition: null,
+      };
+      const existingKey = findExistingMailboxKey(merged, runtimeMailbox);
+      const key = existingKey || runtimeMailbox.id;
+      if (merged.has(key)) {
+        const existing = merged.get(key);
+        const mergedMailbox = {
+          ...runtimeMailbox,
+          ...existing,
+          id: key,
+          email: runtimeMailbox.email || existing.email,
+          label: existing.label || runtimeMailbox.label,
+          owner: runtimeMailbox.owner || existing.owner,
+          custom: false,
+          order: existing.order ?? runtimeMailbox.order,
+          toneClass: existing.toneClass || runtimeMailbox.toneClass || "",
+          hasLiveSource: true,
+          liveSourceKind: existing.liveSourceKind || runtimeMailbox.liveSourceKind || "runtime",
+          localSignatureDefinition: existing.localSignatureDefinition || null,
+        };
+        mergedMailbox.identityTokens = getMailboxIdentityTokens(mergedMailbox);
+        merged.set(key, mergedMailbox);
+        return;
+      }
+      runtimeMailbox.identityTokens = getMailboxIdentityTokens(runtimeMailbox);
+      merged.set(key, runtimeMailbox);
     });
 
     asArray(state.customMailboxes).forEach((mailbox, index) => {
       const normalized = normalizeCustomMailboxDefinition(mailbox, index);
       if (!normalized) return;
-      const duplicateByEmail = normalized.email
-        ? Array.from(merged.values()).find((entry) => normalizeMailboxId(entry.email) === normalizeMailboxId(normalized.email))
-        : null;
-      const key = duplicateByEmail?.id || normalized.id;
+      const key = findExistingMailboxKey(merged, normalized) || normalized.id;
       if (merged.has(key)) {
         const existing = merged.get(key);
-        merged.set(key, {
-          ...existing,
-          ...normalized,
-          id: key,
-          label: normalized.label || existing.label,
-          email: normalized.email || existing.email,
-          custom: true,
-        });
+        const mergedMailbox =
+          existing.hasLiveSource === true
+            ? {
+                ...existing,
+                id: key,
+                signature: normalized.signature,
+                order:
+                  existing.order ??
+                  normalized.order ??
+                  LEGACY_RUNTIME_MAILBOXES.length + index,
+                localSignatureDefinition: normalized,
+              }
+            : {
+                ...existing,
+                ...normalized,
+                id: key,
+                label: normalized.label || existing.label,
+                email: normalized.email || existing.email,
+                custom: true,
+                order:
+                  existing.order ??
+                  normalized.order ??
+                  LEGACY_RUNTIME_MAILBOXES.length + index,
+                toneClass: existing.toneClass || normalized.toneClass || "",
+                hasLiveSource: false,
+                localSignatureDefinition: normalized,
+              };
+        mergedMailbox.identityTokens = getMailboxIdentityTokens(mergedMailbox);
+        merged.set(key, mergedMailbox);
         return;
       }
-      merged.set(key, normalized);
+      const customMailbox = {
+        ...normalized,
+        id: key,
+        order: LEGACY_RUNTIME_MAILBOXES.length + asArray(state.runtime.mailboxes).length + index,
+        toneClass: normalized.toneClass || "",
+        hasLiveSource: false,
+        liveSourceKind: "custom",
+        localSignatureDefinition: normalized,
+      };
+      customMailbox.identityTokens = getMailboxIdentityTokens(customMailbox);
+      merged.set(key, customMailbox);
     });
 
-    return Array.from(merged.values());
+    return Array.from(merged.values())
+      .map((mailbox) => ({
+        ...finalizeRuntimeMailboxSurface(mailbox),
+        canonicalId: getRuntimeMailboxCanonicalId(mailbox),
+      }))
+      .sort((left, right) => {
+      const leftOrder = Number.isFinite(left?.order) ? left.order : Number.MAX_SAFE_INTEGER;
+      const rightOrder = Number.isFinite(right?.order) ? right.order : Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      return asText(left?.label).localeCompare(asText(right?.label), "sv");
+      });
   }
 
   function ensureRuntimeMailboxSelection() {
-    const availableIds = getAvailableRuntimeMailboxes().map((mailbox) =>
-      normalizeMailboxId(mailbox.id)
-    );
+    const availableIds = getCanonicalAvailableRuntimeMailboxIds();
     const preferredMailboxId = getPreferredOperationalMailboxId();
     if (!availableIds.length) {
-      workspaceSourceOfTruth.setSelectedMailboxIds([]);
       return;
     }
     const selectedMailboxIds = workspaceSourceOfTruth.getSelectedMailboxIds();
@@ -4770,7 +11394,7 @@
     }
     const validIds = new Set(availableIds);
     workspaceSourceOfTruth.setSelectedMailboxIds(
-      selectedMailboxIds.filter((id) => validIds.has(normalizeMailboxId(id)))
+      selectedMailboxIds.filter((id) => validIds.has(canonicalizeRuntimeMailboxId(id)))
     );
     if (!workspaceSourceOfTruth.getSelectedMailboxIds().length) {
       workspaceSourceOfTruth.setSelectedMailboxIds(
@@ -4782,32 +11406,53 @@
   }
 
   function getMailboxScopedRuntimeThreads() {
-    const mailboxes = state.runtime.selectedMailboxIds.map(normalizeMailboxId);
+    const availableMailboxes = getAvailableRuntimeMailboxes();
+    const selectedMailboxIds = asArray(state.runtime.selectedMailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value, availableMailboxes))
+      .filter(Boolean);
     const threads = Array.isArray(state.runtime.threads) ? state.runtime.threads : [];
-    if (!mailboxes.length) {
-      return getAvailableRuntimeMailboxes().length ? [] : threads;
+    if (!selectedMailboxIds.length) {
+      return availableMailboxes.length ? [] : threads;
     }
-    return threads.filter((thread) => mailboxes.includes(normalizeMailboxId(thread.mailboxAddress)));
+    const allowedMailboxTokens = new Set();
+
+    selectedMailboxIds.forEach((selectedMailboxId) => {
+      const matchedMailbox = findRuntimeMailboxByScopeId(selectedMailboxId, availableMailboxes);
+      const mailboxTokens = matchedMailbox
+        ? getMailboxIdentityTokens(matchedMailbox)
+        : [selectedMailboxId];
+      mailboxTokens.forEach((token) => {
+        const normalizedToken = normalizeMailboxId(token);
+        if (normalizedToken) allowedMailboxTokens.add(normalizedToken);
+      });
+    });
+
+    return threads.filter((thread) => {
+      const threadMailboxTokens = getMailboxIdentityTokens({
+        id: thread?.mailboxAddress,
+        email: thread?.mailboxAddress,
+        label: thread?.mailboxLabel,
+      });
+      return threadMailboxTokens.some((token) => allowedMailboxTokens.has(normalizeMailboxId(token)));
+    });
   }
 
-  function normalizeVisibleRuntimeScope() {
+  function normalizeVisibleRuntimeScope(options = {}) {
     const allThreads = Array.isArray(state.runtime.threads) ? state.runtime.threads : [];
-    if (!allThreads.length) return;
+    const selectionOptions = {
+      preferredThreadId: Object.prototype.hasOwnProperty.call(options, "preferredThreadId")
+        ? options.preferredThreadId
+        : workspaceSourceOfTruth.getSelectedThreadId(),
+      resetHistoryOnChange: Boolean(options.resetHistoryOnChange),
+    };
+    if (!allThreads.length) {
+      return reconcileRuntimeSelection([], selectionOptions);
+    }
 
-    const threadMailboxIds = Array.from(
-      new Set(
-        allThreads
-          .map((thread) => normalizeMailboxId(thread.mailboxAddress))
-          .filter(Boolean)
-      )
-    );
-
-    if (
-      workspaceSourceOfTruth.getSelectedMailboxIds().length <= 1 &&
-      !getMailboxScopedRuntimeThreads().length &&
-      threadMailboxIds.length
-    ) {
-      workspaceSourceOfTruth.setSelectedMailboxIds(threadMailboxIds);
+    if (normalizePrimaryQueueLaneId(workspaceSourceOfTruth.getActiveLaneId()) === "all") {
+      if (normalizeKey(workspaceSourceOfTruth.getActiveLaneId() || "all") !== "all") {
+        workspaceSourceOfTruth.setActiveLaneId("all");
+      }
     }
 
     if (
@@ -4824,7 +11469,35 @@
       workspaceSourceOfTruth.setActiveLaneId("all");
     }
 
-    ensureRuntimeSelection();
+    let visibleThreads = getFilteredRuntimeThreads();
+    if (!visibleThreads.length && options.allowLaneFallback) {
+      const activeQueueThreads = getQueueScopedRuntimeThreads().filter((thread) => !isHandledRuntimeThread(thread));
+      if (activeQueueThreads.length) {
+        const preferredThreadId = asText(selectionOptions.preferredThreadId);
+        const orderedLaneIds = getOrderedQueueLaneIds();
+        const preferredLaneId = orderedLaneIds.find((laneId) =>
+          getQueueLaneThreads(laneId, activeQueueThreads).some(
+            (thread) => runtimeConversationIdsMatch(thread?.id, preferredThreadId)
+          )
+        );
+        const preferredOperationalLaneId = orderedLaneIds.find((laneId) =>
+          getQueueLaneThreads(laneId, activeQueueThreads).some(
+            (thread) => !isVerificationRuntimeThread(thread)
+          )
+        );
+        const fallbackLaneId =
+          preferredLaneId ||
+          preferredOperationalLaneId ||
+          orderedLaneIds.find((laneId) => getQueueLaneThreads(laneId, activeQueueThreads).length) ||
+          "";
+        if (fallbackLaneId) {
+          workspaceSourceOfTruth.setActiveLaneId(fallbackLaneId);
+          visibleThreads = getFilteredRuntimeThreads();
+        }
+      }
+    }
+
+    return reconcileRuntimeSelection(visibleThreads, selectionOptions);
   }
 
   function getAvailableRuntimeOwners() {
@@ -4865,6 +11538,36 @@
     return listed;
   }
 
+  function getOwnerScopeAvailability(ownerOptions = getAvailableRuntimeOwners()) {
+    const options = asArray(ownerOptions);
+    const namedOwners = options.filter(
+      (owner) => owner && owner.id !== "all" && owner.id !== "unassigned"
+    );
+    const hasUnassigned = options.some((owner) => owner && owner.id === "unassigned");
+    if (namedOwners.length) {
+      return {
+        hasNamedOwners: true,
+        limitedByFixture: false,
+        disableMenu: false,
+        note: "",
+      };
+    }
+    if (hasUnassigned) {
+      return {
+        hasNamedOwners: false,
+        limitedByFixture: true,
+        disableMenu: false,
+        note: "Aktuell fixture skiljer bara mellan Alla ägare och Oägd. Inga namngivna ägare exponeras i detta scope.",
+      };
+    }
+    return {
+      hasNamedOwners: false,
+      limitedByFixture: true,
+      disableMenu: true,
+      note: "Aktuell fixture exponerar bara Alla ägare. Ingen separat ägarvy finns att välja just nu.",
+    };
+  }
+
   function getQueueScopedRuntimeThreads() {
     const ownerKey = normalizeKey(state.runtime.selectedOwnerKey || "all");
     const threads = getMailboxScopedRuntimeThreads();
@@ -4879,16 +11582,16 @@
   }
 
   function getQueueLaneThreads(laneId, threads = getQueueScopedRuntimeThreads()) {
-    const normalizedLane = normalizeKey(laneId || "all");
+    const normalizedLane = normalizePrimaryQueueLaneId(laneId);
     const activeQueueThreads = threads.filter((thread) => !isHandledRuntimeThread(thread));
     if (normalizedLane === "all") {
-      return activeQueueThreads.filter((thread) => !isLaterRuntimeThread(thread));
+      return activeQueueThreads;
     }
-    return activeQueueThreads.filter((thread) => asArray(thread.tags).includes(normalizedLane));
+    return activeQueueThreads.filter((thread) => getThreadPrimaryLaneId(thread) === normalizedLane);
   }
 
   function getFilteredRuntimeThreads() {
-    return getQueueLaneThreads(state.runtime.activeLaneId || "all");
+    return getQueueLaneThreads(normalizePrimaryQueueLaneId(state.runtime.activeLaneId || "all"));
   }
 
   function getOrderedQueueLaneIds() {
@@ -4898,18 +11601,652 @@
     return [...persisted, ...missing];
   }
 
-  function getSelectedRuntimeThread() {
-    const visibleThreads = getFilteredRuntimeThreads();
-    if (!visibleThreads.length) return null;
-    const selected = visibleThreads.find(
-      (thread) => thread.id === workspaceSourceOfTruth.getSelectedThreadId()
+  function hasRuntimeQueueThreads() {
+    return Array.isArray(state.runtime?.threads) && state.runtime.threads.length > 0;
+  }
+
+  function getRuntimeLeftColumnState() {
+    const inlinePanelState =
+      state.runtime && typeof state.runtime.queueInlinePanel === "object"
+        ? state.runtime.queueInlinePanel
+        : {};
+    const historyState =
+      state.runtime && typeof state.runtime.queueHistory === "object"
+        ? state.runtime.queueHistory
+        : {};
+    const activeLaneId = normalizePrimaryQueueLaneId(state.runtime.activeLaneId || "all");
+    const feedKey = normalizeKey(inlinePanelState.feedKey || "");
+    const laneId = normalizeKey(inlinePanelState.laneId || activeLaneId || "all") || activeLaneId;
+
+    if (historyState.open) {
+      return {
+        mode: "history",
+        feedKey: "",
+        laneId: "",
+        open: true,
+      };
+    }
+
+    if (inlinePanelState.open && feedKey) {
+      return {
+        mode: "feed",
+        feedKey,
+        laneId: "",
+        open: true,
+      };
+    }
+
+    if (inlinePanelState.open) {
+      return {
+        mode: "lane",
+        feedKey: "",
+        laneId,
+        open: true,
+      };
+    }
+
+    if (getRuntimeMode() === "offline_history") {
+      return {
+        mode: "offline_history",
+        feedKey: "",
+        laneId: activeLaneId,
+        open: false,
+      };
+    }
+
+    return {
+      mode: "default",
+      feedKey: "",
+      laneId: activeLaneId,
+      open: false,
+    };
+  }
+
+  function normalizeRuntimeConversationId(value) {
+    return asText(value).trim().toLowerCase();
+  }
+
+  function runtimeConversationIdsMatch(left, right) {
+    const normalizedLeft = normalizeRuntimeConversationId(left);
+    const normalizedRight = normalizeRuntimeConversationId(right);
+    return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+  }
+
+  function getSelectedQueueHistoryConversationId() {
+    return asText(state.runtime?.queueHistory?.selectedConversationId);
+  }
+
+  function getQueueHistoryItemByConversationId(conversationId) {
+    return (
+      asArray(state.runtime?.queueHistory?.items).find((item) =>
+        runtimeConversationIdsMatch(item?.conversationId, conversationId)
+      ) || null
     );
-    return selected || visibleThreads[0];
+  }
+
+  function isOfflineHistoryContextThread(thread) {
+    return Boolean(
+      thread &&
+        typeof thread === "object" &&
+        (thread.offlineHistorySelection === true || thread.raw?.offlineHistorySelection === true)
+    );
+  }
+
+  function createOfflineHistoryContextThread(thread, historyItem = null) {
+    if (!thread || typeof thread !== "object") return null;
+    if (isOfflineHistoryContextThread(thread)) return thread;
+    return {
+      ...thread,
+      offlineHistorySelection: true,
+      offlineContextMode: "read_only",
+      offlineContextLabel: "Offline historik",
+      historyQueueItem: historyItem || null,
+      raw: {
+        ...(thread.raw && typeof thread.raw === "object" ? thread.raw : {}),
+        offlineHistorySelection: true,
+        offlineContextLabel: "Offline historik",
+      },
+    };
+  }
+
+  function buildOfflineHistoryFallbackThread(historyItem) {
+    if (!historyItem || typeof historyItem !== "object") return null;
+    const normalizedDirection = normalizeKey(historyItem.direction || "mottaget");
+    const syntheticMessage = {
+      conversationId: asText(historyItem.conversationId || historyItem.id),
+      mailboxId: asText(historyItem.mailboxId),
+      mailboxAddress: asText(historyItem.mailboxId),
+      userPrincipalName: asText(historyItem.mailboxId),
+      customerEmail: asText(historyItem.customerEmail),
+      counterpartyEmail: asText(historyItem.customerEmail),
+      counterpartyName: asText(historyItem.counterpartyLabel),
+      senderName: asText(historyItem.counterpartyLabel),
+      senderEmail: asText(historyItem.customerEmail),
+      subject: asText(historyItem.title, "Historikrad"),
+      bodyPreview: asText(historyItem.detail, "Ingen förhandsvisning tillgänglig."),
+      sentAt: asText(historyItem.recordedAt),
+      direction: normalizedDirection === "skickat" ? "outbound" : "inbound",
+    };
+    const row = buildHistoryBackedRuntimeRow({
+      conversationId: syntheticMessage.conversationId,
+      messages: [syntheticMessage],
+      events: [],
+      liveRow: null,
+    });
+    const thread = buildRuntimeThread(row, {
+      feedEntries: buildHistoryFeedEntries([syntheticMessage]),
+      historyEvents: [],
+    });
+    return createOfflineHistoryContextThread(thread, historyItem);
+  }
+
+  function getSelectedOfflineHistoryThread() {
+    const conversationId = getSelectedQueueHistoryConversationId();
+    if (!conversationId) return null;
+    const runtimeThread =
+      asArray(state.runtime?.threads).find((candidate) =>
+        runtimeConversationIdsMatch(candidate?.id, conversationId)
+      ) || null;
+    const historyItem = getQueueHistoryItemByConversationId(conversationId);
+    if (runtimeThread) {
+      return createOfflineHistoryContextThread(runtimeThread, historyItem);
+    }
+    return buildOfflineHistoryFallbackThread(historyItem);
+  }
+
+  function isOfflineHistoryReadOnlyMode() {
+    return (
+      getRuntimeLeftColumnState().mode === "history" &&
+      Boolean(asText(getSelectedQueueHistoryConversationId()))
+    );
+  }
+
+  function isOfflineHistorySelectionActive() {
+    return isOfflineHistoryReadOnlyMode();
+  }
+
+  function getSelectedRuntimeThreadTruth() {
+    const selectedThreadId = asText(workspaceSourceOfTruth.getSelectedThreadId());
+    const leftColumnState = getRuntimeLeftColumnState();
+    const runtimeMode = getRuntimeMode();
+    const queueHistoryConversationId = getSelectedQueueHistoryConversationId();
+    const pickThread = (threads = []) => {
+      const candidates = asArray(threads);
+      if (!candidates.length) return null;
+      const selected = candidates.find((thread) =>
+        runtimeConversationIdsMatch(thread?.id, selectedThreadId)
+      );
+      if (selected) return selected;
+      return (
+        candidates.find((thread) => !isVerificationRuntimeThread(thread)) ||
+        candidates[0] ||
+        null
+      );
+    };
+
+    const getInlinePanelFeedThreads = (feedKey) => {
+      const normalizedFeed = normalizeKey(feedKey);
+      const scopedThreads = getMailboxScopedRuntimeThreads();
+      if (normalizedFeed === "later") {
+        return scopedThreads.filter(isLaterRuntimeThread);
+      }
+      if (normalizedFeed === "sent") {
+        return scopedThreads.filter(isSentRuntimeThread);
+      }
+      return [];
+    };
+
+    let runtimeThread = null;
+    let runtimeSource = "";
+
+    const offlineHistoryWithoutSelection =
+      leftColumnState.mode === "history" &&
+      normalizeKey(runtimeMode) === "offline_history" &&
+      !asText(queueHistoryConversationId);
+
+    if (leftColumnState.mode === "history") {
+      if (offlineHistoryWithoutSelection) {
+        runtimeSource = "offline_history_empty";
+      } else if (isOfflineHistoryReadOnlyMode()) {
+        runtimeThread = getSelectedOfflineHistoryThread();
+        runtimeSource = runtimeThread ? "offline_history" : "offline_history_empty";
+      } else {
+        runtimeThread = pickThread(getQueueScopedRuntimeThreads());
+        runtimeSource = runtimeThread ? "history_queue_scope" : "";
+        if (!runtimeThread) {
+          runtimeThread = pickThread(getMailboxScopedRuntimeThreads());
+          runtimeSource = runtimeThread ? "history_mailbox_scope" : runtimeSource;
+        }
+        if (!runtimeThread) {
+          runtimeThread = pickThread(state.runtime.threads);
+          runtimeSource = runtimeThread ? "history_runtime_scope" : "history_empty";
+        }
+      }
+    }
+
+    if (!runtimeThread && !offlineHistoryWithoutSelection && leftColumnState.mode === "feed" && leftColumnState.feedKey) {
+      runtimeThread = pickThread(getInlinePanelFeedThreads(leftColumnState.feedKey));
+      runtimeSource = runtimeThread ? `feed_${normalizeKey(leftColumnState.feedKey, "scope")}` : runtimeSource;
+    }
+
+    if (!runtimeThread && !offlineHistoryWithoutSelection && leftColumnState.mode === "lane") {
+      runtimeThread = pickThread(
+        getQueueLaneThreads(
+          leftColumnState.laneId || state.runtime.activeLaneId || "all",
+          getQueueScopedRuntimeThreads()
+        )
+      );
+      runtimeSource = runtimeThread ? "lane_scope" : runtimeSource;
+    }
+
+    if (!runtimeThread && !offlineHistoryWithoutSelection) {
+      const visibleThread = pickThread(getFilteredRuntimeThreads());
+      if (visibleThread) {
+        runtimeThread = visibleThread;
+        runtimeSource =
+          leftColumnState.mode === "offline_history" ? "offline_visible_scope" : "filtered_scope";
+      }
+    }
+
+    if (
+      !runtimeThread &&
+      !offlineHistoryWithoutSelection &&
+      (!state.runtime.live || state.runtime.authRequired || state.runtime.loading)
+    ) {
+      runtimeSource =
+        leftColumnState.mode === "offline_history"
+          ? "offline_unavailable"
+          : "runtime_unavailable";
+    }
+
+    if (!runtimeThread && !offlineHistoryWithoutSelection) {
+      runtimeThread = pickThread(getQueueScopedRuntimeThreads());
+      runtimeSource = runtimeThread ? "queue_scope_fallback" : runtimeSource;
+    }
+    if (!runtimeThread && !offlineHistoryWithoutSelection) {
+      runtimeThread = pickThread(getMailboxScopedRuntimeThreads());
+      runtimeSource = runtimeThread ? "mailbox_scope_fallback" : runtimeSource;
+    }
+    if (!runtimeThread && !offlineHistoryWithoutSelection) {
+      runtimeThread = pickThread(state.runtime.threads);
+      runtimeSource = runtimeThread ? "runtime_scope_fallback" : runtimeSource;
+    }
+
+    const mailboxId = canonicalizeRuntimeMailboxId(
+      runtimeThread?.mailboxAddress ||
+        runtimeThread?.raw?.mailboxAddress ||
+        runtimeThread?.raw?.mailboxId ||
+        runtimeThread?.mailboxLabel
+    );
+    const activeFocusMailboxIds = new Set(
+      asArray(state.runtime?.focusTruthPrimary?.activeMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+    );
+    const focusScopeActive =
+      Boolean(mailboxId) &&
+      activeFocusMailboxIds.has(mailboxId);
+    const focusTruthPrimaryEnabled = state.runtime?.focusTruthPrimary?.enabled === true;
+    const legacyFocusThread =
+      runtimeThread && focusScopeActive && focusTruthPrimaryEnabled !== true
+        ? getLegacyRuntimeThreadById(runtimeThread.id)
+        : null;
+    const focusThread = legacyFocusThread || runtimeThread || null;
+    const focusSource = legacyFocusThread ? "legacy_focus_fallback" : runtimeSource || "none";
+
+    return {
+      selectedThreadId,
+      queueHistoryConversationId: asText(queueHistoryConversationId),
+      runtimeMode: normalizeKey(runtimeMode || "live"),
+      leftColumnMode: normalizeKey(leftColumnState.mode || "default") || "default",
+      runtimeThread,
+      runtimeSource: normalizeKey(runtimeSource || "none"),
+      focusThread,
+      focusSource: normalizeKey(focusSource || "none"),
+      focusScopeActive,
+      focusTruthPrimaryEnabled,
+      offlineHistoryReadOnly: isOfflineHistoryReadOnlyMode(),
+    };
+  }
+
+  function getSelectedRuntimeThread() {
+    return getSelectedRuntimeThreadTruth().runtimeThread;
+  }
+
+  function getLegacyRuntimeThreadById(threadId) {
+    const selectedThreadId = asText(threadId);
+    if (!selectedThreadId) return null;
+    return (
+      asArray(state.runtime?.truthPrimaryLegacyThreads).find((candidate) =>
+        runtimeConversationIdsMatch(candidate?.id, selectedThreadId)
+      ) || null
+    );
+  }
+
+  function getSelectedRuntimeFocusThread() {
+    const focusThread = getSelectedRuntimeThreadTruth().focusThread;
+    if (focusThread && state.runtime?.loading === true) {
+      return focusThread;
+    }
+    if (
+      focusThread &&
+      state.runtime?.authRequired === true &&
+      typeof isLocalPreviewHost === "function" &&
+      isLocalPreviewHost()
+    ) {
+      return focusThread;
+    }
+    if (state.runtime?.authRequired === true) {
+      return null;
+    }
+    return focusThread;
+  }
+
+  function getRuntimeFocusReadState(thread = null) {
+    const focusThread = thread || getSelectedRuntimeFocusThread();
+    if (!focusThread) {
+      return {
+        source: "legacy",
+        truthDriven: false,
+        readOnly: false,
+        label: "Legacy focus",
+        detail: "",
+        waveLabel: "",
+      };
+    }
+
+    const mailboxId = canonicalizeRuntimeMailboxId(
+      focusThread?.mailboxAddress ||
+        focusThread?.raw?.mailboxAddress ||
+        focusThread?.raw?.mailboxId ||
+        focusThread?.mailboxLabel
+    );
+    const activeMailboxIds = new Set(
+      asArray(state.runtime?.focusTruthPrimary?.activeMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+    );
+    const mailboxInScope = Boolean(mailboxId) && activeMailboxIds.has(mailboxId);
+    const truthDriven =
+      mailboxInScope &&
+      state.runtime?.focusTruthPrimary?.enabled === true &&
+      normalizeKey(focusThread?.worklistSource || focusThread?.raw?.worklistSource || "legacy") ===
+        "truth_primary";
+    const readOnly = truthDriven && FOCUS_TRUTH_PRIMARY?.readOnly !== false;
+    const foundationState = resolveRuntimeFoundationState(focusThread);
+    const foundationProvenance =
+      foundationState &&
+      (normalizeKey(foundationState?.source) || asNumber(foundationState?.messageCount, 0) > 0)
+        ? {
+            foundationDriven: true,
+            fallbackDriven: false,
+            foundationLabel: asText(foundationState?.label, "Mail foundation"),
+            foundationDetail: `Öppnat mail läser nu primärt canonical threaddata från ${asText(
+              foundationState?.source,
+              "mail foundation"
+            )}.`,
+            fallbackLabel: "",
+            fallbackDetail: "",
+          }
+        : {
+            foundationDriven: false,
+            fallbackDriven: true,
+            foundationLabel: "",
+            foundationDetail: "",
+            fallbackLabel: "Legacy fallback",
+            fallbackDetail:
+              "Canonical threaddata saknas för den här tråden just nu, så fokusytan läser preview/body via kompatibilitetskedjan.",
+          };
+
+    if (truthDriven) {
+      return {
+        source: "truth_primary",
+        truthDriven: true,
+        readOnly,
+        label: "Truth-driven focus",
+        detail:
+          "Trådid, meddelandeordning, mailboxidentitet, riktning, tidsstämplar och unread-läge läses från mailbox truth och mailbox truth history i wave 1. Reply- och studioflödet ligger kvar utanför detta pass.",
+        waveLabel: asText(
+          focusThread?.worklistWaveLabel || focusThread?.raw?.worklistWaveLabel,
+          "Wave 1"
+        ),
+        ...foundationProvenance,
+      };
+    }
+
+    if (mailboxInScope && state.runtime?.focusTruthPrimary?.enabled !== true) {
+      return {
+        source: "legacy",
+        truthDriven: false,
+        readOnly: false,
+        label: "Legacy focus",
+        detail: asText(
+          state.runtime?.focusTruthPrimary?.fallbackReason,
+          "Truth-driven focus är avstängd för wave 1. Fokusytan läser legacy-tråden medan worklisten fortsatt kan vara truth-primary."
+        ),
+        waveLabel: "Wave 1 rollback",
+        ...foundationProvenance,
+      };
+    }
+
+    return {
+      source: "legacy",
+      truthDriven: false,
+      readOnly: false,
+      label: "Legacy focus",
+      detail: foundationProvenance.foundationDetail || foundationProvenance.fallbackDetail,
+      waveLabel: "",
+      ...foundationProvenance,
+    };
+  }
+
+  function getRuntimeStudioTruthState(thread = null) {
+    const studioThread = thread || getSelectedRuntimeThread();
+    if (!studioThread) {
+      return {
+        source: "legacy",
+        truthDriven: false,
+        inConfiguredScope: false,
+        writeAllowed: false,
+        senderLocked: false,
+        label: "Legacy studio",
+        detail: "",
+        waveLabel: "",
+        sourceMailboxId: "",
+        sourceMailboxLabel: "",
+        selectedSignatureId: "",
+        senderMailboxId: "",
+        replyContextThreadId: "",
+      };
+    }
+
+    const mailboxId = canonicalizeRuntimeMailboxId(
+      studioThread?.mailboxAddress ||
+        studioThread?.raw?.mailboxAddress ||
+        studioThread?.raw?.mailboxId ||
+        studioThread?.mailboxLabel
+    );
+    const configuredMailboxIds = new Set(
+      asArray(state.runtime?.studioTruthPrimary?.configuredMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+    );
+    const activeMailboxIds = new Set(
+      asArray(state.runtime?.studioTruthPrimary?.activeMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+    );
+    const mailboxConfigured = Boolean(mailboxId) && configuredMailboxIds.has(mailboxId);
+    const mailboxInScope = Boolean(mailboxId) && activeMailboxIds.has(mailboxId);
+    const truthDriven =
+      mailboxInScope &&
+      state.runtime?.studioTruthPrimary?.enabled === true &&
+      normalizeKey(
+        studioThread?.worklistSource || studioThread?.raw?.worklistSource || "legacy"
+      ) === "truth_primary";
+    const sourceMailboxId = asText(mailboxId);
+    const sourceMailboxLabel = getStudioSourceMailboxLabel(sourceMailboxId);
+    const lockedSignatureProfile = truthDriven
+      ? getStudioReplyDefaultSignatureProfile(studioThread)
+      : null;
+
+    if (truthDriven) {
+      return {
+        source: "truth_primary",
+        truthDriven: true,
+        inConfiguredScope: true,
+        writeAllowed: true,
+        senderLocked: true,
+        label: "Truth-driven studio",
+        detail:
+          "Reply-context, källmailbox, trådid, medlemskap, meddelandeordning och unread-läge är låsta till mailbox truth i wave 1. Studion får skriva bara i detta låsta scope.",
+        waveLabel: asText(
+          studioThread?.worklistWaveLabel || studioThread?.raw?.worklistWaveLabel,
+          "Wave 1"
+        ),
+        sourceMailboxId,
+        sourceMailboxLabel,
+        selectedSignatureId: asText(lockedSignatureProfile?.id),
+        senderMailboxId: getStudioSenderMailboxId(asText(lockedSignatureProfile?.id), studioThread),
+        replyContextThreadId: asText(studioThread?.id),
+      };
+    }
+
+    if (mailboxConfigured || mailboxInScope) {
+      return {
+        source: "legacy",
+        truthDriven: false,
+        inConfiguredScope: true,
+        writeAllowed: true,
+        senderLocked: false,
+        label: "Legacy studio",
+        detail: asText(
+          state.runtime?.studioTruthPrimary?.fallbackReason,
+          "Truth-driven studio är avstängd för wave 1. Studion läser och skriver via legacy-kedjan tills truth-pathen åter är aktiv."
+        ),
+        waveLabel: "Wave 1 rollback",
+        sourceMailboxId,
+        sourceMailboxLabel,
+        selectedSignatureId: "",
+        senderMailboxId: "",
+        replyContextThreadId: asText(studioThread?.id),
+      };
+    }
+
+    return {
+      source: "legacy",
+      truthDriven: false,
+      inConfiguredScope: false,
+      writeAllowed: true,
+      senderLocked: false,
+      label: "Legacy studio",
+      detail: "",
+      waveLabel: "",
+      sourceMailboxId,
+      sourceMailboxLabel,
+      selectedSignatureId: "",
+      senderMailboxId: "",
+      replyContextThreadId: asText(studioThread?.id),
+    };
+  }
+
+  function reconcileRuntimeSelection(visibleThreads = getFilteredRuntimeThreads(), options = {}) {
+    const visible = asArray(visibleThreads);
+    const preferredThreadId = Object.prototype.hasOwnProperty.call(options, "preferredThreadId")
+      ? asText(options.preferredThreadId)
+      : asText(workspaceSourceOfTruth.getSelectedThreadId());
+    const currentThreadId = asText(workspaceSourceOfTruth.getSelectedThreadId());
+    const nextThread =
+      visible.find((thread) => runtimeConversationIdsMatch(thread?.id, preferredThreadId)) ||
+      visible.find((thread) => !isVerificationRuntimeThread(thread)) ||
+      visible[0] ||
+      null;
+    const nextThreadId = asText(
+      nextThread?.id ||
+        ""
+    );
+    const changed = nextThreadId !== currentThreadId;
+    const nextMailboxIds = getThreadHistoryMailboxOptions(nextThread)
+      .map((option) => canonicalizeRuntimeMailboxId(option?.id))
+      .filter(Boolean);
+    const currentMailboxIds = getSelectedRuntimeMailboxScopeIds();
+    const mailboxScopeChanged =
+      nextMailboxIds.length > 0 &&
+      (nextMailboxIds.length !== currentMailboxIds.length ||
+        nextMailboxIds.some(
+          (mailboxId, index) => canonicalizeRuntimeMailboxId(currentMailboxIds[index]) !== mailboxId
+        ));
+
+    if (changed) {
+      workspaceSourceOfTruth.setSelectedThreadId(nextThreadId);
+      if (options.resetHistoryOnChange) {
+        state.runtime.historyContextThreadId = "";
+        resetRuntimeHistoryFilters();
+      }
+    }
+    const preserveMailboxScope = state.runtime.mailboxScopePinned === true || Boolean(options.preserveMailboxSelection);
+    if (mailboxScopeChanged && !preserveMailboxScope) {
+      workspaceSourceOfTruth.setSelectedMailboxIds(nextMailboxIds);
+    }
+
+    return {
+      changed,
+      previousSelectedThreadId: currentThreadId,
+      selectedThreadId: nextThreadId,
+    };
   }
 
   function ensureRuntimeSelection() {
+    const leftColumnState = getRuntimeLeftColumnState();
+    if (leftColumnState.mode === "history") {
+      if (isOfflineHistoryReadOnlyMode()) {
+        const previousSelectedThreadId = asText(workspaceSourceOfTruth.getSelectedThreadId());
+        const nextSelectedThreadId = getSelectedQueueHistoryConversationId();
+        const changed = !runtimeConversationIdsMatch(
+          previousSelectedThreadId,
+          nextSelectedThreadId
+        );
+        if (changed) {
+          workspaceSourceOfTruth.setSelectedThreadId(nextSelectedThreadId);
+        }
+        return {
+          changed,
+          previousSelectedThreadId,
+          selectedThreadId: asText(nextSelectedThreadId),
+        };
+      }
+      return reconcileRuntimeSelection(
+        getQueueScopedRuntimeThreads().length
+          ? getQueueScopedRuntimeThreads()
+          : getMailboxScopedRuntimeThreads()
+      );
+    }
+
+    if (leftColumnState.mode === "feed") {
+      const feedThreads = leftColumnState.feedKey
+        ? getMailFeedRuntimeThreads(leftColumnState.feedKey)
+        : [];
+      return reconcileRuntimeSelection(feedThreads);
+    }
+
+    if (leftColumnState.mode === "lane") {
+      return reconcileRuntimeSelection(
+        getQueueLaneThreads(leftColumnState.laneId || state.runtime.activeLaneId || "all", getQueueScopedRuntimeThreads())
+      );
+    }
+
     const visibleThreads = getFilteredRuntimeThreads();
-    workspaceSourceOfTruth.ensureSelectedThread(visibleThreads);
+    if (
+      !visibleThreads.length &&
+      leftColumnState.mode === "default"
+    ) {
+      return normalizeVisibleRuntimeScope({
+        allowLaneFallback: true,
+        preferredThreadId: workspaceSourceOfTruth.getSelectedThreadId(),
+        resetHistoryOnChange: false,
+      });
+    }
+    return reconcileRuntimeSelection(visibleThreads);
   }
 
   function getActiveWorkspaceContext() {
@@ -5053,10 +12390,28 @@
 
   function createHistoryEvent(definition = {}) {
     const recordedAt = toIso(definition.recordedAt || definition.timestamp);
+    const sanitizeHistoryCopy = (value = "") =>
+      asText(value)
+        .replace(/\s+/g, " ")
+        .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+        .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+        .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+        .replace(/^Get more done with apps like Word\.?\s*/i, "")
+        .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+        .replace(/^Read more about why this is important\.?\s*/i, "")
+        .replace(/^[\s_—–-]{6,}/, "")
+        .trim();
+    const title = sanitizeHistoryCopy(asText(definition.title, "Händelse"));
+    const description = sanitizeHistoryCopy(
+      asText(definition.description, asText(definition.detail, "Ingen beskrivning."))
+    );
+    const detail = sanitizeHistoryCopy(
+      asText(definition.detail, asText(definition.description, "Ingen detalj tillgänglig."))
+    );
     return {
-      title: asText(definition.title, "Händelse"),
-      description: asText(definition.description, asText(definition.detail, "Ingen beskrivning.")),
-      detail: asText(definition.detail, asText(definition.description, "Ingen detalj tillgänglig.")),
+      title: title || description || detail || "Händelse",
+      description: description || title || detail || "Ingen beskrivning.",
+      detail: detail || description || title || "Ingen detalj tillgänglig.",
       time: asText(definition.time, formatHistoryTimestamp(recordedAt)),
       recordedAt,
       mailboxLabel: asText(definition.mailboxLabel),
@@ -5095,11 +12450,11 @@
     );
     if (options.length) {
       return options.map((option) => ({
-        id: normalizeMailboxId(option.id),
+        id: canonicalizeRuntimeMailboxId(option.id),
         label: asText(option.label),
       }));
     }
-    const fallbackId = normalizeMailboxId(thread.mailboxAddress || thread.mailboxLabel);
+    const fallbackId = canonicalizeRuntimeMailboxId(thread.mailboxAddress || thread.mailboxLabel);
     return fallbackId
       ? [{ id: fallbackId, label: asText(thread.mailboxLabel, thread.mailboxAddress) }]
       : [];
@@ -5123,11 +12478,11 @@
   }
 
   function getRuntimeThreadById(threadId) {
-    const normalizedId = normalizeKey(threadId);
+    const normalizedId = normalizeRuntimeConversationId(threadId);
     if (!normalizedId) return null;
     return (
       asArray(state.runtime?.threads).find(
-        (candidate) => normalizeKey(candidate?.id) === normalizedId
+        (candidate) => runtimeConversationIdsMatch(candidate?.id, normalizedId)
       ) || null
     );
   }
@@ -5159,20 +12514,10 @@
 
   function renderFocusSummaryCards(container, cards, tone = "history") {
     if (!container) return;
-    const safeCards = asArray(cards).filter(
-      (card) => card && typeof card === "object" && (asText(card.label) || asText(card.value))
-    );
-    container.innerHTML = safeCards
-      .map((card) => {
-        const note = normalizeText(card.note);
-        const cardTone = normalizeKey(card.tone || tone) || tone;
-        return `<article class="focus-summary-card focus-summary-card--${escapeHtml(cardTone)}">
-          <span class="focus-summary-card-label">${escapeHtml(asText(card.label, "Info"))}</span>
-          <strong class="focus-summary-card-value">${escapeHtml(asText(card.value, "-"))}</strong>
-          ${note ? `<p class="focus-summary-card-note">${escapeHtml(note)}</p>` : ""}
-        </article>`;
-      })
-      .join("");
+    // The top summary strip duplicated detail already shown in the lower panels,
+    // so we suppress it and keep the detail cards as the single source of truth.
+    container.innerHTML = "";
+    container.hidden = true;
   }
 
   function buildFocusHistoryScopeCards(thread, allEvents = []) {
@@ -5183,7 +12528,7 @@
     return [
       {
         label: "Tråd",
-        value: compactRuntimeCopy(thread.subject, "Aktiv tråd", 42),
+        value: compactRuntimeCopy(thread.displaySubject || thread.subject, "Aktiv tråd", 42),
         note: `${thread.mailboxLabel} · ${latestEvent?.time || thread.lastActivityLabel}`,
         tone: "message",
       },
@@ -5230,7 +12575,11 @@
       {
         label: "Senaste aktivitet",
         value: latestEvent?.time || thread.lastActivityLabel,
-        note: compactRuntimeCopy(latestEvent?.description || thread.subject, thread.subject, 76),
+        note: compactRuntimeCopy(
+          latestEvent?.description || thread.displaySubject || thread.subject,
+          thread.displaySubject || thread.subject,
+          76
+        ),
         tone: "message",
       },
       {
@@ -5295,7 +12644,7 @@
           conversationId: event?.conversationId || relatedThread.id,
           mailboxId: event?.mailboxId || relatedThread.mailboxAddress,
           mailboxLabel: event?.mailboxLabel || relatedThread.mailboxLabel,
-          scopeLabel: relatedThread.subject,
+          scopeLabel: relatedThread.displaySubject || relatedThread.subject,
         })
       )
     );
@@ -5310,7 +12659,11 @@
         mailboxLabel:
           getRuntimeThreadById(note.conversationId || thread.id)?.mailboxLabel || thread.mailboxLabel,
         conversationId: note.conversationId || thread.id,
-        scopeLabel: getRuntimeThreadById(note.conversationId || thread.id)?.subject || thread.subject,
+        scopeLabel:
+          getRuntimeThreadById(note.conversationId || thread.id)?.displaySubject ||
+          getRuntimeThreadById(note.conversationId || thread.id)?.subject ||
+          thread.displaySubject ||
+          thread.subject,
         resultType: "action",
         type: "note",
       })
@@ -5335,7 +12688,10 @@
             thread.mailboxLabel,
           conversationId: followUp.conversationId || thread.id,
           scopeLabel:
-            getRuntimeThreadById(followUp.conversationId || thread.id)?.subject || thread.subject,
+            getRuntimeThreadById(followUp.conversationId || thread.id)?.displaySubject ||
+            getRuntimeThreadById(followUp.conversationId || thread.id)?.subject ||
+            thread.displaySubject ||
+            thread.subject,
           resultType: "action",
           type: "followup",
         })
@@ -5413,16 +12769,14 @@
 
   function getSelectedRuntimeMailboxScopeIds() {
     return asArray(state.runtime.selectedMailboxIds)
-      .map(normalizeMailboxId)
+      .map((mailboxId) => canonicalizeRuntimeMailboxId(mailboxId))
       .filter(Boolean);
   }
 
   function getQueueHistoryScopeIds() {
     const selectedScope = getSelectedRuntimeMailboxScopeIds();
     if (selectedScope.length) return selectedScope;
-    return getAvailableRuntimeMailboxes()
-      .map((mailbox) => normalizeMailboxId(mailbox.id))
-      .filter(Boolean);
+    return getCanonicalAvailableRuntimeMailboxIds();
   }
 
   function getQueueHistoryScopeKey(scopeIds = getQueueHistoryScopeIds()) {
@@ -5431,9 +12785,7 @@
 
   function getQueueHistoryMailboxLabel(mailboxId) {
     const normalizedMailboxId = normalizeMailboxId(mailboxId);
-    const runtimeMailbox = getAvailableRuntimeMailboxes().find(
-      (mailbox) => normalizeMailboxId(mailbox.id) === normalizedMailboxId
-    );
+    const runtimeMailbox = findRuntimeMailboxByScopeId(normalizedMailboxId);
     if (runtimeMailbox) {
       return asText(runtimeMailbox.label, runtimeMailbox.id);
     }
@@ -5450,10 +12802,17 @@
         item.contactName ||
         item.contactLabel
     );
-    if (explicitLabel) return explicitLabel;
+    if (explicitLabel) {
+      const explicitEmail = extractEmail(explicitLabel);
+      if (explicitEmail && normalizeKey(explicitLabel) === normalizeKey(explicitEmail)) {
+        return humanizeHistoryCounterpartyEmail(explicitEmail) || explicitLabel;
+      }
+      return explicitLabel;
+    }
     const normalizedEmail = asText(customerEmail);
     if (normalizedEmail) {
-      const derivedLabel = deriveMailboxLabel(normalizedEmail);
+      const derivedLabel =
+        humanizeHistoryCounterpartyEmail(normalizedEmail) || deriveMailboxLabel(normalizedEmail);
       return derivedLabel || normalizedEmail;
     }
     if (normalizeKey(item.direction || "message") === "outbound") {
@@ -5506,6 +12865,7 @@
         loaded: true,
         error: "",
         items: [],
+        selectedConversationId: "",
         limit: nextLimit,
         hasMore: false,
         scopeKey,
@@ -5540,12 +12900,18 @@
       if (requestSequence !== queueHistoryRequestSequence) return;
 
       const items = buildQueueHistoryItems(payload?.results);
+      const nextSelectedConversationId = items.some((item) =>
+        runtimeConversationIdsMatch(item?.conversationId, state.runtime.queueHistory.selectedConversationId)
+      )
+        ? asText(state.runtime.queueHistory.selectedConversationId)
+        : "";
       state.runtime.queueHistory = {
         ...state.runtime.queueHistory,
         loading: false,
         loaded: true,
         error: "",
         items,
+        selectedConversationId: nextSelectedConversationId,
         limit: nextLimit,
         hasMore: items.length >= nextLimit,
         scopeKey,
@@ -5560,12 +12926,1042 @@
         loaded: true,
         error: error instanceof Error ? error.message : String(error),
         items: [],
+        selectedConversationId: "",
         hasMore: false,
         scopeKey,
         open: prefetch ? state.runtime.queueHistory.open : true,
       };
       renderQueueHistorySection();
     }
+  }
+
+  function isTruthWorklistViewFeatureEnabled() {
+    return WORKLIST_TRUTH_VIEW?.enabled === true;
+  }
+
+  function getTruthWorklistViewLimit() {
+    return Math.max(1, Number(WORKLIST_TRUTH_VIEW?.limit || 6));
+  }
+
+  function getTruthWorklistComparableBaselineMailboxIds() {
+    const availableMailboxIds = new Set(getCanonicalAvailableRuntimeMailboxIds());
+    return asArray(WORKLIST_TRUTH_VIEW?.comparableBaselineMailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean)
+      .filter((mailboxId) => !availableMailboxIds.size || availableMailboxIds.has(mailboxId));
+  }
+
+  function resolveTruthWorklistScope() {
+    const queueScopeIds = getQueueHistoryScopeIds()
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+    const comparableBaselineMailboxIds = getTruthWorklistComparableBaselineMailboxIds();
+    if (!comparableBaselineMailboxIds.length) {
+      return {
+        mailboxIds: queueScopeIds,
+        scopeMode: "queue_scope",
+      };
+    }
+    if (!queueScopeIds.length) {
+      return {
+        mailboxIds: comparableBaselineMailboxIds,
+        scopeMode: "comparable_baseline",
+      };
+    }
+    const queueScopeSet = new Set(queueScopeIds);
+    const hasComparableMailbox = comparableBaselineMailboxIds.some((mailboxId) =>
+      queueScopeSet.has(mailboxId)
+    );
+    if (!hasComparableMailbox) {
+      return {
+        mailboxIds: comparableBaselineMailboxIds,
+        scopeMode: "comparable_baseline",
+      };
+    }
+    return {
+      mailboxIds: queueScopeIds,
+      scopeMode: "queue_scope",
+    };
+  }
+
+  function getTruthWorklistScopeIds() {
+    return resolveTruthWorklistScope().mailboxIds;
+  }
+
+  function getTruthWorklistScopeKey(mailboxIds = []) {
+    return asArray(mailboxIds)
+      .map((value) => normalizeMailboxId(value))
+      .filter(Boolean)
+      .sort()
+      .join(",");
+  }
+
+  function normalizeTruthWorklistPage(page = "overview") {
+    const normalized = normalizeText(page || "overview") || "overview";
+    if (normalized === "guardrail") return "guardrail";
+    if (normalized === "assist") return "assist";
+    if (normalized === "parity") return "parity";
+    if (normalized === "scope") return "scope";
+    return "overview";
+  }
+
+  function setTruthWorklistPage(page = "overview") {
+    const viewState =
+      state.runtime && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+    state.runtime.truthWorklistView = {
+      ...viewState,
+      page: normalizeTruthWorklistPage(page),
+    };
+    renderTruthWorklistView();
+  }
+
+  function persistTruthWorklistViewHidden(hidden) {
+    try {
+      if (hidden) {
+        window.localStorage.setItem(TRUTH_WORKLIST_VIEW_STORAGE_KEY, "1");
+      } else {
+        window.localStorage.removeItem(TRUTH_WORKLIST_VIEW_STORAGE_KEY);
+      }
+    } catch (error) {
+      console.warn("Truth Worklist View kunde inte spara lokal preferens.", error);
+    }
+  }
+
+  function setTruthWorklistViewHidden(hidden) {
+    state.runtime.truthWorklistView = {
+      ...(state.runtime.truthWorklistView || {}),
+      hidden: hidden === true,
+    };
+    persistTruthWorklistViewHidden(hidden === true);
+    renderTruthWorklistView();
+    if (hidden !== true) {
+      ensureTruthWorklistViewLoaded({ force: false });
+    }
+  }
+
+  function setTruthWorklistShellOpen(open) {
+    const isOpen = workspaceSourceOfTruth.setOverlayOpen("truthWorklist", open);
+    if (canvas) {
+      canvas.classList.toggle("is-truth-worklist-open", isOpen);
+    }
+    if (!truthWorklistShell) return;
+    truthWorklistShell.hidden = !isOpen;
+    truthWorklistShell.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    truthWorklistShell.style.opacity = isOpen ? "1" : "0";
+    truthWorklistShell.style.pointerEvents = isOpen ? "auto" : "none";
+    truthWorklistShell.style.visibility = isOpen ? "visible" : "hidden";
+    truthWorklistShell.style.transform = isOpen ? "translateY(0)" : "translateY(14px)";
+  }
+
+  function buildTruthWorklistConsumerHref(mailboxIds = [], limit = getTruthWorklistViewLimit()) {
+    const params = new URLSearchParams();
+    const normalizedMailboxIds = asArray(mailboxIds)
+      .map((item) => normalizeMailboxId(item))
+      .filter(Boolean);
+    if (normalizedMailboxIds.length) {
+      params.set("mailboxIds", normalizedMailboxIds.join(","));
+    }
+    params.set("limit", String(Math.max(1, Number(limit || getTruthWorklistViewLimit()))));
+    return `/api/v1/cco/runtime/worklist/consumer?${params.toString()}`;
+  }
+
+  function buildTruthWorklistReadoutHref(mailboxIds = [], limit = getTruthWorklistViewLimit()) {
+    const params = new URLSearchParams();
+    const normalizedMailboxIds = asArray(mailboxIds)
+      .map((item) => normalizeMailboxId(item))
+      .filter(Boolean);
+    if (normalizedMailboxIds.length) {
+      params.set("mailboxIds", normalizedMailboxIds.join(","));
+    }
+    params.set("limit", String(Math.max(1, Number(limit || getTruthWorklistViewLimit()))));
+    return `/api/v1/cco/runtime/worklist/consumer/readout?${params.toString()}`;
+  }
+
+  function buildTruthWorklistSummaryMarkup(payload = {}) {
+    const summary = payload?.summary && typeof payload.summary === "object" ? payload.summary : {};
+    const items = [
+      { label: "Truth-rader", value: Number(summary.rowCount || 0), tone: "truth" },
+      { label: "Unread inbound", value: Number(summary.unreadCount || 0), tone: "inbound" },
+      { label: "Needs reply", value: Number(summary.needsReplyCount || 0), tone: "reply" },
+      { label: "Act now", value: Number(summary.actNowCount || 0), tone: "act" },
+    ];
+    return `
+      <div class="queue-truth-view-facts queue-truth-view-facts--summary">
+        ${items
+          .map(
+            (item) => `<article class="queue-truth-view-fact" data-tone="${escapeHtml(item.tone)}">
+              <span class="queue-truth-view-fact-label">${escapeHtml(item.label)}</span>
+              <strong class="queue-truth-view-fact-value">${escapeHtml(String(item.value))}</strong>
+            </article>`
+          )
+          .join("")}
+      </div>`;
+  }
+
+  function buildTruthWorklistStatusMarkup(payload = {}) {
+    const guardrail =
+      payload?.shadowGuardrail && typeof payload.shadowGuardrail === "object"
+        ? payload.shadowGuardrail
+        : {};
+    const aggregate =
+      guardrail.aggregate && typeof guardrail.aggregate === "object"
+        ? guardrail.aggregate
+        : {};
+    const acceptanceGate =
+      guardrail.acceptanceGate && typeof guardrail.acceptanceGate === "object"
+        ? guardrail.acceptanceGate
+        : {};
+    const classificationCounts =
+      aggregate.classificationCounts && typeof aggregate.classificationCounts === "object"
+        ? aggregate.classificationCounts
+        : {};
+    const items = [
+      { label: "Båda", value: Number(aggregate.bothCount || 0), tone: "parity" },
+      {
+        label: "Mapping gap",
+        value: Number(classificationCounts.mapping_gap || 0),
+        tone: "gap",
+      },
+      {
+        label: "Truth shift",
+        value: Number(classificationCounts.truth_shift || 0),
+        tone: "truth",
+      },
+      {
+        label: "Unread diff",
+        value: Number(aggregate.unreadDiffCount || 0),
+        tone: "inbound",
+      },
+      {
+        label: "Ownership diff",
+        value: Number(aggregate.ownershipDiffCount || 0),
+        tone: "ownership",
+      },
+    ];
+    return `
+      <div class="queue-truth-view-status-lead" data-gate-state="${
+        acceptanceGate.canConsiderCutover === true ? "ready" : "blocked"
+      }">
+        <span class="queue-truth-view-status-lead-label">Shadow gate</span>
+        <strong class="queue-truth-view-status-lead-value">${escapeHtml(
+          acceptanceGate.canConsiderCutover === true ? "Klar för läsning" : "Blockerad"
+        )}</strong>
+        <p class="queue-truth-view-status-lead-copy">${escapeHtml(
+          acceptanceGate.canConsiderCutover === true
+            ? "Truth- och legacy-baseline ligger tillräckligt nära för att läsas som jämförbar assistvy."
+            : "Diffar och mapping-gaps kräver fortsatt shadow-läsning innan något kan tolkas som skiftklart."
+        )}</p>
+      </div>
+      <div class="queue-truth-view-facts queue-truth-view-facts--status">
+        ${items
+          .map(
+            (item) => `<article class="queue-truth-view-fact" data-tone="${escapeHtml(item.tone)}">
+              <span class="queue-truth-view-fact-label">${escapeHtml(item.label)}</span>
+              <strong class="queue-truth-view-fact-value">${escapeHtml(String(item.value))}</strong>
+            </article>`
+          )
+          .join("")}
+      </div>`;
+  }
+
+  function getTruthWorklistAssistFilterLabel(filterId = "all") {
+    const normalized = normalizeText(filterId || "all");
+    if (normalized === "unread") return "Unread";
+    if (normalized === "needs_reply") return "Needs reply";
+    if (normalized === "act_now") return "Act now";
+    if (normalized === "comparable") return "Jämförbara";
+    return "Alla";
+  }
+
+  function getTruthWorklistAssistSortLabel(sortId = "latest") {
+    const normalized = normalizeText(sortId || "latest");
+    if (normalized === "inbound") return "Senaste inbound";
+    if (normalized === "needs_reply") return "Needs reply först";
+    if (normalized === "unread") return "Unread först";
+    return "Senaste aktivitet";
+  }
+
+  function getTruthWorklistComparableMailboxIds(payload = {}) {
+    return asArray(payload?.parityBaseline?.comparableMailboxIds)
+      .map((item) => normalizeMailboxId(item))
+      .filter(Boolean);
+  }
+
+  function getTruthWorklistNotComparableMailboxIds(payload = {}) {
+    return asArray(payload?.parityBaseline?.notComparableMailboxIds)
+      .map((item) => normalizeMailboxId(item))
+      .filter(Boolean);
+  }
+
+  function getTruthWorklistParityLabel(assessment = {}) {
+    const parityStatus = normalizeText(assessment?.parityStatus || "");
+    if (parityStatus === "comparable") return "Jämförbar";
+    if (parityStatus === "not_comparable_no_legacy_baseline") return "Not comparable yet";
+    if (parityStatus === "not_comparable_no_truth_rows") return "Ingen truth-rad ännu";
+    return "Inte jämförbar ännu";
+  }
+
+  function buildTruthWorklistMailboxMarkup(payload = {}) {
+    const parityBaseline =
+      payload?.parityBaseline && typeof payload.parityBaseline === "object"
+        ? payload.parityBaseline
+        : {};
+    const items = asArray(parityBaseline.mailboxAssessment);
+    if (!items.length) {
+      return '<p class="queue-truth-view-empty">Ingen parity-baseline ännu i det valda scope:t.</p>';
+    }
+    return items
+      .map((item) => {
+        const mailboxId = normalizeText(item?.mailboxId || "okand mailbox");
+        const parityLabel = getTruthWorklistParityLabel(item);
+        return `<article class="queue-truth-view-mailbox-row" data-parity-status="${escapeHtml(
+          normalizeText(item?.parityStatus || "unknown")
+        )}">
+          <div class="queue-truth-view-mailbox-copy">
+            <strong>${escapeHtml(mailboxId)}</strong>
+          </div>
+          <span class="queue-truth-view-mailbox-metric" data-tone="legacy">
+            <span class="queue-truth-view-mailbox-metric-label">Legacy</span>
+            <strong class="queue-truth-view-mailbox-metric-value">${escapeHtml(
+              String(Number(item?.legacyCount || 0))
+            )}</strong>
+          </span>
+          <span class="queue-truth-view-mailbox-metric" data-tone="truth">
+            <span class="queue-truth-view-mailbox-metric-label">Truth</span>
+            <strong class="queue-truth-view-mailbox-metric-value">${escapeHtml(
+              String(Number(item?.shadowCount || 0))
+            )}</strong>
+          </span>
+          <span class="queue-truth-view-mailbox-metric" data-tone="both">
+            <span class="queue-truth-view-mailbox-metric-label">Båda</span>
+            <strong class="queue-truth-view-mailbox-metric-value">${escapeHtml(
+              String(Number(item?.bothCount || 0))
+            )}</strong>
+          </span>
+          <span class="queue-truth-view-mailbox-badge">${escapeHtml(parityLabel)}</span>
+        </article>`;
+      })
+      .join("");
+  }
+
+  function getTruthWorklistVisibleRows(payload = {}, viewState = {}) {
+    const rows = asArray(payload?.rows);
+    const comparableMailboxIds = new Set(getTruthWorklistComparableMailboxIds(payload));
+    const filterMode = normalizeText(viewState?.localFilter || "all") || "all";
+    const sortMode = normalizeText(viewState?.localSort || "latest") || "latest";
+    const filteredRows = rows.filter((item) => {
+      const mailboxId = normalizeMailboxId(item?.mailbox?.mailboxId || "");
+      if (filterMode === "unread") return item?.state?.hasUnreadInbound === true;
+      if (filterMode === "needs_reply") return item?.state?.needsReply === true;
+      if (filterMode === "act_now") return normalizeText(item?.lane || "") === "act-now";
+      if (filterMode === "comparable") return comparableMailboxIds.has(mailboxId);
+      return true;
+    });
+
+    const toTimestamp = (value) => {
+      const timestamp = Date.parse(normalizeText(value || ""));
+      return Number.isFinite(timestamp) ? timestamp : 0;
+    };
+
+    return [...filteredRows].sort((left, right) => {
+      const leftUnread = left?.state?.hasUnreadInbound === true ? 1 : 0;
+      const rightUnread = right?.state?.hasUnreadInbound === true ? 1 : 0;
+      const leftNeedsReply = left?.state?.needsReply === true ? 1 : 0;
+      const rightNeedsReply = right?.state?.needsReply === true ? 1 : 0;
+      const leftLatest = toTimestamp(left?.timing?.latestMessageAt);
+      const rightLatest = toTimestamp(right?.timing?.latestMessageAt);
+      const leftInbound = toTimestamp(left?.timing?.lastInboundAt);
+      const rightInbound = toTimestamp(right?.timing?.lastInboundAt);
+
+      if (sortMode === "unread") {
+        if (rightUnread !== leftUnread) return rightUnread - leftUnread;
+        if (rightNeedsReply !== leftNeedsReply) return rightNeedsReply - leftNeedsReply;
+        if (rightLatest !== leftLatest) return rightLatest - leftLatest;
+      } else if (sortMode === "needs_reply") {
+        if (rightNeedsReply !== leftNeedsReply) return rightNeedsReply - leftNeedsReply;
+        if (rightUnread !== leftUnread) return rightUnread - leftUnread;
+        if (rightLatest !== leftLatest) return rightLatest - leftLatest;
+      } else if (sortMode === "inbound") {
+        if (rightInbound !== leftInbound) return rightInbound - leftInbound;
+        if (rightLatest !== leftLatest) return rightLatest - leftLatest;
+      } else if (rightLatest !== leftLatest) {
+        return rightLatest - leftLatest;
+      }
+
+      return normalizeText(left?.subject || "").localeCompare(
+        normalizeText(right?.subject || ""),
+        "sv"
+      );
+    });
+  }
+
+  function buildTruthWorklistControlsMarkup(payload = {}, viewState = {}) {
+    const rows = asArray(payload?.rows);
+    const comparableMailboxIds = new Set(getTruthWorklistComparableMailboxIds(payload));
+    const counts = {
+      all: rows.length,
+      unread: rows.filter((item) => item?.state?.hasUnreadInbound === true).length,
+      needs_reply: rows.filter((item) => item?.state?.needsReply === true).length,
+      act_now: rows.filter((item) => normalizeText(item?.lane || "") === "act-now").length,
+      comparable: rows.filter((item) =>
+        comparableMailboxIds.has(normalizeMailboxId(item?.mailbox?.mailboxId || ""))
+      ).length,
+    };
+    const filterMode = normalizeText(viewState?.localFilter || "all") || "all";
+    const sortMode = normalizeText(viewState?.localSort || "latest") || "latest";
+    const visibleRows = getTruthWorklistVisibleRows(payload, viewState);
+    const filters = [
+      { id: "all", label: "Alla" },
+      { id: "unread", label: "Unread" },
+      { id: "needs_reply", label: "Needs reply" },
+      { id: "act_now", label: "Act now" },
+      { id: "comparable", label: "Jämförbara" },
+    ];
+    const sorts = [
+      { id: "latest", label: "Senaste aktivitet" },
+      { id: "inbound", label: "Senaste inbound" },
+      { id: "unread", label: "Unread först" },
+      { id: "needs_reply", label: "Needs reply först" },
+    ];
+    return `
+      <p class="queue-truth-view-controls-state">
+        ${escapeHtml(
+          `Aktivt lokalt läge · ${getTruthWorklistAssistFilterLabel(
+            viewState?.localFilter
+          )} · ${getTruthWorklistAssistSortLabel(viewState?.localSort)}`
+        )}
+      </p>
+      <div class="queue-truth-view-toolbar">
+        <div class="queue-truth-view-controls-group">
+          <p class="queue-truth-view-controls-label">Filtrera lokalt</p>
+          <div class="queue-truth-view-toolbar-strip">
+            ${filters
+              .map(
+                (filter) => `<button
+                  class="queue-truth-view-toggle${filterMode === filter.id ? " is-active" : ""}"
+                  type="button"
+                  data-filter-id="${escapeHtml(filter.id)}"
+                  data-truth-worklist-filter="${escapeHtml(filter.id)}"
+                  aria-pressed="${filterMode === filter.id ? "true" : "false"}"
+                >
+                  <span>${escapeHtml(filter.label)}</span>
+                  <strong>${escapeHtml(String(Number(counts[filter.id] || 0)))}</strong>
+                </button>`
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="queue-truth-view-controls-group">
+          <p class="queue-truth-view-controls-label">Sortera lokalt</p>
+          <div class="queue-truth-view-toolbar-strip">
+            ${sorts
+              .map(
+                (sort) => `<button
+                  class="queue-truth-view-toggle${sortMode === sort.id ? " is-active" : ""}"
+                  type="button"
+                  data-sort-id="${escapeHtml(sort.id)}"
+                  data-truth-worklist-sort="${escapeHtml(sort.id)}"
+                  aria-pressed="${sortMode === sort.id ? "true" : "false"}"
+                >
+                  <span>${escapeHtml(sort.label)}</span>
+                </button>`
+              )
+              .join("")}
+          </div>
+        </div>
+      </div>
+      <p class="queue-truth-view-controls-note">
+        ${escapeHtml(
+          `Visar ${visibleRows.length} av ${rows.length} truth-rader. Lokal filtrering och sortering påverkar bara assistytan; legacy queue, selection, fokusyta och studio lämnas orörda.`
+        )}
+      </p>`;
+  }
+
+  function buildTruthWorklistGuidanceMarkup(payload = {}, viewState = {}) {
+    const acceptanceGate =
+      payload?.shadowGuardrail?.acceptanceGate &&
+      typeof payload.shadowGuardrail.acceptanceGate === "object"
+        ? payload.shadowGuardrail.acceptanceGate
+        : {};
+    const relay = viewState?.relay && typeof viewState.relay === "object" ? viewState.relay : null;
+    const items = [
+      {
+        label: "Guardrail",
+        value: acceptanceGate.canConsiderCutover === true ? "Guardrail läsbar" : "Guardrail blockerad",
+        tone: acceptanceGate.canConsiderCutover === true ? "ready" : "blocked",
+      },
+      {
+        label: "Relay",
+        value: relay ? "Relay redo via legacy-kö" : "Relay väntar på vald truth-rad",
+        tone: relay ? "relay" : "waiting",
+      },
+      { label: "Öppning", value: "Envägs-relay", tone: "truth" },
+      { label: "Selection", value: "Ingen global selection", tone: "neutral" },
+      { label: "Fokusyta", value: "Ingen fokusyta", tone: "neutral" },
+      { label: "Studio", value: "Ingen studio", tone: "neutral" },
+    ];
+    return `
+      <div class="queue-truth-view-guidance-strip">
+        ${items
+          .map(
+            (item) =>
+              `<article class="queue-truth-view-guidance-chip" data-tone="${escapeHtml(item.tone)}">
+                <span class="queue-truth-view-guidance-card-label">${escapeHtml(item.label)}</span>
+                <strong class="queue-truth-view-guidance-card-value">${escapeHtml(item.value)}</strong>
+              </article>`
+          )
+          .join("")}
+      </div>
+      <p class="queue-truth-view-guidance-note">
+        ${escapeHtml(
+          `Assistytan får hjälpa användaren prioritera lokalt med ${getTruthWorklistAssistFilterLabel(
+            viewState?.localFilter
+          )} och ${getTruthWorklistAssistSortLabel(
+            viewState?.localSort
+          )}. Operativ öppning sker fortfarande manuellt via legacy-kön.`
+        )}
+      </p>`;
+  }
+
+  function buildTruthWorklistRelayNoteMarkup(relay = null) {
+    if (!relay || typeof relay !== "object") return "";
+    const mailboxId = normalizeText(relay.mailboxId || "okand mailbox");
+    const customerLabel = normalizeText(relay.customerEmail || relay.customerName || "okand kund");
+    const subject = compactRuntimeCopy(relay.subject, "(utan amne)", 92);
+    const parityLabel = relay.comparable === true ? "Jämförbar parity" : "Not comparable yet";
+    const laneLabel = normalizeText(relay.lane || "all");
+    return `
+      <div class="queue-truth-relay-note-head">
+        <div class="queue-truth-relay-note-copy">
+          <p class="queue-truth-relay-note-kicker">Truth relay</p>
+          <h3>Visa i legacy-kö</h3>
+        </div>
+        <button
+          class="queue-truth-relay-note-clear"
+          type="button"
+          data-truth-relay-clear
+        >
+          Rensa relay
+        </button>
+      </div>
+      <p class="queue-truth-relay-note-provenance">
+        Truth-driven · Sekundär vy · Legacy queue fortfarande styrande · Envägs-relay aktivt
+      </p>
+      <p class="queue-truth-relay-note-meta">
+        Mailboxhint ${escapeHtml(mailboxId)} · Kund ${escapeHtml(customerLabel)} · Lane ${escapeHtml(
+          laneLabel
+        )} · ${escapeHtml(parityLabel)}
+      </p>
+      <p class="queue-truth-relay-note-body">
+        ${escapeHtml(
+          `Ämne: ${subject}. Öppna motsvarande rad manuellt i legacy-kön. Relay sätter inte vald tråd, öppnar inte fokusyta och öppnar inte studio.`
+        )}
+      </p>`;
+  }
+
+  function buildTruthWorklistRowsMarkup(payload = {}, relay = null) {
+    const items = asArray(payload?.rows).slice(0, getTruthWorklistViewLimit());
+    const comparableMailboxIds = new Set(getTruthWorklistComparableMailboxIds(payload));
+    const activeRelayConversationKey = normalizeText(
+      relay?.conversationKey || relay?.id || ""
+    ).toLowerCase();
+    if (!items.length) {
+      const emptyStateMessage = normalizeText(payload?.emptyStateMessage || "");
+      return `<p class="queue-truth-view-empty">${escapeHtml(
+        emptyStateMessage || "Inga truth-rader i parity-scope för det här mailboxscope:t ännu."
+      )}</p>`;
+    }
+    return items
+      .map((item) => {
+        const mailboxId = normalizeMailboxId(item?.mailbox?.mailboxId || "");
+        const comparable = comparableMailboxIds.has(mailboxId);
+        const relayConversationKey = normalizeText(
+          item?.conversation?.key || item?.conversationKey || item?.id || ""
+        );
+        const relayActive =
+          Boolean(activeRelayConversationKey) &&
+          relayConversationKey &&
+          relayConversationKey.toLowerCase() === activeRelayConversationKey;
+        const customerLabel = normalizeText(item?.customer?.email || item?.customer?.name || "okand kund");
+        const rollup = item?.rollup && typeof item.rollup === "object" ? item.rollup : null;
+        const stateBits = [];
+        if (item?.state?.hasUnreadInbound === true) stateBits.push("Unread inbound");
+        if (item?.state?.needsReply === true) stateBits.push("Needs reply");
+        if (item?.state?.folderPresence?.inbox === true) stateBits.push("Inbox");
+        if (item?.state?.folderPresence?.sent === true) stateBits.push("Sent");
+        const rollupMeta = [];
+        if (rollup?.enabled === true) {
+          rollupMeta.push({
+            tone: "mailbox",
+            text: `Rollup ${Number(rollup.count || 0)}`,
+          });
+          if (Number(rollup?.mailboxCount || 0) > 0) {
+            rollupMeta.push({
+              tone: "customer",
+              text: `${Number(rollup.mailboxCount || 0)} mailboxar`,
+            });
+          }
+          if (normalizeText(rollup?.provenanceDetail || "")) {
+            rollupMeta.push({
+              tone: "timing",
+              text: compactRuntimeCopy(rollup.provenanceDetail, "", 64),
+            });
+          }
+          const operationalParts = [];
+          const operationalSummary = rollup?.operationalSummary || {};
+          if (Number(operationalSummary.unreadCount || 0) > 0) {
+            operationalParts.push(`Unread ${Number(operationalSummary.unreadCount || 0)}`);
+          }
+          if (Number(operationalSummary.needsReplyCount || 0) > 0) {
+            operationalParts.push(`Needs reply ${Number(operationalSummary.needsReplyCount || 0)}`);
+          }
+          if (Number(operationalSummary.inboxCount || 0) > 0) {
+            operationalParts.push(`Inbox ${Number(operationalSummary.inboxCount || 0)}`);
+          }
+          if (Number(operationalSummary.sentCount || 0) > 0) {
+            operationalParts.push(`Sent ${Number(operationalSummary.sentCount || 0)}`);
+          }
+          if (operationalParts.length) {
+            rollupMeta.push({
+              tone: "state",
+              text: operationalParts.join(" · "),
+            });
+          }
+        }
+        const rowMeta = [
+          ...rollupMeta,
+          {
+            tone: "mailbox",
+            text: normalizeText(item?.mailbox?.mailboxId || "okand mailbox"),
+          },
+          { tone: "customer", text: customerLabel },
+          {
+            tone: "lane",
+            text: `Lane ${normalizeText(item?.lane || "all")}`,
+          },
+          {
+            tone: "owner",
+            text: `Ownership ${normalizeText(item?.mailbox?.ownershipMailbox || "okand")}`,
+          },
+          {
+            tone: "timing",
+            text: `Senaste inbound ${
+              item?.timing?.lastInboundAt ? formatConversationTime(item.timing.lastInboundAt) : "ingen"
+            }`,
+          },
+        ];
+        if (stateBits.length) {
+          rowMeta.push({
+            tone: "state",
+            text: stateBits.join(" · "),
+          });
+        }
+        return `<article class="queue-truth-view-row">
+          <div class="queue-truth-view-row-main">
+            <div class="queue-truth-view-row-head">
+              <strong>${escapeHtml(compactRuntimeCopy(item?.subject, "(utan amne)", 92))}</strong>
+              <div class="queue-truth-view-row-head-trail">
+                <span class="queue-truth-view-row-time">${escapeHtml(
+                  formatConversationTime(item?.timing?.latestMessageAt)
+                )}</span>
+                <div
+                  class="queue-truth-view-row-state"
+                  data-parity-state="${escapeHtml(comparable ? "comparable" : "not-comparable")}"
+                >
+                  <span>Parity</span>
+                  <strong>${escapeHtml(comparable ? "Jämförbar parity" : "Not comparable yet")}</strong>
+                </div>
+                <button
+                  class="queue-truth-view-relay-button"
+                  type="button"
+                  data-truth-relay-legacy
+                  data-truth-relay-mailbox-id="${escapeHtml(normalizeText(item?.mailbox?.mailboxId || ""))}"
+                  data-truth-relay-mailbox-address="${escapeHtml(
+                    normalizeText(item?.mailbox?.mailboxAddress || item?.mailbox?.mailboxId || "")
+                  )}"
+                  data-truth-relay-customer-email="${escapeHtml(
+                    normalizeText(item?.customer?.email || "")
+                  )}"
+                  data-truth-relay-customer-name="${escapeHtml(
+                    normalizeText(item?.customer?.name || "")
+                  )}"
+                  data-truth-relay-subject="${escapeHtml(normalizeText(item?.subject || ""))}"
+                  data-truth-relay-conversation-key="${escapeHtml(relayConversationKey)}"
+                  data-truth-relay-lane="${escapeHtml(normalizeText(item?.lane || "all"))}"
+                  data-truth-relay-comparable="${comparable ? "true" : "false"}"
+                  ${comparable ? "" : 'disabled aria-disabled="true"'}
+                >
+                  ${escapeHtml(
+                    comparable
+                      ? relayActive
+                        ? "Relay aktivt i legacy-kö"
+                        : "Visa i legacy-kö"
+                      : "Legacy-baseline saknas"
+                  )}
+                </button>
+              </div>
+            </div>
+            <p class="queue-truth-view-row-preview">${escapeHtml(
+              compactRuntimeCopy(item?.preview, "Ingen preview tillganglig.", 150)
+            )}</p>
+            <div class="queue-truth-view-row-meta">
+              ${rowMeta
+                .map(
+                  (meta) =>
+                    `<span class="queue-truth-view-row-meta-item" data-tone="${escapeHtml(
+                      meta.tone
+                    )}">${escapeHtml(meta.text)}</span>`
+                )
+                .join("")}
+            </div>
+          </div>
+        </article>`;
+      })
+      .join("");
+  }
+
+  function renderTruthWorklistRelayNote() {
+    if (!truthWorklistRelayNote) return;
+    const featureEnabled = isTruthWorklistViewFeatureEnabled();
+    const relay =
+      state.runtime?.truthWorklistView && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView.relay
+        : null;
+    const relayMarkup = buildTruthWorklistRelayNoteMarkup(relay);
+    truthWorklistRelayNote.hidden = !featureEnabled || !relayMarkup;
+    truthWorklistRelayNote.innerHTML = relayMarkup;
+  }
+
+  function clearTruthWorklistRelay() {
+    const viewState =
+      state.runtime?.truthWorklistView && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+    state.runtime.truthWorklistView = {
+      ...viewState,
+      relay: null,
+    };
+    renderTruthWorklistView();
+  }
+
+  function activateTruthWorklistRelay({
+    mailboxId = "",
+    mailboxAddress = "",
+    customerEmail = "",
+    customerName = "",
+    subject = "",
+    conversationKey = "",
+    lane = "all",
+    comparable = false,
+  } = {}) {
+    const viewState =
+      state.runtime?.truthWorklistView && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+    state.runtime.truthWorklistView = {
+      ...viewState,
+      page: "assist",
+      relay: {
+        mailboxId: normalizeText(mailboxId || mailboxAddress),
+        mailboxAddress: normalizeText(mailboxAddress || mailboxId),
+        customerEmail: normalizeText(customerEmail),
+        customerName: normalizeText(customerName),
+        subject: normalizeText(subject),
+        conversationKey: normalizeText(conversationKey),
+        lane: normalizeText(lane || "all") || "all",
+        comparable: comparable === true,
+        issuedAt: new Date().toISOString(),
+      },
+    };
+    renderTruthWorklistView();
+    if (truthWorklistRelayNote && typeof truthWorklistRelayNote.scrollIntoView === "function") {
+      truthWorklistRelayNote.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    } else if (queueContent && typeof queueContent.scrollIntoView === "function") {
+      queueContent.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  }
+
+  function renderTruthWorklistView() {
+    const featureEnabled = isTruthWorklistViewFeatureEnabled();
+    const viewState =
+      state.runtime && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+    const mailboxIds = asArray(viewState.mailboxIds).map((item) => normalizeMailboxId(item)).filter(Boolean);
+    const payload =
+      viewState.payload && typeof viewState.payload === "object" ? viewState.payload : null;
+    const hidden = viewState.hidden === true;
+    const activePage = normalizeTruthWorklistPage(viewState.page);
+
+    if (truthWorklistLaunchButton) {
+      truthWorklistLaunchButton.hidden = !featureEnabled;
+      truthWorklistLaunchButton.textContent = hidden
+        ? "Öppna Truth Worklist Assist View"
+        : "Stäng Truth Worklist Assist View";
+      truthWorklistLaunchButton.setAttribute("aria-pressed", hidden ? "false" : "true");
+      truthWorklistLaunchButton.setAttribute("aria-expanded", hidden ? "false" : "true");
+      syncTruthWorklistLaunchWidth();
+    }
+
+    setTruthWorklistShellOpen(featureEnabled && !hidden);
+
+    if (!featureEnabled || hidden) {
+      renderTruthWorklistRelayNote();
+      return;
+    }
+
+    truthWorklistPageButtons.forEach((button) => {
+      const isActive = normalizeTruthWorklistPage(button.dataset.truthWorklistPageButton) === activePage;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+      button.tabIndex = isActive ? 0 : -1;
+    });
+
+    truthWorklistPagePanels.forEach((panel) => {
+      const isActive = normalizeTruthWorklistPage(panel.dataset.truthWorklistPagePanel) === activePage;
+      panel.hidden = !isActive;
+      panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+    });
+
+    if (truthWorklistReadoutLink) {
+      truthWorklistReadoutLink.href = buildTruthWorklistReadoutHref(mailboxIds);
+    }
+
+    if (truthWorklistMeta) {
+      if (!mailboxIds.length) {
+        truthWorklistMeta.textContent =
+          "Valj ett mailboxscope for att se den truth-driven assistvyn. Legacy queue ar fortfarande styrande.";
+      } else if (viewState.authRequired) {
+        truthWorklistMeta.textContent =
+          "Logga in igen i admin for att lasa Truth Worklist Assist View. Legacy queue ar fortfarande styrande och shadow guardrail aktiv.";
+      } else if (viewState.loading) {
+        truthWorklistMeta.textContent =
+          "Laddar truth-driven assistvy for valt mailboxscope. Legacy queue fortfarande styrande och shadow guardrail aktiv.";
+      } else if (viewState.error) {
+        truthWorklistMeta.textContent = `Truth Worklist View kunde inte laddas: ${viewState.error}`;
+      } else {
+        const comparableMailboxIds = getTruthWorklistComparableMailboxIds(payload);
+        const notComparableMailboxIds = getTruthWorklistNotComparableMailboxIds(payload);
+        const scopeLabel =
+          mailboxIds.length === 1 ? mailboxIds[0] : `${mailboxIds.length} mailboxar i scope`;
+        const comparableLabel = comparableMailboxIds.length
+          ? `${comparableMailboxIds.length} jämförbara`
+          : "ingen jämförbar baseline ännu";
+        const notComparableLabel = notComparableMailboxIds.length
+          ? `${notComparableMailboxIds.length} not comparable yet`
+          : null;
+        const metaBits = [
+          viewState.scopeMode === "comparable_baseline"
+            ? "Assist scope jämförbar baseline"
+            : "Assist scope följer köscope",
+          `Scope ${scopeLabel}`,
+          payload?.shadowGuardrail?.acceptanceGate?.canConsiderCutover === true
+            ? "Shadow guardrail klar"
+            : "Shadow guardrail blockerad",
+          comparableLabel,
+        ];
+        if (notComparableLabel) {
+          metaBits.push(notComparableLabel);
+        }
+        truthWorklistMeta.textContent = metaBits.join(" · ");
+      }
+    }
+
+    if (truthWorklistSummary) {
+      truthWorklistSummary.innerHTML = payload
+        ? buildTruthWorklistSummaryMarkup(payload)
+        : '<p class="queue-truth-view-empty">Ingen consumer-data laddad ännu.</p>';
+    }
+
+    if (truthWorklistStatus) {
+      truthWorklistStatus.innerHTML = payload
+        ? buildTruthWorklistStatusMarkup(payload)
+        : '<p class="queue-truth-view-empty">Shadow guardrail invantar data.</p>';
+    }
+
+    if (truthWorklistMailboxes) {
+      truthWorklistMailboxes.innerHTML = payload
+        ? buildTruthWorklistMailboxMarkup(payload)
+        : '<p class="queue-truth-view-empty">Ingen mailbox-baseline tillganglig.</p>';
+    }
+
+    if (truthWorklistControls) {
+      truthWorklistControls.innerHTML = payload
+        ? buildTruthWorklistControlsMarkup(payload, viewState)
+        : '<p class="queue-truth-view-empty">Assistläget väntar på truth-rader.</p>';
+    }
+
+    if (truthWorklistGuidance) {
+      truthWorklistGuidance.innerHTML = payload
+        ? buildTruthWorklistGuidanceMarkup(payload, viewState)
+        : '<p class="queue-truth-view-empty">Relay och guardrail väntar på samma consumer-data.</p>';
+    }
+
+    if (truthWorklistRows) {
+      const visibleRows = payload ? getTruthWorklistVisibleRows(payload, viewState) : [];
+      const rowsPayload = payload
+        ? {
+            ...payload,
+            rows: visibleRows,
+            emptyStateMessage: asArray(payload?.rows).length
+              ? "Inga truth-rader matchar det lokala assistläget ännu."
+              : "Inga truth-rader i parity-scope för det här mailboxscope:t ännu.",
+          }
+        : null;
+      truthWorklistRows.innerHTML = payload
+        ? buildTruthWorklistRowsMarkup(rowsPayload, viewState.relay)
+        : '<p class="queue-truth-view-empty">Ingen truth-rad tillganglig an.</p>';
+    }
+
+    renderTruthWorklistRelayNote();
+  }
+
+  function syncTruthWorklistLaunchWidth() {
+    if (!truthWorklistLaunchButton) return;
+    truthWorklistLaunchButton.style.removeProperty("width");
+  }
+
+  async function loadTruthWorklistView({
+    mailboxIds = getTruthWorklistScopeIds(),
+    scopeMode = resolveTruthWorklistScope().scopeMode,
+    force = false,
+  } = {}) {
+    if (!isTruthWorklistViewFeatureEnabled()) return;
+    const normalizedMailboxIds = asArray(mailboxIds)
+      .map((item) => normalizeMailboxId(item))
+      .filter(Boolean);
+    const scopeKey = getTruthWorklistScopeKey(normalizedMailboxIds);
+    const currentState =
+      state.runtime && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+
+    if (!normalizedMailboxIds.length) {
+      state.runtime.truthWorklistView = {
+        ...currentState,
+        loading: false,
+        loaded: true,
+        error: "",
+        scopeKey: "",
+        scopeMode: "",
+        mailboxIds: [],
+        payload: null,
+      };
+      renderTruthWorklistView();
+      return;
+    }
+
+    if (!force && currentState.loading === true && currentState.scopeKey === scopeKey) {
+      return;
+    }
+
+    if (
+      !force &&
+      currentState.loaded === true &&
+      currentState.scopeKey === scopeKey &&
+      currentState.payload
+    ) {
+      renderTruthWorklistView();
+      return;
+    }
+
+    const requestSequence = ++truthWorklistRequestSequence;
+    state.runtime.truthWorklistView = {
+      ...currentState,
+      loading: true,
+      loaded: false,
+      authRequired: false,
+      error: "",
+      scopeKey,
+      scopeMode,
+      mailboxIds: normalizedMailboxIds,
+      payload:
+        currentState.scopeKey === scopeKey && currentState.payload ? currentState.payload : null,
+    };
+    renderTruthWorklistView();
+
+    try {
+      const adminToken = await waitForTruthWorklistAuthToken();
+      if (requestSequence !== truthWorklistRequestSequence) return;
+      if (!adminToken) {
+        state.runtime.truthWorklistView = {
+          ...state.runtime.truthWorklistView,
+          loading: false,
+          loaded: true,
+          authRequired: true,
+          error:
+            "Logga in igen i admin for att lasa truth-driven worklistdata i denna assistvy.",
+          scopeKey,
+          scopeMode,
+          mailboxIds: normalizedMailboxIds,
+          payload: null,
+        };
+        renderTruthWorklistView();
+        return;
+      }
+      const payload = await apiRequest(
+        buildTruthWorklistConsumerHref(normalizedMailboxIds, getTruthWorklistViewLimit())
+      );
+      if (requestSequence !== truthWorklistRequestSequence) return;
+      state.runtime.truthWorklistView = {
+        ...state.runtime.truthWorklistView,
+        loading: false,
+        loaded: true,
+        authRequired: false,
+        error: "",
+        scopeKey,
+        scopeMode,
+        mailboxIds: normalizedMailboxIds,
+        payload,
+      };
+      renderTruthWorklistView();
+    } catch (error) {
+      if (requestSequence !== truthWorklistRequestSequence) return;
+      state.runtime.truthWorklistView = {
+        ...state.runtime.truthWorklistView,
+        loading: false,
+        loaded: true,
+        authRequired: isAuthFailure(error?.statusCode, error?.message),
+        error: error instanceof Error ? error.message : String(error),
+        scopeKey,
+        scopeMode,
+        mailboxIds: normalizedMailboxIds,
+        payload: null,
+      };
+      renderTruthWorklistView();
+    }
+  }
+
+  function ensureTruthWorklistViewLoaded({ force = false } = {}) {
+    if (!isTruthWorklistViewFeatureEnabled()) {
+      renderTruthWorklistView();
+      return;
+    }
+    const viewState =
+      state.runtime && typeof state.runtime.truthWorklistView === "object"
+        ? state.runtime.truthWorklistView
+        : {};
+    if (viewState.hidden === true) {
+      renderTruthWorklistView();
+      return;
+    }
+    const truthWorklistScope = resolveTruthWorklistScope();
+    loadTruthWorklistView({
+      mailboxIds: truthWorklistScope.mailboxIds,
+      scopeMode: truthWorklistScope.scopeMode,
+      force,
+    }).catch((error) => {
+      console.warn("Truth Worklist View kunde inte laddas.", error);
+    });
   }
 
   function getIntelReadoutMailboxIds(thread) {
@@ -5633,7 +14029,8 @@
       title: "Ingen historik i valt urval",
       text: "Justera filtren eller byt scope för att läsa fler händelser.",
       chip: "Historik",
-    }
+    },
+    leadState = null
   ) {
     if (!container) return;
     container.innerHTML = "";
@@ -5652,11 +14049,39 @@
               )}</p>
             </div>
           </div>
-        </article>`;
+      </article>`;
       return;
     }
 
-    events.forEach((event) => {
+    if (leadState?.label) {
+      const leadArticle = document.createElement("article");
+      leadArticle.className = "focus-history-entry focus-history-entry--state";
+      const leadHead = document.createElement("div");
+      leadHead.className = "focus-history-entry-head";
+      const leadCopy = document.createElement("div");
+      const leadMeta = document.createElement("div");
+      leadMeta.className = "focus-history-meta-row";
+
+      const statePill = document.createElement("span");
+      statePill.className = "focus-customer-chip focus-customer-chip--green";
+      statePill.textContent = leadState.label;
+      leadMeta.appendChild(statePill);
+
+      const leadTitle = document.createElement("h4");
+      leadTitle.className = "focus-history-entry-title";
+      leadTitle.textContent = leadState.title || "Kundhistorik";
+
+      const leadText = document.createElement("p");
+      leadText.className = "focus-history-entry-text";
+      leadText.textContent = leadState.text || "";
+
+      leadCopy.append(leadMeta, leadTitle, leadText);
+      leadHead.appendChild(leadCopy);
+      leadArticle.appendChild(leadHead);
+      container.appendChild(leadArticle);
+    }
+
+    events.forEach((event, index) => {
       const article = document.createElement("article");
       article.className = "focus-history-entry";
       const resultType = deriveHistoryEventResultType(event);
@@ -5677,6 +14102,13 @@
 
       meta.appendChild(type);
 
+      if (index === 0 && leadState?.label) {
+        const state = document.createElement("span");
+        state.className = "focus-customer-chip focus-customer-chip--green focus-history-entry-state-pill";
+        state.textContent = leadState.label;
+        meta.appendChild(state);
+      }
+
       if (asText(event.mailboxLabel)) {
         const mailbox = document.createElement("span");
         mailbox.className = "focus-history-mailbox-pill";
@@ -5685,7 +14117,11 @@
       }
 
       const conversationId = asText(event.conversationId);
-      if (asText(event.scopeLabel) && conversationId && conversationId !== asText(selectedThreadId)) {
+      if (
+        asText(event.scopeLabel) &&
+        conversationId &&
+        !runtimeConversationIdsMatch(conversationId, selectedThreadId)
+      ) {
         const scope = document.createElement("span");
         scope.className = "focus-history-scope-pill";
         scope.textContent = compactRuntimeCopy(event.scopeLabel, event.scopeLabel, 28);
@@ -5710,7 +14146,7 @@
       head.append(copy, stamp);
       article.append(head);
 
-      if (conversationId && conversationId !== asText(selectedThreadId)) {
+      if (conversationId && !runtimeConversationIdsMatch(conversationId, selectedThreadId)) {
         const actions = document.createElement("div");
         actions.className = "focus-history-entry-actions";
 
@@ -5889,6 +14325,17 @@
 
   function setAutomationStatus(message = "", tone = "") {
     setFeedback(automationStatus, tone, message);
+  }
+
+  function setTrustNote(node, message = "", tone = "derived") {
+    if (!node) return;
+    const normalizedMessage = normalizeText(message);
+    node.textContent = normalizedMessage;
+    node.hidden = !normalizedMessage;
+    node.classList.remove("is-live", "is-derived", "is-fallback", "is-auth");
+    if (normalizedMessage) {
+      node.classList.add(`is-${normalizeKey(tone) || "derived"}`);
+    }
   }
 
   function setAuxStatus(node, message = "", tone = "") {
@@ -6238,14 +14685,14 @@
 
   function getCustomerDirectoryMap() {
     if (!state.customerRuntime.directory || typeof state.customerRuntime.directory !== "object") {
-      state.customerRuntime.directory = cloneJson(CUSTOMER_DIRECTORY);
+      state.customerRuntime.directory = {};
     }
     return state.customerRuntime.directory;
   }
 
   function getCustomerDetailsMap() {
     if (!state.customerRuntime.details || typeof state.customerRuntime.details !== "object") {
-      state.customerRuntime.details = cloneJson(CUSTOMER_PROFILE_DETAILS);
+      state.customerRuntime.details = {};
     }
     return state.customerRuntime.details;
   }
@@ -6270,6 +14717,15 @@
       details: cloneJson(getCustomerDetailsMap()),
       profileCounts: { ...state.customerRuntime.profileCounts },
       primaryEmailByKey: { ...state.customerPrimaryEmailByKey },
+      identityByKey:
+        state.customerRuntime.identityByKey && typeof state.customerRuntime.identityByKey === "object"
+          ? cloneJson(state.customerRuntime.identityByKey)
+          : {},
+      mergeReviewDecisionsByPairId:
+        state.customerRuntime.mergeReviewDecisionsByPairId &&
+        typeof state.customerRuntime.mergeReviewDecisionsByPairId === "object"
+          ? cloneJson(state.customerRuntime.mergeReviewDecisionsByPairId)
+          : {},
       customerSettings: { ...state.customerSettings },
       updatedAt: new Date().toISOString(),
     };
@@ -6291,38 +14747,32 @@
         .map((item) => buildCustomerSuggestionPairId(...String(item || "").split("::")))
         .filter(Boolean),
     ];
-    state.customerRuntime.directory = {
-      ...cloneJson(CUSTOMER_DIRECTORY),
-      ...(customerState?.directory && typeof customerState.directory === "object"
+    state.customerRuntime.directory =
+      customerState?.directory && typeof customerState.directory === "object"
         ? cloneJson(customerState.directory)
-        : {}),
-    };
-    state.customerRuntime.details = {
-      ...cloneJson(CUSTOMER_PROFILE_DETAILS),
-      ...(customerState?.details && typeof customerState.details === "object"
+        : {};
+    state.customerRuntime.details =
+      customerState?.details && typeof customerState.details === "object"
         ? cloneJson(customerState.details)
-        : {}),
-    };
-    state.customerRuntime.profileCounts = {
-      ...Object.fromEntries(
-        Object.entries(CUSTOMER_DIRECTORY).map(([key, item]) => [key, item.profileCount])
-      ),
-      ...(customerState?.profileCounts && typeof customerState.profileCounts === "object"
-        ? customerState.profileCounts
-        : {}),
-    };
-    state.customerPrimaryEmailByKey = {
-      ...Object.fromEntries(
-        Object.entries(CUSTOMER_PROFILE_DETAILS).map(([key, detail]) => [
-          key,
-          detail.emails[0] || "",
-        ])
-      ),
-      ...(customerState?.primaryEmailByKey &&
+        : {};
+    state.customerRuntime.profileCounts =
+      customerState?.profileCounts && typeof customerState.profileCounts === "object"
+        ? { ...customerState.profileCounts }
+        : {};
+    state.customerPrimaryEmailByKey =
+      customerState?.primaryEmailByKey &&
       typeof customerState.primaryEmailByKey === "object"
-        ? customerState.primaryEmailByKey
-        : {}),
-    };
+        ? { ...customerState.primaryEmailByKey }
+        : {};
+    state.customerRuntime.identityByKey =
+      customerState?.identityByKey && typeof customerState.identityByKey === "object"
+        ? cloneJson(customerState.identityByKey)
+        : {};
+    state.customerRuntime.mergeReviewDecisionsByPairId =
+      customerState?.mergeReviewDecisionsByPairId &&
+      typeof customerState.mergeReviewDecisionsByPairId === "object"
+        ? cloneJson(customerState.mergeReviewDecisionsByPairId)
+        : {};
     state.customerSettings = {
       ...DEFAULT_CUSTOMER_SETTINGS,
       ...(customerState?.customerSettings &&
@@ -6527,6 +14977,22 @@
         (key) => normalizeKey(directoryMap[key]?.name) === normalizedName
       ) || "";
     return normalizeKey(state.customerRuntime.mergedInto[normalizeKey(match)] || match);
+  }
+
+  function syncSelectedCustomerIdentityForThread(thread) {
+    if (!thread) return false;
+    ensureCustomerRuntimeProfilesFromLive();
+    const resolvedCustomerKey =
+      normalizeKey(thread?.customerKey) ||
+      findCustomerKeyByEmail(thread?.customerEmail) ||
+      findCustomerKeyByName(thread?.customerName) ||
+      "";
+    if (!resolvedCustomerKey) return false;
+    if (normalizeKey(state.selectedCustomerIdentity) !== resolvedCustomerKey) {
+      setSelectedCustomerIdentity(resolvedCustomerKey);
+      return true;
+    }
+    return false;
   }
 
   function createCustomerKeyFromThread(thread) {
@@ -6813,11 +15279,15 @@
       state.customerPrimaryEmailByKey[detail.key] || detail.emails[0] || "";
 
     if (customerDetailName) {
-      customerDetailName.textContent = detail.name;
+      customerDetailName.textContent = detail.key ? detail.name : "Ingen kund vald";
     }
 
     if (customerEmailList) {
       customerEmailList.innerHTML = "";
+      if (!detail.key) {
+        customerEmailList.innerHTML =
+          '<p class="customers-rail-inline-note">Välj en kund i listan för att se e-post, primary email och identitetsverktyg.</p>';
+      }
       detail.emails.forEach((email, index) => {
         const row = document.createElement("div");
         row.className = "customers-email-row";
@@ -6973,11 +15443,13 @@
     const fileName =
       normalizeText(state.customerImport.fileName) || inferCustomerImportFileName(sourceText);
     const previewRows = asArray(state.customerImport.preview?.rows);
+    const sourceSystem = "cliento";
     if (previewRows.length) {
       return {
         rows: buildCustomerImportRowsPayload(previewRows),
         fileName,
         defaultMailboxId: getOperationalImportMailboxId(),
+        sourceSystem,
       };
     }
     if (state.customerImport.sourceBinaryBase64) {
@@ -6985,12 +15457,14 @@
         binaryBase64: state.customerImport.sourceBinaryBase64,
         fileName,
         defaultMailboxId: getOperationalImportMailboxId(),
+        sourceSystem,
       };
     }
     return {
       text: sourceText,
       fileName,
       defaultMailboxId: getOperationalImportMailboxId(),
+      sourceSystem,
     };
   }
 
@@ -7381,12 +15855,45 @@
       .forEach((node) => node.remove());
 
     state.customMailboxes.forEach((mailbox) => {
+      const mailboxTokens = new Set(
+        getMailboxIdentityTokens(mailbox).map((token) => normalizeMailboxId(token)).filter(Boolean)
+      );
+      const mirrorsLegacyMailbox = LEGACY_RUNTIME_MAILBOXES.some((legacyMailbox) =>
+        getMailboxIdentityTokens(legacyMailbox).some((token) =>
+          mailboxTokens.has(normalizeMailboxId(token))
+        )
+      );
+      if (mirrorsLegacyMailbox) return;
+      const toneClass = deriveMailboxToneClass({
+        id: mailbox.id,
+        email: mailbox.email,
+        label: mailbox.name || mailbox.label,
+        toneClass: mailbox.toneClass,
+      });
+      const mailboxName = escapeHtml(mailbox.name || mailbox.label || "Mailbox");
+      const mailboxEmail = escapeHtml(asText(mailbox.email).toLowerCase());
+      const signatureLabel = normalizeText(mailbox.signature?.label);
+      const metaCopy = escapeHtml(
+        signatureLabel ? `Signatur: ${signatureLabel}` : `Ägare: ${mailbox.owner || "Team"}`
+      );
       const label = document.createElement("label");
       label.className = "mailbox-option mailbox-option-custom";
+      if (toneClass) {
+        label.classList.add(toneClass);
+      }
       label.innerHTML =
         '<input class="mailbox-option-input" type="checkbox" />' +
         '<span class="mailbox-option-box" aria-hidden="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 8.4 6.6 11.2l5.8-6.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" /></svg></span>' +
-        `<span class="mailbox-option-name">${mailbox.name}</span>`;
+        `<span class="mailbox-option-copy">
+          <span class="mailbox-option-primary">
+            <span class="mailbox-option-name">${mailboxName}</span>
+            <span class="mailbox-option-status">Custom</span>
+          </span>
+          <span class="mailbox-option-secondary">
+            <span class="mailbox-option-email">${mailboxEmail}</span>
+            <span class="mailbox-option-meta">${metaCopy}</span>
+          </span>
+        </span>`;
       mailboxOptionsContainer.insertBefore(label, mailboxAdminOpenButton);
     });
   }
@@ -7605,8 +16112,7 @@
     }
 
     if (normalizedCommand === "snooze") {
-      state.later.bulkSelectionKeys = selectedThreads.map((thread) => thread.id);
-      openLaterDialog();
+      openLaterDialog({ bulkThreadIds: selectedThreads.map((thread) => thread.id) });
       setAuxStatus(
         laterStatus,
         `${selectedThreads.length} trådar redo för nytt senareläggningsval.`,
@@ -8096,6 +16602,8 @@
         throw settingsPayload.reason;
       }
       applySettingsViewState(settingsPayload.value?.settings || {});
+      renderMailboxAdminList();
+      renderMailboxOptions();
       if (mePayload.status === "fulfilled") {
         const profile = parseIntegrationActorProfile(mePayload.value);
         if (
@@ -8401,6 +16909,28 @@
     return state.automationRuntime.templateRecordsByKey[normalizedKey] || null;
   }
 
+  function getPreferredAutomationVersionId(
+    templateKey = state.selectedAutomationTemplate
+  ) {
+    const versions = getAutomationVersions(templateKey);
+    const selectedVersionId = normalizeKey(state.selectedAutomationVersion);
+    const selectedExists = versions.some(
+      (version) => normalizeKey(version.id) === selectedVersionId
+    );
+    if (selectedExists) {
+      return state.selectedAutomationVersion;
+    }
+
+    const activeVersionId = normalizeText(
+      state.automationRuntime.activeVersionIdByKey[normalizeKey(templateKey) || "churn_guard"]
+    );
+    if (activeVersionId) {
+      return activeVersionId;
+    }
+
+    return versions[0]?.id || "placeholder";
+  }
+
   function buildAutomationTemplateContent(templateKey = state.selectedAutomationTemplate) {
     const normalizedKey = normalizeKey(templateKey) || "churn_guard";
     const template =
@@ -8642,6 +17172,7 @@
             }
           });
         }
+        renderAutomationTrustNotes();
         return;
       }
 
@@ -8698,10 +17229,11 @@
         point.textContent = pointValue;
       });
       buttons.forEach((button) => {
-        button.disabled = false;
-        if (normalizeKey(button.dataset.automationVersionAction) === "restore") {
+        const actionKey = normalizeKey(button.dataset.automationVersionAction);
+        button.disabled = authRequired && actionKey === "restore";
+        if (actionKey === "restore") {
           button.textContent = isActive ? "Aktiv nu" : "Aktivera";
-          button.disabled = isActive;
+          button.disabled = isActive || authRequired;
         }
       });
 
@@ -8771,6 +17303,8 @@
         }
       });
     });
+
+    renderAutomationTrustNotes();
   }
 
   async function loadAutomationVersions(templateKey = state.selectedAutomationTemplate, options = {}) {
@@ -9113,7 +17647,17 @@
     renderCustomerBatchSelection();
 
     if (!visibleKeys.length) {
-      setCustomersStatus("Ingen kund matchar ditt urval just nu.", "error");
+      const hasSearch = Boolean(normalizeKey(state.customerSearch));
+      const hasNonDefaultFilter =
+        normalizeKey(state.customerFilter) && normalizeKey(state.customerFilter) !== "alla kunder";
+      if (state.customerRuntime.error) {
+        setCustomersStatus(state.customerRuntime.error, "error");
+      } else if (hasSearch || hasNonDefaultFilter) {
+        setCustomersStatus("Ingen kund matchar ditt urval just nu.", "error");
+      } else if (state.customerRuntime.loaded) {
+        setCustomersStatus("Kundregistret är tomt just nu.", "loading");
+      }
+      setSelectedCustomerIdentity("");
       return;
     }
 
@@ -9192,6 +17736,7 @@
     const visibleThreads = getQueueScopedRuntimeThreads();
     const mailboxScopeCount =
       getSelectedRuntimeMailboxScopeIds().length || getAvailableRuntimeMailboxes().length || 0;
+    const ownerScopeAvailability = getOwnerScopeAvailability();
 
     return {
       readiness: {
@@ -9236,7 +17781,9 @@
         trend: `${mailboxScopeCount} mailboxar`,
         trendTone: "positive",
         value: String(visibleThreads.length),
-        meta: `Ägarscope: ${getAnalyticsOwnerScopeLabel()}.`,
+        meta: `Ägarscope: ${getAnalyticsOwnerScopeLabel()}.${
+          ownerScopeAvailability.note ? ` ${ownerScopeAvailability.note}` : ""
+        }`,
       },
     };
   }
@@ -9328,6 +17875,146 @@
         )
         .join("");
     }
+
+    renderAnalyticsTrustNotes();
+  }
+
+  function buildAnalyticsAuthBlockedPeriodData(periodKey = state.selectedAnalyticsPeriod) {
+    const fallback =
+      ANALYTICS_PERIOD_DATA[normalizeKey(periodKey)] || ANALYTICS_PERIOD_DATA.week;
+    return {
+      metrics: {
+        reply_time: {
+          value: "Låst",
+          trend: "Inloggning krävs",
+          tone: "negative",
+        },
+        sla: {
+          value: "Låst",
+          trend: "Auth krävs",
+          tone: "negative",
+        },
+        conversations: {
+          value: "Låst",
+          trend: "Ägarvy låst",
+          tone: "negative",
+        },
+        csat: {
+          value: "Låst",
+          trend: "Ingen livebild",
+          tone: "negative",
+        },
+      },
+      self: {
+        closed: "Låst",
+        self_reply_time: "Låst",
+        templates: "Låst",
+        upsell: "Låst",
+        upsell_count: "—",
+        upsellCaption: "logga in för personlig analytics",
+      },
+      leaderboard: [
+        {
+          medal: "•",
+          name: "Logga in för live-ranking",
+          score: "Låst",
+        },
+      ],
+      templates: Object.fromEntries(
+        Object.entries(fallback.templates).map(([key, template]) => [
+          key,
+          {
+            label: template.label,
+            share: "Låst",
+            width: "0%",
+          },
+        ])
+      ),
+      coaching: {
+        label: "Inloggning krävs",
+        copy:
+          "Lower dashboard är spärrad tills analytics-källorna kan läsas med giltig admin-session.",
+        action: "Logga in",
+        target: "auth",
+        templateTarget: "",
+        disabled: false,
+      },
+    };
+  }
+
+  function renderAnalyticsTrustNotes(
+    periodData = buildDerivedAnalyticsPeriodData(state.selectedAnalyticsPeriod)
+  ) {
+    const analytics = state.analyticsRuntime;
+    const authRequired = analytics.authRequired === true;
+    const authLocked = authRequired && !analytics.loaded;
+    const partialAuth = authRequired && analytics.loaded;
+    const leaderboardPlaceholder = normalizeKey(periodData?.leaderboard?.[0]?.name).includes(
+      "ingen live-ranking ännu"
+    );
+    const authLeaderboardPlaceholder = normalizeKey(periodData?.leaderboard?.[0]?.name).includes(
+      "logga in för live-ranking"
+    );
+
+    setTrustNote(
+      analyticsTrustNotes.team,
+      authLocked
+        ? "Auth-låst: teamkortet visar inga fallback-KPI:er som om de vore live analytics."
+        : partialAuth
+          ? "Härledd från livekällor: KPI-raden bygger på live telemetry och aktivt scope. Vissa owner-källor kräver ny inloggning."
+          : analytics.loaded
+            ? "Härledd från livekällor: KPI-raden bygger på live telemetry, aktivt mailboxscope och runtime-kön."
+            : "Fallback/vänteläge: KPI-raden väntar på första livebilden och ska inte läsas som analytics-sanning ännu.",
+      authLocked || partialAuth ? "auth" : analytics.loaded ? "derived" : "fallback"
+    );
+
+    setTrustNote(
+      analyticsTrustNotes.self,
+      authLocked
+        ? "Auth-låst: personlig analytics väntar på att admin-sessionen återställs."
+        : partialAuth
+          ? "Härledd från livekällor: din prestation följer samma live-scope som teamkortet, men owner-data är delvis auth-låst."
+          : analytics.loaded
+            ? "Härledd från livekällor: din prestation byggs från live telemetry och aktivt runtime-scope, inte från en separat self-feed."
+            : "Fallback/vänteläge: självkortet väntar på en verifierad livebild.",
+      authLocked || partialAuth ? "auth" : analytics.loaded ? "derived" : "fallback"
+    );
+
+    setTrustNote(
+      analyticsTrustNotes.leaderboard,
+      authLocked || authLeaderboardPlaceholder
+        ? "Auth-låst: leaderboarden väntar på live-ranking med giltig admin-session."
+        : leaderboardPlaceholder
+          ? "Fallback/vänteläge: ingen separat live-ranking hittades, så ytan visar vänteläge i stället för statiska fallbacknamn."
+          : "Härledd från livekällor: leaderboarden följer den ranking som finns i aktuell analytics-sammanställning.",
+      authLocked || authLeaderboardPlaceholder
+        ? "auth"
+        : leaderboardPlaceholder
+          ? "fallback"
+          : "derived"
+    );
+
+    setTrustNote(
+      analyticsTrustNotes.templates,
+      authLocked
+        ? "Auth-låst: mallandelar visas inte som analytics-sanning utan giltig admin-session."
+        : analytics.loaded
+          ? "Härledd från livekällor: mallandelarna byggs från synligt scope och vald period, inte från en separat performance-feed."
+          : "Fallback/vänteläge: mallandelar väntar på analytics-laddning innan de kan tolkas.",
+      authLocked ? "auth" : analytics.loaded ? "derived" : "fallback"
+    );
+
+    setTrustNote(
+      analyticsTrustNotes.coaching,
+      authLocked
+        ? "Auth-låst: coachningen väntar på att analytics-källorna kan läsas med giltig session."
+        : partialAuth
+          ? "Härledd från livekällor: coachningen bygger på live telemetry och scope, men vissa owner-källor är auth-låsta."
+          : analytics.loaded
+            ? "Härledd från livekällor: coachningen bygger på live telemetry och runtime-scope, inte från en separat coachingtjänst."
+            : "Fallback/vänteläge: coachningen väntar på live analytics innan den kan tolkas som vägledning.",
+      authLocked || partialAuth ? "auth" : analytics.loaded ? "derived" : "fallback"
+    );
   }
 
   async function loadAnalyticsRuntime({ force = false } = {}) {
@@ -9336,6 +18023,7 @@
     const requestId = state.analyticsRuntime.requestId + 1;
     state.analyticsRuntime.requestId = requestId;
     state.analyticsRuntime.loading = true;
+    state.analyticsRuntime.authRequired = false;
     if (!state.analyticsRuntime.loaded) {
       state.analyticsRuntime.error = "";
     }
@@ -9363,6 +18051,7 @@
     let successCount = 0;
     const nextValues = {};
     const failures = [];
+    let hasAuthFailure = false;
 
     settled.forEach((result, index) => {
       const [key] = requests[index];
@@ -9372,6 +18061,11 @@
         return;
       }
       nextValues[key] = state.analyticsRuntime[key] || null;
+      const statusCode = Number(result.reason?.statusCode || result.reason?.status || 0);
+      const message = result.reason instanceof Error ? result.reason.message : String(result.reason || "");
+      if (isAuthFailure(statusCode, message)) {
+        hasAuthFailure = true;
+      }
       failures.push(result.reason);
     });
 
@@ -9381,28 +18075,37 @@
         firstFailure instanceof Error ? firstFailure.message : "Kunde inte läsa live analytics.";
       const statusCode = Number(firstFailure?.statusCode || firstFailure?.status || 0);
       state.analyticsRuntime.loading = false;
+      state.analyticsRuntime.authRequired = hasAuthFailure;
       state.analyticsRuntime.error = isAuthFailure(statusCode, message)
         ? "Inloggning krävs för analytics i nya CCO."
         : message;
       renderAnalyticsRuntime();
+      renderAnalyticsPeriod();
       return;
     }
 
     state.analyticsRuntime.loading = false;
     state.analyticsRuntime.loaded = true;
+    state.analyticsRuntime.authRequired = hasAuthFailure;
     state.analyticsRuntime.partial = failures.length > 0;
     state.analyticsRuntime.lastLoadedAt = new Date().toISOString();
     Object.assign(state.analyticsRuntime, nextValues);
     state.analyticsRuntime.error =
       failures.length > 0
-        ? "Vissa analytics-källor kunde inte läsas. Visar senaste kompletta livebild."
+        ? hasAuthFailure
+          ? "Vissa analytics-källor kräver inloggning. Visar senaste kompletta livebild där det går."
+          : "Vissa analytics-källor kunde inte läsas. Visar senaste kompletta livebild."
         : "";
     renderAnalyticsRuntime();
+    renderAnalyticsPeriod();
   }
 
   function buildDerivedAnalyticsPeriodData(periodKey = state.selectedAnalyticsPeriod) {
     const fallback =
       ANALYTICS_PERIOD_DATA[normalizeKey(periodKey)] || ANALYTICS_PERIOD_DATA.week;
+    if (state.analyticsRuntime.authRequired && !state.analyticsRuntime.loaded) {
+      return buildAnalyticsAuthBlockedPeriodData(periodKey);
+    }
     if (!state.analyticsRuntime.loaded) return fallback;
 
     const visibleThreads = getQueueScopedRuntimeThreads();
@@ -9469,21 +18172,23 @@
       return text.includes("ombok") || text.includes("later") || text.includes("followup");
     }).length;
     const templateCounts = {
-      booking_confirmation: Math.max(1, bookingCount),
-      pricing: Math.max(1, pricingCount),
-      reschedule: Math.max(1, rescheduleCount),
+      booking_confirmation: bookingCount,
+      pricing: pricingCount,
+      reschedule: rescheduleCount,
     };
     const templateCountTotal = Object.values(templateCounts).reduce((sum, value) => sum + value, 0);
     const templateRows = Object.fromEntries(
       Object.entries(templateCounts).map(([key, count]) => {
         const fallbackRow = fallback.templates[key];
-        const share = Math.round((count / Math.max(templateCountTotal, 1)) * 100);
+        const share =
+          templateCountTotal > 0 ? Math.round((count / Math.max(templateCountTotal, 1)) * 100) : 0;
         return [
           key,
           {
             label: fallbackRow.label,
             share: `${share}%`,
-            width: `${Math.min(92, Math.max(26, share))}%`,
+            width:
+              templateCountTotal > 0 ? `${Math.min(92, Math.max(26, share || 12))}%` : "0%",
           },
         ];
       })
@@ -9509,13 +18214,20 @@
           asNumber(item?.handled, 0),
       }))
       .filter((item) => normalizeText(item.name));
-    const leaderboard = (leaderboardCandidates.length ? leaderboardCandidates : fallback.leaderboard)
-      .slice(0, 3)
-      .map((item, index) => ({
-        medal: medalByIndex[index] || "•",
-        name: item.name,
-        score: String(item.score || item.score === 0 ? item.score : fallback.leaderboard[index]?.score || "0"),
-      }));
+    const leaderboard =
+      leaderboardCandidates.length > 0
+        ? leaderboardCandidates.slice(0, 3).map((item, index) => ({
+            medal: medalByIndex[index] || "•",
+            name: item.name,
+            score: String(item.score || item.score === 0 ? item.score : "0"),
+          }))
+        : [
+            {
+              medal: "•",
+              name: "Ingen live-ranking ännu",
+              score: "Väntar",
+            },
+          ];
 
     const coachingAction =
       ownerPending > 0
@@ -9572,6 +18284,13 @@
         label: ownerPending > 0 ? "Coachningsinsikt" : fallback.coaching.label,
         copy: coachingCopy,
         action: coachingAction,
+        target:
+          ownerPending > 0
+            ? "history"
+            : riskOpen > 0 || incidentOpen > 0
+              ? "risk"
+              : "templates",
+        templateTarget: "payment_reminder",
       },
     };
   }
@@ -9617,6 +18336,8 @@
 
     analyticsLeaderboardRows.forEach((row) => {
       const item = periodData.leaderboard[Number(row.dataset.analyticsLeaderboardRow) || 0];
+      row.hidden = !item;
+      row.setAttribute("aria-hidden", item ? "false" : "true");
       if (!item) return;
       const badge = row.querySelector("div span");
       const name = row.querySelector("div strong");
@@ -9645,7 +18366,72 @@
     }
     if (analyticsCoachingAction) {
       analyticsCoachingAction.textContent = periodData.coaching.action;
+      analyticsCoachingAction.disabled = periodData.coaching.disabled === true;
     }
+
+    renderAnalyticsTrustNotes(periodData);
+  }
+
+  function renderAutomationTrustNotes() {
+    const authRequired = state.automationRuntime.authRequired === true;
+
+    setTrustNote(
+      automationTrustNotes.global,
+      authRequired
+        ? "Auth-låst: live save, test och aktivering kräver ny admin-session. Buildern och senaste läsbara versioner kan fortfarande granskas."
+        : "Livekälla: spara, testkör och versionsspår går mot templatesystemet. Builder, analys och autopilot innehåller också shell-lokala ytor.",
+      authRequired ? "auth" : "live"
+    );
+    setTrustNote(
+      automationTrustNotes.analysis,
+      "Shell-lokal: analyskort och copy är härledd UI tills en separat livekälla verifieras.",
+      "fallback"
+    );
+    setTrustNote(
+      automationTrustNotes.testing,
+      authRequired
+        ? "Auth-låst: Kör test kräver giltig admin-session. Hoppa över väntan förblir shell-lokal simulering även när auth saknas."
+        : "Delad sanning: Kör test använder live evaluate. Hoppa över väntan är shell-lokal simulering för testing-vyn.",
+      authRequired ? "auth" : "derived"
+    );
+    setTrustNote(
+      automationTrustNotes.versioner,
+      authRequired
+        ? "Auth-låst: versionskort kan visa senaste läsbara livebild, men aktivering kräver ny inloggning."
+        : "Livekälla: versionskort och aktivering läser och skriver till templatesystemets livehistorik.",
+      authRequired ? "auth" : "live"
+    );
+    setTrustNote(
+      automationTrustNotes.autopilot,
+      "Shell-lokal: autopilotförslag, pending count och senaste optimeringar saknar separat livekälla.",
+      "fallback"
+    );
+
+    if (automationRunButton && !automationRunButton.classList.contains("is-busy")) {
+      automationRunButton.disabled = authRequired || state.automationRuntime.loading;
+    }
+    if (automationSaveButton && !automationSaveButton.classList.contains("is-busy")) {
+      automationSaveButton.disabled = authRequired || state.automationRuntime.loading;
+    }
+    automationTestingActionButtons.forEach((button) => {
+      if (normalizeKey(button.dataset.automationTestingAction) === "run") {
+        button.disabled = authRequired || state.automationRuntime.loading;
+      }
+    });
+    automationVersionCards.forEach((card) => {
+      const versionKey = normalizeKey(card.dataset.automationVersion);
+      const restoreButton = card.querySelector('[data-automation-version-action="restore"]');
+      if (!restoreButton) return;
+      if (authRequired || state.automationRuntime.loading) {
+        restoreButton.disabled = true;
+        return;
+      }
+      const isActiveVersion =
+        versionKey &&
+        versionKey !== "placeholder" &&
+        versionKey === normalizeKey(state.automationRuntime.activeVersionIdByKey[state.selectedAutomationTemplate]);
+      restoreButton.disabled = isActiveVersion;
+    });
   }
 
   function renderAutomationTemplateConfig() {
@@ -9676,6 +18462,8 @@
           : "";
       });
     });
+
+    renderAutomationTrustNotes();
   }
 
   function renderAutomationTestingState() {
@@ -9710,6 +18498,8 @@
         automationTestingLogList.appendChild(article);
       });
     }
+
+    renderAutomationTrustNotes();
   }
 
   function renderAutomationSuggestions() {
@@ -9777,6 +18567,8 @@
       automationAutopilotFootCards[2].querySelector("strong").textContent =
         state.automationRuntime.autopilotPerformance;
     }
+
+    renderAutomationTrustNotes();
   }
 
   function applyCustomerMerge(primaryKey, secondaryKeys, options = {}) {
@@ -10099,6 +18891,7 @@
       renderAutomationVersions();
     } finally {
       setButtonBusy(button, false, idleLabel, busyLabel);
+      renderAutomationTrustNotes();
     }
   }
 
@@ -10181,6 +18974,32 @@
     setAutomationStatus("Öppnade mallbiblioteket från huvud-analys för att följa upp insikten.", "success");
   }
 
+  function handleAnalyticsCoachingAction() {
+    const coaching = buildDerivedAnalyticsPeriodData(state.selectedAnalyticsPeriod)?.coaching || {};
+    const target = normalizeKey(coaching.target);
+
+    if (target === "auth") {
+      window.open(buildReauthUrl("analytics_auth"), "_blank", "noopener");
+      return;
+    }
+
+    if (target === "history") {
+      setAppView("conversations");
+      applyFocusSection("history");
+      setContextCollapsed(false);
+      return;
+    }
+
+    if (target === "risk") {
+      setAppView("conversations");
+      applyFocusSection("conversation");
+      setContextCollapsed(false);
+      return;
+    }
+
+    handleAnalyticsTemplateJump(coaching.templateTarget || "payment_reminder");
+  }
+
   function applyAutomationSuggestionAction(card, actionKey) {
     const key = normalizeKey(card?.dataset.automationSuggestion);
     if (!key) return;
@@ -10247,7 +19066,7 @@
     }
 
     setAutomationSubnav("versioner");
-    setSelectedAutomationVersion("v3_0");
+    setSelectedAutomationVersion(getPreferredAutomationVersionId());
     setAutomationStatus("Versionsytan öppnades för att visa mer release- och diffkontext.", "loading");
   }
 
@@ -10528,11 +19347,104 @@
     }
   }
 
-  function handleMailboxAdminSave() {
+  function setMailboxAdminSignatureEditorHtml(html = "", { markAuto = false } = {}) {
+    if (!mailboxAdminSignatureEditor) return;
+    const safeHtml = sanitizeMailboxSignatureHtml(html) || buildMailboxAdminSignatureSeedHtml();
+    mailboxAdminSignatureEditor.innerHTML = safeHtml;
+    mailboxAdminSignatureEditor.dataset.autoHtml = markAuto ? safeHtml : "";
+  }
+
+  function syncMailboxAdminSignatureEditorFromFields({ force = false } = {}) {
+    if (!mailboxAdminSignatureEditor) return;
+    const nextHtml = buildMailboxAdminSignatureSeedHtml();
+    const currentHtml = sanitizeMailboxSignatureHtml(mailboxAdminSignatureEditor.innerHTML || "");
+    const lastAutoHtml = sanitizeMailboxSignatureHtml(
+      mailboxAdminSignatureEditor.dataset.autoHtml || ""
+    );
+    if (force || !currentHtml || currentHtml === lastAutoHtml) {
+      mailboxAdminSignatureEditor.innerHTML = nextHtml;
+    }
+    mailboxAdminSignatureEditor.dataset.autoHtml = nextHtml;
+  }
+
+  function renderMailboxAdminFormState() {
+    const isEditing = Boolean(normalizeMailboxId(state.mailboxAdminEditingId));
+    if (mailboxAdminFormTitle) {
+      mailboxAdminFormTitle.textContent = isEditing ? "Redigera mailbox" : "Lägg till mailbox";
+    }
+    if (mailboxAdminResetButton) {
+      mailboxAdminResetButton.hidden = !isEditing;
+    }
+    if (mailboxAdminSaveButton) {
+      mailboxAdminSaveButton.textContent = isEditing ? "Spara mailbox" : "Lägg till mailbox";
+    }
+  }
+
+  function resetMailboxAdminForm({ preserveFeedback = false } = {}) {
+    state.mailboxAdminEditingId = "";
+    if (mailboxAdminNameInput) mailboxAdminNameInput.value = "";
+    if (mailboxAdminEmailInput) mailboxAdminEmailInput.value = "";
+    if (mailboxAdminOwnerSelect) mailboxAdminOwnerSelect.value = "Fazli";
+    if (mailboxAdminSignatureNameInput) mailboxAdminSignatureNameInput.value = "";
+    if (mailboxAdminSignatureFullNameInput) mailboxAdminSignatureFullNameInput.value = "";
+    if (mailboxAdminSignatureTitleInput) mailboxAdminSignatureTitleInput.value = "";
+    syncMailboxAdminSignatureEditorFromFields({ force: true });
+    renderMailboxAdminFormState();
+    renderMailboxAdminList();
+    if (!preserveFeedback) {
+      setFeedback(mailboxAdminFeedback, "", "");
+    }
+  }
+
+  function setMailboxAdminEditingMailbox(mailboxId = "") {
+    const mailbox = findCustomMailboxDefinition(mailboxId);
+    if (!mailbox) {
+      resetMailboxAdminForm({ preserveFeedback: true });
+      return;
+    }
+    state.mailboxAdminEditingId = mailbox.id;
+    if (mailboxAdminNameInput) mailboxAdminNameInput.value = mailbox.label || "";
+    if (mailboxAdminEmailInput) mailboxAdminEmailInput.value = mailbox.email || "";
+    if (mailboxAdminOwnerSelect) {
+      mailboxAdminOwnerSelect.value = mailbox.owner || "Team";
+    }
+    if (mailboxAdminSignatureNameInput) {
+      mailboxAdminSignatureNameInput.value = mailbox.signature?.label || "";
+    }
+    if (mailboxAdminSignatureFullNameInput) {
+      mailboxAdminSignatureFullNameInput.value = mailbox.signature?.fullName || "";
+    }
+    if (mailboxAdminSignatureTitleInput) {
+      mailboxAdminSignatureTitleInput.value = mailbox.signature?.title || "";
+    }
+    const storedSignatureHtml = sanitizeMailboxSignatureHtml(mailbox.signature?.html || "");
+    if (storedSignatureHtml) {
+      setMailboxAdminSignatureEditorHtml(storedSignatureHtml, { markAuto: false });
+    } else {
+      syncMailboxAdminSignatureEditorFromFields({ force: true });
+    }
+    renderMailboxAdminFormState();
+    renderMailboxAdminList();
+    setFeedback(mailboxAdminFeedback, "", "");
+  }
+
+  function applyMailboxAdminSignatureCommand(command = "") {
+    if (!mailboxAdminSignatureEditor || !command) return;
+    mailboxAdminSignatureEditor.focus();
+    if (typeof document.execCommand !== "function") return;
+    document.execCommand(command, false, null);
+  }
+
+  async function handleMailboxAdminSave() {
     const mailboxName = normalizeText(mailboxAdminNameInput?.value);
     const mailboxEmail = normalizeText(mailboxAdminEmailInput?.value).toLowerCase();
     const ownerName = normalizeText(mailboxAdminOwnerSelect?.value) || "Team";
+    const signatureLabel = normalizeText(mailboxAdminSignatureNameInput?.value);
+    const signatureFullName = normalizeText(mailboxAdminSignatureFullNameInput?.value);
+    const signatureTitle = normalizeText(mailboxAdminSignatureTitleInput?.value);
+    const signatureHtml = sanitizeMailboxSignatureHtml(mailboxAdminSignatureEditor?.innerHTML || "");
     const mailboxLabel = mailboxName || deriveMailboxLabel(mailboxEmail);
+    const editingId = normalizeMailboxId(state.mailboxAdminEditingId);
     if (!mailboxEmail || !mailboxEmail.includes("@")) {
       setFeedback(mailboxAdminFeedback, "error", "Ange en giltig mailboxadress.");
       return;
@@ -10544,19 +19456,26 @@
 
     const existingMailboxes = getAvailableRuntimeMailboxes();
     if (
-      existingMailboxes.some(
-        (item) =>
+      existingMailboxes.some((item) => {
+        const itemId = normalizeMailboxId(item.id);
+        if (itemId === editingId) return false;
+        return (
           normalizeMailboxId(item.email) === normalizeMailboxId(mailboxEmail) ||
           normalizeKey(item.label) === normalizeKey(mailboxLabel)
-      )
+        );
+      })
     ) {
       setFeedback(mailboxAdminFeedback, "error", "Mailboxen finns redan i listan.");
       return;
     }
 
-    let mailboxId = slugifyMailboxId(mailboxLabel) || slugifyMailboxId(mailboxEmail) || `mailbox-${Date.now()}`;
+    let mailboxId =
+      editingId ||
+      slugifyMailboxId(mailboxLabel) ||
+      slugifyMailboxId(mailboxEmail) ||
+      `mailbox-${Date.now()}`;
     const existingIds = new Set(existingMailboxes.map((item) => normalizeMailboxId(item.id)));
-    if (existingIds.has(mailboxId)) {
+    if (!editingId && existingIds.has(mailboxId)) {
       let suffix = 2;
       let candidate = `${mailboxId}-${suffix}`;
       while (existingIds.has(candidate)) {
@@ -10571,20 +19490,115 @@
       email: mailboxEmail,
       label: mailboxLabel,
       owner: ownerName,
+      signature: {
+        label: signatureLabel,
+        fullName: signatureFullName,
+        title: signatureTitle,
+        html:
+          signatureHtml ||
+          buildDefaultMailboxSignatureHtml({
+            label: mailboxLabel,
+            email: mailboxEmail,
+            fullName: signatureFullName,
+            title: signatureTitle,
+          }),
+      },
     });
-    state.customMailboxes.push(mailbox);
+    const previousCustomMailboxes = state.customMailboxes.slice();
+    if (editingId) {
+      state.customMailboxes = state.customMailboxes.map((entry, index) => {
+        const normalized = normalizeCustomMailboxDefinition(entry, index);
+        return normalized?.id === editingId ? mailbox : entry;
+      });
+    } else {
+      state.customMailboxes.push(mailbox);
+    }
+    const nextCustomMailboxes = state.customMailboxes;
+
+    try {
+      const payload = await apiRequest("/api/v1/cco/settings", {
+        method: "PUT",
+        headers: {
+          "x-idempotency-key": createIdempotencyKey("major-arcana-mailbox-admin-save"),
+        },
+        body: buildSettingsPayloadFromState({
+          customMailboxes: nextCustomMailboxes,
+        }),
+      });
+      if (payload?.settings) {
+        applySettingsViewState(payload.settings);
+        state.settingsRuntime.loaded = true;
+        state.settingsRuntime.lastLoadedAt = new Date().toISOString();
+      } else {
+        state.customMailboxes = nextCustomMailboxes;
+        persistCustomMailboxes();
+      }
+    } catch (error) {
+      if (isAuthFailure(error?.statusCode, error?.message)) {
+        state.settingsRuntime.authRequired = true;
+        state.customMailboxes = previousCustomMailboxes;
+        window.location.assign(buildReauthUrl());
+        return;
+      }
+      state.customMailboxes = previousCustomMailboxes;
+      setFeedback(
+        mailboxAdminFeedback,
+        "error",
+        error?.message || "Kunde inte spara mailboxen."
+      );
+      return;
+    }
+
     if (!workspaceSourceOfTruth.getSelectedMailboxIds().includes(mailbox.id)) {
       workspaceSourceOfTruth.setSelectedMailboxIds(
         workspaceSourceOfTruth.getSelectedMailboxIds().concat(mailbox.id)
       );
     }
-    if (mailboxAdminNameInput) mailboxAdminNameInput.value = "";
-    if (mailboxAdminEmailInput) mailboxAdminEmailInput.value = "";
+    resetMailboxAdminForm({ preserveFeedback: true });
     ensureRuntimeMailboxSelection();
     ensureRuntimeSelection();
     renderMailboxAdminList();
+    renderMailboxOptions();
+    renderStudioShell();
     renderRuntimeConversationShell();
-    setFeedback(mailboxAdminFeedback, "success", `Mailboxen ${mailbox.label} lades till.`);
+    setFeedback(
+      mailboxAdminFeedback,
+      "success",
+      editingId
+        ? `Mailboxen ${mailbox.label} uppdaterades.`
+        : `Mailboxen ${mailbox.label} lades till.`
+    );
+  }
+
+  function exitAuxViewToConversations({
+    feedKey = "",
+    threadId = "",
+    statusNode = null,
+    message = "",
+    tone = "success",
+    focusSection = "conversation",
+    restoreContext = true,
+  } = {}) {
+    const normalizedFeed = normalizeKey(feedKey);
+    if (threadId) {
+      selectRuntimeThread(threadId);
+    }
+    if (normalizedFeed === "later" || normalizedFeed === "sent") {
+      clearMailFeedSelection(normalizedFeed);
+    }
+    closeMailboxDropdowns();
+    if (restoreContext) {
+      setStudioOpen(false);
+      setContextCollapsed(false);
+    }
+    setMoreMenuOpen(false);
+    setAppView("conversations");
+    applyFocusSection(focusSection);
+    normalizeWorkspaceState();
+    renderRuntimeConversationShell();
+    if (statusNode && message) {
+      setAuxStatus(statusNode, message, tone);
+    }
   }
 
   function handleMailFeedCommand(commandKey) {
@@ -10592,32 +19606,51 @@
     const activeFeedKey = state.view === "later" ? "later" : state.view === "sent" ? "sent" : "";
     const selectedFeedThread = activeFeedKey ? getSelectedMailFeedThread(activeFeedKey) : null;
     if (key === "resume") {
-      if (selectedFeedThread?.id) {
-        selectRuntimeThread(selectedFeedThread.id);
-      }
-      setAuxStatus(laterStatus, "Den valda tråden återupptas nu i konversationsytan.", "success");
-      setAppView("conversations");
-      applyFocusSection("conversation");
-      setStudioOpen(false);
-      setContextCollapsed(false);
+      exitAuxViewToConversations({
+        feedKey: activeFeedKey,
+        statusNode: laterStatus,
+        message: "Den valda tråden återupptas nu i konversationsytan.",
+        tone: "success",
+        focusSection: "conversation",
+        threadId: asText(selectedFeedThread?.id),
+      });
       return;
     }
     if (key === "history") {
-      if (selectedFeedThread?.id) {
-        selectRuntimeThread(selectedFeedThread.id);
-      }
-      setAuxStatus(sentStatus, "Historiken öppnades i fokusytan för det skickade spåret.", "success");
-      setAppView("conversations");
-      applyFocusSection("history");
+      exitAuxViewToConversations({
+        feedKey: activeFeedKey,
+        statusNode: sentStatus,
+        message: "Historiken öppnades i fokusytan för det skickade spåret.",
+        tone: "success",
+        focusSection: "history",
+        threadId: asText(selectedFeedThread?.id),
+        restoreContext: false,
+      });
       return;
     }
     if (state.view === "later") {
-      setAuxStatus(laterStatus, "Du är tillbaka i konversationsytan.", "success");
+      exitAuxViewToConversations({
+        feedKey: activeFeedKey,
+        statusNode: laterStatus,
+        message: "Du är tillbaka i konversationsytan.",
+        tone: "success",
+        focusSection: "conversation",
+        threadId: asText(selectedFeedThread?.id),
+      });
+      return;
     }
     if (state.view === "sent") {
-      setAuxStatus(sentStatus, "Du är tillbaka i inkorgen från skickat-vyn.", "success");
+      exitAuxViewToConversations({
+        feedKey: activeFeedKey,
+        statusNode: sentStatus,
+        message: "Du är tillbaka i inkorgen från skickat-vyn.",
+        tone: "success",
+        focusSection: "conversation",
+        threadId: asText(selectedFeedThread?.id),
+      });
+      return;
     }
-    setAppView("conversations");
+    exitAuxViewToConversations({ focusSection: "conversation" });
   }
 
   async function handleIntegrationToggle(integrationKey) {
@@ -11028,17 +20061,8 @@
     });
   }
 
-  function renderRuntimeFocusSignals(thread) {
-    if (!thread) {
-      renderSignalRows(focusSignalRows, []);
-      return;
-    }
-    const items = [
-      { label: thread.statusLabel, tone: "rose", icon: "mail" },
-      { label: thread.followUpLabel || thread.waitingLabel, tone: "blue", icon: "history" },
-      { label: thread.riskLabel, tone: "green", icon: "note" },
-    ];
-    renderSignalRows(focusSignalRows, items);
+  function renderRuntimeFocusSignals() {
+    renderSignalRows(focusSignalRows, []);
   }
 
   function deriveIntelVipStatus(thread) {
@@ -11175,30 +20199,47 @@
   function renderRuntimeConversationShell() {
     ensureRuntimeSelection();
     renderRuntimeQueue();
-    renderQuickActionRows(queueActionRows, QUEUE_ACTIONS);
+    renderQueueCategoryStripMode();
+    renderTruthWorklistView();
+    ensureTruthWorklistViewLoaded({ force: false });
+    renderQueueLaneShortcutRows(queueActionRows);
     renderQueueHistorySection();
     renderMailFeeds();
     renderThreadContextRows();
     const selectedThread = getSelectedRuntimeThread();
+    const selectedFocusThread = getSelectedRuntimeFocusThread();
+    syncSelectedCustomerIdentityForThread(selectedFocusThread || selectedThread);
+    const focusReadState = getRuntimeFocusReadState(selectedFocusThread);
     const focusNotesHeading = document.querySelector(".focus-notes-head h3");
     if (focusNotesHeading) {
-      focusNotesHeading.textContent = selectedThread
-        ? `Anteckningar för ${selectedThread.customerName}`
+      focusNotesHeading.textContent = selectedFocusThread
+        ? `Anteckningar för ${selectedFocusThread.customerName}`
         : state.runtime.authRequired
           ? "Anteckningar kräver inloggning"
           : "Anteckningar";
     }
-    renderRuntimeFocusSignals(selectedThread);
-    renderQuickActionRows(focusActionRows, FOCUS_ACTIONS);
-    renderRuntimeFocusConversation(selectedThread);
-    renderRuntimeCustomerPanel(selectedThread);
-    renderFocusHistorySection(selectedThread);
+    renderRuntimeFocusSignals(selectedFocusThread, focusReadState);
+    renderQuickActionRows(focusActionRows, focusReadState.readOnly ? [] : FOCUS_ACTIONS);
+    renderRuntimeFocusConversation(selectedFocusThread, focusReadState);
+    renderRuntimeCustomerPanel(selectedFocusThread, focusReadState);
+    renderFocusHistorySection(selectedFocusThread, focusReadState);
     renderFocusNotesSection();
     renderQuickActionRows(intelActionRows, INTEL_ACTIONS);
-    renderRuntimeIntel(selectedThread);
+    renderRuntimeIntel(selectedFocusThread, focusReadState);
     renderStudioShell();
     renderWorkspaceRuntimeContext();
     renderAnalyticsRuntime();
+    renderRuntimeIntel(selectedFocusThread, focusReadState);
+    if (
+      (state.runtime.loaded === true ||
+        state.runtime.live === true ||
+        state.runtime.offline === true) &&
+      state.runtime.authRequired !== true
+    ) {
+      document.body.classList.add("is-preview-ready");
+    } else {
+      document.body.classList.remove("is-preview-ready");
+    }
   }
 
   function isLaterRuntimeThread(thread) {
@@ -11237,6 +20278,88 @@
     );
   }
 
+  function isVerificationRuntimeThread(thread) {
+    if (!thread || typeof thread !== "object") return false;
+    if (thread.isVerificationThread === true) return true;
+    const raw = thread?.raw && typeof thread.raw === "object" ? thread.raw : {};
+    const haystack = normalizeKey(
+      [
+        thread?.subject,
+        thread?.displaySubject,
+        thread?.preview,
+        thread?.whyInFocus,
+        thread?.nextActionSummary,
+        raw?.subject,
+        raw?.latestInboundPreview,
+        raw?.riskStackExplanation,
+        raw?.operatorCue,
+      ]
+        .map((value) => asText(value))
+        .filter(Boolean)
+        .join(" ")
+    );
+    if (!haystack) return false;
+    return [
+      /\bcco-next\b/i,
+      /\bcco qa\b/i,
+      /\bqa-trad\b/i,
+      /\blive send inspect\b/i,
+      /\bverifieringsmail\b/i,
+      /\bkontrollerad cco\b/i,
+      /\blive end-to-end verifiering\b/i,
+      /\bend-to-end verifiering i nya cco\b/i,
+      /\bkontrollerat live-test\b/i,
+      /\blive-test\b/i,
+    ].some((pattern) => pattern.test(haystack));
+  }
+
+  function isManualReviewRuntimeThread(thread) {
+    const raw = thread?.raw && typeof thread.raw === "object" ? thread.raw : {};
+    const decisionCandidates = [
+      raw?.risk?.decision,
+      raw?.latestOutcome?.risk?.decision,
+      raw?.latestReplyDraft?.risk?.decision,
+      raw?.latestReplySuggestion?.risk?.decision,
+      raw?.customerSummary?.risk?.decision,
+      raw?.deliveryMode,
+      raw?.latestOutcome?.deliveryMode,
+      raw?.latestReplyDraft?.deliveryMode,
+    ]
+      .map((value) => normalizeKey(value))
+      .filter(Boolean);
+
+    if (
+      decisionCandidates.some(
+        (value) => value === "review_required" || value === "manual_review_required"
+      )
+    ) {
+      return true;
+    }
+
+    const reviewFlagCandidates = [
+      raw?.reviewRequired,
+      raw?.needsReview,
+      raw?.manualReviewRequired,
+      raw?.latestOutcome?.reviewRequired,
+      raw?.latestReplyDraft?.reviewRequired,
+    ];
+    return reviewFlagCandidates.some((value) => value === true);
+  }
+
+  function isUnclearRuntimeThread(thread) {
+    const raw = thread?.raw && typeof thread.raw === "object" ? thread.raw : {};
+    const intentCandidates = [
+      raw?.intent,
+      raw?.latestOutcome?.intent,
+      raw?.latestReplyDraft?.intent,
+      raw?.latestAction?.intent,
+      thread?.intentLabel,
+    ]
+      .map((value) => normalizeKey(value))
+      .filter(Boolean);
+    return intentCandidates.includes("unclear") || intentCandidates.includes("oklart");
+  }
+
   function renderQuickActionRows(rows, items) {
     const selectedThread = getSelectedRuntimeThread();
     const isDeletingThread = Boolean(asText(state.runtime.deletingThreadId));
@@ -11272,9 +20395,110 @@
     });
   }
 
+  function renderQueueLaneShortcutRows(rows) {
+    const selectedThread = getSelectedRuntimeThread();
+    const isDeletingThread = Boolean(asText(state.runtime.deletingThreadId));
+    const runtimeMode = normalizeKey(state.runtime.mode || "");
+    const shouldHideShortcutRows =
+      runtimeMode === "offline_history" ||
+      !hasRuntimeQueueThreads() &&
+      (state.runtime.loading === true ||
+        state.runtime.authRequired === true ||
+        Boolean(asText(state.runtime.error)));
+    const activeLaneId = normalizePrimaryQueueLaneId(state.runtime.activeLaneId || "all");
+    const activeLaneLabel = QUEUE_LANE_LABELS[activeLaneId] || QUEUE_LANE_LABELS.all;
+    const shortcutActions = QUEUE_ACTIONS.filter(
+      (item) => item.action === "handled" || item.action === "delete"
+    );
+
+    rows.forEach((row) => {
+      row.hidden = shouldHideShortcutRows;
+      const labelNode = row.querySelector("[data-queue-active-lane-label]");
+      const strip = row.querySelector("[data-queue-action-strip]");
+      if (!strip) return;
+      if (shouldHideShortcutRows) {
+        if (labelNode) labelNode.textContent = "";
+        strip.innerHTML = "";
+        return;
+      }
+      if (labelNode) {
+        const activeLaneButton =
+          queueLaneButtons.find(
+            (button) => normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === activeLaneId
+          ) ||
+          queueLaneButtons.find(
+            (button) => normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === "all"
+          ) ||
+          null;
+        const activeLaneIcon = activeLaneButton?.querySelector("svg")?.cloneNode(true) || null;
+        labelNode.textContent = "";
+        labelNode.style.color = activeLaneButton ? window.getComputedStyle(activeLaneButton).color : "";
+        if (activeLaneIcon) {
+          activeLaneIcon.setAttribute("aria-hidden", "true");
+          labelNode.appendChild(activeLaneIcon);
+        }
+        labelNode.appendChild(document.createTextNode(activeLaneLabel));
+      }
+      strip.innerHTML = "";
+      shortcutActions.forEach((item) => {
+        const button = document.createElement("button");
+        const isDeleteAction = item.action === "delete";
+        const isHandledAction = item.action === "handled";
+        button.type = "button";
+        button.className = `queue-history-head-action queue-history-head-action--${isDeleteAction ? "delete" : "done"}`;
+        button.dataset.quickAction = item.action;
+        button.setAttribute("aria-label", item.label);
+        button.setAttribute("title", item.label);
+        const shortcutDisabled =
+          !selectedThread ||
+          (isDeleteAction &&
+            (!state.runtime.deleteEnabled || isDeletingThread)) ||
+          (isHandledAction && isHandledRuntimeThread(selectedThread));
+        button.disabled = shortcutDisabled;
+        button.setAttribute("aria-disabled", String(shortcutDisabled));
+        const icon = isHandledAction
+          ? (() => {
+              const wrapper = document.createElement("span");
+              wrapper.className = "pill-icon";
+              wrapper.setAttribute("aria-hidden", "true");
+              wrapper.innerHTML =
+                '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.6 8.4 6.6 11.2l5.8-6.3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" /></svg>';
+              return wrapper;
+            })()
+          : createPillIcon(item.icon);
+        if (icon) button.appendChild(icon);
+        strip.appendChild(button);
+      });
+    });
+  }
+
+  function renderQueueCategoryStripMode() {
+    if (!queueScopeStrip || !queueCollapsedList || !queueCategoryToggleButton) return;
+    const isCompact = state.runtime?.queueCategoriesCompact === true;
+    queueScopeStrip.classList.toggle("is-compact", isCompact);
+    queueCategoryToggleButton.classList.toggle("is-compact", isCompact);
+    queueCategoryToggleButton.setAttribute("aria-pressed", isCompact ? "true" : "false");
+    queueCategoryToggleButton.setAttribute("aria-expanded", isCompact ? "false" : "true");
+    queueCategoryToggleButton.setAttribute(
+      "aria-label",
+      isCompact ? "Visa full storlek" : "Visa kompakt läge"
+    );
+    queueCategoryToggleButton.setAttribute(
+      "title",
+      isCompact ? "Visa full storlek" : "Visa kompakt läge"
+    );
+    const iconHost = queueCategoryToggleButton.querySelector("span");
+    if (iconHost) {
+      iconHost.innerHTML = isCompact
+        ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.4 9.8 8 6.2l3.6 3.6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" /></svg>'
+        : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.4 6.2 8 9.8l3.6-3.6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" /></svg>';
+    }
+  }
+
   function renderSignalRows(rows, items) {
     rows.forEach((row) => {
       row.innerHTML = "";
+      row.hidden = !items.length;
       items.forEach((item) => {
         const pill = document.createElement("span");
         pill.className = `status-pill status-pill--${item.tone}`;
@@ -11312,6 +20536,8 @@
       button.classList.toggle("preview-nav-item-active", isActive);
       button.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
+
+    closeMailboxDropdowns();
     if (moreMenuToggle) {
       const isMoreView = AUX_VIEWS.has(shellView);
       moreMenuToggle.classList.toggle("preview-nav-item-active", isMoreView);
@@ -11428,7 +20654,7 @@
   function setSelectedCustomerIdentity(customerKey) {
     const normalizedKey = normalizeKey(customerKey);
     state.selectedCustomerIdentity =
-      normalizedKey || getVisibleCustomerPoolKeys()[0] || "johan";
+      normalizedKey || getVisibleCustomerPoolKeys()[0] || "";
 
     customerRows.forEach((row) => {
       const isActive = normalizeKey(row.dataset.customerRow) === state.selectedCustomerIdentity;
@@ -11631,6 +20857,7 @@
       panel.classList.toggle("is-active", isActive);
       panel.setAttribute("aria-hidden", isActive ? "false" : "true");
     });
+    captureRuntimeReentrySnapshot("focus_section_change");
   }
 
   function applyReplyLaterToThread(thread, label, { closeStudio = false } = {}) {
@@ -11764,7 +20991,6 @@
   async function apiRequest(path, options = {}) {
     const url = new URL(path, window.location.origin);
     const isWorkspaceRequest = path.includes("/api/v1/cco-workspace/");
-    const authToken = getAdminToken();
     const context = getActiveWorkspaceContext();
 
     if (isWorkspaceRequest && !url.searchParams.has("workspaceId")) {
@@ -11791,37 +21017,78 @@
           ? { ...context, ...options.body }
           : options.body;
 
-    const response = await fetch(url.toString(), {
-      method: options.method || "GET",
-      credentials: "same-origin",
-      headers: {
-        "content-type": "application/json",
-        ...(authToken &&
-        !("Authorization" in headerObject) &&
-        !("authorization" in headerObject)
-          ? { Authorization: `Bearer ${authToken}` }
-          : {}),
-        ...headerObject,
-      },
-      body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
+    const executeRequest = async ({ authToken = "", allowRetry = false } = {}) => {
+      const response = await fetch(url.toString(), {
+        method: options.method || "GET",
+        credentials: "same-origin",
+        headers: {
+          "content-type": "application/json",
+          ...(authToken &&
+          authToken !== "__preview_local__" &&
+          !("Authorization" in headerObject) &&
+          !("authorization" in headerObject)
+            ? { Authorization: `Bearer ${authToken}` }
+            : {}),
+          ...headerObject,
+        },
+        body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
+      });
+
+      const text = await response.text();
+      const payload = text ? JSON.parse(text) : {};
+
+      if (
+        !response.ok &&
+        allowRetry &&
+        typeof isLocalPreviewHost === "function" &&
+        isLocalPreviewHost() &&
+        isAuthFailure(response.status, payload?.error || "") &&
+        normalizeText(authToken) &&
+        normalizeText(authToken) !== "__preview_local__"
+      ) {
+        clearAdminToken();
+        return executeRequest({
+          authToken: getAdminToken(),
+          allowRetry: false,
+        });
+      }
+
+      if (!response.ok) {
+        const error = new Error(payload?.error || "Request failed.");
+        error.statusCode = response.status;
+        error.metadata = payload?.metadata || null;
+        throw error;
+      }
+
+      return payload;
+    };
+
+    return executeRequest({
+      authToken: getAdminToken(),
+      allowRetry: true,
     });
-
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
-
-    if (!response.ok) {
-      const error = new Error(payload?.error || "Request failed.");
-      error.statusCode = response.status;
-      error.metadata = payload?.metadata || null;
-      throw error;
-    }
-
-    return payload;
   }
 
   function applyStudioTemplateSelection(templateKey) {
+    if (normalizeKey(state.studio.mode) === "compose") {
+      const studioState = state.studio;
+      studioState.activeTemplateKey = normalizeKey(templateKey);
+      studioState.activeRefineKey = "";
+      studioState.draftBody = buildComposeTemplateDraft(
+        studioState.activeTemplateKey,
+        studioState.composeTo
+      );
+      studioState.baseDraftBody = studioState.draftBody;
+      renderStudioShell();
+      setStudioFeedback(`Mallen "${studioState.activeTemplateKey}" laddades i nytt mejl.`, "success");
+      return;
+    }
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
+    if (isOfflineHistoryContextThread(thread)) {
+      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra studioutkastet.", "error");
+      return;
+    }
     const studioState = ensureStudioState(thread);
     studioState.activeTemplateKey = normalizeKey(templateKey);
     studioState.activeTrackKey = studioState.activeTrackKey || inferStudioTrackKey(thread);
@@ -11833,8 +21100,26 @@
   }
 
   function applyStudioTrackSelection(trackKey) {
+    if (normalizeKey(state.studio.mode) === "compose") {
+      const studioState = state.studio;
+      studioState.activeTrackKey = normalizeKey(trackKey) || "booking";
+      studioState.activeTemplateKey = "";
+      studioState.activeRefineKey = "";
+      studioState.draftBody = buildComposeTrackDraft(
+        studioState.activeTrackKey,
+        studioState.composeTo
+      );
+      studioState.baseDraftBody = studioState.draftBody;
+      renderStudioShell();
+      setStudioFeedback(`Spåret "${studioState.activeTrackKey}" är aktivt i nytt mejl.`, "success");
+      return;
+    }
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
+    if (isOfflineHistoryContextThread(thread)) {
+      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att växla responsspår.", "error");
+      return;
+    }
     const studioState = ensureStudioState(thread);
     studioState.activeTrackKey = normalizeKey(trackKey) || inferStudioTrackKey(thread);
     studioState.activeTemplateKey = "";
@@ -11846,8 +21131,25 @@
   }
 
   function applyStudioToneSelection(toneKey) {
+    if (normalizeKey(state.studio.mode) === "compose") {
+      const studioState = state.studio;
+      studioState.activeToneKey = normalizeKey(toneKey) || "professional";
+      studioState.draftBody = buildComposeToneDraft(
+        studioState.draftBody,
+        studioState.activeToneKey,
+        studioState.composeTo
+      );
+      studioState.baseDraftBody = studioState.draftBody;
+      renderStudioShell();
+      setStudioFeedback(`Tonfiltret "${studioState.activeToneKey}" applicerades i nytt mejl.`, "success");
+      return;
+    }
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
+    if (isOfflineHistoryContextThread(thread)) {
+      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra tonfilter.", "error");
+      return;
+    }
     const studioState = ensureStudioState(thread);
     studioState.activeToneKey = normalizeKey(toneKey) || "professional";
     studioState.draftBody = buildStudioToneDraft(thread, studioState.draftBody, studioState.activeToneKey);
@@ -11857,8 +21159,24 @@
   }
 
   function applyStudioRefineSelection(refineKey) {
+    if (normalizeKey(state.studio.mode) === "compose") {
+      const studioState = state.studio;
+      studioState.activeRefineKey = normalizeKey(refineKey);
+      studioState.draftBody = buildComposeRefinedDraft(
+        studioState.draftBody,
+        studioState.activeRefineKey,
+        studioState.composeTo
+      );
+      renderStudioShell();
+      setStudioFeedback(`Finjusteringen "${studioState.activeRefineKey}" applicerades i nytt mejl.`, "success");
+      return;
+    }
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
+    if (isOfflineHistoryContextThread(thread)) {
+      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att finjustera svaret.", "error");
+      return;
+    }
     const studioState = ensureStudioState(thread);
     studioState.activeRefineKey = normalizeKey(refineKey);
     studioState.draftBody = buildStudioRefinedDraft(thread, studioState.draftBody, studioState.activeRefineKey);
@@ -11867,14 +21185,43 @@
   }
 
   function handleStudioToolAction(toolKey) {
-    const thread = getSelectedRuntimeThread();
-    if (!thread) return;
-    const studioState = ensureStudioState(thread);
-    const normalizedTool = normalizeKey(toolKey);
-    if (normalizedTool === "warm") {
-      applyStudioToneSelection("warm");
+    if (normalizeKey(state.studio.mode) === "compose") {
+      const studioState = state.studio;
+      const normalizedTool = normalizeKey(toolKey);
+      if (normalizedTool === "gift") {
+        const giftLine =
+          "\n\nPS: Om du vill kan jag också skicka ett konkret prisupplägg eller bokningsförslag direkt.";
+        if (!studioState.draftBody.includes(giftLine.trim())) {
+          studioState.draftBody = `${studioState.draftBody}${giftLine}`;
+        }
+        renderStudioShell();
+        setStudioFeedback("Merförsäljningsrad lades till i nytt mejl.", "success");
+        return;
+      }
+      if (normalizedTool === "regenerate") {
+        studioState.activeRefineKey = "";
+        studioState.draftBody = studioState.activeTemplateKey
+          ? buildComposeTemplateDraft(studioState.activeTemplateKey, studioState.composeTo)
+          : buildComposeTrackDraft(studioState.activeTrackKey || "booking", studioState.composeTo);
+        studioState.baseDraftBody = studioState.draftBody;
+        renderStudioShell();
+        setStudioFeedback("Nytt mejl regenererades från vald mall och ton.", "success");
+        return;
+      }
+      if (normalizedTool === "policy") {
+        const policy = evaluateStudioPolicy(null, studioState.draftBody);
+        setStudioFeedback(policy.summary, policy.tone === "warning" ? "error" : "success");
+      }
       return;
     }
+    const thread = getSelectedRuntimeThread();
+    if (!thread) return;
+    if (isOfflineHistoryContextThread(thread)) {
+      setStudioFeedback("Offline historik är läsläge. Verktygen låses upp när live-tråden är tillgänglig.", "error");
+      return;
+    }
+    const studioState = ensureStudioState(thread);
+    const normalizedTool = normalizeKey(toolKey);
     if (normalizedTool === "gift") {
       const giftLine =
         "\n\nPS: Om du vill kan jag även skicka ett konkret bokningsförslag eller prisupplägg direkt i samma tråd.";
@@ -11883,10 +21230,6 @@
       }
       renderStudioShell();
       setStudioFeedback("Merförsäljningsrad lades till i utkastet.", "success");
-      return;
-    }
-    if (normalizedTool === "admin") {
-      applyStudioTrackSelection("admin");
       return;
     }
     if (normalizedTool === "regenerate") {
@@ -12030,6 +21373,18 @@
       if (button.closest(".preview-more-menu")) {
         setMoreMenuOpen(false);
       }
+      const targetView = normalizeKey(button.dataset.navView);
+      if (targetView === "conversations" && (state.view === "sent" || state.view === "later")) {
+        const activeFeedKey = state.view === "later" ? "later" : "sent";
+        const selectedFeedThread = getSelectedMailFeedThread(activeFeedKey);
+        exitAuxViewToConversations({
+          feedKey: activeFeedKey,
+          threadId: asText(selectedFeedThread?.id),
+          focusSection: "conversation",
+          restoreContext: true,
+        });
+        return;
+      }
       setAppView(button.dataset.navView);
     });
   });
@@ -12041,25 +21396,163 @@
     });
   }
 
+  mailboxDropdowns.forEach((dropdown) => {
+    const parts = getMailboxDropdownParts(dropdown);
+    if (!parts) return;
+    const { toggle, menu } = parts;
+
+    toggle.addEventListener("change", () => {
+      if (!toggle.checked) {
+        clearMailboxDropdownOverlay(menu);
+        return;
+      }
+      closeMailboxDropdowns({ exceptToggle: toggle });
+      window.requestAnimationFrame(() => {
+        syncMailboxDropdownOverlay(dropdown);
+      });
+    });
+  });
+
+  [
+    mailboxAdminNameInput,
+    mailboxAdminEmailInput,
+    mailboxAdminSignatureFullNameInput,
+    mailboxAdminSignatureTitleInput,
+  ].forEach((input) => {
+    input?.addEventListener("input", () => {
+      syncMailboxAdminSignatureEditorFromFields();
+    });
+  });
+
+  if (queueHistoryCompleteButton) {
+    queueHistoryCompleteButton.addEventListener("click", async () => {
+      if (queueHistoryCompleteButton.disabled) return;
+      await handleRuntimeHandledAction();
+    });
+  }
+
+  if (queueHistoryDeleteButton) {
+    queueHistoryDeleteButton.addEventListener("click", async () => {
+      if (queueHistoryDeleteButton.disabled) return;
+      const leftColumnState = getRuntimeLeftColumnState();
+      if (leftColumnState.mode === "history") {
+        await handleFocusHistoryDelete();
+        return;
+      }
+      await handleRuntimeDeleteAction("major-arcana-queue-delete");
+    });
+  }
+
+  if (truthWorklistLaunchButton) {
+    truthWorklistLaunchButton.addEventListener("click", () => {
+      const isHidden =
+        state.runtime?.truthWorklistView &&
+        typeof state.runtime.truthWorklistView === "object" &&
+        state.runtime.truthWorklistView.hidden === true;
+      setTruthWorklistViewHidden(!isHidden);
+    });
+  }
+
+  if (queueCategoryToggleButton) {
+    queueCategoryToggleButton.addEventListener("click", () => {
+      state.runtime.queueCategoriesCompact = !(state.runtime.queueCategoriesCompact === true);
+      renderQueueCategoryStripMode();
+    });
+  }
+
+  truthWorklistCloseButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setTruthWorklistViewHidden(true);
+    });
+  });
+
+  truthWorklistPageButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setTruthWorklistPage(button.dataset.truthWorklistPageButton || "overview");
+    });
+  });
+
+  if (truthWorklistRows) {
+    truthWorklistRows.addEventListener("click", (event) => {
+      const relayButton = event.target.closest("[data-truth-relay-legacy]");
+      if (!relayButton || relayButton.disabled) return;
+      activateTruthWorklistRelay({
+        mailboxId: relayButton.dataset.truthRelayMailboxId,
+        mailboxAddress: relayButton.dataset.truthRelayMailboxAddress,
+        customerEmail: relayButton.dataset.truthRelayCustomerEmail,
+        customerName: relayButton.dataset.truthRelayCustomerName,
+        subject: relayButton.dataset.truthRelaySubject,
+        conversationKey: relayButton.dataset.truthRelayConversationKey,
+        lane: relayButton.dataset.truthRelayLane,
+        comparable: relayButton.dataset.truthRelayComparable === "true",
+      });
+    });
+  }
+
+  if (truthWorklistControls) {
+    truthWorklistControls.addEventListener("click", (event) => {
+      const filterButton = event.target.closest("[data-truth-worklist-filter]");
+      if (filterButton) {
+        const viewState =
+          state.runtime?.truthWorklistView && typeof state.runtime.truthWorklistView === "object"
+            ? state.runtime.truthWorklistView
+            : {};
+        state.runtime.truthWorklistView = {
+          ...viewState,
+          localFilter: normalizeText(filterButton.dataset.truthWorklistFilter || "all") || "all",
+        };
+        renderTruthWorklistView();
+        return;
+      }
+      const sortButton = event.target.closest("[data-truth-worklist-sort]");
+      if (!sortButton) return;
+      const viewState =
+        state.runtime?.truthWorklistView && typeof state.runtime.truthWorklistView === "object"
+          ? state.runtime.truthWorklistView
+          : {};
+      state.runtime.truthWorklistView = {
+        ...viewState,
+        localSort: normalizeText(sortButton.dataset.truthWorklistSort || "latest") || "latest",
+      };
+      renderTruthWorklistView();
+    });
+  }
+
+  if (truthWorklistRelayNote) {
+    truthWorklistRelayNote.addEventListener("click", (event) => {
+      const clearButton = event.target.closest("[data-truth-relay-clear]");
+      if (!clearButton) return;
+      clearTruthWorklistRelay();
+    });
+  }
+
   document.addEventListener("pointerdown", (event) => {
+    if (!event.target.closest(".mailbox-dropdown")) {
+      closeMailboxDropdowns();
+    }
     if (state.moreMenuOpen && !event.target.closest(".preview-more")) {
       setMoreMenuOpen(false);
     }
   });
 
   window.addEventListener("blur", () => {
+    closeMailboxDropdowns();
     if (state.moreMenuOpen) {
       setMoreMenuOpen(false);
     }
   });
 
   document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      closeMailboxDropdowns();
+    }
     if (document.hidden && state.moreMenuOpen) {
       setMoreMenuOpen(false);
     }
   });
 
   window.addEventListener("resize", () => {
+    syncOpenMailboxDropdownOverlays();
     if (state.moreMenuOpen) {
       setMoreMenuOpen(false);
     }
@@ -12068,6 +21561,7 @@
   document.addEventListener(
     "scroll",
     () => {
+      syncOpenMailboxDropdownOverlays();
       if (state.moreMenuOpen) {
         setMoreMenuOpen(false);
       }
@@ -12416,7 +21910,7 @@
 
   if (analyticsCoachingAction) {
     analyticsCoachingAction.addEventListener("click", () => {
-      handleAnalyticsTemplateJump("payment_reminder");
+      handleAnalyticsCoachingAction();
     });
   }
 
@@ -12724,7 +22218,7 @@
 
   window.addEventListener("resize", normalizeWorkspaceState);
   state.customerFilter = normalizeText(customerFilterSelect?.value) || "Alla kunder";
-  setSelectedCustomerIdentity("johan");
+  setSelectedCustomerIdentity("");
   setSelectedAnalyticsPeriod("week");
   setSelectedAutomationLibrary("email");
   setSelectedAutomationNode("trigger");
@@ -12772,4 +22266,353 @@
   } else {
     syncShellViewToLocation();
   }
+
+  function getRuntimeMailboxParitySnapshot() {
+    const queueListMode = asText(queueHistoryList?.dataset?.queueListMode, "");
+    const visibleThreads = getFilteredRuntimeThreads();
+    const mailboxScopedThreads = getMailboxScopedRuntimeThreads();
+    const queueScopedThreads = getQueueScopedRuntimeThreads();
+    const allThreads = asArray(state.runtime?.threads);
+    const domCards = Array.from(
+      queueHistoryList?.querySelectorAll("[data-runtime-thread], [data-history-conversation], .thread-card, .queue-history-item") ||
+        []
+    );
+
+    return {
+      capturedAt: new Date().toISOString(),
+      runtimeMode: getRuntimeMode(),
+      flags: {
+        loading: state.runtime.loading === true,
+        live: state.runtime.live === true,
+        offline: state.runtime.offline === true,
+        authRequired: state.runtime.authRequired === true,
+        error: asText(state.runtime.error),
+      },
+      selection: {
+        selectedMailboxIds: workspaceSourceOfTruth.getSelectedMailboxIds(),
+        requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+        selectedOwnerKey: workspaceSourceOfTruth.getSelectedOwnerKey(),
+        activeLaneId: workspaceSourceOfTruth.getActiveLaneId(),
+        selectedThreadId: workspaceSourceOfTruth.getSelectedThreadId(),
+      },
+      counts: {
+        allThreads: allThreads.length,
+        mailboxScopedThreads: mailboxScopedThreads.length,
+        queueScopedThreads: queueScopedThreads.length,
+        visibleThreads: visibleThreads.length,
+      },
+      dom: {
+        queueListMode,
+        cardCount: domCards.length,
+        liveCardCount: domCards.filter((node) => node.classList?.contains("thread-card-live")).length,
+        historyCardCount: domCards.filter((node) => node.classList?.contains("queue-history-item")).length,
+        selectedCardCount: domCards.filter((node) => node.classList?.contains("is-selected")).length,
+        firstCards: domCards.slice(0, 6).map((node) => ({
+          className: asText(node.className),
+          runtimeThreadId: asText(node.getAttribute?.("data-runtime-thread")),
+          historyConversationId: asText(node.getAttribute?.("data-history-conversation")),
+          text: compactRuntimeCopy(asText(node.innerText), "", 160),
+        })),
+      },
+      visibleThreads: visibleThreads.slice(0, 8).map((thread) => summarizeRuntimeThreadForDiagnostics(thread)),
+      selectedThread: summarizeRuntimeThreadForDiagnostics(getSelectedRuntimeThread()),
+      mailboxDiagnostics:
+        state.runtime?.mailboxDiagnostics && typeof state.runtime.mailboxDiagnostics === "object"
+          ? JSON.parse(JSON.stringify(state.runtime.mailboxDiagnostics))
+          : null,
+      reentry: {
+        snapshot: getRuntimeReentrySnapshot(),
+        outcome: getRuntimeReentryOutcome(),
+      },
+    };
+  }
+
+  function summarizeMailBodyBlockForDiagnostics(block) {
+    if (!block || typeof block !== "object") return null;
+    const text = asText(block.text);
+    const html = asText(block.html);
+    return {
+      textLength: text.length,
+      htmlLength: html.length,
+      previewText: compactRuntimeCopy(text, "", 180),
+      previewHtmlText: compactRuntimeCopy(html.replace(/<[^>]+>/g, " "), "", 180),
+    };
+  }
+
+  function summarizeMailThreadMessageForDiagnostics(message) {
+    if (!message || typeof message !== "object") return null;
+    const assets =
+      message?.assets && typeof message.assets === "object" ? message.assets : null;
+    const familyCounts =
+      assets?.familyCounts && typeof assets.familyCounts === "object"
+        ? {
+            attachment: asNumber(assets.familyCounts.attachment, 0),
+            inline: asNumber(assets.familyCounts.inline, 0),
+            external: asNumber(assets.familyCounts.external, 0),
+          }
+        : null;
+    return {
+      messageId: asText(message.messageId),
+      direction: normalizeKey(message.direction),
+      sentAt: asText(message.sentAt),
+      mimeBacked: message.mimeBacked === true,
+      contentMode: normalizeKey(message.contentSections?.mode),
+      mimePreferredBodyKind: normalizeKey(message.contentSections?.mimePreferredBodyKind),
+      primaryBody: summarizeMailBodyBlockForDiagnostics(message.primaryBody),
+      signatureBlock: summarizeMailBodyBlockForDiagnostics(message.signatureBlock),
+      quotedCount: asArray(message.quotedBlocks).length,
+      systemCount: asArray(message.systemBlocks).length,
+      assetCount: asNumber(
+        assets?.assetCount,
+        familyCounts
+          ? familyCounts.attachment + familyCounts.inline + familyCounts.external
+          : 0
+      ),
+      inlineAssetCount: asNumber(
+        familyCounts?.inline,
+        asArray(assets?.inlineAssetIds).length
+      ),
+      attachmentCount: asNumber(
+        familyCounts?.attachment,
+        asArray(assets?.attachmentIds).length
+      ),
+      externalAssetCount: asNumber(familyCounts?.external, 0),
+      previewTextLength: asText(message.presentation?.previewText).length,
+      conversationTextLength: asText(message.presentation?.conversationText).length,
+      conversationHtmlLength: asText(message.presentation?.conversationHtml).length,
+    };
+  }
+
+  function summarizeMailDocumentForDiagnostics(mailDocument) {
+    if (!mailDocument || typeof mailDocument !== "object") return null;
+    const assets = asArray(mailDocument.assets);
+    const familyCounts =
+      mailDocument?.assetSummary?.familyCounts &&
+      typeof mailDocument.assetSummary.familyCounts === "object"
+        ? {
+            attachment: asNumber(mailDocument.assetSummary.familyCounts.attachment, 0),
+            inline: asNumber(mailDocument.assetSummary.familyCounts.inline, 0),
+            external: asNumber(mailDocument.assetSummary.familyCounts.external, 0),
+          }
+        : null;
+    return {
+      sourceDepth: normalizeKey(mailDocument.sourceDepth),
+      mimeAvailable: mailDocument.mimeAvailable === true,
+      mimeBacked: mailDocument.mimeBacked === true,
+      primaryBodyTextLength: asText(mailDocument.primaryBodyText).length,
+      primaryBodyHtmlLength: asText(mailDocument.primaryBodyHtml).length,
+      previewTextLength: asText(mailDocument.previewText).length,
+      assetCount: asNumber(
+        mailDocument?.assetSummary?.assetCount,
+        assets.length
+      ),
+      inlineAssetCount: asNumber(
+        familyCounts?.inline,
+        assets.filter((asset) => normalizeKey(asset?.family) === "inline").length
+      ),
+      attachmentCount: asNumber(
+        familyCounts?.attachment,
+        assets.filter((asset) => normalizeKey(asset?.family) === "attachment").length
+      ),
+      externalAssetCount: asNumber(
+        familyCounts?.external,
+        assets.filter((asset) => normalizeKey(asset?.family) === "external").length
+      ),
+      mimeTriggerReasons: asArray(mailDocument.mime?.triggerReasons)
+        .map((reason) => normalizeKey(reason))
+        .filter(Boolean),
+      mimePreferredBodyKind: normalizeKey(mailDocument.mime?.preferredBodyKind),
+    };
+  }
+
+  function getRuntimeFocusThreadSnapshot() {
+    const selectedThreadTruth = getSelectedRuntimeThreadTruth();
+    const focusThread = selectedThreadTruth.focusThread;
+    const focusReadState = getRuntimeFocusReadState(focusThread);
+    const threadDocument =
+      focusThread?.threadDocument && typeof focusThread.threadDocument === "object"
+        ? focusThread.threadDocument
+        : null;
+    const messages = asArray(focusThread?.messages)
+      .slice(0, 6)
+      .map((message) => ({
+        id: asText(message?.id),
+        role: normalizeKey(message?.role),
+        latest: message?.latest === true,
+        bodyLength: asText(message?.body).length,
+        conversationBodyLength: asText(message?.conversationBody).length,
+        conversationBodyHtmlLength: asText(message?.conversationBodyHtml).length,
+        mailThreadMessage: summarizeMailThreadMessageForDiagnostics(message?.mailThreadMessage),
+        mailDocument: summarizeMailDocumentForDiagnostics(message?.mailDocument),
+      }));
+
+    return {
+      capturedAt: new Date().toISOString(),
+      selectedThreadTruth: {
+        selectedThreadId: asText(selectedThreadTruth?.selectedThreadId),
+        queueHistoryConversationId: asText(selectedThreadTruth?.queueHistoryConversationId),
+        runtimeMode: normalizeKey(selectedThreadTruth?.runtimeMode),
+        leftColumnMode: normalizeKey(selectedThreadTruth?.leftColumnMode),
+        runtimeSource: normalizeKey(selectedThreadTruth?.runtimeSource),
+        focusSource: normalizeKey(selectedThreadTruth?.focusSource),
+        focusScopeActive: selectedThreadTruth?.focusScopeActive === true,
+        focusTruthPrimaryEnabled: selectedThreadTruth?.focusTruthPrimaryEnabled === true,
+        offlineHistoryReadOnly: selectedThreadTruth?.offlineHistoryReadOnly === true,
+      },
+      selectedFocusThread: summarizeRuntimeThreadForDiagnostics(focusThread),
+      focusReadState: {
+        source: normalizeKey(focusReadState?.source),
+        truthDriven: focusReadState?.truthDriven === true,
+        foundationDriven: focusReadState?.foundationDriven === true,
+        fallbackDriven: focusReadState?.fallbackDriven === true,
+        readOnly: focusReadState?.readOnly === true,
+        label: asText(focusReadState?.label),
+        detail: asText(focusReadState?.detail),
+        foundationLabel: asText(focusReadState?.foundationLabel),
+        fallbackLabel: asText(focusReadState?.fallbackLabel),
+        waveLabel: asText(focusReadState?.waveLabel),
+      },
+      foundationState:
+        focusThread?.foundationState && typeof focusThread.foundationState === "object"
+          ? JSON.parse(JSON.stringify(focusThread.foundationState))
+          : null,
+      threadDocument: threadDocument
+        ? {
+            sourceStore: asText(threadDocument.sourceStore),
+            messageCount: asArray(threadDocument.messages).length,
+            hasMimeBackedMessages: threadDocument.hasMimeBackedMessages === true,
+            hasQuotedMessages: threadDocument.hasQuotedMessages === true,
+            hasSignatureBlocks: threadDocument.hasSignatureBlocks === true,
+            hasSystemBlocks: threadDocument.hasSystemBlocks === true,
+          }
+        : null,
+      messages,
+    };
+  }
+
+  function getRuntimeOpenFlowSnapshot() {
+    const selectedThreadTruth = getSelectedRuntimeThreadTruth();
+    const selectedRuntimeThread = selectedThreadTruth.runtimeThread;
+    const selectedFocusThread = selectedThreadTruth.focusThread;
+    const focusReadState = getRuntimeFocusReadState(selectedFocusThread);
+    const openFlowDiagnostics =
+      state.runtime?.openFlowDiagnostics && typeof state.runtime.openFlowDiagnostics === "object"
+        ? JSON.parse(JSON.stringify(state.runtime.openFlowDiagnostics))
+        : null;
+
+    return {
+      capturedAt: new Date().toISOString(),
+      selectedThreadId: asText(workspaceSourceOfTruth.getSelectedThreadId()),
+      selectedThreadTruth: {
+        selectedThreadId: asText(selectedThreadTruth?.selectedThreadId),
+        queueHistoryConversationId: asText(selectedThreadTruth?.queueHistoryConversationId),
+        runtimeMode: normalizeKey(selectedThreadTruth?.runtimeMode),
+        leftColumnMode: normalizeKey(selectedThreadTruth?.leftColumnMode),
+        runtimeSource: normalizeKey(selectedThreadTruth?.runtimeSource),
+        focusSource: normalizeKey(selectedThreadTruth?.focusSource),
+        focusScopeActive: selectedThreadTruth?.focusScopeActive === true,
+        focusTruthPrimaryEnabled: selectedThreadTruth?.focusTruthPrimaryEnabled === true,
+        offlineHistoryReadOnly: selectedThreadTruth?.offlineHistoryReadOnly === true,
+      },
+      selectedRuntimeThread: summarizeRuntimeThreadForDiagnostics(selectedRuntimeThread),
+      selectedFocusThread: summarizeRuntimeThreadForDiagnostics(selectedFocusThread),
+      focusReadState: {
+        source: normalizeKey(focusReadState?.source),
+        truthDriven: focusReadState?.truthDriven === true,
+        foundationDriven: focusReadState?.foundationDriven === true,
+        fallbackDriven: focusReadState?.fallbackDriven === true,
+        readOnly: focusReadState?.readOnly === true,
+        label: asText(focusReadState?.label),
+        detail: asText(focusReadState?.detail),
+        foundationLabel: asText(focusReadState?.foundationLabel),
+        fallbackLabel: asText(focusReadState?.fallbackLabel),
+      },
+      diagnostics: openFlowDiagnostics,
+    };
+  }
+
+  async function openRuntimeHistoryConversationForDiagnostics({
+    conversationId = "",
+    mailboxIds = [],
+  } = {}) {
+    const nextConversationId = asText(conversationId);
+    const scopedMailboxIds = asArray(mailboxIds)
+      .map((value) => canonicalizeRuntimeMailboxId(value))
+      .filter(Boolean);
+    if (!nextConversationId) {
+      return {
+        ok: false,
+        error: "conversationId saknas.",
+      };
+    }
+
+    let historyPayload = null;
+    let historyItems = [];
+    let historyError = "";
+    try {
+      const params = new URLSearchParams();
+      if (scopedMailboxIds.length) {
+        params.set("mailboxIds", scopedMailboxIds.join(","));
+      }
+      params.set("lookbackDays", "1095");
+      params.set("resultTypes", "message");
+      params.set("limit", "24");
+      params.set("conversationId", nextConversationId);
+      historyPayload = await apiRequest(`/api/v1/cco/runtime/history/search?${params.toString()}`);
+      historyItems = buildQueueHistoryItems(historyPayload?.results);
+    } catch (error) {
+      historyError = error instanceof Error ? error.message : String(error);
+    }
+
+    state.runtime.queueHistory = {
+      ...state.runtime.queueHistory,
+      open: true,
+      loading: false,
+      loaded: historyItems.length > 0 || historyError !== "",
+      error: historyError,
+      items: historyItems.length > 0 ? historyItems : state.runtime.queueHistory.items,
+      selectedConversationId: nextConversationId,
+      scopeKey: scopedMailboxIds.length
+        ? getQueueHistoryScopeKey(scopedMailboxIds)
+        : asText(state.runtime.queueHistory?.scopeKey),
+    };
+
+    selectOfflineHistoryConversation(nextConversationId, {
+      reloadBootstrap: false,
+      mailboxIds: scopedMailboxIds,
+      hydrate: false,
+    });
+    const hydrationResult = await requestRuntimeThreadHydration(nextConversationId, {
+      mailboxIds: scopedMailboxIds,
+    }).catch((error) => ({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      reason: "history_open_diagnostics_hydration_failed",
+    }));
+    applyFocusSection("conversation");
+
+    return {
+      ok: true,
+      conversationId: nextConversationId,
+      mailboxIds: scopedMailboxIds,
+      historySource: normalizeKey(historyPayload?.source),
+      historyResultCount: historyItems.length,
+      historyError,
+      hydrationResult:
+        hydrationResult && typeof hydrationResult === "object"
+          ? JSON.parse(JSON.stringify(hydrationResult))
+          : hydrationResult,
+    };
+  }
+
+  window.MajorArcanaPreviewDiagnostics = Object.freeze({
+    captureRuntimeReentrySnapshot,
+    restoreRuntimeReentrySnapshot,
+    getRuntimeMailboxParitySnapshot,
+    getRuntimeFocusThreadSnapshot,
+    getRuntimeOpenFlowSnapshot,
+    getRuntimeReentrySnapshot,
+    getRuntimeReentryOutcome,
+    openRuntimeHistoryConversationForDiagnostics,
+  });
 })();

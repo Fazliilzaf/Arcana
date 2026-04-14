@@ -7,9 +7,11 @@ const {
   createCapabilityExecutor,
   applyCcoSignatureHtml,
   resolveCcoSignatureProfile,
+  resolveCcoSignatureSelection,
 } = require('../capabilities/executionService');
 const { createMicrosoftGraphReadConnector } = require('../infra/microsoftGraphReadConnector');
 const { createMicrosoftGraphSendConnector } = require('../infra/microsoftGraphSendConnector');
+const { createMicrosoftGraphMailboxTruthBackfill } = require('../infra/microsoftGraphMailboxTruthBackfill');
 const {
   isValidEmail,
   normalizeMailboxAddress,
@@ -32,6 +34,18 @@ const { resolveAdaptiveFocusState } = require('../intelligence/adaptiveFocusCont
 const { evaluateRecovery } = require('../intelligence/recoveryEngine');
 const { evaluateStrategicInsights } = require('../intelligence/strategicInsightsEngine');
 const { summarizeShadowReview } = require('../ops/ccoShadowRun');
+const { buildCanonicalMailDocument } = require('../ops/ccoMailDocument');
+const {
+  buildCanonicalMailMimeMetadata,
+  getMailMimeTriggerReasons,
+} = require('../ops/ccoMailMimeLayer');
+const {
+  buildCanonicalCcoMailboxSettingsDocument,
+} = require('../ops/ccoMailboxSettingsDocument');
+const { buildCanonicalMailThreadDocument } = require('../ops/ccoMailThreadHydrator');
+const { createCcoMailboxTruthReadAdapter } = require('../ops/ccoMailboxTruthReadAdapter');
+const { createCcoMailboxTruthWorklistReadModel } = require('../ops/ccoMailboxTruthWorklistReadModel');
+const { createCcoMailboxTruthWorklistShadow } = require('../ops/ccoMailboxTruthWorklistShadow');
 
 const CCO_LIFECYCLE_AUDIT_STATES = new Set([
   'NEW',
@@ -77,6 +91,145 @@ const CCO_HISTORY_SIGNAL_BOOKING_PATTERN =
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function attachMailDocuments(messages = [], { sourceStore = 'unknown' } = {}) {
+  return asArray(messages).map((message) => ({
+    ...message,
+    mailDocument: buildCanonicalMailDocument(message, { sourceStore }),
+  }));
+}
+
+function attachMailThreadHydration(
+  messages = [],
+  {
+    sourceStore = 'unknown',
+    conversationId = '',
+    customerEmail = '',
+  } = {}
+) {
+  const threadDocument = buildCanonicalMailThreadDocument(messages, {
+    sourceStore,
+    conversationId,
+    customerEmail,
+  });
+  const threadMessagesById = new Map(
+    asArray(threadDocument?.messages).map((message) => [normalizeText(message?.messageId), message])
+  );
+  return {
+    messages: asArray(messages).map((message) => ({
+      ...message,
+      mailThreadMessage:
+        threadMessagesById.get(normalizeText(message?.messageId || message?.graphMessageId)) ||
+        null,
+    })),
+    threadDocument,
+  };
+}
+
+async function enrichMessagesWithMailAssets({
+  messages = [],
+  graphReadConnector = null,
+  label = 'CCO runtime history mail asset enrichment',
+} = {}) {
+  const safeMessages = asArray(messages);
+  if (!safeMessages.length || !graphReadConnector) return safeMessages;
+  const shouldEnrich = safeMessages.some(
+    (message) =>
+      message?.hasAttachments === true ||
+      /<img\b|cid:|data:image\//i.test(normalizeText(message?.bodyHtml))
+  );
+  if (!shouldEnrich) return safeMessages;
+  try {
+    if (typeof graphReadConnector.enrichStoredMessagesWithMailAssets === 'function') {
+      return await graphReadConnector.enrichStoredMessagesWithMailAssets({
+        messages: safeMessages,
+        label,
+      });
+    }
+    if (typeof graphReadConnector.enrichStoredMessagesWithInlineHtmlAssets === 'function') {
+      return await graphReadConnector.enrichStoredMessagesWithInlineHtmlAssets({
+        messages: safeMessages,
+        label,
+      });
+    }
+  } catch (_error) {
+  }
+  return safeMessages;
+}
+
+async function enrichMessagesWithMailMime({
+  messages = [],
+  graphReadConnector = null,
+  label = 'CCO runtime history MIME enrichment',
+  maxMessages = 3,
+} = {}) {
+  const safeMessages = asArray(messages).map((message) =>
+    message && typeof message === 'object' ? { ...message } : message
+  );
+  if (
+    !safeMessages.length ||
+    !graphReadConnector ||
+    typeof graphReadConnector.fetchMessageMimeContent !== 'function'
+  ) {
+    return safeMessages;
+  }
+
+  const candidates = safeMessages
+    .map((message, index) => ({
+      index,
+      message,
+      triggerReasons: getMailMimeTriggerReasons(message),
+    }))
+    .filter(
+      (entry) =>
+        entry.triggerReasons.length > 0 &&
+        normalizeText(entry?.message?.graphMessageId || entry?.message?.messageId) &&
+        normalizeText(
+          entry?.message?.userPrincipalName ||
+            entry?.message?.mailboxAddress ||
+            entry?.message?.mailboxId
+        )
+    )
+    .slice(0, Math.max(1, Number(maxMessages || 3)));
+
+  if (!candidates.length) return safeMessages;
+
+  for (const candidate of candidates) {
+    const safeMessage =
+      candidate.message && typeof candidate.message === 'object' ? { ...candidate.message } : {};
+    try {
+      const mimePayload = await graphReadConnector.fetchMessageMimeContent({
+        userId: normalizeText(
+          safeMessage?.userPrincipalName || safeMessage?.mailboxAddress || safeMessage?.mailboxId
+        ),
+        messageId: normalizeText(safeMessage?.graphMessageId || safeMessage?.messageId),
+        label,
+        timeoutMs: 7000,
+      });
+      safeMessages[candidate.index] = {
+        ...safeMessage,
+        mime: buildCanonicalMailMimeMetadata({
+          rawMime: mimePayload?.rawMime,
+          contentType: mimePayload?.contentType,
+          fetchState: normalizeText(mimePayload?.rawMime) ? 'fetched' : 'empty',
+          triggerReasons: candidate.triggerReasons,
+        }),
+      };
+    } catch (error) {
+      safeMessages[candidate.index] = {
+        ...safeMessage,
+        mime: buildCanonicalMailMimeMetadata({
+          fetchState: 'failed',
+          triggerReasons: candidate.triggerReasons,
+          errorCode: normalizeText(error?.code),
+          errorMessage: normalizeText(error?.message),
+        }),
+      };
+    }
+  }
+
+  return safeMessages;
 }
 
 function escapeHtml(value = '') {
@@ -137,9 +290,9 @@ function buildSignaturePreviewDocument({
   senderMailboxId = '',
   emailHtml = '',
 } = {}) {
-  const safeProfileName = normalizeText(profile?.fullName) || 'Hair TP Clinic';
-  const safeProfileKey = normalizeText(profile?.key) || 'contact';
-  const safeSenderMailbox = normalizeText(senderMailboxId) || 'contact@hairtpclinic.com';
+  const safeProfileName = normalizeText(profile?.fullName) || normalizeText(profile?.label) || 'Fazli Krasniqi';
+  const safeProfileKey = normalizeText(profile?.key) || 'fazli';
+  const safeSenderMailbox = normalizeText(senderMailboxId) || 'fazli@hairtpclinic.com';
   const safeEmailHtml = String(emailHtml || '');
 
   return `<!doctype html>
@@ -328,7 +481,7 @@ function buildSignaturePreviewDocument({
 
 function toCcoSignaturePreviewHandler() {
   return async (req, res) => {
-    const profile = resolveCcoSignatureProfile(req.query?.profile);
+    const profile = resolveCcoSignatureSelection(req.query || {});
     const senderMailboxId =
       normalizeMailboxAddress(req.query?.senderMailboxId) ||
       normalizeMailboxAddress(profile?.senderMailboxId) ||
@@ -2610,6 +2763,7 @@ function toActor(req) {
   return {
     id: req.auth.userId,
     role: req.auth.role,
+    email: normalizeMailboxAddress(req.currentUser?.email || ''),
   };
 }
 
@@ -3549,6 +3703,7 @@ async function readCcoMetricsHandler({ req, res, authStore, capabilityAnalysisSt
 function toCcoRuntimeStatusHandler({
   authStore,
   capabilityAnalysisStore,
+  ccoSettingsStore = null,
   graphReadEnabled = false,
   graphSendEnabled = false,
   graphDeleteEnabled = false,
@@ -3558,21 +3713,68 @@ function toCcoRuntimeStatusHandler({
   return async (req, res) => {
     const tenantId = toTenantId(req);
     const graphReadOptions = toGraphReadOptionsFromEnv();
-    const signatureProfiles = ['contact', 'egzona', 'fazli'].map((key) => {
-      const profile = resolveCcoSignatureProfile(key);
-      return {
-        key: normalizeText(profile?.key) || 'contact',
-        fullName: normalizeText(profile?.fullName) || 'Hair TP Clinic',
-        title: normalizeText(profile?.title) || '',
-        senderMailboxId:
-          normalizeMailboxAddress(profile?.senderMailboxId) || 'contact@hairtpclinic.com',
-      };
+    const normalizedAllowlistMailboxIds = asArray(graphReadOptions.allowlistMailboxIds)
+      .map((mailboxId) => normalizeMailboxAddress(mailboxId) || normalizeText(mailboxId).toLowerCase())
+      .filter(Boolean);
+    const normalizedSendAllowlistMailboxIds = parseMailboxIds(process.env.ARCANA_GRAPH_SEND_ALLOWLIST)
+      .map((mailboxId) => normalizeMailboxAddress(mailboxId) || normalizeText(mailboxId).toLowerCase())
+      .filter(Boolean);
+    const normalizedDeleteAllowlistMailboxIds = parseMailboxIds(
+      process.env.ARCANA_CCO_DELETE_ALLOWLIST || process.env.ARCANA_GRAPH_SEND_ALLOWLIST
+    )
+      .map((mailboxId) => normalizeMailboxAddress(mailboxId) || normalizeText(mailboxId).toLowerCase())
+      .filter(Boolean);
+    const tenantSettings =
+      ccoSettingsStore && typeof ccoSettingsStore.getTenantSettings === 'function'
+        ? await ccoSettingsStore.getTenantSettings({ tenantId })
+        : {};
+    const mailboxSettingsDocument = buildCanonicalCcoMailboxSettingsDocument({
+      tenantSettings,
+      defaultSenderMailboxId: process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX,
+      readAllowlistMailboxIds: normalizedAllowlistMailboxIds,
+      sendAllowlistMailboxIds: normalizedSendAllowlistMailboxIds,
+      deleteAllowlistMailboxIds: normalizedDeleteAllowlistMailboxIds,
+      graphReadEnabled,
+      graphSendEnabled,
+      graphDeleteEnabled,
     });
+    const signatureProfiles = asArray(mailboxSettingsDocument.signatureProfiles).map((profile) => ({
+      key: normalizeText(profile?.key) || 'fazli',
+      fullName: normalizeText(profile?.fullName) || normalizeText(profile?.label) || '',
+      title: normalizeText(profile?.title) || '',
+      senderMailboxId:
+        normalizeMailboxAddress(profile?.senderMailboxId) || 'contact@hairtpclinic.com',
+      email:
+        normalizeMailboxAddress(profile?.email || profile?.senderMailboxId) ||
+        normalizeMailboxAddress(profile?.senderMailboxId) ||
+        'contact@hairtpclinic.com',
+      displayEmail:
+        normalizeMailboxAddress(
+          profile?.displayEmail || profile?.visibleEmail || profile?.email || profile?.senderMailboxId
+        ) ||
+        normalizeMailboxAddress(profile?.email || profile?.senderMailboxId) ||
+        'contact@hairtpclinic.com',
+      html: normalizeText(profile?.html || profile?.bodyHtml || profile?.body_html),
+      label: normalizeText(profile?.label) || normalizeText(profile?.fullName) || 'Signatur',
+      source: normalizeText(profile?.source) || 'profile',
+    }));
     const defaultSenderMailbox =
-      normalizeMailboxAddress(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) ||
+      normalizeMailboxAddress(mailboxSettingsDocument?.defaults?.senderMailboxId) ||
       'contact@hairtpclinic.com';
     const defaultSignatureProfile =
-      normalizeText(resolveCcoSignatureProfile('contact')?.key) || 'contact';
+      normalizeText(mailboxSettingsDocument?.defaults?.signatureProfileId) || 'fazli';
+    const senderMailboxOptions = asArray(mailboxSettingsDocument.senderMailboxOptions)
+      .map((mailboxId) => normalizeMailboxAddress(mailboxId))
+      .filter(Boolean);
+    const mailboxCapabilities = asArray(mailboxSettingsDocument.mailboxCapabilities).map((capability) => ({
+      ...capability,
+      id: normalizeMailboxAddress(capability?.id || capability?.email),
+      email: normalizeMailboxAddress(capability?.email || capability?.id),
+      label: normalizeText(capability?.label) || 'Mailbox',
+      signatureProfileId: normalizeText(capability?.signatureProfileId) || null,
+      signatureProfileLabel: normalizeText(capability?.signatureProfileLabel) || null,
+    }));
+    const runtimeMode = graphReadEnabled === true ? 'live' : 'offline_history';
 
     let latestAnalysisEntry = null;
     if (capabilityAnalysisStore && typeof capabilityAnalysisStore.list === 'function') {
@@ -3636,19 +3838,19 @@ function toCcoRuntimeStatusHandler({
         readEnabled: graphReadEnabled === true,
         sendEnabled: graphSendEnabled === true,
         deleteEnabled: graphDeleteEnabled === true,
+        runtimeMode,
         defaultSenderMailbox,
         defaultSignatureProfile,
-        senderMailboxOptions: Array.from(
-          new Set(signatureProfiles.map((profile) => profile.senderMailboxId).filter(Boolean))
-        ),
+        senderMailboxOptions,
         signatureProfiles,
+        mailboxCapabilities,
         readConnectorAvailable: graphReadConnectorAvailable === true,
         sendConnectorAvailable: graphSendConnectorAvailable === true,
         fullTenant: graphReadOptions.fullTenant === true,
         userScope: graphReadOptions.userScope,
         allowlistMode: graphReadOptions.allowlistMode === true,
-        allowlistMailboxIds: asArray(graphReadOptions.allowlistMailboxIds),
-        allowlistMailboxCount: asArray(graphReadOptions.allowlistMailboxIds).length,
+        allowlistMailboxIds: normalizedAllowlistMailboxIds,
+        allowlistMailboxCount: normalizedAllowlistMailboxIds.length,
         maxUsers: toNumber(graphReadOptions.maxUsers, 0),
         maxMessagesPerUser: toNumber(graphReadOptions.maxMessagesPerUser, 0),
         maxInboxMessagesPerUser: toNumber(graphReadOptions.maxInboxMessagesPerUser, 0),
@@ -3682,6 +3884,7 @@ function toCcoRuntimeHistoryQuery(query = {}) {
   const customerEmail = toMailboxAddress(safeQuery.customerEmail);
   const conversationId = normalizeText(safeQuery.conversationId);
   const requestedCustomerEmail = normalizeText(safeQuery.customerEmail);
+  const includeBodyHtml = toBoolean(safeQuery.includeBodyHtml, true);
   const lookbackDays = clampInteger(
     safeQuery.lookbackDays,
     30,
@@ -3710,6 +3913,7 @@ function toCcoRuntimeHistoryQuery(query = {}) {
     mailboxIds,
     customerEmail,
     conversationId,
+    includeBodyHtml,
     lookbackDays,
   };
 }
@@ -4237,6 +4441,52 @@ function toCcoRuntimeHistorySearchQuery(query = {}) {
   };
 }
 
+function sanitizeAttachmentFilename(value = '', fallback = 'bilaga') {
+  const safeValue = normalizeText(value)
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return safeValue || fallback;
+}
+
+function buildContentDispositionHeader(filename = 'bilaga', { inline = false } = {}) {
+  const safeFilename = sanitizeAttachmentFilename(filename);
+  const asciiFilename = safeFilename
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7e]/g, '')
+    .replace(/["\\]/g, '')
+    .trim();
+  const fallbackFilename = asciiFilename || 'attachment';
+  const encodedFilename = encodeURIComponent(safeFilename);
+  return `${inline ? 'inline' : 'attachment'}; filename="${fallbackFilename}"; filename*=UTF-8''${encodedFilename}`;
+}
+
+function toCcoRuntimeMailAssetQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxId =
+    toMailboxAddress(
+      safeQuery.mailboxId || safeQuery.mailboxAddress || safeQuery.userId || safeQuery.mailbox
+    ) || null;
+  const messageId = normalizeText(
+    safeQuery.messageId || safeQuery.graphMessageId || safeQuery.mailMessageId
+  );
+  const attachmentId = normalizeText(safeQuery.attachmentId || safeQuery.id || safeQuery.assetId);
+  const mode = normalizeText(safeQuery.mode).toLowerCase() === 'open' ? 'open' : 'download';
+  const fileName = sanitizeAttachmentFilename(
+    safeQuery.fileName || safeQuery.filename || safeQuery.name,
+    'bilaga'
+  );
+  return {
+    mailboxId,
+    messageId,
+    attachmentId,
+    mode,
+    fileName,
+    ok: Boolean(mailboxId && messageId && attachmentId),
+  };
+}
+
 function toCcoRuntimeShadowQuery(query = {}) {
   const safeQuery = asObject(query);
   const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
@@ -4250,6 +4500,16 @@ function toCcoRuntimeShadowQuery(query = {}) {
     intent: normalizeText(safeQuery.intent) || null,
     sinceIso: explicitSinceIso,
     untilIso: explicitUntilIso,
+  };
+}
+
+function toCcoRuntimeWorklistShadowQuery(query = {}) {
+  const safeQuery = asObject(query);
+  const mailboxIds = resolveCcoRuntimeHistoryMailboxIds(safeQuery);
+  return {
+    mailboxId: mailboxIds[0] || CCO_KONS_HISTORY_DEFAULT_MAILBOX,
+    mailboxIds,
+    limit: clampInteger(safeQuery.limit, 10, 1000, 250),
   };
 }
 
@@ -4363,6 +4623,7 @@ function toCcoRuntimeHistoryHandler({
   graphReadConnector,
   graphReadEnabled = false,
   ccoHistoryStore = null,
+  ccoMailboxTruthStore = null,
 }) {
   return async (req, res) => {
     try {
@@ -4379,10 +4640,86 @@ function toCcoRuntimeHistoryHandler({
         mailboxIds,
         customerEmail,
         conversationId,
+        includeBodyHtml,
         lookbackDays,
       } = parsedQuery;
       const tenantId = toTenantId(req);
       const { startIso, endIso } = resolveCcoRuntimeWindowBounds({ lookbackDays });
+      const mailboxTruthHistory = createCcoMailboxTruthReadAdapter({
+        store: ccoMailboxTruthStore,
+      });
+
+      if (mailboxTruthHistory) {
+        let messages = mailboxTruthHistory.listHistoryMessages({
+          mailboxIds,
+          sinceIso: startIso,
+          untilIso: endIso,
+          customerEmail,
+          conversationId,
+          includeBodyHtml,
+        });
+        messages = await enrichMessagesWithMailAssets({
+          messages,
+          graphReadConnector,
+          label: `CCO runtime history mail asset enrichment (${mailboxId})`,
+        });
+        if (includeBodyHtml) {
+          messages = await enrichMessagesWithMailMime({
+            messages,
+            graphReadConnector,
+            label: `CCO runtime history MIME enrichment (${mailboxId})`,
+          });
+        }
+        messages = attachMailDocuments(messages, { sourceStore: 'mailbox_truth_store' });
+        const hydratedThread = attachMailThreadHydration(messages, {
+          sourceStore: 'mailbox_truth_store',
+          conversationId,
+          customerEmail,
+        });
+        messages = hydratedThread.messages;
+        const events = mailboxTruthHistory.listHistoryEvents({
+          mailboxIds,
+          sinceIso: startIso,
+          untilIso: endIso,
+          customerEmail,
+          conversationId,
+        });
+        const historyCoverage = mailboxTruthHistory.getHistoryCoverage({ mailboxIds });
+        return res.json({
+          ok: true,
+          mailboxId,
+          mailboxIds,
+          customerEmail: customerEmail || null,
+          conversationId: conversationId || null,
+          includeBodyHtml,
+          lookbackDays,
+          source: 'mailbox_truth_store',
+          window: {
+            startIso,
+            endIso,
+          },
+          windowCount: mailboxIds.length,
+          backfilledWindowCount: 0,
+          summary: summarizeHistoryMessages(messages),
+          messages,
+          threadDocument: hydratedThread.threadDocument,
+          events,
+          store: {
+            source: 'mailbox_truth_store',
+            mailbox: historyCoverage.mailboxes[0]?.mailbox || null,
+            mailboxes: historyCoverage.mailboxes.map((entry) => ({
+              mailboxId: entry.mailboxId,
+              mailbox: entry.mailbox,
+              missingWindowCount: entry.coverage?.missingWindowCount || 0,
+              missingWindowsPreview: entry.coverage?.missingWindowsPreview || [],
+              backfilledWindowCount: 0,
+              complete: entry.coverage?.complete === true,
+            })),
+            missingWindowCount: historyCoverage.coverage?.missingWindowCount || 0,
+            mailboxCount: historyCoverage.mailboxes.length,
+          },
+        });
+      }
 
       if (ccoHistoryStore && typeof ccoHistoryStore.listMailboxMessages === 'function') {
         const coverages = await ensureCcoRuntimeHistoryCoverageForMailboxIds({
@@ -4404,7 +4741,7 @@ function toCcoRuntimeHistoryHandler({
           });
         }
 
-        const messages = filterHistoryMessages(
+        let messages = filterHistoryMessages(
           await collectStoredMailboxHistoryMessages({
             tenantId,
             mailboxIds,
@@ -4417,9 +4754,30 @@ function toCcoRuntimeHistoryHandler({
             customerEmail,
           }
         );
+        messages = await enrichMessagesWithMailAssets({
+          messages,
+          graphReadConnector,
+          label: `CCO runtime history mail asset enrichment (${mailboxId})`,
+        });
+        if (includeBodyHtml) {
+          messages = await enrichMessagesWithMailMime({
+            messages,
+            graphReadConnector,
+            label: `CCO runtime history MIME enrichment (${mailboxId})`,
+          });
+        }
+        const messagesWithDocuments = attachMailDocuments(messages, {
+          sourceStore: 'cco_history_store',
+        });
+        const hydratedThread = attachMailThreadHydration(messagesWithDocuments, {
+          sourceStore: 'cco_history_store',
+          conversationId,
+          customerEmail,
+        });
+        const hydratedMessages = hydratedThread.messages;
         await materializeCustomerReplyActions({
           tenantId,
-          messages,
+          messages: hydratedMessages,
           ccoHistoryStore,
         });
         const events =
@@ -4438,7 +4796,7 @@ function toCcoRuntimeHistoryHandler({
                 resultTypes: ['message', 'outcome', 'action'],
               })
             : [];
-        const summary = summarizeHistoryMessages(messages);
+        const summary = summarizeHistoryMessages(hydratedMessages);
         const missingWindowCount = missingCoverages.reduce(
           (sum, coverage) => sum + Number(coverage?.missingWindows?.length || 0),
           0
@@ -4480,7 +4838,8 @@ function toCcoRuntimeHistoryHandler({
           windowCount: totalWindowCount,
           backfilledWindowCount: totalBackfilledWindowCount,
           summary,
-          messages,
+          messages: hydratedMessages,
+          threadDocument: hydratedThread.threadDocument,
           events,
           store: {
             source: 'cco_history_store',
@@ -4511,6 +4870,27 @@ function toCcoRuntimeHistoryHandler({
         conversationId,
         lookbackDays,
       });
+      const enrichedGraphMessages = await enrichMessagesWithMailAssets({
+        messages: result.messages,
+        graphReadConnector,
+        label: `CCO runtime history mail asset enrichment (${mailboxId})`,
+      });
+      const mimeEnrichedGraphMessages = includeBodyHtml
+        ? await enrichMessagesWithMailMime({
+            messages: enrichedGraphMessages,
+            graphReadConnector,
+            label: `CCO runtime history MIME enrichment (${mailboxId})`,
+          })
+        : enrichedGraphMessages;
+      const graphMessages = attachMailDocuments(mimeEnrichedGraphMessages, {
+        sourceStore: 'graph_runtime_fallback',
+      });
+      const hydratedThread = attachMailThreadHydration(graphMessages, {
+        sourceStore: 'graph_runtime_fallback',
+        conversationId,
+        customerEmail,
+      });
+      const hydratedMessages = hydratedThread.messages;
 
       return res.json({
         ok: true,
@@ -4524,8 +4904,9 @@ function toCcoRuntimeHistoryHandler({
           endIso,
         },
         windowCount: result.windowCount,
-        summary: result.summary,
-        messages: result.messages,
+        summary: summarizeHistoryMessages(hydratedMessages),
+        messages: hydratedMessages,
+        threadDocument: hydratedThread.threadDocument,
         events: [],
       });
     } catch (error) {
@@ -4537,13 +4918,145 @@ function toCcoRuntimeHistoryHandler({
   };
 }
 
+function toCcoRuntimeMailAssetContentHandler({
+  graphReadConnector,
+  graphReadEnabled = false,
+}) {
+  return async (req, res) => {
+    try {
+      const query = toCcoRuntimeMailAssetQuery(req.query);
+      if (!query.ok) {
+        return res.status(400).json({
+          ok: false,
+          error: 'mailboxId, messageId och attachmentId krävs för bilageåtkomst.',
+        });
+      }
+
+      if (
+        graphReadEnabled !== true ||
+        !graphReadConnector ||
+        typeof graphReadConnector.fetchMessageAttachmentContent !== 'function'
+      ) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Bilageåtkomst är inte tillgänglig just nu.',
+        });
+      }
+
+      const asset = await graphReadConnector.fetchMessageAttachmentContent({
+        userId: query.mailboxId,
+        messageId: query.messageId,
+        attachmentId: query.attachmentId,
+        label: `CCO runtime mail asset content (${query.mailboxId})`,
+      });
+
+      const buffer = Buffer.isBuffer(asset?.buffer)
+        ? asset.buffer
+        : Buffer.from(asset?.buffer || []);
+      if (!buffer.length) {
+        return res.status(404).json({
+          ok: false,
+          error: 'Bilagan kunde inte hämtas.',
+        });
+      }
+
+      const contentType = normalizeText(asset?.contentType) || 'application/octet-stream';
+      const fileName = sanitizeAttachmentFilename(asset?.name || query.fileName, 'bilaga');
+      res.setHeader('content-type', contentType);
+      res.setHeader(
+        'content-disposition',
+        buildContentDispositionHeader(fileName, { inline: query.mode === 'open' })
+      );
+      res.setHeader('content-length', String(buffer.length));
+      res.setHeader('cache-control', 'private, max-age=300');
+      res.setHeader('x-content-type-options', 'nosniff');
+      return res.status(200).send(buffer);
+    } catch (error) {
+      return res.status(Number(error?.status || 500) || 500).json({
+        ok: false,
+        error: error?.message || 'Bilagan kunde inte hämtas.',
+      });
+    }
+  };
+}
+
 function toCcoRuntimeHistoryBackfillHandler({
   graphReadConnector,
   graphReadEnabled = false,
   ccoHistoryStore = null,
+  ccoMailboxTruthStore = null,
 }) {
   return async (req, res) => {
     try {
+      if (ccoMailboxTruthStore && typeof ccoMailboxTruthStore.getCompletenessReport === 'function') {
+        if (
+          graphReadEnabled !== true ||
+          !graphReadConnector ||
+          typeof graphReadConnector.fetchMailboxTruthFolderPage !== 'function'
+        ) {
+          return res.status(503).json({
+            ok: false,
+            error: 'Graph-läsning är inte tillgänglig för mailbox truth-backfill just nu.',
+          });
+        }
+
+        const input = toCcoRuntimeHistoryBackfillInput({
+          ...(asObject(req.body)),
+          ...(asObject(req.query)),
+        });
+        const mailboxTruthHistory = createCcoMailboxTruthReadAdapter({
+          store: ccoMailboxTruthStore,
+        });
+        const currentCoverage = mailboxTruthHistory.getHistoryCoverage({
+          mailboxIds: input.mailboxIds,
+        });
+        if (input.refresh !== true && currentCoverage?.coverage?.complete === true) {
+          return res.json({
+            ok: true,
+            mailboxId: input.mailboxId,
+            mailboxIds: input.mailboxIds,
+            lookbackDays: input.lookbackDays,
+            refresh: input.refresh,
+            source: 'mailbox_truth_store',
+            backfilledWindowCount: 0,
+            backfilledFolderCount: 0,
+            missingWindowCount: 0,
+            mailbox: currentCoverage.mailboxes[0]?.mailbox || null,
+            mailboxes: currentCoverage.mailboxes,
+          });
+        }
+
+        const backfill = createMicrosoftGraphMailboxTruthBackfill({
+          connectorFactory: () => graphReadConnector,
+          store: ccoMailboxTruthStore,
+        });
+        const result = await backfill.runBackfill({
+          mailboxIds: input.mailboxIds,
+          folderTypes: ['inbox', 'sent', 'drafts', 'deleted'],
+          resume: input.refresh !== true,
+        });
+        const nextCoverage = mailboxTruthHistory.getHistoryCoverage({
+          mailboxIds: input.mailboxIds,
+        });
+        const backfilledFolderCount = asArray(result?.perMailbox).reduce(
+          (sum, mailbox) => sum + asArray(mailbox?.folderReports).length,
+          0
+        );
+        return res.json({
+          ok: true,
+          mailboxId: input.mailboxId,
+          mailboxIds: input.mailboxIds,
+          lookbackDays: input.lookbackDays,
+          refresh: input.refresh,
+          source: 'mailbox_truth_store',
+          backfilledWindowCount: backfilledFolderCount,
+          backfilledFolderCount,
+          missingWindowCount: nextCoverage?.coverage?.missingWindowCount || 0,
+          mailbox: nextCoverage?.mailboxes?.[0]?.mailbox || null,
+          mailboxes: nextCoverage?.mailboxes || [],
+        });
+      }
+
       if (
         !ccoHistoryStore ||
         typeof ccoHistoryStore.getMailboxSummary !== 'function' ||
@@ -5389,11 +5902,42 @@ function toWritingIdentityAutoExtractHandler({ capabilityAnalysisStore, authStor
 
 function toCcoRuntimeHistoryStatusHandler({
   ccoHistoryStore = null,
+  ccoMailboxTruthStore = null,
   graphReadEnabled = false,
   scheduler = null,
 }) {
   return async (req, res) => {
     try {
+      const mailboxTruthHistory = createCcoMailboxTruthReadAdapter({
+        store: ccoMailboxTruthStore,
+      });
+      if (mailboxTruthHistory) {
+        const { mailboxId, mailboxIds, lookbackDays } = toCcoRuntimeHistoryStatusQuery(req.query);
+        const historyCoverage = mailboxTruthHistory.getHistoryCoverage({ mailboxIds });
+        const schedulerStatus =
+          scheduler && typeof scheduler.getStatus === 'function'
+            ? scheduler.getStatus()
+            : null;
+        return res.json({
+          ok: true,
+          mailboxId,
+          mailboxIds,
+          lookbackDays,
+          graphReadEnabled: graphReadEnabled === true,
+          source: 'mailbox_truth_store',
+          mailbox: historyCoverage.mailboxes[0]?.mailbox || null,
+          mailboxes: historyCoverage.mailboxes,
+          coverage: historyCoverage.coverage,
+          scheduler: schedulerStatus
+            ? {
+                enabled: schedulerStatus.enabled === true,
+                started: schedulerStatus.started === true,
+                job: null,
+              }
+            : null,
+        });
+      }
+
       if (
         !ccoHistoryStore ||
         typeof ccoHistoryStore.getMailboxSummary !== 'function' ||
@@ -5933,6 +6477,133 @@ async function listCapabilityEntriesByName({
   });
 }
 
+function buildWorklistLegacyBaselineEntrySummary(entry = {}) {
+  const directOutputData = asObject(entry?.output?.data);
+  const nestedOutputData = asObject(directOutputData.data);
+  const outputData =
+    Array.isArray(directOutputData.conversationWorklist) ||
+    Array.isArray(directOutputData.needsReplyToday)
+      ? directOutputData
+      : Array.isArray(nestedOutputData.conversationWorklist) ||
+          Array.isArray(nestedOutputData.needsReplyToday)
+        ? nestedOutputData
+        : directOutputData;
+  const conversationWorklist = asArray(outputData.conversationWorklist);
+  const needsReplyToday = asArray(outputData.needsReplyToday);
+  const rowMailboxIds = Array.from(
+    new Set(
+      [...conversationWorklist, ...needsReplyToday]
+        .map((row) =>
+          normalizeText(row?.mailboxId || row?.mailboxAddress || row?.userPrincipalName).toLowerCase()
+        )
+        .filter(Boolean)
+    )
+  );
+  const inputMailboxIds = asArray(entry?.input?.mailboxIds)
+    .map((item) => normalizeText(item).toLowerCase())
+    .filter(Boolean);
+  const mailboxIds = Array.from(new Set([...rowMailboxIds, ...inputMailboxIds]));
+  return {
+    outputData,
+    conversationWorklist,
+    needsReplyToday,
+    rowCount: conversationWorklist.length + needsReplyToday.length,
+    mailboxIds,
+  };
+}
+
+function getWorklistLegacyBaselineObservedAt(entry = {}) {
+  const summary = buildWorklistLegacyBaselineEntrySummary(entry);
+  const outputData = asObject(summary.outputData);
+  return (
+    normalizeText(outputData?.generatedAt) ||
+    normalizeText(entry?.ts) ||
+    normalizeText(entry?.id) ||
+    ''
+  );
+}
+
+function selectLatestWorklistLegacyBaseline({
+  entries = [],
+  mailboxIds = [],
+} = {}) {
+  const safeEntries = asArray(entries).sort((left, right) => {
+    const observedCompare = getWorklistLegacyBaselineObservedAt(right).localeCompare(
+      getWorklistLegacyBaselineObservedAt(left)
+    );
+    if (observedCompare !== 0) return observedCompare;
+    const tsCompare = normalizeText(right?.ts).localeCompare(normalizeText(left?.ts));
+    if (tsCompare !== 0) return tsCompare;
+    return normalizeText(right?.id).localeCompare(normalizeText(left?.id));
+  });
+  const requestedMailboxIds = new Set(
+    asArray(mailboxIds)
+      .map((item) => normalizeText(item).toLowerCase())
+      .filter(Boolean)
+  );
+  const latestObservedEntry = safeEntries[0] || null;
+  let firstNonEmptyEntry = null;
+  let firstScopeMatchedEntry = null;
+  let skippedEmptyEntries = 0;
+  let skippedScopeMismatchEntries = 0;
+
+  for (const entry of safeEntries) {
+    const summary = buildWorklistLegacyBaselineEntrySummary(entry);
+    if (summary.rowCount <= 0) {
+      skippedEmptyEntries += 1;
+      continue;
+    }
+    if (!firstNonEmptyEntry) {
+      firstNonEmptyEntry = {
+        entry,
+        summary,
+      };
+    }
+    const scopeMatched =
+      requestedMailboxIds.size === 0 ||
+      summary.mailboxIds.some((mailboxId) => requestedMailboxIds.has(mailboxId));
+    if (scopeMatched) {
+      firstScopeMatchedEntry = {
+        entry,
+        summary,
+      };
+      break;
+    }
+    skippedScopeMismatchEntries += 1;
+  }
+
+  const selected =
+    firstScopeMatchedEntry ||
+    firstNonEmptyEntry || {
+      entry: latestObservedEntry,
+      summary: buildWorklistLegacyBaselineEntrySummary(latestObservedEntry),
+    };
+
+  const strategy =
+    firstScopeMatchedEntry
+      ? 'latest_non_empty_scope_match'
+      : firstNonEmptyEntry
+        ? 'latest_non_empty_fallback'
+        : 'latest_entry';
+
+  return {
+    latestObservedEntry,
+    selectedEntry: selected.entry,
+    selectedOutputData: selected.summary.outputData,
+    selectedConversationWorklist: selected.summary.conversationWorklist,
+    selectedNeedsReplyToday: selected.summary.needsReplyToday,
+    selection: {
+      strategy,
+      latestObservedEntryId: normalizeText(latestObservedEntry?.id) || null,
+      selectedEntryId: normalizeText(selected.entry?.id) || null,
+      skippedEmptyEntries,
+      skippedScopeMismatchEntries,
+      selectedRowCount: Number(selected.summary.rowCount || 0),
+      selectedMailboxIds: selected.summary.mailboxIds,
+    },
+  };
+}
+
 async function buildShadowReviewContext({
   tenantId = '',
   capabilityAnalysisStore = null,
@@ -6028,6 +6699,507 @@ async function buildShadowReviewContext({
     latestRunEntry: asArray(shadowEntries)[0] || null,
     latestReviewEntry: asArray(reviewEntries)[0] || null,
   };
+}
+
+async function resolveWorklistCustomerState({
+  tenantId = '',
+  customerState = null,
+  ccoCustomerStore = null,
+} = {}) {
+  if (customerState && typeof customerState === 'object') {
+    return customerState;
+  }
+  if (ccoCustomerStore && typeof ccoCustomerStore.getTenantCustomerState === 'function') {
+    return ccoCustomerStore.getTenantCustomerState({ tenantId });
+  }
+  return null;
+}
+
+async function buildWorklistShadowContext({
+  tenantId = '',
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+  customerState = null,
+  mailboxIds = [],
+  limit = 250,
+} = {}) {
+  const resolvedCustomerState = await resolveWorklistCustomerState({
+    tenantId,
+    customerState,
+    ccoCustomerStore,
+  });
+  const shadow = createCcoMailboxTruthWorklistShadow({
+    store: ccoMailboxTruthStore,
+    customerState: resolvedCustomerState,
+  });
+  const legacyEntries = await listCapabilityEntriesByName({
+    capabilityAnalysisStore,
+    tenantId,
+    capabilityName: 'CCO.InboxAnalysis',
+    limit: 50,
+  });
+  const baseline = selectLatestWorklistLegacyBaseline({
+    entries: legacyEntries,
+    mailboxIds,
+  });
+  const latestEntry = baseline.selectedEntry;
+  const latestOutputData = baseline.selectedOutputData;
+  const diffReport = shadow
+    ? shadow.buildDiffReport({
+        legacyConversationWorklist: baseline.selectedConversationWorklist,
+        legacyNeedsReplyToday: baseline.selectedNeedsReplyToday,
+        mailboxIds,
+        limit,
+        customerState: resolvedCustomerState,
+      })
+    : null;
+
+  return {
+    latestEntry,
+    latestObservedEntry: baseline.latestObservedEntry,
+    latestOutputData,
+    baselineSelection: baseline.selection,
+    diffReport,
+    truthCoverage:
+      ccoMailboxTruthStore && typeof ccoMailboxTruthStore.getCompletenessReport === 'function'
+        ? ccoMailboxTruthStore.getCompletenessReport({ mailboxIds })
+        : null,
+    deltaCoverage:
+      ccoMailboxTruthStore && typeof ccoMailboxTruthStore.getDeltaSyncReport === 'function'
+        ? ccoMailboxTruthStore.getDeltaSyncReport({ mailboxIds })
+        : null,
+  };
+}
+
+async function buildWorklistTruthContext({
+  tenantId = '',
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+  customerState = null,
+  mailboxIds = [],
+  limit = 250,
+} = {}) {
+  const resolvedCustomerState = await resolveWorklistCustomerState({
+    tenantId,
+    customerState,
+    ccoCustomerStore,
+  });
+  const worklistReadModel = createCcoMailboxTruthWorklistReadModel({
+    store: ccoMailboxTruthStore,
+    customerState: resolvedCustomerState,
+  });
+  const shadowContext = await buildWorklistShadowContext({
+    tenantId,
+    capabilityAnalysisStore,
+    ccoMailboxTruthStore,
+    ccoCustomerStore,
+    customerState: resolvedCustomerState,
+    mailboxIds,
+    limit,
+  });
+
+  return {
+    readModel: worklistReadModel
+      ? worklistReadModel.buildReadModel({
+          mailboxIds,
+          limit,
+        })
+      : null,
+    latestEntry: shadowContext.latestEntry,
+    latestObservedEntry: shadowContext.latestObservedEntry,
+    latestOutputData: shadowContext.latestOutputData,
+    baselineSelection: shadowContext.baselineSelection,
+    truthCoverage: shadowContext.truthCoverage,
+    deltaCoverage: shadowContext.deltaCoverage,
+    shadowDiffReport: shadowContext.diffReport,
+  };
+}
+
+function buildWorklistConsumerParityBaseline({
+  shadowDiffReport = null,
+  mailboxIds = [],
+} = {}) {
+  const mailboxAssessment = asArray(shadowDiffReport?.mailboxAssessment)
+    .map((item) => asObject(item))
+    .filter((item) => normalizeText(item.mailboxId));
+  const assessmentByMailboxId = new Map(
+    mailboxAssessment.map((item) => [normalizeText(item.mailboxId).toLowerCase(), item])
+  );
+  const requestedMailboxIds = asArray(mailboxIds)
+    .map((item) => normalizeText(item).toLowerCase())
+    .filter(Boolean);
+  const comparableMailboxIds = mailboxAssessment
+    .filter((item) => item.comparable === true)
+    .map((item) => normalizeText(item.mailboxId).toLowerCase());
+  const notComparableMailboxIds = requestedMailboxIds.filter((mailboxId) => {
+    const assessment = assessmentByMailboxId.get(mailboxId);
+    return !assessment || assessment.comparable !== true;
+  });
+
+  return {
+    comparableMailboxIds,
+    notComparableMailboxIds,
+    mailboxAssessment: requestedMailboxIds.map((mailboxId) => {
+      const assessment = assessmentByMailboxId.get(mailboxId);
+      if (assessment) return assessment;
+      return {
+        mailboxId,
+        legacyCount: 0,
+        shadowCount: 0,
+        bothCount: 0,
+        legacyOnlyCount: 0,
+        shadowOnlyCount: 0,
+        unreadDiffCount: 0,
+        ownershipDiffCount: 0,
+        laneDiffCount: 0,
+        classificationCounts: {},
+        comparable: false,
+        parityStatus: 'not_comparable_no_data',
+      };
+    }),
+  };
+}
+
+async function buildWorklistConsumerContext({
+  tenantId = '',
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+  customerState = null,
+  mailboxIds = [],
+  limit = 120,
+} = {}) {
+  const resolvedCustomerState = await resolveWorklistCustomerState({
+    tenantId,
+    customerState,
+    ccoCustomerStore,
+  });
+  const worklistReadModel = createCcoMailboxTruthWorklistReadModel({
+    store: ccoMailboxTruthStore,
+    customerState: resolvedCustomerState,
+  });
+  const truthContext = await buildWorklistTruthContext({
+    tenantId,
+    capabilityAnalysisStore,
+    ccoMailboxTruthStore,
+    ccoCustomerStore,
+    customerState: resolvedCustomerState,
+    mailboxIds,
+    limit,
+  });
+
+  return {
+    consumerModel: worklistReadModel
+      ? worklistReadModel.buildConsumerModel({
+          mailboxIds,
+          limit,
+        })
+      : null,
+    latestEntry: truthContext.latestEntry,
+    latestObservedEntry: truthContext.latestObservedEntry,
+    latestOutputData: truthContext.latestOutputData,
+    baselineSelection: truthContext.baselineSelection,
+    truthCoverage: truthContext.truthCoverage,
+    deltaCoverage: truthContext.deltaCoverage,
+    shadowDiffReport: truthContext.shadowDiffReport,
+    parityBaseline: buildWorklistConsumerParityBaseline({
+      shadowDiffReport: truthContext.shadowDiffReport,
+      mailboxIds,
+    }),
+  };
+}
+
+function buildWorklistConsumerCountList(items = {}) {
+  return Object.entries(asObject(items))
+    .sort((left, right) => String(left[0]).localeCompare(String(right[0])))
+    .map(
+      ([key, value]) =>
+        `<li><strong>${escapeHtml(normalizeText(key) || 'okänd')}</strong><span>${escapeHtml(
+          String(Number(value || 0))
+        )}</span></li>`
+    )
+    .join('');
+}
+
+function buildWorklistConsumerMailboxCards(items = []) {
+  const rows = asArray(items);
+  if (rows.length === 0) {
+    return '<p class="readout-empty">Ingen parity-baseline ännu.</p>';
+  }
+  return rows
+    .map((item) => {
+      const comparable = item.comparable === true;
+      const parityLabel = comparable ? 'Jämförbar' : 'Inte jämförbar ännu';
+      return `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">${escapeHtml(parityLabel)}</span>
+          <span class="result-time">${escapeHtml(normalizeText(item.mailboxId) || 'okänd mailbox')}</span>
+        </div>
+        <h4>${escapeHtml(normalizeText(item.mailboxId) || 'okänd mailbox')}</h4>
+        <p class="result-summary">${escapeHtml(
+          [
+            `Legacy ${Number(item.legacyCount || 0)}`,
+            `Truth ${Number(item.shadowCount || 0)}`,
+            `Båda ${Number(item.bothCount || 0)}`,
+          ].join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(
+          [
+            `Unread diff ${Number(item.unreadDiffCount || 0)}`,
+            `Ownership diff ${Number(item.ownershipDiffCount || 0)}`,
+            `Lane diff ${Number(item.laneDiffCount || 0)}`,
+          ].join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(
+          normalizeText(item.parityStatus) || 'okänd paritystatus'
+        )}</p>
+      </article>`;
+    })
+    .join('');
+}
+
+function buildWorklistConsumerRowCards(rows = []) {
+  const items = asArray(rows).slice(0, 40);
+  if (items.length === 0) {
+    return '<p class="readout-empty">Inga truth-rader i det här scope:t ännu.</p>';
+  }
+  return items
+    .map((item) => {
+      const stateBits = [];
+      if (item?.state?.hasUnreadInbound === true) stateBits.push('Unread inbound');
+      if (item?.state?.needsReply === true) stateBits.push('Needs reply');
+      if (item?.state?.folderPresence?.inbox === true) stateBits.push('Inbox');
+      if (item?.state?.folderPresence?.sent === true) stateBits.push('Sent');
+      if (item?.state?.folderPresence?.drafts === true) stateBits.push('Drafts');
+      if (item?.state?.folderPresence?.deleted === true) stateBits.push('Deleted');
+      const rollup = item?.rollup && typeof item.rollup === 'object' ? item.rollup : null;
+      const rollupBits = [];
+      if (rollup?.enabled === true) {
+        rollupBits.push(`Rollup ${Number(rollup.count || 0)}`);
+        if (Number(rollup?.mailboxCount || 0) > 0) {
+          rollupBits.push(`${Number(rollup.mailboxCount || 0)} mailboxar`);
+        }
+        if (normalizeText(rollup?.provenanceDetail)) {
+          rollupBits.push(normalizeText(rollup.provenanceDetail));
+        }
+        const operationalSummary = rollup?.operationalSummary || {};
+        const operationalBits = [];
+        if (Number(operationalSummary.unreadCount || 0) > 0) {
+          operationalBits.push(`Unread ${Number(operationalSummary.unreadCount || 0)}`);
+        }
+        if (Number(operationalSummary.needsReplyCount || 0) > 0) {
+          operationalBits.push(`Needs reply ${Number(operationalSummary.needsReplyCount || 0)}`);
+        }
+        if (Number(operationalSummary.inboxCount || 0) > 0) {
+          operationalBits.push(`Inbox ${Number(operationalSummary.inboxCount || 0)}`);
+        }
+        if (Number(operationalSummary.sentCount || 0) > 0) {
+          operationalBits.push(`Sent ${Number(operationalSummary.sentCount || 0)}`);
+        }
+        if (operationalBits.length) {
+          rollupBits.push(operationalBits.join(' · '));
+        }
+      }
+      const rollupMarkup = rollupBits.length
+        ? `<p class="result-meta">${escapeHtml(rollupBits.join(' · '))}</p>`
+        : '';
+      return `<article class="result-card">
+        <div class="result-head">
+          <span class="result-type">Truth-rad · ${escapeHtml(normalizeText(item?.lane) || 'all')}</span>
+          <span class="result-time">${escapeHtml(formatReadoutDateTimeSv(item?.timing?.latestMessageAt))}</span>
+        </div>
+        <h4>${escapeHtml(normalizeText(item?.subject) || '(utan ämne)')}</h4>
+        <p class="result-summary">${escapeHtml(
+          normalizeText(item?.preview) || 'Ingen preview tillgänglig.'
+        )}</p>
+        ${rollupMarkup}
+        <p class="result-meta">${escapeHtml(
+          [
+            normalizeText(item?.mailbox?.mailboxId),
+            normalizeText(item?.customer?.email || item?.customer?.name),
+            normalizeText(item?.conversation?.key),
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        )}</p>
+        <p class="result-meta">${escapeHtml(
+          [
+            `Ownership: ${normalizeText(item?.mailbox?.ownershipMailbox) || 'okänd'}`,
+            `Message count: ${Number(item?.state?.messageCount || 0)}`,
+            ...stateBits,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        )}</p>
+        ${
+          normalizeText(item?.conversation?.conversationId)
+            ? `<p class="result-links"><a href="${escapeHtml(
+                buildCcoNextConversationHref(item.conversation.conversationId)
+              )}" target="_blank" rel="noreferrer">Öppna i CCO Next</a></p>`
+            : ''
+        }
+      </article>`;
+    })
+    .join('');
+}
+
+function buildWorklistConsumerReadoutDocument({
+  mailboxIds = [],
+  limit = 120,
+  consumerModel = null,
+  parityBaseline = null,
+  shadowDiffReport = null,
+  latestEntry = null,
+  latestOutputData = null,
+} = {}) {
+  const mailboxValue = asArray(mailboxIds).join(',');
+  const consumerParams = new URLSearchParams();
+  if (mailboxValue) consumerParams.set('mailboxIds', mailboxValue);
+  consumerParams.set('limit', String(limit));
+  const consumerJsonHref = `/api/v1/cco/runtime/worklist/consumer?${consumerParams.toString()}`;
+  const shadowJsonHref = `/api/v1/cco/runtime/worklist/shadow?${consumerParams.toString()}`;
+  const summary = asObject(consumerModel?.summary);
+  const aggregate = asObject(shadowDiffReport?.aggregate);
+  const acceptanceGate = asObject(shadowDiffReport?.acceptanceGate);
+  const parity = asObject(parityBaseline);
+  const comparableMailboxIds = asArray(parity.comparableMailboxIds);
+  const notComparableMailboxIds = asArray(parity.notComparableMailboxIds);
+
+  return `<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CCO worklist consumer preview</title>
+    <style>
+      :root { color-scheme: light; }
+      body { margin: 0; padding: 32px; font-family: Arial, sans-serif; background: #f6f2ec; color: #2f2f33; }
+      .page { max-width: 1360px; margin: 0 auto; }
+      h1 { margin: 0 0 8px; font-size: 30px; }
+      .lead { margin: 0 0 24px; color: rgba(70,60,50,.72); }
+      .panel { background: rgba(255,252,248,.92); border: 1px solid rgba(120,105,90,.16); border-radius: 20px; box-shadow: 0 8px 24px rgba(70,50,30,.08), 0 2px 6px rgba(70,50,30,.05), inset 0 1px 0 rgba(255,255,255,.55); padding: 24px; margin-bottom: 24px; }
+      .warning { border-radius: 16px; padding: 16px 18px; background: rgba(108, 70, 34, 0.08); border: 1px solid rgba(120,105,90,.16); margin-top: 18px; }
+      .warning strong { display: block; margin-bottom: 6px; }
+      .filters { display: grid; grid-template-columns: 1.2fr .8fr auto; gap: 12px; align-items: end; }
+      .filters label { display: block; font-size: 13px; color: rgba(70,60,50,.72); margin-bottom: 6px; }
+      .filters input { width: 100%; border: 1px solid rgba(120,105,90,.16); border-radius: 14px; padding: 11px 12px; font-size: 14px; background: rgba(255,255,255,.82); }
+      .filters button { border: 0; border-radius: 14px; padding: 12px 16px; background: linear-gradient(180deg, rgba(34,108,74,.94), rgba(18,88,58,.98)); color: #fff; font-weight: 700; cursor: pointer; }
+      .meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; color: rgba(70,60,50,.72); font-size: 13px; }
+      .meta-chip { border: 1px solid rgba(120,105,90,.16); border-radius: 999px; padding: 7px 12px; background: rgba(255,255,255,.72); }
+      .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+      .kpi { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .kpi-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: rgba(70,60,50,.62); margin-bottom: 8px; }
+      .kpi-value { font-size: 28px; font-weight: 700; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      .list-card, .result-card { padding: 16px; border-radius: 16px; background: rgba(255,255,255,.82); border: 1px solid rgba(120,105,90,.12); }
+      .list-card h3, .result-card h4 { margin: 0 0 12px; font-size: 16px; }
+      .list-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+      .list-card li { display: grid; gap: 4px; }
+      .list-card li span { color: rgba(70,60,50,.72); font-size: 13px; }
+      .result-grid { display: grid; gap: 12px; }
+      .result-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: rgba(70,60,50,.62); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+      .result-summary { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+      .result-meta { margin: 0; color: rgba(70,60,50,.62); font-size: 12px; }
+      .result-links { margin: 10px 0 0; }
+      .result-links a { color: #2a5bd7; text-decoration: none; font-size: 13px; font-weight: 600; }
+      .readout-empty { color: rgba(70,60,50,.62); }
+      .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+      .links a { color: #2a5bd7; text-decoration: none; font-size: 13px; font-weight: 600; }
+      @media (max-width: 1100px) {
+        body { padding: 20px; }
+        .filters, .kpis, .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>CCO worklist consumer preview</h1>
+      <p class="lead">Intern read-only preview av den truth-driven worklist-consumern. Detta är inte primär operativ arbetskö och får inte användas som styrande vänsterkö i det här steget.</p>
+
+      <section class="panel">
+        <form method="get" action="/api/v1/cco/runtime/worklist/consumer/readout" class="filters">
+          <div>
+            <label for="mailboxIds">Mailboxar</label>
+            <input id="mailboxIds" name="mailboxIds" value="${escapeHtml(mailboxValue)}" />
+          </div>
+          <div>
+            <label for="limit">Antal rader</label>
+            <input id="limit" name="limit" value="${escapeHtml(String(limit))}" />
+          </div>
+          <button type="submit">Uppdatera</button>
+        </form>
+
+        <div class="warning">
+          <strong>Preview-läge</strong>
+          <span>Legacy-worklisten fortsätter vara styrande. Shadow guardrail är obligatorisk. Cutover är uttryckligen inte tillåten i denna yta.</span>
+        </div>
+
+        <div class="meta">
+          <span class="meta-chip">Senaste legacy-analys: ${escapeHtml(formatReadoutDateTimeSv(normalizeText(latestOutputData?.generatedAt) || latestEntry?.ts))}</span>
+          <span class="meta-chip">Parity-scope: draft-only review out of scope</span>
+          <span class="meta-chip">Comparable mailboxar: ${escapeHtml(comparableMailboxIds.join(', ') || 'inga ännu')}</span>
+          <span class="meta-chip">Not comparable yet: ${escapeHtml(notComparableMailboxIds.join(', ') || 'inga')}</span>
+        </div>
+
+        <div class="links">
+          <a href="${escapeHtml(consumerJsonHref)}" target="_blank" rel="noreferrer">Öppna consumer JSON</a>
+          <a href="${escapeHtml(shadowJsonHref)}" target="_blank" rel="noreferrer">Öppna shadow JSON</a>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-label">Truth-rader</div><div class="kpi-value">${escapeHtml(String(summary.rowCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Unread inbound</div><div class="kpi-value">${escapeHtml(String(summary.unreadCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Needs reply</div><div class="kpi-value">${escapeHtml(String(summary.needsReplyCount || 0))}</div></div>
+          <div class="kpi"><div class="kpi-label">Shadow gate</div><div class="kpi-value">${escapeHtml(acceptanceGate.canConsiderCutover === true ? 'Klar' : 'Block')}</div></div>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <div class="grid">
+            <div class="list-card">
+              <h3>Consumer summary</h3>
+              <ul>
+                <li><strong>Lane counts</strong><span>${escapeHtml(JSON.stringify(asObject(summary.laneCounts)))}</span></li>
+                <li><strong>Ownership counts</strong><span>${escapeHtml(JSON.stringify(asObject(summary.ownershipCounts)))}</span></li>
+                <li><strong>Act now</strong><span>${escapeHtml(String(Number(summary.actNowCount || 0)))}</span></li>
+                <li><strong>Out of scope draft review</strong><span>${escapeHtml(String(Number(summary.outOfScopeDraftReviewCount || 0)))}</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Shadow guardrail</h3>
+              <ul>
+                <li><strong>Mapping gap</strong><span>${escapeHtml(String(Number(aggregate.classificationCounts?.mapping_gap || 0)))}</span></li>
+                <li><strong>Truth shift</strong><span>${escapeHtml(String(Number(aggregate.classificationCounts?.truth_shift || 0)))}</span></li>
+                <li><strong>Legacy heuristic</strong><span>${escapeHtml(String(Number(aggregate.classificationCounts?.legacy_heuristic || 0)))}</span></li>
+                <li><strong>Unread diff</strong><span>${escapeHtml(String(Number(aggregate.unreadDiffCount || 0)))}</span></li>
+              </ul>
+            </div>
+            <div class="list-card">
+              <h3>Comparable mailboxar</h3>
+              <ul>${comparableMailboxIds.length ? comparableMailboxIds.map((item) => `<li><strong>${escapeHtml(item)}</strong><span>Parity jämförbar i den här körningen.</span></li>`).join('') : '<li class="readout-empty">Ingen jämförbar mailbox ännu.</li>'}</ul>
+            </div>
+            <div class="list-card">
+              <h3>Not comparable yet</h3>
+              <ul>${notComparableMailboxIds.length ? notComparableMailboxIds.map((item) => `<li><strong>${escapeHtml(item)}</strong><span>Coverage finns men legacy-baseline saknas eller är inte jämförbar ännu.</span></li>`).join('') : '<li class="readout-empty">Ingen mailbox i detta läge.</li>'}</ul>
+            </div>
+          </div>
+        </section>
+        <section class="panel">
+          <h3>Per mailbox parity-baseline</h3>
+          <div class="result-grid">${buildWorklistConsumerMailboxCards(parity.mailboxAssessment)}</div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h3>Truth-driven consumer rows</h3>
+        <div class="result-grid">${buildWorklistConsumerRowCards(consumerModel?.rows)}</div>
+      </section>
+    </div>
+  </body>
+</html>`;
 }
 
 function formatShadowStatList(items = [], formatter = (item) => item?.label || item?.key || '–') {
@@ -6556,18 +7728,340 @@ function toCcoRuntimeShadowReadoutHandler({
   };
 }
 
-function toCcoRuntimeHistorySearchHandler({
-  ccoHistoryStore = null,
+function toCcoRuntimeWorklistShadowHandler({
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
 }) {
   return async (req, res) => {
     try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeWorklistShadowQuery(req.query);
+      const context = await buildWorklistShadowContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+      });
+      if (!context.diffReport) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Mailbox truth shadow-adapter är inte tillgänglig.',
+        });
+      }
+      return res.json({
+        ok: true,
+        mailboxId: query.mailboxId,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+        latestAnalysisEntry: context.latestEntry
+          ? {
+              id: context.latestEntry.id,
+              ts: context.latestEntry.ts,
+              generatedAt: normalizeText(context.latestOutputData?.generatedAt) || null,
+            }
+          : null,
+        latestObservedAnalysisEntry: context.latestObservedEntry
+          ? {
+              id: context.latestObservedEntry.id,
+              ts: context.latestObservedEntry.ts,
+              generatedAt: normalizeText(
+                buildWorklistLegacyBaselineEntrySummary(context.latestObservedEntry).outputData
+                  ?.generatedAt
+              ) || null,
+            }
+          : null,
+        legacyBaselineSelection: context.baselineSelection,
+        truthCoverage: context.truthCoverage,
+        deltaCoverage: context.deltaCoverage,
+        aggregate: context.diffReport.aggregate,
+        dimensionAssessment: context.diffReport.dimensionAssessment,
+        acceptanceGate: context.diffReport.acceptanceGate,
+        conversationDiffs: context.diffReport.conversationDiffs,
+        metadata: context.diffReport.metadata,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Worklist-shadow kunde inte byggas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeWorklistTruthHandler({
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeWorklistShadowQuery(req.query);
+      const context = await buildWorklistTruthContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+      });
+      if (!context.readModel) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Mailbox truth worklist-read-model är inte tillgänglig.',
+        });
+      }
+
+      return res.json({
+        ok: true,
+        source: context.readModel.source,
+        modelVersion: context.readModel.modelVersion,
+        mailboxId: query.mailboxId,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+        parityScope: context.readModel.parityScope,
+        metadata: context.readModel.metadata,
+        summary: context.readModel.summary,
+        rows: context.readModel.rows,
+        truthCoverage: context.truthCoverage,
+        deltaCoverage: context.deltaCoverage,
+        shadowGuardrail: context.shadowDiffReport
+          ? {
+              latestAnalysisEntry: context.latestEntry
+                ? {
+                    id: context.latestEntry.id,
+                    ts: context.latestEntry.ts,
+                    generatedAt: normalizeText(context.latestOutputData?.generatedAt) || null,
+                  }
+                : null,
+              latestObservedAnalysisEntry: context.latestObservedEntry
+                ? {
+                    id: context.latestObservedEntry.id,
+                    ts: context.latestObservedEntry.ts,
+                    generatedAt: normalizeText(
+                      buildWorklistLegacyBaselineEntrySummary(context.latestObservedEntry).outputData
+                        ?.generatedAt
+                    ) || null,
+                  }
+                : null,
+              legacyBaselineSelection: context.baselineSelection,
+              aggregate: context.shadowDiffReport.aggregate,
+              dimensionAssessment: context.shadowDiffReport.dimensionAssessment,
+              acceptanceGate: context.shadowDiffReport.acceptanceGate,
+              metadata: context.shadowDiffReport.metadata,
+            }
+          : null,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Worklist truth-read-model kunde inte byggas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeWorklistConsumerHandler({
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeWorklistShadowQuery(req.query);
+      const context = await buildWorklistConsumerContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+      });
+      if (!context.consumerModel) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Mailbox truth worklist-consumer är inte tillgänglig.',
+        });
+      }
+
+      return res.json({
+        ok: true,
+        source: context.consumerModel.source,
+        modelVersion: context.consumerModel.modelVersion,
+        mailboxId: query.mailboxId,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+        parityScope: context.consumerModel.parityScope,
+        metadata: context.consumerModel.metadata,
+        summary: context.consumerModel.summary,
+        rows: context.consumerModel.rows,
+        truthCoverage: context.truthCoverage,
+        deltaCoverage: context.deltaCoverage,
+        consumerExposure: {
+          mode: 'limited',
+          legacyUiDriving: true,
+          cutoverState: 'not_allowed',
+          shadowGuardrail: 'required',
+        },
+        readiness: {
+          canStartLimitedConsumerExposure:
+            context.shadowDiffReport?.acceptanceGate?.canConsiderCutover === true,
+          canConsiderCutover: false,
+          blockers: asArray(context.shadowDiffReport?.acceptanceGate?.blockers),
+        },
+        parityBaseline: context.parityBaseline,
+        shadowGuardrail: context.shadowDiffReport
+          ? {
+              latestAnalysisEntry: context.latestEntry
+                ? {
+                    id: context.latestEntry.id,
+                    ts: context.latestEntry.ts,
+                    generatedAt: normalizeText(context.latestOutputData?.generatedAt) || null,
+                  }
+                : null,
+              latestObservedAnalysisEntry: context.latestObservedEntry
+                ? {
+                    id: context.latestObservedEntry.id,
+                    ts: context.latestObservedEntry.ts,
+                    generatedAt: normalizeText(
+                      buildWorklistLegacyBaselineEntrySummary(context.latestObservedEntry).outputData
+                        ?.generatedAt
+                    ) || null,
+                  }
+                : null,
+              legacyBaselineSelection: context.baselineSelection,
+              aggregate: context.shadowDiffReport.aggregate,
+              mailboxAssessment: context.shadowDiffReport.mailboxAssessment,
+              dimensionAssessment: context.shadowDiffReport.dimensionAssessment,
+              acceptanceGate: context.shadowDiffReport.acceptanceGate,
+              metadata: context.shadowDiffReport.metadata,
+            }
+          : null,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || 'Worklist consumer kunde inte byggas.',
+      });
+    }
+  };
+}
+
+function toCcoRuntimeWorklistConsumerReadoutHandler({
+  capabilityAnalysisStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const tenantId = toTenantId(req);
+      const query = toCcoRuntimeWorklistShadowQuery(req.query);
+      const context = await buildWorklistConsumerContext({
+        tenantId,
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+        mailboxIds: query.mailboxIds,
+        limit: query.limit,
+      });
+      if (!context.consumerModel) {
+        return res
+          .status(503)
+          .send(escapeHtml('Worklist consumer-preview kunde inte byggas.'));
+      }
+      return res.send(
+        buildWorklistConsumerReadoutDocument({
+          mailboxIds: query.mailboxIds,
+          limit: query.limit,
+          consumerModel: context.consumerModel,
+          parityBaseline: context.parityBaseline,
+          shadowDiffReport: context.shadowDiffReport,
+          latestEntry: context.latestEntry,
+          latestOutputData: context.latestOutputData,
+        })
+      );
+    } catch (error) {
+      return res
+        .status(500)
+        .send(escapeHtml(error?.message || 'Worklist consumer-preview kunde inte byggas.'));
+    }
+  };
+}
+
+function toCcoRuntimeHistorySearchHandler({
+  ccoHistoryStore = null,
+  ccoMailboxTruthStore = null,
+}) {
+  return async (req, res) => {
+    try {
+      const parsedQuery = toCcoRuntimeHistorySearchQuery(req.query);
+      const resultTypes = new Set(
+        asArray(parsedQuery.resultTypes)
+          .map((item) => normalizeText(item).toLowerCase())
+          .filter(Boolean)
+      );
+      const explicitMessageOnlyResultType =
+        resultTypes.size === 1 && resultTypes.has('message');
+      const implicitMessageOnlyFlags =
+        resultTypes.size === 0 &&
+        parsedQuery.includeMessages === true &&
+        parsedQuery.includeActions !== true &&
+        parsedQuery.includeOutcomes !== true;
+      const messageOnlySearch =
+        (explicitMessageOnlyResultType || implicitMessageOnlyFlags) &&
+        asArray(parsedQuery.actionTypes).length === 0 &&
+        asArray(parsedQuery.outcomeCodes).length === 0;
+      const mailboxTruthHistory =
+        messageOnlySearch && ccoMailboxTruthStore
+          ? createCcoMailboxTruthReadAdapter({ store: ccoMailboxTruthStore })
+          : null;
+      if (mailboxTruthHistory) {
+        const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
+          lookbackDays: parsedQuery.lookbackDays,
+          sinceIso: parsedQuery.sinceIso,
+          untilIso: parsedQuery.untilIso,
+        });
+        const results = mailboxTruthHistory.searchHistoryMessages({
+          mailboxIds: parsedQuery.mailboxIds,
+          customerEmail: parsedQuery.customerEmail,
+          conversationId: parsedQuery.conversationId,
+          q: parsedQuery.q,
+          sinceIso: startIso,
+          untilIso: endIso,
+          limit: parsedQuery.limit,
+        });
+        return res.json({
+          ok: true,
+          mailboxId: parsedQuery.mailboxId,
+          mailboxIds: parsedQuery.mailboxIds,
+          customerEmail: parsedQuery.customerEmail,
+          conversationId: parsedQuery.conversationId,
+          lookbackDays: parsedQuery.lookbackDays,
+          q: parsedQuery.q,
+          intent: parsedQuery.intent,
+          resultTypes: ['message'],
+          actionTypes: [],
+          outcomeCodes: [],
+          source: 'mailbox_truth_store',
+          window: {
+            startIso,
+            endIso,
+          },
+          resultCount: results.length,
+          results,
+        });
+      }
+
       if (!ccoHistoryStore || typeof ccoHistoryStore.searchHistoryRecords !== 'function') {
         return res.status(503).json({
           ok: false,
           error: 'Historiksök är inte tillgänglig just nu.',
         });
       }
-      const parsedQuery = toCcoRuntimeHistorySearchQuery(req.query);
       const tenantId = toTenantId(req);
       const { startIso, endIso } = resolveCcoRuntimeWindowBounds({
         lookbackDays: parsedQuery.lookbackDays,
@@ -6702,11 +8196,14 @@ function toCcoRuntimeCalibrationReadoutHandler({
 function createCapabilitiesRouter({
   authStore,
   tenantConfigStore,
+  ccoSettingsStore = null,
   requireAuth,
   requireRole,
   executionGateway = null,
   capabilityAnalysisStore = null,
   ccoHistoryStore = null,
+  ccoMailboxTruthStore = null,
+  ccoCustomerStore = null,
   templateStore = null,
   scheduler = null,
   graphReadConnector = null,
@@ -6744,7 +8241,11 @@ function createCapabilitiesRouter({
     process.env.ARCANA_CCO_DELETE_ALLOWLIST || graphSendAllowlist
   );
   const resolvedGraphReadConnector = (() => {
-    if (graphReadConnector && typeof graphReadConnector.fetchInboxSnapshot === 'function') {
+    if (
+      graphReadConnector &&
+      (typeof graphReadConnector.fetchInboxSnapshot === 'function' ||
+        typeof graphReadConnector.fetchMailboxTruthFolderPage === 'function')
+    ) {
       return graphReadConnector;
     }
     if (!shouldEnableGraphRead) return null;
@@ -6777,7 +8278,8 @@ function createCapabilitiesRouter({
   const resolvedGraphSendConnector = (() => {
     if (
       graphSendConnector &&
-      (typeof graphSendConnector.sendReply === 'function' ||
+      (typeof graphSendConnector.sendComposeDocument === 'function' ||
+        typeof graphSendConnector.sendReply === 'function' ||
         typeof graphSendConnector.sendNewMessage === 'function')
     ) {
       return graphSendConnector;
@@ -6819,12 +8321,14 @@ function createCapabilitiesRouter({
   const isGraphReadOperational =
     shouldEnableGraphRead ||
     (!!resolvedGraphReadConnector &&
-      typeof resolvedGraphReadConnector.fetchInboxSnapshot === 'function');
+      (typeof resolvedGraphReadConnector.fetchInboxSnapshot === 'function' ||
+        typeof resolvedGraphReadConnector.fetchMailboxTruthFolderPage === 'function'));
   const executor = createCapabilityExecutor({
     executionGateway: gateway,
     authStore,
     tenantConfigStore,
     capabilityAnalysisStore,
+    ccoSettingsStore,
     buildVersion: process.env.npm_package_version || 'dev',
   });
 
@@ -6903,6 +8407,7 @@ function createCapabilitiesRouter({
       toCcoRuntimeStatusHandler({
         authStore,
         capabilityAnalysisStore,
+        ccoSettingsStore,
         graphReadEnabled: isGraphReadOperational,
         graphSendEnabled: shouldEnableGraphSend,
         graphDeleteEnabled: shouldEnableGraphDelete,
@@ -6911,7 +8416,8 @@ function createCapabilitiesRouter({
           typeof resolvedGraphReadConnector.fetchInboxSnapshot === 'function',
         graphSendConnectorAvailable:
           !!resolvedGraphSendConnector &&
-          (typeof resolvedGraphSendConnector.sendReply === 'function' ||
+          (typeof resolvedGraphSendConnector.sendComposeDocument === 'function' ||
+            typeof resolvedGraphSendConnector.sendReply === 'function' ||
             typeof resolvedGraphSendConnector.sendNewMessage === 'function'),
       })
     )
@@ -6924,6 +8430,7 @@ function createCapabilitiesRouter({
     toRoleGuardedHandler(
       toCcoRuntimeHistoryStatusHandler({
         ccoHistoryStore,
+        ccoMailboxTruthStore,
         graphReadEnabled: isGraphReadOperational,
         scheduler,
       })
@@ -6986,6 +8493,58 @@ function createCapabilitiesRouter({
   );
 
   router.get(
+    '/cco/runtime/worklist/truth',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeWorklistTruthHandler({
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/worklist/consumer',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeWorklistConsumerHandler({
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/worklist/consumer/readout',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeWorklistConsumerReadoutHandler({
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/worklist/shadow',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeWorklistShadowHandler({
+        capabilityAnalysisStore,
+        ccoMailboxTruthStore,
+        ccoCustomerStore,
+      })
+    )
+  );
+
+  router.get(
     '/cco/runtime/calibration/summary',
     requireAuth,
     requireRole(ROLE_OWNER, ROLE_STAFF),
@@ -7016,6 +8575,7 @@ function createCapabilitiesRouter({
         graphReadConnector: resolvedGraphReadConnector,
         graphReadEnabled: isGraphReadOperational,
         ccoHistoryStore,
+        ccoMailboxTruthStore,
       })
     )
   );
@@ -7027,6 +8587,19 @@ function createCapabilitiesRouter({
     toRoleGuardedHandler(
       toCcoRuntimeHistorySearchHandler({
         ccoHistoryStore,
+        ccoMailboxTruthStore,
+      })
+    )
+  );
+
+  router.get(
+    '/cco/runtime/mail-asset/content',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    toRoleGuardedHandler(
+      toCcoRuntimeMailAssetContentHandler({
+        graphReadConnector: resolvedGraphReadConnector,
+        graphReadEnabled: isGraphReadOperational,
       })
     )
   );
@@ -7040,6 +8613,7 @@ function createCapabilitiesRouter({
         graphReadConnector: resolvedGraphReadConnector,
         graphReadEnabled: isGraphReadOperational,
         ccoHistoryStore,
+        ccoMailboxTruthStore,
       })
     )
   );

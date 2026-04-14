@@ -88,10 +88,15 @@
       ? value
           .filter((entry) => isPlainObject(entry))
           .map((entry) => ({
+            id: asText(entry.id),
             author: asText(entry.author),
             role: asText(entry.role || 'agent', 'agent'),
-            timestamp: asText(entry.timestamp),
+            time: asText(entry.time || entry.timestamp),
+            timestamp: asText(entry.timestamp || entry.recordedAt || entry.time),
+            recordedAt: asText(entry.recordedAt || entry.timestamp || entry.time),
             body: asText(entry.body),
+            bodyHtml: asText(entry.bodyHtml),
+            latest: asBoolean(entry.latest),
           }))
       : [];
   }
@@ -1827,11 +1832,15 @@
       const safeThreadId = asText(threadId);
       const record = threadCasesById[safeThreadId];
       if (!record) return;
+      const timestamp = asText(message?.timestamp || message?.recordedAt, getTimestampOffset(0, 0, dependencies));
       const nextMessage = {
         author: asText(message?.author, dependencies.getActorLabel ? dependencies.getActorLabel() : 'CCO'),
         role: asText(message?.role || 'agent', 'agent'),
-        timestamp: asText(message?.timestamp, getTimestampOffset(0, 0, dependencies)),
+        time: asText(message?.time || timestamp),
+        timestamp,
+        recordedAt: timestamp,
         body: asText(message?.body),
+        bodyHtml: asText(message?.bodyHtml),
       };
       applyLegacyPatch(safeThreadId, {
         previewMessages: [...cloneMessages(record.thread.messages), nextMessage],

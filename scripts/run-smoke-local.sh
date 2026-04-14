@@ -6,6 +6,9 @@ cd "$ROOT_DIR"
 
 PORT="${PORT:-3100}"
 SERVER_PID=""
+SMOKE_STARTUP_TIMEOUT_SEC="${LOCAL_SMOKE_STARTUP_TIMEOUT_SEC:-${ARCANA_LOCAL_SMOKE_STARTUP_TIMEOUT_SEC:-90}}"
+SMOKE_READY_TIMEOUT_SEC="${LOCAL_SMOKE_READY_TIMEOUT_SEC:-${ARCANA_LOCAL_SMOKE_READY_TIMEOUT_SEC:-120}}"
+SMOKE_POLL_INTERVAL_SEC="${LOCAL_SMOKE_POLL_INTERVAL_SEC:-1}"
 DEFAULT_SMOKE_OWNER_EMAIL="fazli@hairtpclinic.com"
 DEFAULT_SMOKE_OWNER_PASSWORD="ArcanaPilot!2026"
 DEFAULT_SMOKE_TENANT_ID="hair-tp-clinic"
@@ -45,23 +48,58 @@ ARCANA_DEFAULT_TENANT="$SMOKE_TENANT_ID" \
 node server.js >/tmp/arcana-dev.log 2>&1 &
 SERVER_PID="$!"
 
-READY=0
-for _ in $(seq 1 40); do
-  if curl -sf "http://localhost:${PORT}/readyz" >/dev/null 2>&1; then
-    READY=1
+HTTP_UP=0
+STARTUP_POLLS=$(( SMOKE_STARTUP_TIMEOUT_SEC / SMOKE_POLL_INTERVAL_SEC ))
+if [[ "${STARTUP_POLLS}" -lt 1 ]]; then
+  STARTUP_POLLS=1
+fi
+for _ in $(seq 1 "${STARTUP_POLLS}"); do
+  if curl -sf "http://localhost:${PORT}/healthz" >/dev/null 2>&1; then
+    HTTP_UP=1
     break
   fi
-  sleep 0.5
+  if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
+    break
+  fi
+  sleep "${SMOKE_POLL_INTERVAL_SEC}"
 done
 
-if [[ "${READY}" -ne 1 ]]; then
-  echo "❌ Servern svarade inte på port ${PORT}."
+if [[ "${HTTP_UP}" -ne 1 ]]; then
+  echo "❌ Servern band inte port ${PORT} inom ${SMOKE_STARTUP_TIMEOUT_SEC}s."
   echo "--- /tmp/arcana-dev.log ---"
   cat /tmp/arcana-dev.log || true
   exit 1
 fi
 
-echo "✅ Server uppe. Kör smoke-test..."
+echo "✅ Servern svarar på port ${PORT}. Väntar på readyz..."
+
+READY=0
+READY_POLLS=$(( SMOKE_READY_TIMEOUT_SEC / SMOKE_POLL_INTERVAL_SEC ))
+if [[ "${READY_POLLS}" -lt 1 ]]; then
+  READY_POLLS=1
+fi
+for _ in $(seq 1 "${READY_POLLS}"); do
+  if curl -sf "http://localhost:${PORT}/readyz" >/dev/null 2>&1; then
+    READY=1
+    break
+  fi
+  if ! kill -0 "${SERVER_PID}" 2>/dev/null; then
+    break
+  fi
+  sleep "${SMOKE_POLL_INTERVAL_SEC}"
+done
+
+if [[ "${READY}" -ne 1 ]]; then
+  echo "❌ Servern blev inte ready inom ${SMOKE_READY_TIMEOUT_SEC}s."
+  echo "--- /readyz ---"
+  curl -s "http://localhost:${PORT}/readyz" || true
+  echo
+  echo "--- /tmp/arcana-dev.log ---"
+  cat /tmp/arcana-dev.log || true
+  exit 1
+fi
+
+echo "✅ Server ready. Kör smoke-test..."
 BASE_URL="http://localhost:${PORT}" \
 ARCANA_OWNER_EMAIL="$SMOKE_OWNER_EMAIL" \
 ARCANA_OWNER_PASSWORD="$SMOKE_OWNER_PASSWORD" \

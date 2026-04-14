@@ -33,6 +33,7 @@
   const CCO_PRIMARY_PATH = '/cco';
   const CCO_NEXT_PRIMARY_PATH = '/cco-next';
   const CCO_UNANSWERED_PRIMARY_PATH = '/unanswered';
+  const AUTH_RETURN_TO_QUERY_PARAM = 'next';
   const CCO_THREAD_QUERY_PARAM = 'thread';
   const CCO_WORKSPACE_SESSION_KEY = 'ARCANA_CCO_WORKSPACE_STATE';
   const CCO_LAST_SEEN_AT_KEY = 'ARCANA_CCO_LAST_SEEN_AT';
@@ -74,7 +75,7 @@
       kpi_pilot_report: 'Pilotrapport',
       monitor_scheduler_jobs: 'Schedulerjobb (krav)',
       monitor_readiness_history: 'Beredskapshistorik',
-      monitor_readiness_nogo: 'Beredskapsblockeringar (No-Go)',
+      monitor_readiness_nogo: 'Aktiva No-Go-blockeringar',
       open_queue: 'Öppna kö',
       see_incidents: 'Se incidenter',
       overview_insights: 'Översiktsinsikter',
@@ -130,7 +131,7 @@
       kpi_pilot_report: 'Pilot report',
       monitor_scheduler_jobs: 'Scheduler jobs (required)',
       monitor_readiness_history: 'Readiness history',
-      monitor_readiness_nogo: 'Readiness blockers (No-Go)',
+      monitor_readiness_nogo: 'Active No-Go blockers',
       open_queue: 'Open queue',
       see_incidents: 'View incidents',
       overview_insights: 'Overview insights',
@@ -170,6 +171,44 @@
   function isUnansweredRoutePath(pathname = '') {
     void pathname;
     return false;
+  }
+
+  function readPostLoginRedirectPath() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const raw = String(params.get(AUTH_RETURN_TO_QUERY_PARAM) || '').trim();
+      if (!raw) return '';
+      const parsed = new URL(raw, window.location.origin);
+      if (parsed.origin !== window.location.origin) return '';
+      if (!parsed.pathname.startsWith('/')) return '';
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return '';
+    }
+  }
+
+  function redirectToPostLoginTargetIfNeeded() {
+    const target = readPostLoginRedirectPath();
+    if (!target) return false;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (current === target) return false;
+    window.location.replace(target);
+    return true;
+  }
+
+  function buildPreservedAdminSearch() {
+    try {
+      const currentParams = new URLSearchParams(window.location.search || '');
+      const preserved = new URLSearchParams();
+      const next = String(currentParams.get(AUTH_RETURN_TO_QUERY_PARAM) || '').trim();
+      const reason = String(currentParams.get('reason') || '').trim();
+      if (next) preserved.set(AUTH_RETURN_TO_QUERY_PARAM, next);
+      if (reason) preserved.set('reason', reason);
+      const search = preserved.toString();
+      return search ? `?${search}` : '';
+    } catch {
+      return '';
+    }
   }
 
   function getEventTargetElement(event = null) {
@@ -1869,16 +1908,40 @@
     return valueRaw || '-';
   }
 
-  function formatOwnerActionLabel(actionRaw) {
+  function getOwnerActionPresentation(actionRaw) {
     const action = String(actionRaw || '').trim().toLowerCase();
     const map = {
-      request_revision: isEnglishLanguage() ? 'Request revision' : 'Begär revidering',
-      approve_exception: isEnglishLanguage() ? 'Approve exception' : 'Godkänn avvikelse',
-      mark_false_positive: isEnglishLanguage() ? 'Mark false positive' : 'Markera falskt positiv',
-      escalate: isEnglishLanguage() ? 'Escalate' : 'Eskalera',
+      request_revision: {
+        icon: '↺',
+        label: isEnglishLanguage() ? 'Request revision' : 'Begär revidering',
+        meta: isEnglishLanguage() ? 'Send back for a new version.' : 'Skicka tillbaka för ny version.',
+      },
+      approve_exception: {
+        icon: '✓',
+        label: isEnglishLanguage() ? 'Approve exception' : 'Godkänn avvikelse',
+        meta: isEnglishLanguage() ? 'Allow despite the deviation.' : 'Tillåt trots avvikelsen.',
+      },
+      mark_false_positive: {
+        icon: '○',
+        label: isEnglishLanguage() ? 'Mark false positive' : 'Markera falskt positiv',
+        meta: isEnglishLanguage() ? 'Treat the hit as incorrect.' : 'Bedöm träffen som felaktig.',
+      },
+      escalate: {
+        icon: '↑',
+        label: isEnglishLanguage() ? 'Escalate' : 'Eskalera',
+        meta: isEnglishLanguage() ? 'Hand off to a higher-priority path.' : 'Lyft vidare till högre prioriterat spår.',
+      },
     };
     if (Object.prototype.hasOwnProperty.call(map, action)) return map[action];
-    return actionRaw || '-';
+    return {
+      icon: '•',
+      label: actionRaw || '-',
+      meta: '',
+    };
+  }
+
+  function formatOwnerActionLabel(actionRaw) {
+    return getOwnerActionPresentation(actionRaw).label;
   }
 
   function formatTemplateStateLabel(stateRaw) {
@@ -1901,6 +1964,17 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function renderOwnerActionButtonLabel(actionRaw) {
+    const presentation = getOwnerActionPresentation(actionRaw);
+    return `
+      <span class="owner-action-icon" aria-hidden="true">${escapeHtml(presentation.icon)}</span>
+      <span class="owner-action-copy">
+        <span class="owner-action-label">${escapeHtml(presentation.label)}</span>
+        ${presentation.meta ? `<span class="owner-action-meta">${escapeHtml(presentation.meta)}</span>` : ''}
+      </span>
+    `;
   }
 
   function normalizeTemplateCategory(value) {
@@ -4158,18 +4232,42 @@
     const remediationP0 = Number(remediationSummary?.byPriority?.P0 || 0);
     const potentialGain = Number(remediationSummary?.potentialScoreGain || 0);
     const goAllowed = readiness?.goNoGo?.allowed === true;
+    const goLabel = goAllowed
+      ? isEnglishLanguage()
+        ? 'yes'
+        : 'ja'
+      : isEnglishLanguage()
+        ? 'no'
+        : 'nej';
 
     let tone = 'ok';
     if (triggeredNoGo > 0 || remediationP0 > 0) tone = 'bad';
     else if (!goAllowed || remediationTotal > 0) tone = 'warn';
 
     setText(els.readinessBandValue, formatReadinessBandLabel(readiness?.band));
-    const metaText = isEnglishLanguage()
-      ? `Score ${scoreRounded} • no-go ${triggeredNoGo} • P0 ${remediationP0} • actions ${remediationTotal} • gain ${potentialGain}`
-      : `Poäng ${scoreRounded} • no-go ${triggeredNoGo} • P0 ${remediationP0} • åtgärder ${remediationTotal} • möjlig ökning ${potentialGain}`;
+    const metaParts = isEnglishLanguage()
+      ? [
+          `Score ${scoreRounded}`,
+          `Go ${goLabel}`,
+          `No-go ${triggeredNoGo}`,
+          `P0 ${remediationP0}`,
+          `Actions ${remediationTotal}`,
+        ]
+      : [
+          `Poäng ${scoreRounded}`,
+          `Go ${goLabel}`,
+          `No-Go ${triggeredNoGo}`,
+          `P0 ${remediationP0}`,
+          `Åtgärder ${remediationTotal}`,
+        ];
+    if (potentialGain > 0) {
+      metaParts.push(
+        isEnglishLanguage() ? `+${potentialGain} possible` : `+${potentialGain} möjlig`
+      );
+    }
     setKpiMeta(
       els.readinessBandMeta,
-      metaText,
+      metaParts.join(' • '),
       tone
     );
   }
@@ -4441,7 +4539,14 @@
         .querySelectorAll('button[data-owner-action]')
         .forEach((btn) => {
           const action = String(btn.getAttribute('data-owner-action') || '').trim();
-          btn.textContent = formatOwnerActionLabel(action);
+          const presentation = getOwnerActionPresentation(action);
+          btn.innerHTML = renderOwnerActionButtonLabel(action);
+          btn.setAttribute('aria-label', presentation.label);
+          if (presentation.meta) {
+            btn.title = presentation.meta;
+          } else {
+            btn.removeAttribute('title');
+          }
           btn.disabled = !canEdit;
           btn.classList.toggle('active', canEdit && action === selectedAction);
           if (currentEvaluation?.id) {
@@ -5237,6 +5342,8 @@
     );
 
     if (!state.selectedRiskEvaluationId && displayEvaluations[0]?.id) {
+      state.selectedRiskEvaluationId = String(displayEvaluations[0].id || '').trim();
+      renderRiskDetail(displayEvaluations[0]);
       void loadRiskEvaluationDetail(displayEvaluations[0].id);
     } else if (state.selectedRiskEvaluationId) {
       const activeRow = displayEvaluations.find((item) => item.id === state.selectedRiskEvaluationId);
@@ -5518,8 +5625,9 @@
     if (normalized === 'ccoNextWorkspaceSection') {
       return CCO_NEXT_PRIMARY_PATH;
     }
+    const preservedSearch = buildPreservedAdminSearch();
     const hash = SECTION_GROUP_HASH_MAP[normalized] || SECTION_GROUP_HASH_MAP.overviewSection;
-    return `${ADMIN_PRIMARY_PATH}${hash}`;
+    return `${ADMIN_PRIMARY_PATH}${preservedSearch}${hash}`;
   }
 
   function syncSectionHash(groupId) {
@@ -8581,20 +8689,52 @@
   }
 
   const CCO_DEFAULT_SENDER_MAILBOX = 'contact@hairtpclinic.com';
-  const CCO_DEFAULT_SIGNATURE_PROFILE = 'egzona';
+  const CCO_DEFAULT_SIGNATURE_PROFILE = 'fazli';
   const CCO_SIGNATURE_SPLIT_PATTERN =
-    /\n(?:Med vanliga halsningar,|Med vanlig halsning,|Basta halsningar,)\n[\s\S]*$/i;
+    /\n(?:Vänliga hälsningar,|Med vänliga hälsningar,|Med vanliga halsningar,|Med vanlig halsning,|Bästa hälsningar,|Basta halsningar,)\n[\s\S]*$/i;
+  const CCO_APPROVED_SIGNATURE_PUBLIC_BASE_URL = String(window.location.origin || '')
+    .trim()
+    .replace(/\/+$/, '');
+  const CCO_APPROVED_HAIR_TP_SIGNATURE_LOGO_URL =
+    'https://img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png';
+  const CCO_APPROVED_FAZLI_SIGNATURE_HTML = `<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html;charset=utf-8"/></head><body><table id="zs-output-sig" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse; width:516px;"><tbody><tr><td style="padding: 0px !important; width: inherit; height: inherit;"><table id="inner-table" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding-bottom: 16px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#4A4946;display:inline;">Bästa hälsningar,</span></p></td></tr></tbody></table></td></tr><tr><td style="padding: 0px !important; width: inherit; height: inherit;"><table id="inner-table" border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td width="75" style="padding-right: 16px; width: inherit; height: inherit;"><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; line-height: 0px; padding-right: 1px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><img height="94" width="75" alt="" border="0" src="https://img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png"></p></td></tr></tbody></table></td><td style="border-collapse: collapse; background-color: rgb(215, 202, 193); width: 3px; vertical-align: super; padding: 0px !important; height: inherit;"></td><td style="border-collapse: collapse; padding-right: 16px; width: inherit; height: inherit;"></td><td style="padding: 0px !important; width: inherit; height: inherit;"><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 700; padding-bottom: 6px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:700;color:#C2AA9C;display:inline;">Fazli Krasniqi</span></p></td></tr><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 700; padding-bottom: 4px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:700;color:#303030;display:inline;">Hårspecialist | Hårtransplantationer & PRP-injektioner</span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span><a target="_blank" rel="nofollow" href="tel:031881166" style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;text-decoration:none;"> 031-88 11 66&nbsp; </a></span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span><a target="_blank" rel="nofollow" href="mailto:contact@hairtpclinic.com" style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;text-decoration:none;"> contact@hairtpclinic.com </a></span></p></td></tr><tr><td style="border-collapse: collapse; font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: normal; line-height: 14px; font-weight: 400; padding-bottom: 8px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><span style="font-family:Helvetica,Arial,sans-serif;font-size:12px;font-style:normal;line-height:14px;font-weight:400;color:#303030;display:inline;">Vasaplatsen 2, 411 34 Göteborg</span></p></td></tr></tbody></table><table border="0" cellpadding="0" cellspacing="0" role="presentation" style="font-family:Arial,Helvetica,sans-serif;line-height:0px;font-size:1px;padding:0px!important;border-spacing:0px;margin:0px;border-collapse:collapse;"><tbody><tr><td style="padding-right: 10px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://hairtpclinic.se/"><img height="24" width="24" alt="Visit website" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M4%2012h16%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M12%203.5c2.6%202.5%204%205.34%204%208.5s-1.4%206-4%208.5c-2.6-2.5-4-5.34-4-8.5s1.4-6%204-8.5Z%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%20stroke-linejoin%3D%22round%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding-right: 10px; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://www.instagram.com/hairtpclinic/"><img height="24" width="24" alt="Visit instagram" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Crect%20x%3D%224.5%22%20y%3D%224.5%22%20width%3D%2215%22%20height%3D%2215%22%20rx%3D%224%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.3%22%20stroke%3D%22%23B9A89D%22%20stroke-width%3D%221.9%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2216.7%22%20cy%3D%227.3%22%20r%3D%221.15%22%20fill%3D%22%23B9A89D%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding: 0px !important; width: inherit; height: inherit;"><p style="margin: 0.04px;"><a style="font-size:0px;line-height:0px;" target="_blank" rel="nofollow" href="https://www.facebook.com/hairtpclinic/"><img height="24" width="24" alt="Visit facebook" border="0" src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22none%22%3E%0A%20%20%3Cpath%20d%3D%22M13.2%2020v-7h2.35l.45-2.7H13.2V8.6c0-.95.4-1.6%201.8-1.6H16V4.55c-.4-.05-1.15-.15-2.2-.15-2.2%200-3.7%201.35-3.7%203.8v2.1H7.75V13h2.35v7h3.1Z%22%20fill%3D%22%23B9A89D%22%2F%3E%0A%3C%2Fsvg%3E%0A"></a></p></td><td style="padding: 0px !important; width: inherit; height: inherit;"></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td style="border-collapse: collapse; padding-bottom: 16px; width: inherit; height: inherit;"><span></span></td></tr></tbody></table></body></html>`;
+
+  function rewriteApprovedCcoSignatureAssetUrls(
+    html = '',
+    { publicBaseUrl = CCO_APPROVED_SIGNATURE_PUBLIC_BASE_URL } = {}
+  ) {
+    const assetBaseUrl =
+      String(publicBaseUrl || '').trim().replace(/\/+$/, '') || CCO_APPROVED_SIGNATURE_PUBLIC_BASE_URL;
+    return String(html || '')
+      .trim()
+      .replace(
+        /https:\/\/img2\.gimm\.io\/9e99c2fb-11b4-402b-8a43-6022ede8aa2b\/image\.png/gi,
+        CCO_APPROVED_HAIR_TP_SIGNATURE_LOGO_URL
+      )
+      .replace(/https?:\/\/(?:127\.0\.0\.1|localhost):3000(?=\/assets\/hair-tp-clinic\/)/gi, assetBaseUrl);
+  }
+
+  function buildApprovedCcoSignatureHtml(profileKey = 'fazli') {
+    const normalizedKey = String(profileKey || '').trim().toLowerCase();
+    const html =
+      normalizedKey === 'egzona'
+        ? CCO_APPROVED_FAZLI_SIGNATURE_HTML.replace('Fazli Krasniqi', 'Egzona Krasniqi')
+            .replace('mailto:contact@hairtpclinic.com', 'mailto:egzona@hairtpclinic.com')
+            .replace(' contact@hairtpclinic.com ', ' egzona@hairtpclinic.com ')
+        : CCO_APPROVED_FAZLI_SIGNATURE_HTML;
+    return rewriteApprovedCcoSignatureAssetUrls(html);
+  }
 
   function normalizeCcoSignatureProfileKey(value = '') {
     const normalized = String(value || '').trim().toLowerCase();
-    if (normalized === 'fazli') return 'fazli';
-    return 'egzona';
+    if (normalized === 'egzona') return 'egzona';
+    return 'fazli';
   }
 
   function resolveDefaultSignatureForSenderMailbox(mailboxId = '') {
     const normalized = String(mailboxId || '').trim().toLowerCase();
-    if (normalized === 'fazli@hairtpclinic.com') return 'fazli';
-    return 'egzona';
+    if (normalized === 'egzona@hairtpclinic.com') return 'egzona';
+    return 'fazli';
   }
 
   function getCcoSignatureProfilesFromMetadata() {
@@ -8611,12 +8751,18 @@
         const fullName = String(item?.fullName || '').trim();
         const title = String(item?.title || '').trim();
         const senderMailboxId = String(item?.senderMailboxId || '').trim();
+        const email = String(item?.email || item?.displayEmail || senderMailboxId).trim();
+        const displayEmail = String(item?.displayEmail || item?.email || senderMailboxId).trim();
+        const html = rewriteApprovedCcoSignatureAssetUrls(String(item?.html || '').trim());
         if (!fullName || !title) return null;
         return {
           key,
           fullName,
           title,
           senderMailboxId,
+          email,
+          displayEmail,
+          html,
         };
       })
       .filter(Boolean);
@@ -8625,14 +8771,20 @@
       {
         key: 'egzona',
         fullName: 'Egzona Krasniqi',
-        title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+        title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
         senderMailboxId: 'egzona@hairtpclinic.com',
+        email: 'egzona@hairtpclinic.com',
+        displayEmail: 'egzona@hairtpclinic.com',
+        html: buildApprovedCcoSignatureHtml('egzona'),
       },
       {
         key: 'fazli',
         fullName: 'Fazli Krasniqi',
-        title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+        title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
         senderMailboxId: 'fazli@hairtpclinic.com',
+        email: 'fazli@hairtpclinic.com',
+        displayEmail: 'contact@hairtpclinic.com',
+        html: buildApprovedCcoSignatureHtml('fazli'),
       },
     ];
   }
@@ -8665,10 +8817,13 @@
     const selected = profiles.find((item) => item.key === selectedKey);
     if (selected) return selected;
     return profiles[0] || {
-      key: 'egzona',
-      fullName: 'Egzona Krasniqi',
-      title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
-      senderMailboxId: 'egzona@hairtpclinic.com',
+      key: 'fazli',
+      fullName: 'Fazli Krasniqi',
+      title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
+      senderMailboxId: 'fazli@hairtpclinic.com',
+      email: 'fazli@hairtpclinic.com',
+      displayEmail: 'contact@hairtpclinic.com',
+      html: buildApprovedCcoSignatureHtml('fazli'),
     };
   }
 
@@ -8685,10 +8840,17 @@
     const resolvedProfile =
       profile && typeof profile === 'object' ? profile : getCcoSelectedSignatureProfile();
     const safeSenderMailbox =
-      String(senderMailboxId || '').trim().toLowerCase() || CCO_DEFAULT_SENDER_MAILBOX;
+      String(
+        resolvedProfile.displayEmail ||
+          resolvedProfile.signatureEmail ||
+          resolvedProfile.email ||
+          senderMailboxId
+      )
+        .trim()
+        .toLowerCase() || CCO_DEFAULT_SENDER_MAILBOX;
     const safeTitle =
       String(resolvedProfile.title || '').trim() ||
-      'Hårspecialist I Hårtransplantationer & PRP-injektioner';
+      'Hårspecialist | Hårtransplantationer & PRP-injektioner';
     return [
       'Bästa hälsningar,',
       resolvedProfile.fullName,
@@ -8699,57 +8861,21 @@
     ].join('\n');
   }
 
-  function getCcoSignatureSocialIconSvg(type = 'web') {
-    if (type === 'instagram') {
-      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3H7Zm5 3.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5Zm5.25-2.75a1.25 1.25 0 1 1 0 2.5a1.25 1.25 0 0 1 0-2.5Z"/></svg>';
-    }
-    if (type === 'facebook') {
-      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.3-1.6 1.6-1.6h1.7V4.8c-.3 0-1.3-.1-2.4-.1c-2.4 0-4 1.4-4 4.1V11H8v3h2.9v8h2.6Z"/></svg>';
-    }
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20Zm7.9 9h-3.2a15 15 0 0 0-1.1-5A8 8 0 0 1 19.9 11ZM12 4.1c1.1 1.2 2 3.7 2.4 6.9H9.6c.4-3.2 1.3-5.7 2.4-6.9ZM4.1 13h3.2a15 15 0 0 0 1.1 5A8 8 0 0 1 4.1 13Zm0-2A8 8 0 0 1 8.4 6c-.5 1.3-.9 3-1.1 5H4.1Zm7.9 8a9 9 0 0 1-2.4-6h4.8a9 9 0 0 1-2.4 6Zm3.6-1c.5-1.3.9-3 1.1-5h3.2a8 8 0 0 1-4.3 5Z"/></svg>';
-  }
-
   function buildCcoSignaturePreviewHtml({
     profile = null,
     senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
   } = {}) {
     const resolvedProfile =
       profile && typeof profile === 'object' ? profile : getCcoSelectedSignatureProfile();
-    const safeSenderMailbox =
-      String(senderMailboxId || '').trim().toLowerCase() || CCO_DEFAULT_SENDER_MAILBOX;
-    const safeName = String(resolvedProfile.fullName || '').trim() || 'Hair TP Clinic';
-    const safeTitle =
-      String(resolvedProfile.title || '').trim() ||
-      'Hårspecialist I Hårtransplantationer & PRP-injektioner';
-    const logoUrl = `${window.location.origin}/assets/hair-tp-clinic/hairtpclinic-mark-light.svg`;
-    const websiteUrl = 'https://hairtpclinic.se';
-    const instagramUrl = 'https://www.instagram.com/hairtpclinic/';
-    const facebookUrl = 'https://www.facebook.com/hairtpclinic';
-
-    return `
-      <div class="cco-signature-rich">
-        <img class="cco-signature-rich-logo" src="${escapeHtml(logoUrl)}" alt="Hair TP Clinic" />
-        <div class="cco-signature-rich-content">
-          <div class="cco-signature-rich-greeting">Bästa hälsningar,</div>
-          <div class="cco-signature-rich-name">${escapeHtml(safeName)}</div>
-          <div class="cco-signature-rich-title">${escapeHtml(safeTitle)}</div>
-          <div class="cco-signature-rich-line">031-88 11 66</div>
-          <div class="cco-signature-rich-line">${escapeHtml(safeSenderMailbox)}</div>
-          <div class="cco-signature-rich-line">Vasaplatsen 2, 411 34 Göteborg</div>
-          <div class="cco-signature-rich-links">
-            <a href="${escapeHtml(websiteUrl)}" target="_blank" rel="noreferrer" aria-label="Webb">${getCcoSignatureSocialIconSvg(
-              'web'
-            )}</a>
-            <a href="${escapeHtml(instagramUrl)}" target="_blank" rel="noreferrer" aria-label="Instagram">${getCcoSignatureSocialIconSvg(
-              'instagram'
-            )}</a>
-            <a href="${escapeHtml(facebookUrl)}" target="_blank" rel="noreferrer" aria-label="Facebook">${getCcoSignatureSocialIconSvg(
-              'facebook'
-            )}</a>
-          </div>
-        </div>
-      </div>
-    `;
+    const assetBaseUrl = String(window.location.origin || '').trim().replace(/\/+$/, '');
+    const sourceHtml = String(resolvedProfile.html || '').trim();
+    if (!sourceHtml) {
+      return '';
+    }
+    return sourceHtml.replace(
+      /https?:\/\/(?:127\.0\.0\.1|localhost):3000(?=\/assets\/hair-tp-clinic\/)/gi,
+      assetBaseUrl
+    );
   }
 
   function applyCcoSignatureToDraft({
@@ -8821,7 +8947,7 @@
   function renderCcoSignaturePreview() {
     if (!els.ccoSignaturePreview) return;
     const profile = getCcoSelectedSignatureProfile();
-    const safeName = String(profile?.fullName || '').trim() || 'Hair TP Clinic';
+    const safeName = String(profile?.fullName || profile?.label || '').trim();
     const previewHtml = buildCcoSignaturePreviewHtml({
       profile,
       senderMailboxId: state.ccoSenderMailboxId,
@@ -18965,7 +19091,7 @@
           escalationRule: 'Eskalera först om inga tider kan erbjudas idag.',
           medicalFlags: [],
           previewDraftBody:
-            'Hej Anna,\n\nVi löser ombokningen direkt. Just nu finns en tid idag kl 15:30 och en tid imorgon kl 17:00. Svara gärna med den som passar bäst så uppdaterar jag bokningen direkt.\n\nVänliga hälsningar,\nSara · Hair TP Clinic',
+            'Hej Anna,\n\nVi löser ombokningen direkt. Just nu finns en tid idag kl 15:30 och en tid imorgon kl 17:00. Svara gärna med den som passar bäst så uppdaterar jag bokningen direkt.',
           previewMessages: [
             {
               author: 'Anna Karlsson',
@@ -19123,7 +19249,7 @@
           escalationRule: 'Eskalera endast om kunden går över till medicinska riskfrågor eller behöver specialistbedömning.',
           medicalFlags: [],
           previewDraftBody:
-            'Hej Erik,\n\nTack för din fråga. För fillers hjälper vi dig gärna vidare direkt till rätt bokningsväg denna vecka. Om du vill kan jag redan idag ge dig nästa lediga tid och kort beskriva hur upplägget brukar se ut.\n\nVänliga hälsningar,\nHair TP Clinic',
+            'Hej Erik,\n\nTack för din fråga. För fillers hjälper vi dig gärna vidare direkt till rätt bokningsväg denna vecka. Om du vill kan jag redan idag ge dig nästa lediga tid och kort beskriva hur upplägget brukar se ut.',
           previewMessages: [
             {
               author: 'Erik Johansson',
@@ -19239,7 +19365,7 @@
           escalationRule: 'Ingen eskalering behövs så länge tiderna är kvar.',
           medicalFlags: [],
           previewDraftBody:
-            'Hej Mona,\n\nPerfekt, då bokar vi in dig på första lediga eftermiddagstiden nästa vecka: tisdag kl 14:00. Om du vill ha onsdag kl 16:30 i stället är det bara att svara så justerar vi direkt.\n\nVänliga hälsningar,\nEgzona · Hair TP Clinic',
+            'Hej Mona,\n\nPerfekt, då bokar vi in dig på första lediga eftermiddagstiden nästa vecka: tisdag kl 14:00. Om du vill ha onsdag kl 16:30 i stället är det bara att svara så justerar vi direkt.',
           previewMessages: [
             {
               author: 'Mona Nilsson',
@@ -19348,7 +19474,7 @@
           escalationRule: 'Eskalera endast om kunden efterfrågar fler tider eller medicinsk rådgivning.',
           medicalFlags: [],
           previewDraftBody:
-            'Hej Johan,\n\nJag följer bara upp de tider vi skickade tidigare. Just nu finns fortfarande fredag kl 09:00 och måndag kl 15:30 tillgängligt. Svara gärna med den tid som passar dig bäst så uppdaterar jag bokningen direkt.\n\nVänliga hälsningar,\nEgzona · Hair TP Clinic',
+            'Hej Johan,\n\nJag följer bara upp de tider vi skickade tidigare. Just nu finns fortfarande fredag kl 09:00 och måndag kl 15:30 tillgängligt. Svara gärna med den tid som passar dig bäst så uppdaterar jag bokningen direkt.',
           previewMessages: [
             {
               author: 'Johan Lagerström',
@@ -19362,7 +19488,7 @@
               role: 'agent',
               timestamp: '2026-04-22T11:32:00.000Z',
               body:
-                'Hej Johan,\n\nDu kan träffa oss fredag kl 09:00 eller måndag kl 15:30. Bekräfta gärna så uppdaterar jag vår kalender.\n\nVänliga hälsningar,\nEgzona · Hair TP Clinic',
+                'Hej Johan,\n\nDu kan träffa oss fredag kl 09:00 eller måndag kl 15:30. Bekräfta gärna så uppdaterar jag vår kalender.',
             },
           ],
           previewHistory: [
@@ -19469,7 +19595,7 @@
           escalationRule: 'Eskalera till klinik endast om kunden beskriver nya symptom.',
           medicalFlags: ['Klinikbedömning vid symptom'],
           previewDraftBody:
-            'Hej Linda,\n\nJag följer bara upp vårt senaste meddelande. Om du vill kan vi hjälpa dig att boka en kontrolltid den här veckan. Återkom gärna när det passar.\n\nVänliga hälsningar,\nFazli · Hair TP Clinic',
+            'Hej Linda,\n\nJag följer bara upp vårt senaste meddelande. Om du vill kan vi hjälpa dig att boka en kontrolltid den här veckan. Återkom gärna när det passar.',
           previewMessages: [
             {
               author: 'Linda Berg',
@@ -19482,7 +19608,7 @@
               role: 'agent',
               timestamp: '2026-04-21T09:25:00.000Z',
               body:
-                'Hej Linda,\n\nAbsolut, vi hjälper dig gärna vidare. Om du vill kan vi boka en kontrolltid denna vecka. Återkom med vad som passar dig bäst.\n\nVänliga hälsningar,\nFazli · Hair TP Clinic',
+                'Hej Linda,\n\nAbsolut, vi hjälper dig gärna vidare. Om du vill kan vi boka en kontrolltid denna vecka. Återkom med vad som passar dig bäst.',
             },
           ],
           previewHistory: [
@@ -19579,7 +19705,7 @@
           responseAngle: 'Trygg, försiktig och transparent. Bekräfta frågan och tydliggör att kliniken granskar innan bokning.',
           escalationRule: 'Eskalera till klinik omedelbart och boka inte innan grönt ljus finns.',
           previewDraftBody:
-            'Hej Karin,\n\nTack för att du berättar detta. Eftersom du använder blodförtunnande och samtidigt beskriver irritation i hårbotten vill vi först låta kliniken granska läget innan vi bokar eller ger definitiv rådgivning. Vi återkommer så snart den bedömningen är klar.\n\nVänliga hälsningar,\nHair TP Clinic',
+            'Hej Karin,\n\nTack för att du berättar detta. Eftersom du använder blodförtunnande och samtidigt beskriver irritation i hårbotten vill vi först låta kliniken granska läget innan vi bokar eller ger definitiv rådgivning. Vi återkommer så snart den bedömningen är klar.',
           previewMessages: [
             {
               author: 'Karin Ekman',
@@ -19681,7 +19807,7 @@
           escalationRule: 'Eskalera endast om kunden går över till medicinska symptom eller behandlingsrisker.',
           medicalFlags: [],
           previewDraftBody:
-            'Hej Maria,\n\nTack för din fråga. För botox börjar vi vanligtvis med att gå igenom område, mål och om en konsultation behövs innan bokning. Om du vill kan vi hjälpa dig vidare med nästa steg i lugn takt.\n\nVänliga hälsningar,\nSara · Hair TP Clinic',
+            'Hej Maria,\n\nTack för din fråga. För botox börjar vi vanligtvis med att gå igenom område, mål och om en konsultation behövs innan bokning. Om du vill kan vi hjälpa dig vidare med nästa steg i lugn takt.',
           previewMessages: [
             {
               author: 'Maria Andersson',
@@ -19863,7 +19989,7 @@
     if (store && typeof store.getDraftValueById === 'function') {
       const value = store.getDraftValueById(conversationId);
       syncCcoNextPreviewBackboneToState();
-      return value || String(conversation?.previewDraftBody || '');
+      return stripCcoNextPreviewStudioSignature(value || String(conversation?.previewDraftBody || ''));
     }
     const overrideMap =
       state.ccoNextPreviewDraftByConversationId && typeof state.ccoNextPreviewDraftByConversationId === 'object'
@@ -19872,7 +19998,9 @@
     const overrideValue = Object.prototype.hasOwnProperty.call(overrideMap, conversationId)
       ? String(overrideMap[conversationId] || '')
       : '';
-    return overrideValue || String(conversation?.previewDraftBody || '');
+    return stripCcoNextPreviewStudioSignature(
+      overrideValue || String(conversation?.previewDraftBody || '')
+    );
   }
 
   function getCcoNextPreviewThreadState(conversationId = '') {
@@ -20036,17 +20164,34 @@
     const conversationId = String(safeRow.conversationId || '').trim();
     if (!conversationId) return { ...safeRow };
     const override = getCcoNextPreviewThreadState(conversationId);
+    const previewDraftBody = stripCcoNextPreviewStudioSignature(
+      String(
+        Object.prototype.hasOwnProperty.call(override, 'previewDraftBody')
+          ? override.previewDraftBody
+          : safeRow.previewDraftBody || ''
+      )
+    );
+    const sanitizePreviewMessage = (message = {}) => {
+      const safeMessage = message && typeof message === 'object' ? { ...message } : {};
+      const role = String(safeMessage.role || '').trim().toLowerCase();
+      if (role !== 'agent') return safeMessage;
+      return {
+        ...safeMessage,
+        body: stripCcoNextPreviewStudioSignature(String(safeMessage.body || '')),
+      };
+    };
     return {
       ...safeRow,
       ...override,
+      previewDraftBody,
       previewSummary: {
         ...(safeRow.previewSummary || {}),
         ...(override.previewSummary || {}),
       },
       previewMessages: Array.isArray(override.previewMessages)
-        ? override.previewMessages
+        ? override.previewMessages.map(sanitizePreviewMessage)
         : Array.isArray(safeRow.previewMessages)
-        ? safeRow.previewMessages
+        ? safeRow.previewMessages.map(sanitizePreviewMessage)
         : [],
       previewHistory: Array.isArray(override.previewHistory)
         ? override.previewHistory
@@ -20259,46 +20404,50 @@
       greeting: String(safeValue.greeting || '').trim(),
       contact: String(safeValue.contact || '').trim(),
       email: String(safeValue.email || '').trim(),
+      displayEmail: String(safeValue.displayEmail || safeValue.email || '').trim(),
       phone: String(safeValue.phone || '').trim(),
+      html: rewriteApprovedCcoSignatureAssetUrls(String(safeValue.html || '').trim()),
     };
   }
 
   function getCcoNextPreviewStudioBaseSignatureCatalog() {
     return [
       cloneCcoNextPreviewStudioSignatureProfile({
-        id: 'sara',
-        ownerKey: 'sara',
-        name: 'Sara',
-        title: 'Patientkoordinator',
-        greeting: 'Vänliga hälsningar,',
-        email: 'contact@hairtpclinic.com',
-        phone: '031-881166',
-      }),
-      cloneCcoNextPreviewStudioSignatureProfile({
         id: 'egzona',
         ownerKey: 'egzona',
-        name: 'Egzona',
-        title: 'Bokningsansvarig',
-        greeting: 'Vänliga hälsningar,',
-        email: 'contact@hairtpclinic.com',
-        phone: '031-881166',
+        name: 'Egzona Krasniqi',
+        title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
+        greeting: 'Bästa hälsningar,',
+        email: 'egzona@hairtpclinic.com',
+        displayEmail: 'egzona@hairtpclinic.com',
+        phone: '031-88 11 66',
+        html: buildApprovedCcoSignatureHtml('egzona'),
       }),
       cloneCcoNextPreviewStudioSignatureProfile({
         id: 'fazli',
         ownerKey: 'fazli',
-        name: 'Fazli',
-        title: 'Clinical advisor',
-        greeting: 'Med vänliga hälsningar,',
-        email: 'contact@hairtpclinic.com',
-        phone: '031-881166',
+        name: 'Fazli Krasniqi',
+        title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
+        greeting: 'Bästa hälsningar,',
+        email: 'fazli@hairtpclinic.com',
+        displayEmail: 'contact@hairtpclinic.com',
+        phone: '031-88 11 66',
+        html: buildApprovedCcoSignatureHtml('fazli'),
       }),
     ].map((entry) => ({
       ...entry,
       contact:
         entry.contact ||
-        `Hair TP Clinic · ${String(entry.email || 'contact@hairtpclinic.com').trim()} · ${String(
-          entry.phone || '031-881166'
-        ).trim()}`,
+        [
+          String(entry.greeting || 'Bästa hälsningar,').trim(),
+          String(entry.name || '').trim(),
+          String(entry.title || '').trim(),
+          String(entry.phone || '031-88 11 66').trim(),
+          String(entry.displayEmail || entry.email || 'contact@hairtpclinic.com').trim(),
+          'Vasaplatsen 2, 411 34 Göteborg',
+        ]
+          .filter(Boolean)
+          .join('\n'),
     }));
   }
 
@@ -20311,6 +20460,7 @@
       : [];
     customProfiles.forEach((entryRaw) => {
       const profile = cloneCcoNextPreviewStudioSignatureProfile(entryRaw, entryRaw?.id);
+      if (!['fazli', 'egzona'].includes(String(profile.id || '').trim().toLowerCase())) return;
       if (!profile.id || !profile.name) return;
       const existing = profileMap.get(profile.id) || {};
       profileMap.set(profile.id, {
@@ -20319,9 +20469,22 @@
         contact:
           profile.contact ||
           existing.contact ||
-          `Hair TP Clinic · ${String(profile.email || existing.email || 'contact@hairtpclinic.com').trim()} · ${String(
-            profile.phone || existing.phone || '031-881166'
-          ).trim()}`,
+          [
+            String(profile.greeting || existing.greeting || 'Bästa hälsningar,').trim(),
+            String(profile.name || existing.name || '').trim(),
+            String(profile.title || existing.title || '').trim(),
+            String(profile.phone || existing.phone || '031-88 11 66').trim(),
+            String(
+              profile.displayEmail ||
+                profile.email ||
+                existing.displayEmail ||
+                existing.email ||
+                'contact@hairtpclinic.com'
+            ).trim(),
+            'Vasaplatsen 2, 411 34 Göteborg',
+          ]
+            .filter(Boolean)
+            .join('\n'),
       });
     });
     return Array.from(profileMap.values());
@@ -20379,7 +20542,7 @@
       .toLowerCase();
     if (ownerKey.includes('egzona')) return 'egzona';
     if (ownerKey.includes('fazli')) return 'fazli';
-    return 'sara';
+    return 'fazli';
   }
 
   function getCcoNextPreviewStudioSignature(conversation = null, studioState = null) {
@@ -20388,11 +20551,16 @@
     return (
       catalog.find((entry) => entry.id === signatureId) ||
       catalog[0] || {
-        id: 'sara',
-        name: 'Sara',
-        title: 'Patientkoordinator',
-        greeting: 'Vänliga hälsningar,',
-        contact: 'Hair TP Clinic · contact@hairtpclinic.com · 031-881166',
+        id: 'fazli',
+        name: 'Fazli Krasniqi',
+        title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
+        greeting: 'Bästa hälsningar,',
+        email: 'fazli@hairtpclinic.com',
+        displayEmail: 'contact@hairtpclinic.com',
+        phone: '031-88 11 66',
+        contact:
+          'Bästa hälsningar,\nFazli Krasniqi\nHårspecialist | Hårtransplantationer & PRP-injektioner\n031-88 11 66\ncontact@hairtpclinic.com\nVasaplatsen 2, 411 34 Göteborg',
+        html: buildApprovedCcoSignatureHtml('fazli'),
       }
     );
   }
@@ -20400,15 +20568,14 @@
   function buildCcoNextPreviewStudioSignatureBlock(signature = null) {
     const safeSignature = signature && typeof signature === 'object' ? signature : getCcoNextPreviewStudioSignature();
     return [
-      String(safeSignature.greeting || 'Vänliga hälsningar,').trim(),
-      String(safeSignature.name || 'Hair TP Clinic').trim(),
-      `${String(safeSignature.title || 'Hair TP Clinic').trim()} · Hair TP Clinic`,
+      String(safeSignature.greeting || 'Bästa hälsningar,').trim(),
+      String(safeSignature.name || '').trim(),
+      String(safeSignature.title || '').trim(),
+      String(safeSignature.phone || '031-88 11 66').trim(),
       String(
-        safeSignature.contact ||
-          `Hair TP Clinic · ${String(safeSignature.email || 'contact@hairtpclinic.com').trim()} · ${String(
-            safeSignature.phone || '031-881166'
-          ).trim()}`
+        safeSignature.displayEmail || safeSignature.email || 'contact@hairtpclinic.com'
       ).trim(),
+      'Vasaplatsen 2, 411 34 Göteborg',
     ]
       .filter(Boolean)
       .join('\n');
@@ -20445,7 +20612,7 @@
       ...safeStudioState,
       selectedSignatureId: selectedProfileId,
     });
-    return cloneCcoNextPreviewStudioSignatureProfile(signature, signature.id || selectedProfileId || 'sara');
+    return cloneCcoNextPreviewStudioSignatureProfile(signature, signature.id || selectedProfileId || 'fazli');
   }
 
   function buildCcoNextPreviewStudioHasClearNextStep(draftBody = '', strategyKey = '') {
@@ -21493,7 +21660,7 @@
     const studioState = currentStudio && typeof currentStudio === 'object' ? currentStudio : {};
     const editorDraft = cloneCcoNextPreviewStudioSignatureProfile(
       studioState.signatureEditorDraft || buildCcoNextPreviewStudioSignatureEditorDraft(safeConversation, studioState),
-      studioState.signatureEditorProfileId || studioState.selectedSignatureId || 'sara'
+      studioState.signatureEditorProfileId || studioState.selectedSignatureId || 'fazli'
     );
     const nextProfiles = getCcoNextPreviewStudioSignatureCatalog(studioState).map((entry) =>
       entry.id === editorDraft.id ? { ...entry, ...editorDraft } : entry
@@ -24362,7 +24529,7 @@
                       .map((entry) =>
                         renderStudioMiniButton(
                           entry?.label || 'Signatur',
-                          entry?.action || 'studio-signature:sara',
+                          entry?.action || 'studio-signature:fazli',
                           entry?.isSelected === true
                         )
                       )
@@ -27862,8 +28029,8 @@
       : '-';
 
     els.monitorReadinessHistorySummary.textContent = isEnglishLanguage()
-      ? `latest score=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goAllowed=${latestGoAllowed ? 'yes' : 'no'} required=${latestRequiredBlockers} (${requiredDeltaLabel}) noGo=${latestNoGo} remediation=${latestRemediation}`
-	      : `senaste poäng=${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) band=${latestBand} goTillåten=${latestGoAllowed ? 'ja' : 'nej'} obligatoriska=${latestRequiredBlockers} (${requiredDeltaLabel}) noGo=${latestNoGo} åtgärder=${latestRemediation}`;
+      ? `Latest ${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) • band ${latestBand} • Go ${latestGoAllowed ? 'yes' : 'no'} • blockers ${latestRequiredBlockers} (${requiredDeltaLabel}) • no-go ${latestNoGo} • actions ${latestRemediation}`
+      : `Senast ${Number(latestScore.toFixed(2))} (${scoreDeltaLabel}) • band ${latestBand} • Go ${latestGoAllowed ? 'ja' : 'nej'} • blockeringar ${latestRequiredBlockers} (${requiredDeltaLabel}) • No-Go ${latestNoGo} • åtgärder ${latestRemediation}`;
 
     const lines = entries.slice(0, 10).map((item) => {
       const ts = formatDateTime(item?.ts);
@@ -27875,7 +28042,9 @@
       const triggeredNoGo = Number(item?.triggeredNoGo || 0);
       const remediationTotal = Number(item?.remediationTotal || 0);
       const remediationP0 = Number(item?.remediationP0 || 0);
-	      return `${ts} (${age}) | poäng=${Number(score.toFixed(2))} | band=${band} | go=${goAllowed ? 'ja' : 'nej'} | obligatoriska=${requiredBlockers} | noGo=${triggeredNoGo} | åtgärder=${remediationTotal} (P0=${remediationP0})`;
+      return isEnglishLanguage()
+        ? `${ts} (${age}) • ${Number(score.toFixed(2))} • band ${band} • Go ${goAllowed ? 'yes' : 'no'} • blockers ${requiredBlockers} • no-go ${triggeredNoGo} • actions ${remediationTotal} (P0 ${remediationP0})`
+        : `${ts} (${age}) • ${Number(score.toFixed(2))} • band ${band} • Go ${goAllowed ? 'ja' : 'nej'} • blockeringar ${requiredBlockers} • No-Go ${triggeredNoGo} • åtgärder ${remediationTotal} (P0 ${remediationP0})`;
     });
     els.monitorReadinessHistoryResult.textContent = lines.join('\n');
   }
@@ -27923,62 +28092,71 @@
     const requiredBlockerDetails = Array.isArray(readiness?.evidence?.blockingRequiredChecks?.checks)
       ? readiness.evidence.blockingRequiredChecks.checks
       : [];
-    const ids = Array.isArray(goNoGo?.triggeredNoGoIds)
-      ? goNoGo.triggeredNoGoIds.map((item) => String(item || '')).filter(Boolean)
-      : triggers.map((item) => String(item?.id || '')).filter(Boolean);
-
     if (triggers.length === 0) {
       els.monitorReadinessNoGoSummary.textContent = isEnglishLanguage()
-        ? `goAllowed=${goAllowed ? 'yes' : 'no'} blockersGreen=${blockersGreen ? 'yes' : 'no'} requiredBlockers=${requiredBlockerCount} triggered=0`
-	        : `goTillåten=${goAllowed ? 'ja' : 'nej'} blockeringarGröna=${blockersGreen ? 'ja' : 'nej'} obligatoriskaBlockeringar=${requiredBlockerCount} utlösta=0`;
+        ? `Go ${goAllowed ? 'yes' : 'no'} • blocker groups ${blockersGreen ? 'green' : 'open'} • required ${requiredBlockerCount} • No-go 0`
+        : `Go ${goAllowed ? 'ja' : 'nej'} • blockergrupper ${blockersGreen ? 'gröna' : 'öppna'} • obligatoriska ${requiredBlockerCount} • No-Go 0`;
 
       const lines = [];
       if (requiredBlockerCount > 0) {
         lines.push(
           isEnglishLanguage()
-            ? `Required blockers (${requiredBlockerCount}): ${requiredBlockerIds.join(',') || '-'}`
-	            : `Obligatoriska blockeringar (${requiredBlockerCount}): ${requiredBlockerIds.join(',') || '-'}`
+            ? `Required blockers (${requiredBlockerCount})`
+            : `Obligatoriska blockeringar (${requiredBlockerCount})`
         );
-        requiredBlockerDetails.slice(0, 6).forEach((item) => {
-          lines.push(
-	            `   - ${String(item?.checkId || '-')} status=${String(item?.status || '-')} kategori=${String(item?.categoryId || '-')}`
-          );
-          if (item?.target) {
-	            lines.push(`     mål: ${String(item.target)}`);
-          }
-        });
+        if (requiredBlockerDetails.length === 0 && requiredBlockerIds.length > 0) {
+          lines.push(`- ${requiredBlockerIds.join(', ')}`);
+        } else {
+          requiredBlockerDetails.slice(0, 6).forEach((item) => {
+            lines.push(
+              `- ${String(item?.checkId || '-')} • status ${String(item?.status || '-')} • kategori ${String(item?.categoryId || '-')}`
+            );
+            if (item?.target) {
+              lines.push(`  ${isEnglishLanguage() ? 'Target' : 'Mål'}: ${String(item.target)}`);
+            }
+          });
+        }
         if (requiredBlockerDetails.length > 6) {
-	          lines.push(`   ... +${requiredBlockerDetails.length - 6} fler obligatoriska blockeringar`);
+          lines.push(
+            isEnglishLanguage()
+              ? `... +${requiredBlockerDetails.length - 6} more required blockers`
+              : `... +${requiredBlockerDetails.length - 6} fler obligatoriska blockeringar`
+          );
         }
       } else {
         lines.push(
           isEnglishLanguage()
             ? 'No active no-go blockers.'
-            : 'Inga aktiva No-Go blockeringar.'
+            : 'Inga aktiva No-Go-blockeringar.'
         );
       }
       els.monitorReadinessNoGoResult.textContent = lines.join('\n');
       return;
     }
 
-      els.monitorReadinessNoGoSummary.textContent = isEnglishLanguage()
-      ? `goAllowed=${goAllowed ? 'yes' : 'no'} blockersGreen=${blockersGreen ? 'yes' : 'no'} requiredBlockers=${requiredBlockerCount} triggered=${triggers.length} ids=${ids.join(',') || '-'}`
-	        : `goTillåten=${goAllowed ? 'ja' : 'nej'} blockeringarGröna=${blockersGreen ? 'ja' : 'nej'} obligatoriskaBlockeringar=${requiredBlockerCount} utlösta=${triggers.length} id=${ids.join(',') || '-'}`;
+    els.monitorReadinessNoGoSummary.textContent = isEnglishLanguage()
+      ? `Go ${goAllowed ? 'yes' : 'no'} • blocker groups ${blockersGreen ? 'green' : 'open'} • required ${requiredBlockerCount} • No-go ${triggers.length}`
+      : `Go ${goAllowed ? 'ja' : 'nej'} • blockergrupper ${blockersGreen ? 'gröna' : 'öppna'} • obligatoriska ${requiredBlockerCount} • No-Go ${triggers.length}`;
 
     const lines = [];
     if (requiredBlockerCount > 0) {
       lines.push(
         isEnglishLanguage()
-          ? `Required blockers (${requiredBlockerCount}): ${requiredBlockerIds.join(',') || '-'}`
-	          : `Obligatoriska blockeringar (${requiredBlockerCount}): ${requiredBlockerIds.join(',') || '-'}`
+          ? `Required blockers (${requiredBlockerCount})`
+          : `Obligatoriska blockeringar (${requiredBlockerCount})`
       );
-      requiredBlockerDetails.slice(0, 5).forEach((item) => {
-        lines.push(
-	          `   - ${String(item?.checkId || '-')} status=${String(item?.status || '-')} kategori=${String(item?.categoryId || '-')}`
-        );
-      });
+      if (requiredBlockerDetails.length === 0 && requiredBlockerIds.length > 0) {
+        lines.push(`- ${requiredBlockerIds.join(', ')}`);
+      } else {
+        requiredBlockerDetails.slice(0, 5).forEach((item) => {
+          lines.push(
+            `- ${String(item?.checkId || '-')} • status ${String(item?.status || '-')} • kategori ${String(item?.categoryId || '-')}`
+          );
+        });
+      }
       lines.push('');
     }
+    lines.push(isEnglishLanguage() ? 'Active triggers:' : 'Aktiva träffar:');
     triggers.forEach((trigger, index) => {
       const id = String(trigger?.id || '-');
       const label = String(trigger?.label || id);
@@ -27986,13 +28164,23 @@
       const violations = Number(trigger?.value?.violations || 0);
       const details = Array.isArray(trigger?.value?.details) ? trigger.value.details : [];
       lines.push(`[${id}] ${label}`);
-	      lines.push(`   underlag: ${evidence}`);
-	      if (violations > 0) lines.push(`   överträdelser: ${violations}`);
+      lines.push(`${isEnglishLanguage() ? 'Evidence' : 'Underlag'}: ${evidence}`);
+      if (violations > 0) {
+        lines.push(
+          isEnglishLanguage() ? `Violations: ${violations}` : `Överträdelser: ${violations}`
+        );
+      }
       details.slice(0, 3).forEach((detail, detailIndex) => {
-	        lines.push(`   detalj${detailIndex + 1}: ${formatReadinessNoGoDetail(detail)}`);
+        lines.push(
+          `${isEnglishLanguage() ? 'Detail' : 'Detalj'} ${detailIndex + 1}: ${formatReadinessNoGoDetail(detail)}`
+        );
       });
       if (details.length > 3) {
-	        lines.push(`   ... +${details.length - 3} fler detaljer`);
+        lines.push(
+          isEnglishLanguage()
+            ? `... +${details.length - 3} more details`
+            : `... +${details.length - 3} fler detaljer`
+        );
       }
       if (index < triggers.length - 1) lines.push('');
     });
@@ -28012,8 +28200,8 @@
 
     if (els.monitorRemediationSummary) {
       els.monitorRemediationSummary.textContent = isEnglishLanguage()
-        ? `Actions=${total} (P0=${p0}, P1=${p1}, P2=${p2}, P3=${p3}) | potentialGain=${potentialGain}`
-	        : `Åtgärder=${total} (P0=${p0}, P1=${p1}, P2=${p2}, P3=${p3}) | möjligPoängökning=${potentialGain}`;
+        ? `Actions ${total} • P0 ${p0} • P1 ${p1} • P2 ${p2} • P3 ${p3} • +${potentialGain} possible`
+        : `Åtgärder ${total} • P0 ${p0} • P1 ${p1} • P2 ${p2} • P3 ${p3} • +${potentialGain} möjlig`;
     }
 
     if (!els.monitorRemediationResult) return;
@@ -28048,11 +28236,11 @@
           : 'nej';
     const lines = [
       isEnglishLanguage()
-        ? `Readiness: score=${readiness?.score ?? '-'} band=${readiness?.band || '-'} goAllowed=${goAllowedLabel}`
-	        : `Beredskap: poäng=${readiness?.score ?? '-'} band=${readiness?.band || '-'} goTillåten=${goAllowedLabel}`,
-      isEnglishLanguage() ? `Critical path (P0): ${p0}` : `Kritisk väg (P0): ${p0}`,
+        ? `Readiness ${readiness?.score ?? '-'} • band ${readiness?.band || '-'} • Go ${goAllowedLabel}`
+        : `Beredskap ${readiness?.score ?? '-'} • band ${readiness?.band || '-'} • Go ${goAllowedLabel}`,
+      isEnglishLanguage() ? `Critical path P0 ${p0}` : `Kritisk väg P0 ${p0}`,
       '',
-	      isEnglishLanguage() ? 'Top actions:' : 'Toppåtgärder:',
+      isEnglishLanguage() ? 'Prioritized actions:' : 'Prioriterade åtgärder:',
     ];
 
     nextActions.forEach((action, index) => {
@@ -28063,14 +28251,14 @@
       const impact = Number(action?.scoreImpactMax || 0);
       lines.push(
         isEnglishLanguage()
-          ? `${index + 1}. [${priority}] ${title} | owner=${owner} | target=${targetState} | impact<=${impact}`
-	          : `${index + 1}. [${priority}] ${title} | ansvarig=${owner} | mål=${targetState} | påverkan<=${impact}`
+          ? `${index + 1}. [${priority}] ${title} • owner ${owner} • target ${targetState} • impact <= ${impact}`
+          : `${index + 1}. [${priority}] ${title} • ansvarig ${owner} • mål ${targetState} • påverkan <= ${impact}`
       );
       if (action?.playbook) {
         lines.push(
           isEnglishLanguage()
-            ? `   playbook: ${String(action.playbook)}`
-	            : `   körplan: ${String(action.playbook)}`
+            ? `   Playbook: ${String(action.playbook)}`
+            : `   Körplan: ${String(action.playbook)}`
         );
       }
     });
@@ -28866,7 +29054,11 @@
       const response = await api('/auth/login', {
         method: 'POST',
         auth: false,
+        headers: {
+          'x-arcana-client': 'major_arcana_admin',
+        },
         body: {
+          client: 'major_arcana_admin',
           email: els.emailInput.value.trim(),
           password: els.passwordInput.value,
           tenantId: (els.tenantInput.value || '').trim(),
@@ -28909,6 +29101,7 @@
       setStatus(els.loginStatus, 'Inloggad.');
       setAuthVisible(true);
       await refreshAll({ scope: resolveRefreshScope() });
+      if (redirectToPostLoginTargetIfNeeded()) return;
     } catch (error) {
       setStatus(els.loginStatus, error.message || 'Inloggning misslyckades.', true);
     }
@@ -28954,6 +29147,7 @@
       setStatus(els.loginStatus, 'Inloggad.');
       setAuthVisible(true);
       await refreshAll({ scope: resolveRefreshScope() });
+      if (redirectToPostLoginTargetIfNeeded()) return;
     } catch (error) {
       setStatus(els.loginStatus, error.message || 'MFA-verifiering misslyckades.', true);
     }
@@ -28983,6 +29177,7 @@
       setStatus(els.loginStatus, 'Inloggad.');
       setAuthVisible(true);
       await refreshAll({ scope: resolveRefreshScope() });
+      if (redirectToPostLoginTargetIfNeeded()) return;
     } catch (error) {
       setStatus(els.loginStatus, error.message || 'Tenant-val misslyckades.', true);
     }
@@ -29044,6 +29239,7 @@
       });
       setAuthVisible(true);
       await refreshAll({ scope: resolveRefreshScope() });
+      if (redirectToPostLoginTargetIfNeeded()) return;
     } catch {
       stopDashboardStream();
       localStorage.removeItem(TOKEN_KEY);
@@ -30743,8 +30939,8 @@
       if (fieldName === 'signature-contact') nextDraft.contact = String(studioField.value || '');
       store.updateStudioState(conversationId, {
         signatureEditorDraft: {
-          id: String(currentDraft.id || currentStudio.selectedSignatureId || 'sara'),
-          ownerKey: String(currentDraft.ownerKey || currentStudio.selectedSignatureId || 'sara'),
+          id: String(currentDraft.id || currentStudio.selectedSignatureId || 'fazli'),
+          ownerKey: String(currentDraft.ownerKey || currentStudio.selectedSignatureId || 'fazli'),
           ...nextDraft,
         },
       });

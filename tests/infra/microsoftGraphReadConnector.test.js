@@ -44,6 +44,7 @@ test('MicrosoftGraphReadConnector fetches 14-day inbox snapshot using read-only 
     if (String(url).includes('/mailFolders/inbox/messages')) {
       return createJsonResponse({
         body: {
+          '@odata.count': 3,
           value: [
             {
               id: 'msg-1',
@@ -294,6 +295,7 @@ test('MicrosoftGraphReadConnector merges inbox + sent items and marks lastOutbou
     if (String(url).includes('/mailFolders/inbox/messages')) {
       return createJsonResponse({
         body: {
+          '@odata.count': 3,
           value: [
             {
               id: 'msg-in-1',
@@ -373,6 +375,7 @@ test('MicrosoftGraphReadConnector falls back to subject + customer correlation w
     if (String(url).includes('/mailFolders/inbox/messages')) {
       return createJsonResponse({
         body: {
+          '@odata.count': 3,
           value: [
             {
               id: 'msg-fallback-in',
@@ -651,6 +654,217 @@ test('MicrosoftGraphReadConnector keeps alias-similar threads separate when acti
 
   const snapshot = await connector.fetchInboxSnapshot();
   assert.equal(snapshot.conversations.length, 2);
+});
+
+test('MicrosoftGraphReadConnector fetches folder-aware mailbox truth for inbox, sent, drafts and deleted items', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    const safeUrl = String(url);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-mailbox-truth',
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          wellKnownName: 'inbox',
+          totalItemCount: 11,
+          unreadItemCount: 4,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-sent',
+          displayName: 'Sent Items',
+          wellKnownName: 'sentitems',
+          totalItemCount: 9,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/Drafts?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-drafts',
+          displayName: 'Drafts',
+          wellKnownName: 'drafts',
+          totalItemCount: 2,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/DeletedItems?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-deleted',
+          displayName: 'Deleted Items',
+          wellKnownName: 'deleteditems',
+          totalItemCount: 3,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-inbox-1',
+              conversationId: 'conv-truth-1',
+              subject: 'Kan ni hjälpa mig med bokning?',
+              bodyPreview: 'Hej, jag vill boka en konsultation.',
+              receivedDateTime: '2026-03-01T09:00:00.000Z',
+              isRead: false,
+              hasAttachments: true,
+              parentFolderId: 'folder-inbox',
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-sent-1',
+              conversationId: 'conv-truth-1',
+              subject: 'Re: Kan ni hjälpa mig med bokning?',
+              bodyPreview: 'Hej, vi kan erbjuda tider på tisdag.',
+              sentDateTime: '2026-03-01T10:00:00.000Z',
+              parentFolderId: 'folder-sent',
+              from: {
+                emailAddress: {
+                  address: 'info@hairtpclinic.com',
+                  name: 'Hair TP Clinic',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'patient@example.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/Drafts/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-draft-1',
+              conversationId: 'conv-truth-2',
+              subject: 'Utkast svar',
+              bodyPreview: 'Jag återkommer med tider inom kort.',
+              createdDateTime: '2026-03-01T11:00:00.000Z',
+              lastModifiedDateTime: '2026-03-01T11:15:00.000Z',
+              isDraft: true,
+              parentFolderId: 'folder-drafts',
+              from: {
+                emailAddress: {
+                  address: 'info@hairtpclinic.com',
+                  name: 'Hair TP Clinic',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'patient@example.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/DeletedItems/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-deleted-1',
+              conversationId: 'conv-truth-3',
+              subject: 'Gammalt ärende',
+              bodyPreview: 'Det här mailet är flyttat till deleted items.',
+              receivedDateTime: '2026-03-01T07:00:00.000Z',
+              lastModifiedDateTime: '2026-03-01T12:00:00.000Z',
+              isRead: true,
+              parentFolderId: 'folder-deleted',
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-truth',
+    clientId: 'client-id-truth',
+    clientSecret: 'client-secret-truth',
+    userId: 'info@hairtpclinic.com',
+    fetchImpl,
+    now: () => Date.parse('2026-03-02T12:00:00.000Z'),
+  });
+
+  const snapshot = await connector.fetchMailboxTruthSnapshot({
+    days: 30,
+  });
+
+  assert.equal(snapshot.snapshotVersion, 'graph.mailbox.truth.snapshot.v1');
+  assert.equal(snapshot.source, 'microsoft-graph');
+  assert.equal(snapshot.accounts.length, 1);
+  assert.equal(snapshot.metadata.accountCount, 1);
+  assert.equal(snapshot.metadata.folderCount, 4);
+  assert.equal(snapshot.metadata.messageCount, 4);
+
+  const account = snapshot.accounts[0];
+  assert.equal(account.mailboxId, 'info@hairtpclinic.com');
+  assert.equal(account.folders.length, 4);
+  assert.equal(account.fetchStatus, 'success');
+
+  const folderTypes = account.folders.map((folder) => folder.folderType);
+  assert.deepEqual(folderTypes, ['inbox', 'sent', 'drafts', 'deleted']);
+
+  const inboxFolder = account.folders.find((folder) => folder.folderType === 'inbox');
+  const draftsFolder = account.folders.find((folder) => folder.folderType === 'drafts');
+  const deletedFolder = account.folders.find((folder) => folder.folderType === 'deleted');
+  assert.equal(inboxFolder.totalItemCount, 11);
+  assert.equal(inboxFolder.unreadItemCount, 4);
+  assert.equal(inboxFolder.messages[0].direction, 'inbound');
+  assert.equal(inboxFolder.messages[0].hasAttachments, true);
+  assert.equal(draftsFolder.messages[0].direction, 'draft');
+  assert.equal(draftsFolder.messages[0].isDraft, true);
+  assert.equal(deletedFolder.messages[0].folderType, 'deleted');
+
+  const inboxRequest = calls.find((item) => item.url.includes('/mailFolders/inbox/messages'));
+  const sentRequest = calls.find((item) => item.url.includes('/mailFolders/SentItems/messages'));
+  const draftsRequest = calls.find((item) => item.url.includes('/mailFolders/Drafts/messages'));
+  const deletedRequest = calls.find((item) => item.url.includes('/mailFolders/DeletedItems/messages'));
+  assert.equal(Boolean(inboxRequest), true);
+  assert.equal(Boolean(sentRequest), true);
+  assert.equal(Boolean(draftsRequest), true);
+  assert.equal(Boolean(deletedRequest), true);
+
+  const inboxUrl = new URL(inboxRequest.url);
+  const draftsUrl = new URL(draftsRequest.url);
+  assert.equal(inboxUrl.searchParams.get('$filter'), 'receivedDateTime ge 2026-01-31T12:00:00.000Z');
+  assert.equal(draftsUrl.searchParams.get('$filter'), 'lastModifiedDateTime ge 2026-01-31T12:00:00.000Z');
 });
 
 test('MicrosoftGraphReadConnector full-tenant mode lists users and reads each inbox with limits', async () => {
@@ -1447,4 +1661,937 @@ test('MicrosoftGraphReadConnector metadata.mailboxIds includes selected mailboxe
   assert.equal(Array.isArray(snapshot.metadata.mailboxIds), true);
   assert.equal(snapshot.metadata.mailboxIds.includes('info@hairtpclinic.com'), true);
   assert.equal(snapshot.metadata.mailboxIds.includes('kons@hairtpclinic.com'), true);
+});
+
+test('MicrosoftGraphReadConnector fetchMailboxTruthFolderPage paginates a single folder page with metadata and nextLink', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-folder-page',
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          totalItemCount: 3,
+          unreadItemCount: 2,
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-1',
+              parentFolderId: 'folder-inbox',
+              conversationId: 'conv-1',
+              subject: 'Hej från kund',
+              bodyPreview: 'Kan ni hjälpa mig?',
+              receivedDateTime: '2026-04-02T08:00:00.000Z',
+              sentDateTime: '2026-04-02T07:59:59.000Z',
+              isRead: false,
+              isDraft: false,
+              hasAttachments: false,
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [
+                {
+                  emailAddress: {
+                    address: 'kons@hairtpclinic.com',
+                    name: 'Kons',
+                  },
+                },
+              ],
+              internetMessageId: '<message-1@example.com>',
+              internetMessageHeaders: [],
+            },
+          ],
+          '@odata.count': 3,
+          '@odata.nextLink': 'https://graph.microsoft.com/v1.0/users/kons@hairtpclinic.com/mailFolders/inbox/messages?$skiptoken=abc',
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-folder-page',
+    clientId: 'client-id-folder-page',
+    clientSecret: 'client-secret-folder-page',
+    userId: 'kons@hairtpclinic.com',
+    fetchImpl,
+    now: () => Date.parse('2026-04-02T09:00:00.000Z'),
+  });
+
+  const page = await connector.fetchMailboxTruthFolderPage({
+    userId: 'kons@hairtpclinic.com',
+    mailboxId: 'kons@hairtpclinic.com',
+    mailboxAddress: 'kons@hairtpclinic.com',
+    userPrincipalName: 'kons@hairtpclinic.com',
+    folderType: 'inbox',
+    includeRead: true,
+    sinceIso: '2026-04-01T00:00:00.000Z',
+    pageSize: 1,
+  });
+
+  assert.equal(page.account.mailboxId, 'kons@hairtpclinic.com');
+  assert.equal(page.folder.folderType, 'inbox');
+  assert.equal(page.folder.totalItemCount, 3);
+  assert.equal(page.folder.messageCollectionCount, 3);
+  assert.equal(page.page.fetchedMessageCount, 1);
+  assert.equal(page.page.complete, false);
+  assert.equal(Boolean(page.page.nextPageUrl), true);
+  assert.equal(page.messages.length, 1);
+  assert.equal(page.messages[0].graphMessageId, 'msg-1');
+  assert.equal(page.messages[0].direction, 'inbound');
+});
+
+test('MicrosoftGraphReadConnector fetchMailboxTruthFolderDeltaPage follows nextLink to deltaLink and maps delete tombstones', async () => {
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-folder-delta',
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          totalItemCount: 2,
+          unreadItemCount: 1,
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox/messages/delta') && !String(url).includes('$skiptoken=delta-2')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-1',
+              parentFolderId: 'folder-inbox',
+              conversationId: 'conv-1',
+              subject: 'Hej från kund',
+              bodyPreview: 'Kan ni hjälpa mig?',
+              receivedDateTime: '2026-04-02T08:00:00.000Z',
+              isRead: false,
+              isDraft: false,
+              hasAttachments: false,
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [
+                {
+                  emailAddress: {
+                    address: 'kons@hairtpclinic.com',
+                    name: 'Kons',
+                  },
+                },
+              ],
+              internetMessageId: '<message-1@example.com>',
+              internetMessageHeaders: [],
+            },
+          ],
+          '@odata.nextLink':
+            'https://graph.microsoft.com/v1.0/users/kons@hairtpclinic.com/mailFolders/inbox/messages/delta?$skiptoken=delta-2',
+        },
+      });
+    }
+    if (String(url).includes('$skiptoken=delta-2')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-2',
+              '@removed': {
+                reason: 'deleted',
+              },
+            },
+          ],
+          '@odata.deltaLink':
+            'https://graph.microsoft.com/v1.0/users/kons@hairtpclinic.com/mailFolders/inbox/messages/delta?$deltatoken=delta-final',
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-folder-delta',
+    clientId: 'client-id-folder-delta',
+    clientSecret: 'client-secret-folder-delta',
+    userId: 'kons@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const firstPage = await connector.fetchMailboxTruthFolderDeltaPage({
+    userId: 'kons@hairtpclinic.com',
+    mailboxId: 'kons@hairtpclinic.com',
+    mailboxAddress: 'kons@hairtpclinic.com',
+    userPrincipalName: 'kons@hairtpclinic.com',
+    folderType: 'inbox',
+    pageSize: 1,
+  });
+  assert.equal(firstPage.page.complete, false);
+  assert.equal(Boolean(firstPage.page.nextPageUrl), true);
+  assert.equal(firstPage.page.deltaLink, null);
+  assert.equal(firstPage.changes.length, 1);
+  assert.equal(firstPage.changes[0].changeType, 'upsert');
+  assert.equal(firstPage.changes[0].message.graphMessageId, 'msg-1');
+
+  const secondPage = await connector.fetchMailboxTruthFolderDeltaPage({
+    userId: 'kons@hairtpclinic.com',
+    mailboxId: 'kons@hairtpclinic.com',
+    mailboxAddress: 'kons@hairtpclinic.com',
+    userPrincipalName: 'kons@hairtpclinic.com',
+    folderType: 'inbox',
+    cursorUrl: firstPage.page.nextPageUrl,
+    folderMetadata: firstPage.folder,
+    pageSize: 1,
+  });
+  assert.equal(secondPage.page.complete, true);
+  assert.equal(secondPage.page.nextPageUrl, null);
+  assert.equal(Boolean(secondPage.page.deltaLink), true);
+  assert.equal(secondPage.changes.length, 1);
+  assert.equal(secondPage.changes[0].changeType, 'deleted');
+  assert.equal(secondPage.changes[0].graphMessageId, 'msg-2');
+});
+
+test('MicrosoftGraphReadConnector fetchMailboxTruthFolderDeltaPage resolves cid images on delta upserts', async () => {
+  const fetchImpl = async (url, _options = {}) => {
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-folder-delta-inline',
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          totalItemCount: 1,
+          unreadItemCount: 1,
+        },
+      });
+    }
+    if (String(url).includes('/messages/msg-inline-1/attachments')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'att-inline-1',
+              name: 'image001.png@abc',
+              contentType: 'image/png',
+              contentId: 'image001.png@abc',
+              isInline: true,
+              size: 128,
+              contentBytes: 'YWJjMTIz',
+            },
+          ],
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox/messages/delta')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-inline-1',
+              parentFolderId: 'folder-inbox',
+              conversationId: 'conv-inline-1',
+              subject: 'Inline-signatur',
+              bodyPreview: 'Här kommer signaturen.',
+              body: {
+                contentType: 'html',
+                content:
+                  '<div><p>Hej</p><img src="cid:image001.png@abc" alt="Hair TP Clinic" /></div>',
+              },
+              receivedDateTime: '2026-04-02T08:00:00.000Z',
+              isRead: false,
+              isDraft: false,
+              hasAttachments: true,
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [
+                {
+                  emailAddress: {
+                    address: 'kons@hairtpclinic.com',
+                    name: 'Kons',
+                  },
+                },
+              ],
+              internetMessageId: '<message-inline@example.com>',
+              internetMessageHeaders: [],
+            },
+          ],
+          '@odata.deltaLink':
+            'https://graph.microsoft.com/v1.0/users/kons@hairtpclinic.com/mailFolders/inbox/messages/delta?$deltatoken=delta-inline-final',
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-folder-delta-inline',
+    clientId: 'client-id-folder-delta-inline',
+    clientSecret: 'client-secret-folder-delta-inline',
+    userId: 'kons@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const page = await connector.fetchMailboxTruthFolderDeltaPage({
+    userId: 'kons@hairtpclinic.com',
+    mailboxId: 'kons@hairtpclinic.com',
+    mailboxAddress: 'kons@hairtpclinic.com',
+    userPrincipalName: 'kons@hairtpclinic.com',
+    folderType: 'inbox',
+    pageSize: 1,
+  });
+
+  assert.equal(page.changes.length, 1);
+  assert.equal(page.changes[0].changeType, 'upsert');
+  assert.match(
+    String(page.changes[0].message?.bodyHtml || ''),
+    /data:image\/png;base64,YWJjMTIz/
+  );
+});
+
+test('MicrosoftGraphReadConnector fetchMailboxTruthFolderDeltaPage marks invalid delta tokens explicitly', async () => {
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-folder-delta-invalid',
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox/messages/delta')) {
+      return createJsonResponse({
+        status: 410,
+        body: {
+          error: {
+            code: 'SyncStateNotFound',
+            message: 'The sync state generation is not found. The delta token is expired.',
+          },
+        },
+      });
+    }
+    if (String(url).includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          totalItemCount: 1,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-folder-delta-invalid',
+    clientId: 'client-id-folder-delta-invalid',
+    clientSecret: 'client-secret-folder-delta-invalid',
+    userId: 'kons@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  await assert.rejects(
+    () =>
+      connector.fetchMailboxTruthFolderDeltaPage({
+        userId: 'kons@hairtpclinic.com',
+        mailboxId: 'kons@hairtpclinic.com',
+        mailboxAddress: 'kons@hairtpclinic.com',
+        userPrincipalName: 'kons@hairtpclinic.com',
+        folderType: 'inbox',
+        deltaLink:
+          'https://graph.microsoft.com/v1.0/users/kons@hairtpclinic.com/mailFolders/inbox/messages/delta?$deltatoken=expired',
+      }),
+    (error) => {
+      assert.equal(error.code, 'GRAPH_DELTA_TOKEN_INVALID');
+      assert.equal(error.status, 410);
+      return true;
+    }
+  );
+});
+
+test('MicrosoftGraphReadConnector preserves inbound bodyHtml and resolves cid inline images in inbox snapshot', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-cid-inbox',
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-in-cid-1/attachments')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'att-inline-1',
+              name: 'image0.png',
+              contentType: 'image/png',
+              size: 2048,
+              isInline: true,
+              contentId: 'image0@cid',
+              contentBytes: 'QUJDRA==',
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-in-cid-1',
+              conversationId: 'conv-cid-1',
+              subject: 'Bild i signaturen',
+              bodyPreview: 'Hej från kund.',
+              receivedDateTime: '2026-04-07T08:00:00.000Z',
+              hasAttachments: true,
+              body: {
+                contentType: 'html',
+                content: '<div>Hej!<br><img src="cid:image0@cid" alt="kundlogga"></div>',
+              },
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+              isRead: false,
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-cid-inbox',
+    clientId: 'client-id-cid-inbox',
+    clientSecret: 'client-secret-cid-inbox',
+    userId: 'info@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const snapshot = await connector.fetchInboxSnapshot();
+  const conversation = snapshot.conversations[0];
+  assert.match(String(conversation.messages[0]?.bodyHtml || ''), /^<div>Hej!<br><img src="data:image\/png;base64,QUJDRA=="/);
+  const attachmentRequest = calls.find((entry) => entry.includes('/messages/msg-in-cid-1/attachments'));
+  assert.equal(Boolean(attachmentRequest), true);
+  assert.equal(String(attachmentRequest).includes('contentId'), false);
+  assert.equal(String(attachmentRequest).includes('contentBytes'), false);
+});
+
+test('MicrosoftGraphReadConnector carries non-inline attachment metadata through inbox snapshot messages', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-attachment-snapshot',
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-in-attachment-1/attachments')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'att-file-1',
+              name: 'order.pdf',
+              contentType: 'application/pdf',
+              size: 12000,
+              isInline: false,
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-in-attachment-1',
+              conversationId: 'conv-attachment-1',
+              subject: 'Bifogad order',
+              bodyPreview: 'Se bifogad order.',
+              receivedDateTime: '2026-04-07T08:00:00.000Z',
+              hasAttachments: true,
+              body: {
+                contentType: 'html',
+                content: '<div>Se bifogad order.</div>',
+              },
+              from: {
+                emailAddress: {
+                  address: 'orders@example.com',
+                  name: 'Orders',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+              isRead: false,
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-attachment-snapshot',
+    clientId: 'client-id-attachment-snapshot',
+    clientSecret: 'client-secret-attachment-snapshot',
+    userId: 'info@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const snapshot = await connector.fetchInboxSnapshot();
+  const message = snapshot.conversations[0]?.messages?.[0] || {};
+  assert.equal(message.hasAttachments, true);
+  assert.equal(Array.isArray(message.attachments), true);
+  assert.equal(message.attachments.length, 1);
+  assert.equal(message.attachments[0]?.name, 'order.pdf');
+  assert.equal(message.attachments[0]?.isInline, false);
+  const attachmentRequest = calls.find((entry) =>
+    entry.includes('/messages/msg-in-attachment-1/attachments')
+  );
+  assert.equal(Boolean(attachmentRequest), true);
+});
+
+test('MicrosoftGraphReadConnector resolves cid inline images inside mailbox truth snapshot payloads', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-cid-truth',
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-inbox',
+          displayName: 'Inbox',
+          wellKnownName: 'inbox',
+          totalItemCount: 1,
+          unreadItemCount: 1,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-sent',
+          displayName: 'Sent Items',
+          wellKnownName: 'sentitems',
+          totalItemCount: 0,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/Drafts?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-drafts',
+          displayName: 'Drafts',
+          wellKnownName: 'drafts',
+          totalItemCount: 0,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/DeletedItems?')) {
+      return createJsonResponse({
+        body: {
+          id: 'folder-deleted',
+          displayName: 'Deleted Items',
+          wellKnownName: 'deleteditems',
+          totalItemCount: 0,
+          unreadItemCount: 0,
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-truth-cid-1/attachments')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'att-inline-2',
+              name: 'logo.png',
+              contentType: 'image/png',
+              size: 4096,
+              isInline: true,
+              contentId: 'EA16576E-2872-4B08-B661-B735472875B3',
+              contentBytes: 'RkFLRQ==',
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-truth-cid-1',
+              conversationId: 'conv-truth-cid-1',
+              subject: 'Organisk kundbild',
+              bodyPreview: 'Hej, här kommer bilden.',
+              receivedDateTime: '2026-04-07T08:00:00.000Z',
+              isRead: false,
+              hasAttachments: true,
+              parentFolderId: 'folder-inbox',
+              body: {
+                contentType: 'html',
+                content:
+                  '<div>Hej!<img alt="image0.jpeg" src="cid:EA16576E-2872-4B08-B661-B735472875B3"></div>',
+              },
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'info@hairtpclinic.com' } }],
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({ body: { value: [] } });
+    }
+    if (safeUrl.includes('/mailFolders/Drafts/messages')) {
+      return createJsonResponse({ body: { value: [] } });
+    }
+    if (safeUrl.includes('/mailFolders/DeletedItems/messages')) {
+      return createJsonResponse({ body: { value: [] } });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-cid-truth',
+    clientId: 'client-id-cid-truth',
+    clientSecret: 'client-secret-cid-truth',
+    userId: 'info@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const snapshot = await connector.fetchMailboxTruthSnapshot({ days: 30 });
+  const inboxFolder = snapshot.accounts[0].folders.find((folder) => folder.folderType === 'inbox');
+  assert.match(
+    String(inboxFolder?.messages?.[0]?.bodyHtml || ''),
+    /src="data:image\/png;base64,RkFLRQ=="/
+  );
+  const attachmentRequest = calls.find((entry) => entry.includes('/messages/msg-truth-cid-1/attachments'));
+  assert.equal(Boolean(attachmentRequest), true);
+  assert.equal(String(attachmentRequest).includes('contentId'), false);
+  assert.equal(String(attachmentRequest).includes('contentBytes'), false);
+});
+
+test('MicrosoftGraphReadConnector enrichStoredMessagesWithMailAssets returns safe attachment metadata and repaired html', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-mail-assets',
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-asset-1/attachments')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'att-inline-asset-1',
+              name: 'logo.png',
+              contentType: 'image/png',
+              size: 4096,
+              isInline: true,
+              contentId: 'asset-logo@cid',
+              contentBytes: 'RkFLRQ==',
+            },
+            {
+              id: 'att-file-asset-2',
+              name: 'price-list.pdf',
+              contentType: 'application/pdf',
+              size: 12000,
+              isInline: false,
+            },
+          ],
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-mail-assets',
+    clientId: 'client-id-mail-assets',
+    clientSecret: 'client-secret-mail-assets',
+    userId: 'contact@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const messages = await connector.enrichStoredMessagesWithMailAssets({
+    messages: [
+      {
+        graphMessageId: 'msg-asset-1',
+        mailboxId: 'contact@hairtpclinic.com',
+        mailboxAddress: 'contact@hairtpclinic.com',
+        userPrincipalName: 'contact@hairtpclinic.com',
+        hasAttachments: true,
+        bodyHtml: '<div><img src="cid:asset-logo@cid" alt="Clinic logo" /></div>',
+      },
+    ],
+  });
+
+  assert.equal(messages.length, 1);
+  assert.match(String(messages[0]?.bodyHtml || ''), /data:image\/png;base64,RkFLRQ==/);
+  assert.equal(Array.isArray(messages[0]?.attachments), true);
+  assert.equal(messages[0].attachments.length, 2);
+  assert.equal(messages[0].attachments[0].contentBytesAvailable, true);
+  assert.equal('contentBytes' in messages[0].attachments[0], false);
+  assert.equal(messages[0].attachments[1].contentBytesAvailable, false);
+  const attachmentRequest = calls.find((entry) => entry.includes('/messages/msg-asset-1/attachments'));
+  assert.equal(Boolean(attachmentRequest), true);
+});
+
+test('MicrosoftGraphReadConnector fetchMessageMimeContent returns raw MIME metadata for an open message', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-mime-open',
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-mime-1/$value')) {
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get(name = '') {
+            return String(name).toLowerCase() === 'content-type' ? 'message/rfc822' : null;
+          },
+        },
+        async text() {
+          return 'MIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="abc"';
+        },
+      };
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-mime-open',
+    clientId: 'client-id-mime-open',
+    clientSecret: 'client-secret-mime-open',
+    userId: 'contact@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const payload = await connector.fetchMessageMimeContent({
+    userId: 'contact@hairtpclinic.com',
+    messageId: 'msg-mime-1',
+    label: 'Open-mail MIME fetch',
+    timeoutMs: 5000,
+  });
+
+  assert.equal(payload.contentType, 'message/rfc822');
+  assert.match(String(payload.rawMime || ''), /MIME-Version: 1\.0/);
+  assert.equal(
+    calls.some((entry) => entry.includes('/messages/msg-mime-1/$value')),
+    true
+  );
+});
+
+test('MicrosoftGraphReadConnector fetchMessageAttachmentContent returns attachment bytes and metadata for open/download actions', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    calls.push(safeUrl);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-attachment-open',
+        },
+      });
+    }
+    if (safeUrl.includes('/messages/msg-asset-open-1/attachments/att-file-open-1/$value')) {
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get(name = '') {
+            return String(name).toLowerCase() === 'content-type'
+              ? 'application/pdf'
+              : null;
+          },
+        },
+        async arrayBuffer() {
+          return Buffer.from('PDF-BYTES');
+        },
+      };
+    }
+    if (safeUrl.includes('/messages/msg-asset-open-1/attachments/att-file-open-1')) {
+      return createJsonResponse({
+        body: {
+          id: 'att-file-open-1',
+          name: 'price-list.pdf',
+          contentType: 'application/pdf',
+          size: 9,
+          isInline: false,
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-attachment-open',
+    clientId: 'client-id-attachment-open',
+    clientSecret: 'client-secret-attachment-open',
+    userId: 'contact@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const payload = await connector.fetchMessageAttachmentContent({
+    userId: 'contact@hairtpclinic.com',
+    messageId: 'msg-asset-open-1',
+    attachmentId: 'att-file-open-1',
+    label: 'Open-mail attachment fetch',
+    timeoutMs: 5000,
+  });
+
+  assert.equal(payload.name, 'price-list.pdf');
+  assert.equal(payload.contentType, 'application/pdf');
+  assert.equal(payload.isInline, false);
+  assert.equal(Buffer.isBuffer(payload.buffer), true);
+  assert.equal(String(payload.buffer), 'PDF-BYTES');
+  assert.equal(
+    calls.some((entry) => entry.includes('/messages/msg-asset-open-1/attachments/att-file-open-1/$value')),
+    true
+  );
+});
+
+test('MicrosoftGraphReadConnector preserves long inline-image html beyond legacy 24000 cutoff', async () => {
+  const longDataImage = `data:image/png;base64,${'QUJD'.repeat(7000)}`;
+  const fetchImpl = async (url) => {
+    const safeUrl = String(url);
+    if (safeUrl.includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-long-html',
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/inbox/messages')) {
+      return createJsonResponse({
+        body: {
+          value: [
+            {
+              id: 'msg-long-html-1',
+              conversationId: 'conv-long-html-1',
+              subject: 'Organisk html-signatur',
+              bodyPreview: 'Hej från kunden.',
+              receivedDateTime: '2026-04-07T08:00:00.000Z',
+              hasAttachments: false,
+              body: {
+                contentType: 'html',
+                content: `<div><p>Hej!</p><img src="${longDataImage}" alt="kundlogga" /></div>`,
+              },
+              from: {
+                emailAddress: {
+                  address: 'patient@example.com',
+                  name: 'Patient',
+                },
+              },
+              toRecipients: [{ emailAddress: { address: 'contact@hairtpclinic.com' } }],
+              isRead: false,
+            },
+          ],
+        },
+      });
+    }
+    if (safeUrl.includes('/mailFolders/SentItems/messages')) {
+      return createJsonResponse({ body: { value: [] } });
+    }
+    throw new Error(`Unexpected URL: ${safeUrl}`);
+  };
+
+  const connector = createMicrosoftGraphReadConnector({
+    tenantId: 'tenant-id-long-html',
+    clientId: 'client-id-long-html',
+    clientSecret: 'client-secret-long-html',
+    userId: 'contact@hairtpclinic.com',
+    fetchImpl,
+  });
+
+  const snapshot = await connector.fetchInboxSnapshot();
+  const bodyHtml = String(snapshot.conversations[0]?.messages?.[0]?.bodyHtml || '');
+  assert.equal(bodyHtml.length > 24000, true);
+  assert.equal(bodyHtml.includes('data:image/png;base64,'), true);
+  assert.equal(bodyHtml.endsWith('</div>'), true);
 });

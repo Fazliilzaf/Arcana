@@ -228,16 +228,30 @@ function humanizeEmailAddress(value = '') {
     .join(' ');
 }
 
-function sanitizeStoredBodyHtml(value = '', maxLength = 24000) {
+const DEFAULT_STORED_BODY_HTML_MAX_LENGTH = 24000;
+const INLINE_IMAGE_BODY_HTML_MAX_LENGTH = 240000;
+
+function resolveStoredBodyHtmlMaxLength(value = '', fallback = DEFAULT_STORED_BODY_HTML_MAX_LENGTH) {
+  const html = normalizeText(value);
+  if (!html) return fallback;
+  return /<img\b|data:image\/|cid:/i.test(html)
+    ? INLINE_IMAGE_BODY_HTML_MAX_LENGTH
+    : fallback;
+}
+
+function sanitizeStoredBodyHtml(value = '', maxLength = DEFAULT_STORED_BODY_HTML_MAX_LENGTH) {
   const html = normalizeText(value);
   if (!html) return null;
-  return html
+  const sanitized = html
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*\/?\s*>/gi, '')
     .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
     .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-    .replace(/\s(src|href)\s*=\s*(['"])\s*(javascript:|data:text\/html)[\s\S]*?\2/gi, ' $1="#"')
-    .slice(0, maxLength);
+    .replace(/\s(src|href)\s*=\s*(['"])\s*(javascript:|data:text\/html)[\s\S]*?\2/gi, ' $1="#"');
+  const effectiveMaxLength = resolveStoredBodyHtmlMaxLength(sanitized, maxLength);
+  return sanitized.length <= effectiveMaxLength
+    ? sanitized
+    : sanitized.slice(0, effectiveMaxLength);
 }
 
 function inferHistoryCounterpartyEmail(rawMessage = {}) {
@@ -278,10 +292,7 @@ function normalizeHistoryMessage(rawMessage = {}) {
     sentAt,
     direction: normalizeDirection(rawMessage.direction),
     bodyPreview: normalizeText(rawMessage.bodyPreview) || '',
-    bodyHtml:
-      normalizeDirection(rawMessage.direction) === 'outbound'
-        ? sanitizeStoredBodyHtml(rawMessage.bodyHtml) || null
-        : null,
+    bodyHtml: sanitizeStoredBodyHtml(rawMessage.bodyHtml) || null,
     senderEmail: normalizeEmailAddress(rawMessage.senderEmail) || null,
     senderName: normalizeText(rawMessage.senderName) || null,
     recipients: normalizeRecipients(rawMessage.recipients),

@@ -263,6 +263,7 @@ function createCcoCustomersRouter({
         const importText = normalizeText(req.body?.text || req.body?.importText);
         const fileName = normalizeText(req.body?.fileName);
         const defaultMailboxId = normalizeText(req.body?.defaultMailboxId).toLowerCase();
+        const sourceSystem = normalizeText(req.body?.sourceSystem).toLowerCase();
         const binaryBase64 = normalizeText(req.body?.binaryBase64 || req.body?.fileBase64);
         const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
         if (!importText && !binaryBase64 && (!Array.isArray(rows) || !rows.length)) {
@@ -275,6 +276,7 @@ function createCcoCustomersRouter({
           binaryBase64,
           fileName,
           defaultMailboxId,
+          sourceSystem,
         });
         await authStore.addAuditEvent({
           tenantId: req.auth.tenantId,
@@ -286,16 +288,18 @@ function createCcoCustomersRouter({
           metadata: {
             fileName,
             defaultMailboxId,
+            sourceSystem,
             sourceMode: Array.isArray(rows) ? 'rows' : binaryBase64 ? 'binary' : 'text',
             totalRows: importSummary.totalRows,
             validRows: importSummary.validRows,
             created: importSummary.created,
             updated: importSummary.updated,
             merged: importSummary.merged,
+            review: importSummary.review,
             invalid: importSummary.invalid,
           },
         });
-        return res.json({ ok: true, importSummary });
+        return res.json({ ok: true, importSummary, coverageReadout: importSummary.coverageReadout });
       } catch (error) {
         console.error(error);
         const message = normalizeText(error?.message);
@@ -322,18 +326,20 @@ function createCcoCustomersRouter({
         const importText = normalizeText(req.body?.text || req.body?.importText);
         const fileName = normalizeText(req.body?.fileName);
         const defaultMailboxId = normalizeText(req.body?.defaultMailboxId).toLowerCase();
+        const sourceSystem = normalizeText(req.body?.sourceSystem).toLowerCase();
         const binaryBase64 = normalizeText(req.body?.binaryBase64 || req.body?.fileBase64);
         const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
         if (!importText && !binaryBase64 && (!Array.isArray(rows) || !rows.length)) {
           return res.status(400).json({ error: 'Importkällan är tom.' });
         }
-        const { customerState, importSummary } = await customerStore.commitTenantCustomerImport({
+        const { customerState, importSummary, coverageReadout } = await customerStore.commitTenantCustomerImport({
           tenantId: req.auth.tenantId,
           importText,
           rows,
           binaryBase64,
           fileName,
           defaultMailboxId,
+          sourceSystem,
         });
         await authStore.addAuditEvent({
           tenantId: req.auth.tenantId,
@@ -345,16 +351,23 @@ function createCcoCustomersRouter({
           metadata: {
             fileName,
             defaultMailboxId,
+            sourceSystem,
             sourceMode: Array.isArray(rows) ? 'rows' : binaryBase64 ? 'binary' : 'text',
             totalRows: importSummary.totalRows,
             validRows: importSummary.validRows,
             created: importSummary.created,
             updated: importSummary.updated,
             merged: importSummary.merged,
+            review: importSummary.review,
             invalid: importSummary.invalid,
           },
         });
-        return res.json({ ok: true, importSummary, customerState });
+        return res.json({
+          ok: true,
+          importSummary,
+          coverageReadout: coverageReadout || importSummary.coverageReadout,
+          customerState,
+        });
       } catch (error) {
         console.error(error);
         const message = normalizeText(error?.message);
@@ -368,6 +381,32 @@ function createCcoCustomersRouter({
         return res.status(statusCode).json({
           error: statusCode === 400 ? message || 'Ogiltig importfil.' : 'Kunde inte importera kunderna.',
         });
+      }
+    }
+  );
+
+  router.get(
+    '/cco/customers/import/status',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        const coverageReadout = await customerStore.getTenantCustomerImportCoverageReadout({
+          tenantId: req.auth.tenantId,
+        });
+        await authStore.addAuditEvent({
+          tenantId: req.auth.tenantId,
+          actorUserId: req.auth.userId,
+          action: 'cco.customers.import.status',
+          outcome: 'success',
+          targetType: 'cco_customers_import',
+          targetId: req.auth.tenantId,
+          metadata: coverageReadout,
+        });
+        return res.json({ ok: true, coverageReadout });
+      } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Kunde inte läsa importstatus.' });
       }
     }
   );

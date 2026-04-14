@@ -205,6 +205,23 @@ function toRecipients(to = []) {
     }));
 }
 
+function normalizeComposeRecipients(recipients = {}) {
+  return {
+    to: (Array.isArray(recipients?.to) ? recipients.to : [])
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+      .slice(0, 20),
+    cc: (Array.isArray(recipients?.cc) ? recipients.cc : [])
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+      .slice(0, 20),
+    bcc: (Array.isArray(recipients?.bcc) ? recipients.bcc : [])
+      .map((item) => normalizeText(item))
+      .filter(Boolean)
+      .slice(0, 20),
+  };
+}
+
 function createMicrosoftGraphSendConnector(config = {}) {
   const tenantId = requiredConfig('tenantId', config.tenantId);
   const clientId = requiredConfig('clientId', config.clientId);
@@ -278,32 +295,99 @@ function createMicrosoftGraphSendConnector(config = {}) {
   async function sendReply({
     mailboxId,
     sourceMailboxId = '',
+    conversationId = '',
     replyToMessageId,
     body = '',
     bodyHtml = '',
     subject = '',
     to = [],
+    cc = [],
+    bcc = [],
     timeoutMs = requestTimeoutMs,
   } = {}) {
     const normalizedSenderMailboxId = requiredConfig('mailboxId', mailboxId);
     const normalizedSourceMailboxId =
       normalizeText(sourceMailboxId) || normalizedSenderMailboxId;
-    const normalizedMessageId = requiredConfig('replyToMessageId', replyToMessageId);
-    const normalizedBody = normalizeText(body);
-    const normalizedBodyHtml = normalizeText(bodyHtml);
-    const normalizedSubject = normalizeText(subject);
-    const normalizedRecipients = toRecipients(to);
     const shouldReplyInThread = normalizedSenderMailboxId === normalizedSourceMailboxId;
+    return sendComposeDocument({
+      composeDocument: {
+        version: 'phase_5',
+        kind: 'mail_compose_document',
+        mode: 'reply',
+        sourceMailboxId: normalizedSourceMailboxId,
+        senderMailboxId: normalizedSenderMailboxId,
+        replyContext: {
+          conversationId: normalizeText(conversationId) || '__legacy_reply__',
+          replyToMessageId: normalizeText(replyToMessageId),
+        },
+        recipients: {
+          to: Array.isArray(to) ? to : [],
+          cc: Array.isArray(cc) ? cc : [],
+          bcc: Array.isArray(bcc) ? bcc : [],
+        },
+        subject: normalizeText(subject),
+        content: {
+          bodyText: normalizeText(body),
+          bodyHtml: normalizeText(bodyHtml) || null,
+        },
+        delivery: {
+          sendStrategy: shouldReplyInThread ? 'reply_draft' : 'send_mail',
+        },
+      },
+      timeoutMs,
+    });
+  }
+
+  async function sendComposeDocument({ composeDocument, timeoutMs = requestTimeoutMs } = {}) {
+    if (!composeDocument || typeof composeDocument !== 'object') {
+      throw new Error('MicrosoftGraphSendConnector sendComposeDocument requires composeDocument.');
+    }
+    if (normalizeText(composeDocument.kind) !== 'mail_compose_document') {
+      throw new Error(
+        'MicrosoftGraphSendConnector sendComposeDocument requires mail_compose_document.'
+      );
+    }
+    const normalizedSenderMailboxId = requiredConfig(
+      'senderMailboxId',
+      composeDocument.senderMailboxId || composeDocument.mailboxId
+    );
+    const normalizedSourceMailboxId =
+      normalizeText(composeDocument.sourceMailboxId) || normalizedSenderMailboxId;
+    const normalizedMode = normalizeText(composeDocument.mode).toLowerCase() || 'compose';
+    const normalizedMessageId = normalizeText(composeDocument.replyContext?.replyToMessageId);
+    const normalizedBody = normalizeText(
+      composeDocument.content?.bodyText || composeDocument.body || ''
+    );
+    const normalizedBodyHtml = normalizeText(
+      composeDocument.content?.bodyHtml || composeDocument.bodyHtml || ''
+    );
+    const normalizedSubject = normalizeText(composeDocument.subject);
+    const normalizedRecipients = normalizeComposeRecipients(composeDocument.recipients);
+    const recipientPayload = {
+      toRecipients: toRecipients(normalizedRecipients.to),
+      ccRecipients: toRecipients(normalizedRecipients.cc),
+      bccRecipients: toRecipients(normalizedRecipients.bcc),
+    };
+    const shouldReplyInThread =
+      (normalizeText(composeDocument.delivery?.sendStrategy) || '') === 'reply_draft' &&
+      normalizedMode === 'reply';
     const normalizedHtmlContent = normalizedBodyHtml || formatPlainTextAsHtml(normalizedBody);
     if (!normalizedBody) {
-      throw new Error('MicrosoftGraphSendConnector sendReply requires body.');
+      throw new Error('MicrosoftGraphSendConnector sendComposeDocument requires body.');
     }
-    if (!shouldReplyInThread && !normalizedRecipients.length) {
-      throw new Error('MicrosoftGraphSendConnector sendReply requires to[].');
+    if (normalizedMode === 'compose' && !normalizedSubject) {
+      throw new Error('MicrosoftGraphSendConnector sendComposeDocument requires subject.');
+    }
+    if (normalizedMode === 'reply' && !normalizedMessageId) {
+      throw new Error('MicrosoftGraphSendConnector sendComposeDocument requires replyToMessageId.');
+    }
+    if (!shouldReplyInThread && !recipientPayload.toRecipients.length) {
+      throw new Error('MicrosoftGraphSendConnector sendComposeDocument requires to[].');
     }
     const accessToken = await fetchAccessToken();
     let sendMode = 'send_mail';
     if (shouldReplyInThread) {
+      requiredConfig('replyToMessageId', normalizedMessageId);
       const createReplyUrl = `${graphBaseUrl}/users/${encodeURIComponent(
         normalizedSenderMailboxId
       )}/messages/${encodeURIComponent(normalizedMessageId)}/createReply`;
@@ -361,7 +445,13 @@ function createMicrosoftGraphSendConnector(config = {}) {
               contentType: 'HTML',
               content: normalizedHtmlContent,
             },
-            toRecipients: normalizedRecipients,
+            toRecipients: recipientPayload.toRecipients,
+            ...(recipientPayload.ccRecipients.length
+              ? { ccRecipients: recipientPayload.ccRecipients }
+              : {}),
+            ...(recipientPayload.bccRecipients.length
+              ? { bccRecipients: recipientPayload.bccRecipients }
+              : {}),
           },
           saveToSentItems: true,
         },
@@ -375,11 +465,15 @@ function createMicrosoftGraphSendConnector(config = {}) {
       provider: 'microsoft_graph',
       mailboxId: normalizedSenderMailboxId,
       sourceMailboxId: normalizedSourceMailboxId,
-      replyToMessageId: normalizedMessageId,
+      replyToMessageId: normalizedMessageId || null,
       subject: normalizedSubject || null,
-      to: normalizedRecipients.map((item) => item.emailAddress.address),
+      to: normalizedRecipients.to,
+      cc: normalizedRecipients.cc,
+      bcc: normalizedRecipients.bcc,
       sentAt: new Date().toISOString(),
       sendMode,
+      composeDocumentVersion: normalizeText(composeDocument.version) || null,
+      composeMode: normalizedMode === 'compose',
     };
   }
 
@@ -390,60 +484,34 @@ function createMicrosoftGraphSendConnector(config = {}) {
     bodyHtml = '',
     subject = '',
     to = [],
+    cc = [],
+    bcc = [],
     timeoutMs = requestTimeoutMs,
   } = {}) {
-    const normalizedSenderMailboxId = requiredConfig('mailboxId', mailboxId);
-    const normalizedSourceMailboxId =
-      normalizeText(sourceMailboxId) || normalizedSenderMailboxId;
-    const normalizedBody = normalizeText(body);
-    const normalizedBodyHtml = normalizeText(bodyHtml);
-    const normalizedSubject = normalizeText(subject);
-    const normalizedRecipients = toRecipients(to);
-    const normalizedHtmlContent = normalizedBodyHtml || formatPlainTextAsHtml(normalizedBody);
-
-    if (!normalizedBody) {
-      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires body.');
-    }
-    if (!normalizedSubject) {
-      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires subject.');
-    }
-    if (!normalizedRecipients.length) {
-      throw new Error('MicrosoftGraphSendConnector sendNewMessage requires to[].');
-    }
-
-    const accessToken = await fetchAccessToken();
-    const sendMailUrl = `${graphBaseUrl}/users/${encodeURIComponent(
-      normalizedSenderMailboxId
-    )}/sendMail`;
-    await postGraphJson({
-      fetchImpl,
-      url: sendMailUrl,
-      accessToken,
-      payload: {
-        message: {
-          subject: normalizedSubject,
-          body: {
-            contentType: 'HTML',
-            content: normalizedHtmlContent,
-          },
-          toRecipients: normalizedRecipients,
+    return sendComposeDocument({
+      composeDocument: {
+        version: 'phase_5',
+        kind: 'mail_compose_document',
+        mode: 'compose',
+        sourceMailboxId: normalizeText(sourceMailboxId) || normalizeText(mailboxId),
+        senderMailboxId: normalizeText(mailboxId),
+        replyContext: null,
+        recipients: {
+          to: Array.isArray(to) ? to : [],
+          cc: Array.isArray(cc) ? cc : [],
+          bcc: Array.isArray(bcc) ? bcc : [],
         },
-        saveToSentItems: true,
+        subject: normalizeText(subject),
+        content: {
+          bodyText: normalizeText(body),
+          bodyHtml: normalizeText(bodyHtml) || null,
+        },
+        delivery: {
+          sendStrategy: 'send_mail',
+        },
       },
       timeoutMs,
-      label: 'Microsoft Graph sendMail',
     });
-
-    return {
-      provider: 'microsoft_graph',
-      mailboxId: normalizedSenderMailboxId,
-      sourceMailboxId: normalizedSourceMailboxId,
-      replyToMessageId: null,
-      subject: normalizedSubject,
-      to: normalizedRecipients.map((item) => item.emailAddress.address),
-      sentAt: new Date().toISOString(),
-      sendMode: 'send_mail',
-    };
   }
 
   async function moveMessageToDeletedItems({
@@ -481,6 +549,7 @@ function createMicrosoftGraphSendConnector(config = {}) {
   }
 
   return {
+    sendComposeDocument,
     sendNewMessage,
     sendReply,
     moveMessageToDeletedItems,

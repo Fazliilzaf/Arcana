@@ -23,6 +23,7 @@
       scheduleNotesTextarea,
       scheduleReminderSelect,
       scheduleTimeInput,
+      studioShell,
       studioDeleteButton,
       studioComposeSubjectInput,
       studioComposeToInput,
@@ -46,9 +47,15 @@
       getActiveNoteDraft,
       getAdminToken,
       getRuntimeCustomerEmail,
+      getRuntimeFocusReadState,
+      getRuntimeMailboxCapability,
+      getRuntimeStudioTruthState,
+      getRuntimeThreadById,
+      isOfflineHistoryContextThread,
+      getSelectedRuntimeFocusThread,
       getSelectedRuntimeThread,
-      getStudioSenderMailboxId,
       getStudioSignatureProfile,
+      getStudioSignatureOverride,
       getStudioSourceMailboxId,
       loadBootstrapFeedback,
       mapPriorityValue,
@@ -79,6 +86,18 @@
       applyHandledToThread,
     } = helpers;
 
+    function renderActiveFocusHistorySection() {
+      const focusThread =
+        typeof getSelectedRuntimeFocusThread === "function"
+          ? getSelectedRuntimeFocusThread()
+          : getSelectedRuntimeThread();
+      const focusReadState =
+        typeof getRuntimeFocusReadState === "function"
+          ? getRuntimeFocusReadState(focusThread)
+          : {};
+      renderFocusHistorySection(focusThread, focusReadState);
+    }
+
     function parseComposeRecipients(value = "") {
       return String(value || "")
         .split(/[;,]/)
@@ -91,7 +110,12 @@
       preserveActiveDestination = true,
       applyWorkspacePrefs = false,
       quiet = false,
+      forceReload = false,
     } = {}) {
+      if (forceReload) {
+        refs.bootstrapPromise = null;
+      }
+
       if (refs.bootstrapPromise) {
         return refs.bootstrapPromise;
       }
@@ -139,7 +163,7 @@
           renderTemplateButtons();
           renderNoteDestination(requestedActiveKey);
           renderScheduleDraft();
-          renderFocusHistorySection(getSelectedRuntimeThread());
+          renderActiveFocusHistorySection();
           renderFocusNotesSection();
 
           if (applyWorkspacePrefs) {
@@ -272,12 +296,38 @@
           },
         });
 
+        const savedNote = payload?.note || null;
+        if (savedNote && state.activity && Array.isArray(state.activity.notes)) {
+          const compositeKey = [
+            savedNote.tenantId,
+            savedNote.workspaceId,
+            savedNote.conversationId,
+            savedNote.customerId,
+            savedNote.destinationKey,
+          ]
+            .map((value) => normalizeKey(value))
+            .join("|");
+          const existingIndex = state.activity.notes.findIndex((note) => {
+            const noteKey = [
+              note?.tenantId,
+              note?.workspaceId,
+              note?.conversationId,
+              note?.customerId,
+              note?.destinationKey,
+            ]
+              .map((value) => normalizeKey(value))
+              .join("|");
+            return noteKey === compositeKey;
+          });
+          if (existingIndex >= 0) {
+            state.activity.notes[existingIndex] = { ...savedNote };
+          } else {
+            state.activity.notes.push({ ...savedNote });
+          }
+        }
+
+        renderFocusNotesSection();
         setFeedback(noteFeedback, "success", payload.message || "Anteckningen sparades.");
-        await loadBootstrap({
-          preserveActiveDestination: true,
-          applyWorkspacePrefs: false,
-          quiet: true,
-        });
         renderNoteDestination(activeKey);
       } catch (error) {
         setFeedback(noteFeedback, "error", error.message || "Kunde inte spara anteckning.");
@@ -332,6 +382,7 @@
           preserveActiveDestination: true,
           applyWorkspacePrefs: false,
           quiet: true,
+          forceReload: true,
         });
         const selectedThread = getSelectedRuntimeThread();
         if (selectedThread) {
@@ -376,24 +427,144 @@
       }
     }
 
-    function buildStudioPreviewUrl(thread, draftBody, signatureId) {
+    function resolveStudioSenderMailboxId(
+      studioState = {},
+      thread = null,
+      { isComposeMode = false, studioTruthState = {} } = {}
+    ) {
+      if (studioTruthState?.truthDriven === true && !isComposeMode) {
+        return asText(
+          studioTruthState.senderMailboxId ||
+            studioTruthState.sourceMailboxId ||
+            studioState?.composeMailboxId ||
+            getStudioSourceMailboxId(thread)
+        );
+      }
+      return asText(studioState?.composeMailboxId || getStudioSourceMailboxId(thread));
+    }
+
+    function buildStudioPreviewUrl(studioState, thread, { isComposeMode = false, studioTruthState = {} } = {}) {
       const params = new URLSearchParams();
-      const selectedProfile = getStudioSignatureProfile(signatureId);
+      const selectedProfile = getStudioSignatureProfile(studioState?.selectedSignatureId);
+      const senderMailboxId = resolveStudioSenderMailboxId(studioState, thread, {
+        isComposeMode,
+        studioTruthState,
+      });
+      const signatureOverride =
+        studioTruthState?.truthDriven === true
+          ? null
+          : getStudioSignatureOverride(selectedProfile.id, senderMailboxId);
       params.set("profile", selectedProfile.id);
-      params.set("senderMailboxId", asText(getStudioSenderMailboxId(selectedProfile.id, thread)));
-      params.set("body", String(draftBody || ""));
+      params.set("senderMailboxId", senderMailboxId);
+      params.set("body", String(studioState?.draftBody || ""));
+      if (signatureOverride) {
+        params.set("signatureOverrideKey", asText(signatureOverride.key));
+        params.set("signatureOverrideLabel", asText(signatureOverride.label));
+        params.set("signatureOverrideFullName", asText(signatureOverride.fullName));
+        params.set("signatureOverrideTitle", asText(signatureOverride.title));
+        params.set(
+          "signatureOverrideSenderMailboxId",
+          asText(signatureOverride.senderMailboxId)
+        );
+        if (asText(signatureOverride.html)) {
+          params.set("signatureOverrideHtml", asText(signatureOverride.html));
+        }
+      }
       return `/api/v1/cco/signature-preview?${params.toString()}`;
     }
 
+    function resolveStudioMode() {
+      return normalizeKey(state.studio?.mode || studioShell?.dataset.mode) || "reply";
+    }
+
+    function getOfflineHistoryThread() {
+      const lockedThread = getLockedReplyStudioThread();
+      if (resolveStudioMode() !== "compose" && state.studio?.readOnly === true && lockedThread) {
+        return {
+          ...lockedThread,
+          offlineHistorySelection: true,
+          raw: {
+            ...(lockedThread.raw && typeof lockedThread.raw === "object" ? lockedThread.raw : {}),
+            offlineHistorySelection: true,
+          },
+        };
+      }
+      const selectedThread = getSelectedRuntimeThread();
+      if (
+        typeof isOfflineHistoryContextThread === "function" &&
+        isOfflineHistoryContextThread(selectedThread)
+      ) {
+        return selectedThread;
+      }
+      return null;
+    }
+
+    function getLockedReplyStudioThread() {
+      const lockedThreadId = asText(state.studio?.replyContextThreadId || state.studio?.threadId);
+      const selectedThread = getSelectedRuntimeThread();
+      if (!lockedThreadId) {
+        return selectedThread;
+      }
+      if (
+        selectedThread &&
+        typeof runtimeConversationIdsMatch === "function" &&
+        runtimeConversationIdsMatch(selectedThread.id, lockedThreadId)
+      ) {
+        return selectedThread;
+      }
+      if (typeof getRuntimeThreadById === "function") {
+        return getRuntimeThreadById(lockedThreadId);
+      }
+      return null;
+    }
+
+    function blockOfflineHistoryAction(message, target = "studio") {
+      if (!getOfflineHistoryThread()) return false;
+      if (target === "focusHistory" && focusHistoryMeta) {
+        focusHistoryMeta.textContent = message;
+      } else if (target === "focusStatus" && focusStatusLine) {
+        focusStatusLine.textContent = message;
+      } else {
+        setStudioFeedback(message, "error");
+      }
+      normalizeStudioBusyState();
+      return true;
+    }
+
     async function handleStudioPreview() {
-      const thread = getSelectedRuntimeThread();
-      const isComposeMode = normalizeKey(state.studio.mode) === "compose";
+      const thread = getLockedReplyStudioThread();
+      const isComposeMode = resolveStudioMode() === "compose";
       const studioState = isComposeMode ? state.studio : thread ? ensureStudioState(thread) : null;
       if (!studioState) return;
+      if (
+        !isComposeMode &&
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att förhandsvisa eller svara.",
+          "studio"
+        )
+      ) {
+        return;
+      }
+      let previewWindow = null;
       try {
+        previewWindow = windowObject.open("", "_blank", "noopener");
+        if (!previewWindow) {
+          throw new Error("Förhandsvisningen blockerades av webbläsaren.");
+        }
+        previewWindow.document.open();
+        previewWindow.document.write(
+          "<!doctype html><html><head><title>Laddar förhandsvisning…</title></head><body style=\"font-family:Arial,sans-serif;padding:24px;background:#f7f1ea;color:#4b433d;\">Laddar förhandsvisning…</body></html>"
+        );
+        previewWindow.document.close();
         const authToken = getAdminToken();
         const response = await fetchImpl(
-          buildStudioPreviewUrl(thread, studioState.draftBody, studioState.selectedSignatureId),
+          buildStudioPreviewUrl(studioState, thread, {
+            isComposeMode,
+            studioTruthState:
+              !isComposeMode && typeof getRuntimeStudioTruthState === "function"
+                ? getRuntimeStudioTruthState(thread)
+                : {},
+          }),
           {
             method: "GET",
             credentials: "same-origin",
@@ -404,24 +575,30 @@
         if (!response.ok) {
           throw new Error("Kunde inte läsa signaturförhandsvisningen.");
         }
-        const previewWindow = windowObject.open("", "_blank", "noopener");
-        if (!previewWindow) {
-          throw new Error("Förhandsvisningen blockerades av webbläsaren.");
-        }
         previewWindow.document.open();
         previewWindow.document.write(html);
         previewWindow.document.close();
         setStudioFeedback("Förhandsvisningen öppnades i ett nytt fönster.", "success");
       } catch (error) {
+        previewWindow?.close();
         setStudioFeedback(error.message || "Kunde inte öppna förhandsvisningen.", "error");
       }
     }
 
     async function handleStudioSaveDraft() {
-      const thread = getSelectedRuntimeThread();
-      const isComposeMode = normalizeKey(state.studio.mode) === "compose";
+      const thread = getLockedReplyStudioThread();
+      const isComposeMode = resolveStudioMode() === "compose";
       const studioState = isComposeMode ? state.studio : thread ? ensureStudioState(thread) : null;
       if (!studioState) return;
+      if (
+        !isComposeMode &&
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att spara utkast.",
+          "studio"
+        )
+      ) {
+        return;
+      }
       studioState.savingDraft = true;
       normalizeStudioBusyState();
       setButtonBusy(studioSaveDraftButton, true, "Spara utkast", "Sparar…");
@@ -452,16 +629,32 @@
     }
 
     async function handleStudioReplyLater(label) {
-      const thread = getSelectedRuntimeThread();
+      const thread = getLockedReplyStudioThread();
       const studioState = thread ? ensureStudioState(thread) : null;
       if (!thread || !studioState) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att parkera konversationen.",
+          "studio"
+        )
+      ) {
+        return;
+      }
       applyReplyLaterToThread(thread, label, { closeStudio: true });
     }
 
     async function handleStudioMarkHandled() {
-      const thread = getSelectedRuntimeThread();
+      const thread = getLockedReplyStudioThread();
       const studioState = thread ? ensureStudioState(thread) : null;
       if (!thread || !studioState) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att markera konversationen som klar.",
+          "studio"
+        )
+      ) {
+        return;
+      }
       const outcome = suggestHandledOutcome(thread, studioState);
       applyHandledToThread(thread, outcome, { closeStudio: true });
     }
@@ -489,9 +682,17 @@
     }
 
     async function handleStudioDelete() {
-      const thread = getSelectedRuntimeThread();
+      const thread = getLockedReplyStudioThread();
       const studioState = thread ? ensureStudioState(thread) : null;
       if (!thread || !studioState) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "studio"
+        )
+      ) {
+        return;
+      }
       studioState.deleting = true;
       normalizeStudioBusyState();
       setButtonBusy(studioDeleteButton, true, "Radera", "Raderar…");
@@ -512,6 +713,14 @@
     async function handleRuntimeDeleteAction(idempotencyScope = "major-arcana-delete") {
       const thread = getSelectedRuntimeThread();
       if (!thread || !state.runtime.deleteEnabled || asText(state.runtime.deletingThreadId)) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "focusStatus"
+        )
+      ) {
+        return;
+      }
       state.runtime.deletingThreadId = asText(thread.id);
       renderRuntimeConversationShell();
       try {
@@ -532,6 +741,14 @@
     async function handleRuntimeHandledAction() {
       const thread = getSelectedRuntimeThread();
       if (!thread) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att markera konversationen som klar.",
+          "focusStatus"
+        )
+      ) {
+        return;
+      }
       const studioState = ensureStudioState(thread);
       const outcome = suggestHandledOutcome(thread, studioState);
       applyHandledToThread(thread, outcome, { closeStudio: false });
@@ -540,8 +757,16 @@
     async function handleFocusHistoryDelete() {
       const thread = getSelectedRuntimeThread();
       if (!thread || state.runtime.historyDeleting) return;
+      if (
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "focusHistory"
+        )
+      ) {
+        return;
+      }
       state.runtime.historyDeleting = true;
-      renderFocusHistorySection(thread);
+      renderActiveFocusHistorySection();
       try {
         await deleteRuntimeThread(thread, "major-arcana-focus-delete");
       } catch (error) {
@@ -550,20 +775,42 @@
         if (focusHistoryMeta) {
           focusHistoryMeta.textContent = error.message || "Kunde inte radera tråden.";
         }
-        renderFocusHistorySection(activeThread);
+        const activeFocusThread =
+          typeof getSelectedRuntimeFocusThread === "function"
+            ? getSelectedRuntimeFocusThread()
+            : activeThread;
+        const activeFocusReadState =
+          typeof getRuntimeFocusReadState === "function"
+            ? getRuntimeFocusReadState(activeFocusThread)
+            : {};
+        renderFocusHistorySection(activeFocusThread, activeFocusReadState);
         return;
       }
       state.runtime.historyDeleting = false;
-      renderFocusHistorySection(getSelectedRuntimeThread());
+      renderActiveFocusHistorySection();
     }
 
     async function handleStudioSend() {
-      const thread = getSelectedRuntimeThread();
-      const isComposeMode = normalizeKey(state.studio.mode) === "compose";
+      const thread = getLockedReplyStudioThread();
+      const isComposeMode = resolveStudioMode() === "compose";
       const studioState = isComposeMode ? state.studio : thread ? ensureStudioState(thread) : null;
       if (!studioState) return;
+      if (
+        !isComposeMode &&
+        blockOfflineHistoryAction(
+          "Offline historik är läsläge. Öppna live-tråden för att skicka svar.",
+          "studio"
+        )
+      ) {
+        return;
+      }
       if (!normalizeText(studioState.draftBody)) {
-        setStudioFeedback("Utkastet är tomt. Skriv ett svar innan du skickar.", "error");
+        setStudioFeedback(
+          isComposeMode
+            ? "Utkastet är tomt. Skriv mejlet innan du skickar."
+            : "Utkastet är tomt. Skriv ett svar innan du skickar.",
+          "error"
+        );
         return;
       }
       const composeRecipients = isComposeMode ? parseComposeRecipients(studioState.composeTo) : [];
@@ -575,10 +822,67 @@
         setStudioFeedback("Skriv en ämnesrad innan du skickar mejlet.", "error");
         return;
       }
+      const studioTruthState =
+        !isComposeMode && typeof getRuntimeStudioTruthState === "function"
+          ? getRuntimeStudioTruthState(thread)
+          : {};
+      const selectedSignatureProfile = getStudioSignatureProfile(studioState.selectedSignatureId);
+      const composeSenderMailboxId = resolveStudioSenderMailboxId(studioState, thread, {
+        isComposeMode,
+        studioTruthState,
+      });
+      const signatureOverride =
+        studioTruthState?.truthDriven === true
+          ? null
+          : getStudioSignatureOverride(
+              selectedSignatureProfile.id,
+              composeSenderMailboxId
+            );
+      if (
+        studioTruthState?.truthDriven === true &&
+        normalizeKey(studioState.selectedSignatureId) !==
+          normalizeKey(studioTruthState.selectedSignatureId)
+      ) {
+        studioState.selectedSignatureId = asText(
+          studioTruthState.selectedSignatureId,
+          studioState.selectedSignatureId
+        );
+        studioState.composeMailboxId = asText(
+          studioTruthState.sourceMailboxId,
+          composeSenderMailboxId
+        );
+        normalizeStudioBusyState();
+        setStudioFeedback(
+          `Truth-driven studio låser signatur och source mailbox till ${asText(
+            studioTruthState.sourceMailboxLabel,
+            composeSenderMailboxId
+          )} i ${asText(studioTruthState.waveLabel, "Wave 1")}.`,
+          "error"
+        );
+        return;
+      }
+      const senderCapability =
+        typeof getRuntimeMailboxCapability === 'function'
+          ? getRuntimeMailboxCapability(composeSenderMailboxId)
+          : null;
+      if (senderCapability && senderCapability.sendAvailable !== true) {
+        setStudioFeedback(
+          `Skicka är inte aktivt för ${senderCapability.label || composeSenderMailboxId}.`,
+          'error'
+        );
+        return;
+      }
+      if (!selectedSignatureProfile?.id) {
+        setStudioFeedback(
+          "Välj en signatur innan du skickar från studion.",
+          "error"
+        );
+        return;
+      }
       studioState.sending = true;
       normalizeStudioBusyState();
       try {
-        await apiRequest("/api/v1/cco/send", {
+        const sendResult = await apiRequest("/api/v1/cco/send", {
           method: "POST",
           headers: {
             "x-idempotency-key": createIdempotencyKey(
@@ -589,15 +893,30 @@
             channel: "admin",
             mode: isComposeMode ? "compose" : "reply",
             mailboxId: isComposeMode
-              ? asText(studioState.composeMailboxId || getStudioSourceMailboxId(thread))
-              : asText(thread.mailboxAddress),
+              ? asText(studioState.composeMailboxId || composeSenderMailboxId || getStudioSourceMailboxId(thread))
+              : asText(
+                  studioTruthState?.truthDriven
+                    ? studioTruthState.sourceMailboxId || thread.mailboxAddress
+                    : thread.mailboxAddress
+                ),
             sourceMailboxId: isComposeMode
-              ? asText(studioState.composeMailboxId || getStudioSourceMailboxId(thread))
-              : asText(thread.mailboxAddress),
-            senderMailboxId: asText(getStudioSenderMailboxId(studioState.selectedSignatureId, thread)),
-            signatureProfile: getStudioSignatureProfile(studioState.selectedSignatureId).id,
+              ? asText(studioState.composeMailboxId || composeSenderMailboxId || getStudioSourceMailboxId(thread))
+              : asText(
+                  studioTruthState?.truthDriven
+                    ? studioTruthState.sourceMailboxId || thread.mailboxAddress
+                    : thread.mailboxAddress
+                ),
+            senderMailboxId: composeSenderMailboxId,
+            signatureProfile: selectedSignatureProfile.id,
+            signatureOverride,
             replyToMessageId: isComposeMode ? "" : asText(thread.raw?.messageId),
             conversationId: isComposeMode ? "" : thread.id,
+            truthPrimaryStudio: studioTruthState?.truthDriven === true,
+            truthPrimaryWave:
+              studioTruthState?.truthDriven === true
+                ? asText(studioTruthState.waveLabel, "Wave 1")
+                : "",
+            replyContextLocked: studioTruthState?.truthDriven === true,
             to: isComposeMode
               ? composeRecipients
               : (() => {
@@ -625,8 +944,16 @@
           normalizeStudioBusyState();
           return;
         }
-        patchStudioThreadAfterSend(thread, studioState.draftBody);
-        setStudioFeedback("Svar skickat från nya CCO.", "success");
+        patchStudioThreadAfterSend(thread, studioState.draftBody, sendResult);
+        setStudioFeedback(
+          studioTruthState?.truthDriven === true
+            ? `Truth-driven studio skickade svar från ${asText(
+                studioTruthState.sourceMailboxLabel,
+                composeSenderMailboxId
+              )} i ${asText(studioTruthState.waveLabel, "Wave 1")}.`
+            : "Svar skickat från nya CCO.",
+          "success"
+        );
         setStudioOpen(false);
         setContextCollapsed(false);
       } catch (error) {

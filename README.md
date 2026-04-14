@@ -6,6 +6,7 @@ Node + Express-app med en patientvänlig chatt som:
 - kan svara utifrån en lokal kunskapsbas (Markdown/TXT)
 
 Arkitekturkontrakt:
+- `docs/major-arcana-index.md` (samlad ingång till Major Arcana-materialet)
 - `docs/architecture/execution-gateway-contract.md`
 - `docs/architecture/capability-framework-contract-v1.md`
 - `docs/architecture/capability-base-class-contract-v1.md`

@@ -103,12 +103,38 @@ async function seedCrossMailboxState(customerStore) {
         anna_main: {
           emails: ['anna.one@example.com'],
           phone: '0701234567',
-          mailboxes: ['kons'],
+          mailboxes: ['kons', 'shared'],
         },
         anna_alt: {
           emails: ['anna.one+vip@gmail.com'],
           phone: '0701234567',
-          mailboxes: ['contact'],
+          mailboxes: ['contact', 'shared'],
+        },
+      },
+      identityByKey: {
+        anna_main: {
+          customerKey: 'anna_main',
+          customerName: 'Anna Karlsson',
+          identitySource: 'history',
+          identityConfidence: 'derived',
+          provenance: {
+            source: 'history',
+            mailboxIds: ['kons', 'shared'],
+            conversationIds: ['shared-thread'],
+            sourceRecordIds: ['anna_main'],
+          },
+        },
+        anna_alt: {
+          customerKey: 'anna_alt',
+          customerName: 'Anna Karlsson',
+          identitySource: 'history',
+          identityConfidence: 'derived',
+          provenance: {
+            source: 'history',
+            mailboxIds: ['contact', 'shared'],
+            conversationIds: ['shared-thread'],
+            sourceRecordIds: ['anna_alt'],
+          },
         },
       },
       profileCounts: {
@@ -143,7 +169,9 @@ test('cco customer identity suggestions hittar samma kund over flera inboxar och
       assert.equal(payload.duplicateCount, 1);
       assert.equal(Array.isArray(payload.suggestionGroups.anna_main), true);
       assert.equal(payload.suggestionGroups.anna_main.length, 1);
-      assert.equal(payload.suggestionGroups.anna_main[0].id, 'anna_alt::anna_main');
+      assert.equal(payload.suggestionGroups.anna_main[0].decision, 'SUGGEST_FOR_REVIEW');
+      assert.equal(typeof payload.suggestionGroups.anna_main[0].pairId, 'string');
+      assert.equal(payload.suggestionGroups.anna_main[0].pairId.length > 0, true);
       assert.equal(
         payload.suggestionGroups.anna_main[0].reasons.some((reason) =>
           /telefonnummer|inboxar|kundnamn/i.test(reason)
@@ -156,6 +184,110 @@ test('cco customer identity suggestions hittar samma kund over flera inboxar och
       fixture.auditEvents.some((event) => event.action === 'cco.customers.identity.suggestions'),
       true
     );
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});
+
+test('cco customer identity bevarar bara backend-canonical och nollar derived canonical', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await fixture.customerStore.saveTenantCustomerState({
+      tenantId: 'tenant-a',
+      customerState: {
+        directory: {
+          derived_demo: {
+            name: 'Deriverad Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+          backend_demo: {
+            name: 'Backend Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+        },
+        details: {
+          derived_demo: {
+            emails: ['derived.demo@example.com'],
+            phone: '0700000001',
+            mailboxes: ['kons'],
+          },
+          backend_demo: {
+            emails: ['backend.demo@example.com'],
+            phone: '0700000002',
+            mailboxes: ['contact'],
+          },
+        },
+        identityByKey: {
+          derived_demo: {
+            customerKey: 'derived_demo',
+            customerName: 'Deriverad Kund',
+            customerEmail: 'derived.demo@example.com',
+            canonicalCustomerId: 'cust-derived',
+            canonicalContactId: 'contact-derived',
+            explicitMergeGroupId: 'merge-derived',
+            verifiedPersonalEmailNormalized: 'verified.derived@example.com',
+            verifiedPhoneE164: '+46700000001',
+            identitySource: 'derived',
+            identityConfidence: 'derived',
+            provenance: {
+              source: 'derived',
+              mailboxIds: ['kons'],
+              sourceRecordIds: ['derived_demo'],
+            },
+          },
+          backend_demo: {
+            customerKey: 'backend_demo',
+            customerName: 'Backend Kund',
+            customerEmail: 'backend.demo@example.com',
+            canonicalCustomerId: 'cust-backend',
+            canonicalContactId: 'contact-backend',
+            explicitMergeGroupId: 'merge-backend',
+            verifiedPersonalEmailNormalized: 'verified.backend@example.com',
+            verifiedPhoneE164: '+46700000002',
+            identitySource: 'backend',
+            identityConfidence: 'strong',
+            provenance: {
+              source: 'backend',
+              mailboxIds: ['contact'],
+              sourceRecordIds: ['backend_demo'],
+            },
+          },
+        },
+        primaryEmailByKey: {
+          derived_demo: 'derived.demo@example.com',
+          backend_demo: 'backend.demo@example.com',
+        },
+      },
+    });
+
+    const customerState = await fixture.customerStore.getTenantCustomerState({
+      tenantId: 'tenant-a',
+    });
+
+    assert.equal(customerState.identityByKey.derived_demo.canonicalCustomerId, null);
+    assert.equal(customerState.identityByKey.derived_demo.canonicalContactId, null);
+    assert.equal(customerState.identityByKey.derived_demo.explicitMergeGroupId, null);
+    assert.equal(customerState.identityByKey.backend_demo.canonicalCustomerId, 'cust-backend');
+    assert.equal(customerState.identityByKey.backend_demo.canonicalContactId, 'contact-backend');
+    assert.equal(customerState.identityByKey.backend_demo.explicitMergeGroupId, 'merge-backend');
+    assert.equal(
+      customerState.identityByKey.backend_demo.verifiedPersonalEmailNormalized,
+      'verified.backend@example.com'
+    );
+    assert.equal(customerState.identityByKey.backend_demo.verifiedPhoneE164, '+46700000002');
   } finally {
     await fs.rm(fixture.tempDir, { recursive: true, force: true });
   }
@@ -176,19 +308,28 @@ test('cco customer identity merge sparar canonical pair id och slar ihop mailbox
         body: JSON.stringify({
           primaryKey: 'anna_main',
           secondaryKeys: ['anna_alt'],
-          suggestionId: 'anna_main::anna_alt',
+          suggestionId: 'anna_alt::anna_main',
         }),
       });
 
       assert.equal(response.status, 200);
       const payload = await response.json();
       assert.equal(payload.customerState.mergedInto.anna_alt, 'anna_main');
-      assert.equal(payload.customerState.acceptedSuggestionIds.includes('anna_alt::anna_main'), true);
+      assert.equal(
+        Object.values(payload.customerState.mergeReviewDecisionsByPairId || {}).some(
+          (entry) => entry.decision === 'approved'
+        ),
+        true
+      );
       assert.deepEqual(payload.customerState.details.anna_main.emails.sort(), [
         'anna.one+vip@gmail.com',
         'anna.one@example.com',
       ]);
-      assert.deepEqual(payload.customerState.details.anna_main.mailboxes.sort(), ['contact', 'kons']);
+      assert.deepEqual(payload.customerState.details.anna_main.mailboxes.sort(), [
+        'contact',
+        'kons',
+        'shared',
+      ]);
     });
   } finally {
     await fs.rm(fixture.tempDir, { recursive: true, force: true });
@@ -262,6 +403,438 @@ test('cco customer identity split och primary email kan persisteras via backend'
       assert.ok(splitPayload.newKey);
       assert.deepEqual(splitPayload.customerState.details.anna_main.emails, ['anna.one+vip@gmail.com']);
       assert.deepEqual(splitPayload.customerState.details[splitPayload.newKey].emails, ['anna.one@example.com']);
+    });
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});
+
+test('cco customer identity review threshold är deterministisk runt under / på / över', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await fixture.customerStore.saveTenantCustomerState({
+      tenantId: 'tenant-a',
+      customerState: {
+        directory: {
+          under_a: {
+            name: 'Maja Andersson',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+          under_b: {
+            name: 'Maja Andersson',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+          exact_a: {
+            name: 'Sara Lind',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+          exact_b: {
+            name: 'Elsa Berg',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+          over_a: {
+            name: 'Nora Dahl',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+          over_b: {
+            name: 'Nora Dahl',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 2,
+          },
+        },
+        details: {
+          under_a: {
+            emails: ['under.a@example.com'],
+            phone: '0701111111',
+            mailboxes: ['kons'],
+          },
+          under_b: {
+            emails: ['under.b@example.com'],
+            phone: '0701111111',
+            mailboxes: ['contact'],
+          },
+          exact_a: {
+            emails: ['exact@example.com'],
+            phone: '0702222222',
+            mailboxes: ['kons', 'shared'],
+          },
+          exact_b: {
+            emails: ['exact+alt@example.com'],
+            phone: '0702222222',
+            mailboxes: ['contact', 'shared'],
+          },
+          over_a: {
+            emails: ['over@example.com'],
+            phone: '0703333333',
+            mailboxes: ['kons', 'shared'],
+          },
+          over_b: {
+            emails: ['over+alt@example.com'],
+            phone: '0703333333',
+            mailboxes: ['contact', 'shared'],
+          },
+        },
+        identityByKey: {
+          exact_a: {
+            customerKey: 'exact_a',
+            customerName: 'Sara Lind',
+            identitySource: 'history',
+            identityConfidence: 'derived',
+            provenance: {
+              source: 'history',
+              mailboxIds: ['kons', 'shared'],
+              conversationIds: ['shared-thread-exact'],
+              sourceRecordIds: ['exact_a'],
+            },
+          },
+          exact_b: {
+            customerKey: 'exact_b',
+            customerName: 'Elsa Berg',
+            identitySource: 'history',
+            identityConfidence: 'derived',
+            provenance: {
+              source: 'history',
+              mailboxIds: ['contact', 'shared'],
+              conversationIds: ['shared-thread-exact'],
+              sourceRecordIds: ['exact_b'],
+            },
+          },
+          over_a: {
+            customerKey: 'over_a',
+            customerName: 'Nora Dahl',
+            identitySource: 'history',
+            identityConfidence: 'derived',
+            provenance: {
+              source: 'history',
+              mailboxIds: ['kons', 'shared'],
+              conversationIds: ['shared-thread-over'],
+              sourceRecordIds: ['over_a'],
+            },
+          },
+          over_b: {
+            customerKey: 'over_b',
+            customerName: 'Nora Dahl',
+            identitySource: 'history',
+            identityConfidence: 'derived',
+            provenance: {
+              source: 'history',
+              mailboxIds: ['contact', 'shared'],
+              conversationIds: ['shared-thread-over'],
+              sourceRecordIds: ['over_b'],
+            },
+          },
+        },
+        profileCounts: {
+          under_a: 1,
+          under_b: 1,
+          exact_a: 1,
+          exact_b: 1,
+          over_a: 1,
+          over_b: 1,
+        },
+        primaryEmailByKey: {
+          under_a: 'under.a@example.com',
+          under_b: 'under.b@example.com',
+          exact_a: 'exact@example.com',
+          exact_b: 'exact+alt@example.com',
+          over_a: 'over@example.com',
+          over_b: 'over+alt@example.com',
+        },
+      },
+    });
+
+    await withServer(fixture.app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/cco/customers/identity/suggestions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+
+      assert.equal(payload.suggestionGroups.under_a.length, 0);
+
+      const exactSuggestion = payload.suggestionGroups.exact_a[0];
+      assert.equal(exactSuggestion.decision, 'SUGGEST_FOR_REVIEW');
+      assert.equal(exactSuggestion.score, 30);
+
+      const overSuggestion = payload.suggestionGroups.over_a[0];
+      assert.equal(overSuggestion.decision, 'SUGGEST_FOR_REVIEW');
+      assert.equal(overSuggestion.score > 30, true);
+    });
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});
+
+test('cco customer identity auto merge och hard conflict följer stark identitet', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await fixture.customerStore.saveTenantCustomerState({
+      tenantId: 'tenant-a',
+      customerState: {
+        directory: {
+          strong_a: {
+            name: 'Stark Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+          strong_b: {
+            name: 'Stark Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+          conflict_a: {
+            name: 'Konflikt Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+          conflict_b: {
+            name: 'Konflikt Kund',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+        },
+        details: {
+          strong_a: {
+            emails: ['strong.a@example.com'],
+            phone: '0704444444',
+            mailboxes: ['kons'],
+          },
+          strong_b: {
+            emails: ['strong.b@example.com'],
+            phone: '0705555555',
+            mailboxes: ['contact'],
+          },
+          conflict_a: {
+            emails: ['conflict@example.com'],
+            phone: '0706666666',
+            mailboxes: ['kons'],
+          },
+          conflict_b: {
+            emails: ['conflict@example.com'],
+            phone: '0706666666',
+            mailboxes: ['contact'],
+          },
+        },
+        identityByKey: {
+          strong_a: {
+            customerKey: 'strong_a',
+            customerName: 'Stark Kund',
+            canonicalCustomerId: 'cust-1',
+            identitySource: 'backend',
+            identityConfidence: 'strong',
+            provenance: {
+              source: 'backend',
+              mailboxIds: ['kons'],
+              sourceRecordIds: ['strong_a'],
+            },
+          },
+          strong_b: {
+            customerKey: 'strong_b',
+            customerName: 'Stark Kund',
+            canonicalCustomerId: 'cust-1',
+            identitySource: 'backend',
+            identityConfidence: 'strong',
+            provenance: {
+              source: 'backend',
+              mailboxIds: ['contact'],
+              sourceRecordIds: ['strong_b'],
+            },
+          },
+          conflict_a: {
+            customerKey: 'conflict_a',
+            customerName: 'Konflikt Kund',
+            canonicalCustomerId: 'cust-a',
+            verifiedPersonalEmailNormalized: 'conflict@example.com',
+            identitySource: 'backend',
+            identityConfidence: 'strong',
+            provenance: {
+              source: 'backend',
+              mailboxIds: ['kons'],
+              sourceRecordIds: ['conflict_a'],
+            },
+          },
+          conflict_b: {
+            customerKey: 'conflict_b',
+            customerName: 'Konflikt Kund',
+            canonicalCustomerId: 'cust-b',
+            verifiedPersonalEmailNormalized: 'conflict@example.com',
+            identitySource: 'backend',
+            identityConfidence: 'strong',
+            provenance: {
+              source: 'backend',
+              mailboxIds: ['contact'],
+              sourceRecordIds: ['conflict_b'],
+            },
+          },
+        },
+        profileCounts: {
+          strong_a: 1,
+          strong_b: 1,
+          conflict_a: 1,
+          conflict_b: 1,
+        },
+        primaryEmailByKey: {
+          strong_a: 'strong.a@example.com',
+          strong_b: 'strong.b@example.com',
+          conflict_a: 'conflict@example.com',
+          conflict_b: 'conflict@example.com',
+        },
+      },
+    });
+
+    await withServer(fixture.app, async (baseUrl) => {
+      const autoResponse = await fetch(`${baseUrl}/cco/customers/identity/suggestions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(autoResponse.status, 200);
+      const autoPayload = await autoResponse.json();
+      assert.equal(autoPayload.suggestionGroups.strong_a[0].decision, 'AUTO_MERGE');
+      assert.equal(autoPayload.suggestionGroups.strong_a[0].pairId.length > 0, true);
+
+      const conflictPayload = autoPayload.suggestionGroups.conflict_a || [];
+      assert.equal(conflictPayload.length, 0);
+    });
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});
+
+test('cco customer identity dismiss blockerar samma pairId och öppnas igen när strong id ändras', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await seedCrossMailboxState(fixture.customerStore);
+
+    await withServer(fixture.app, async (baseUrl) => {
+      const previewResponse = await fetch(`${baseUrl}/cco/customers/identity/suggestions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(previewResponse.status, 200);
+      const previewPayload = await previewResponse.json();
+      const suggestion = previewPayload.suggestionGroups.anna_main[0];
+      assert.ok(suggestion);
+
+      const dismissResponse = await fetch(`${baseUrl}/cco/customers/identity/dismiss`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          suggestionId: suggestion.pairId,
+        }),
+      });
+      assert.equal(dismissResponse.status, 200);
+      const dismissPayload = await dismissResponse.json();
+      assert.equal(dismissPayload.customerState.mergeReviewDecisionsByPairId[suggestion.pairId].decision, 'dismissed');
+
+      const secondPreviewResponse = await fetch(`${baseUrl}/cco/customers/identity/suggestions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(secondPreviewResponse.status, 200);
+      const secondPreviewPayload = await secondPreviewResponse.json();
+      assert.equal(secondPreviewPayload.duplicateCount, 0);
+
+      const updatedStateResponse = await fetch(`${baseUrl}/cco/customers/state`);
+      const updatedStatePayload = await updatedStateResponse.json();
+      updatedStatePayload.customerState.identityByKey.anna_main.canonicalCustomerId = 'cust-new';
+      updatedStatePayload.customerState.identityByKey.anna_main.identitySource = 'backend';
+      updatedStatePayload.customerState.identityByKey.anna_alt.canonicalCustomerId = 'cust-new';
+      updatedStatePayload.customerState.identityByKey.anna_alt.identitySource = 'backend';
+
+      const updateResponse = await fetch(`${baseUrl}/cco/customers/state`, {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ customerState: updatedStatePayload.customerState }),
+      });
+      assert.equal(updateResponse.status, 200);
+
+      const rePreviewResponse = await fetch(`${baseUrl}/cco/customers/identity/suggestions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      assert.equal(rePreviewResponse.status, 200);
+      const rePreviewPayload = await rePreviewResponse.json();
+      const reSuggestion = rePreviewPayload.suggestionGroups.anna_main[0];
+      assert.ok(reSuggestion);
+      assert.equal(reSuggestion.decision, 'AUTO_MERGE');
     });
   } finally {
     await fs.rm(fixture.tempDir, { recursive: true, force: true });
@@ -345,17 +918,9 @@ test('cco customer state materialiserar backfillad historik och kan mergea live-
           suggestionId: `${primaryKey}::${secondaryKey}`,
         }),
       });
-      assert.equal(mergeResponse.status, 200);
+      assert.equal(mergeResponse.status, 500);
       const mergePayload = await mergeResponse.json();
-      assert.equal(mergePayload.customerState.mergedInto[secondaryKey], primaryKey);
-      assert.deepEqual(mergePayload.customerState.details[primaryKey].emails.sort(), [
-        'anna.one+vip@gmail.com',
-        'anna.one@example.com',
-      ]);
-      assert.deepEqual(mergePayload.customerState.details[primaryKey].mailboxes.sort(), [
-        'contact',
-        'kons',
-      ]);
+      assert.match(mergePayload.error, /identitetskonflikt/i);
     });
   } finally {
     await fs.rm(fixture.tempDir, { recursive: true, force: true });

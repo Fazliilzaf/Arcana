@@ -333,6 +333,7 @@ const { createSecretRotationStore } = require('./src/ops/secretRotationStore');
 const { createRuntimeMetricsStore } = require('./src/ops/runtimeMetrics');
 const { createPatientConversionStore } = require('./src/ops/patientConversionStore');
 const { createCcoHistoryStore } = require('./src/ops/ccoHistoryStore');
+const { createCcoMailboxTruthStore } = require('./src/ops/ccoMailboxTruthStore');
 const { createCcoNoteStore } = require('./src/ops/ccoNoteStore');
 const { createCcoFollowUpStore } = require('./src/ops/ccoFollowUpStore');
 const { createCcoWorkspacePrefsStore } = require('./src/ops/ccoWorkspacePrefsStore');
@@ -355,11 +356,22 @@ const runtimeState = {
   startedAt: new Date().toISOString(),
   ready: false,
   lastError: null,
+  startupPhase: 'booting',
 };
 const runtimeMetricsStore = createRuntimeMetricsStore({
   maxSamples: config.metricsMaxSamples,
   slowRequestMs: config.metricsSlowRequestMs,
 });
+
+let server = null;
+let scheduler = null;
+let redisConnection = null;
+let isShuttingDown = false;
+
+function setStartupPhase(phase) {
+  const normalizedPhase = typeof phase === 'string' ? phase.trim() : '';
+  runtimeState.startupPhase = normalizedPhase || 'booting';
+}
 
 function createRuntimeGraphReadConnector() {
   const graphReadEnabled = String(process.env.ARCANA_GRAPH_READ_ENABLED || '')
@@ -470,6 +482,7 @@ app.get('/healthz', (req, res) => {
     ok: true,
     ready: runtimeState.ready,
     startedAt: runtimeState.startedAt,
+    startupPhase: runtimeState.startupPhase,
     uptimeSec: Number(process.uptime().toFixed(1)),
   });
 });
@@ -479,7 +492,7 @@ app.get('/readyz', (req, res) => {
     return res.status(503).json({
       ok: false,
       ready: false,
-      reason: runtimeState.lastError || 'booting',
+      reason: runtimeState.lastError || `booting:${runtimeState.startupPhase}`,
     });
   }
   return res.json({
@@ -490,7 +503,56 @@ app.get('/readyz', (req, res) => {
 
 app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
 
+app.use('/api', (req, res, next) => {
+  if (runtimeState.ready === true) return next();
+  return res.status(503).json({
+    ok: false,
+    ready: false,
+    reason: runtimeState.lastError || `booting:${runtimeState.startupPhase}`,
+  });
+});
+
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  runtimeState.ready = false;
+  runtimeState.lastError = `shutdown:${signal}`;
+  setStartupPhase('shutdown');
+  try {
+    if (scheduler) {
+      await scheduler.stop();
+    }
+  } catch (error) {
+    console.error('[scheduler] stop failed', error?.message || error);
+  }
+  try {
+    if (redisConnection) {
+      await redisConnection.close();
+    }
+  } catch (error) {
+    console.error('[redis] close failed', error?.message || error);
+  }
+  if (server) {
+    await new Promise((resolve) => {
+      server.close(() => resolve());
+    });
+  }
+  process.exit(0);
+}
+
+server = app.listen(config.port, () => {
+  console.log(`Arcana kör på ${config.publicBaseUrl}`);
+});
+
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+
 (async () => {
+  setStartupPhase('startup_disk_guard');
   const diskGuardSummary = await runStartupDiskGuard({ config, logger: console });
   runtimeState.startupDiskGuard = {
     reclaimedBytes: Number(diskGuardSummary?.reclaimedBytes || 0),
@@ -500,6 +562,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     errors: Array.isArray(diskGuardSummary?.errors) ? diskGuardSummary.errors : [],
   };
 
+  setStartupPhase('auth_store');
   const authStore = await createAuthStore({
     filePath: config.authStorePath,
     sessionTtlMs: config.authSessionTtlHours * 60 * 60 * 1000,
@@ -509,6 +572,8 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     auditAppendOnly: config.authAuditAppendOnly,
   });
 
+  setStartupPhase('auth_bootstrap');
+  let previewAuthContext = null;
   if (config.bootstrapOwnerEmail && config.bootstrapOwnerPassword) {
     const bootstrap = await authStore.bootstrapOwner({
       tenantId: config.defaultTenantId,
@@ -518,6 +583,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
       forceMfaReset: config.bootstrapOwnerResetMfa,
     });
     if (bootstrap.bootstrapped) {
+      previewAuthContext = bootstrap;
       const resetMarker = bootstrap.passwordReset ? ' password synced' : '';
       const mfaResetMarker = bootstrap.mfaReset ? ' mfa reset' : '';
       console.log(
@@ -528,8 +594,9 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     console.log('Auth bootstrap hoppades över (ARCANA_OWNER_EMAIL / ARCANA_OWNER_PASSWORD saknas).');
   }
 
-  const auth = createAuthMiddleware({ authStore });
-  const redisConnection = createRedisConnection({
+  const auth = createAuthMiddleware({ authStore, config, previewAuthContext });
+  setStartupPhase('redis_connect');
+  redisConnection = createRedisConnection({
     url: config.redisUrl,
     required:
       config.distributedBackend === 'redis' &&
@@ -645,6 +712,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     scope: 'public_chat',
   });
 
+  setStartupPhase('stores');
   app.use('/api/v1', (req, res, next) => {
     const endpoint = String(req.path || '');
     if (endpoint.startsWith('/auth/login') || endpoint.startsWith('/auth/select-tenant')) {
@@ -671,6 +739,9 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
   });
   const ccoHistoryStore = await createCcoHistoryStore({
     filePath: config.ccoHistoryStorePath,
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: config.ccoMailboxTruthStorePath,
   });
   const ccoNoteStore = await createCcoNoteStore({
     filePath: config.ccoNoteStorePath,
@@ -720,6 +791,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     capabilityAnalysisStore,
     runtimeMetricsStore,
     ccoHistoryStore,
+    ccoCustomerStore,
     graphReadConnector,
     secretRotationStore,
     sloTicketStore,
@@ -782,6 +854,7 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     return config.brand;
   }
 
+  setStartupPhase('routes');
   async function getKnowledgeRetriever(brand) {
     const resolvedBrand =
       typeof brand === 'string' && brand.trim() ? brand.trim() : config.brand;
@@ -1047,12 +1120,15 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     createCapabilitiesRouter({
       authStore,
       tenantConfigStore,
+      ccoSettingsStore,
       templateStore,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
       executionGateway,
       capabilityAnalysisStore,
       ccoHistoryStore,
+      ccoMailboxTruthStore,
+      ccoCustomerStore,
       scheduler,
       graphReadConnector,
     })
@@ -1116,12 +1192,10 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
     })
   );
 
+  setStartupPhase('scheduler');
   runtimeState.ready = true;
   runtimeState.lastError = null;
-
-  const server = app.listen(config.port, () => {
-    console.log(`Arcana kör på ${config.publicBaseUrl}`);
-  });
+  setStartupPhase('ready');
 
   const schedulerStatus = await scheduler.start();
   if (schedulerStatus?.enabled) {
@@ -1131,38 +1205,14 @@ app.use((req, res, next) => runtimeMetricsStore.middleware(req, res, next));
   } else {
     console.log('[scheduler] inaktiv (ARCANA_SCHEDULER_ENABLED=false)');
   }
-
-  let isShuttingDown = false;
-  async function shutdown(signal) {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    runtimeState.ready = false;
-    runtimeState.lastError = `shutdown:${signal}`;
-    try {
-      await scheduler.stop();
-    } catch (error) {
-      console.error('[scheduler] stop failed', error?.message || error);
-    }
-    try {
-      await redisConnection.close();
-    } catch (error) {
-      console.error('[redis] close failed', error?.message || error);
-    }
-    await new Promise((resolve) => {
-      server.close(() => resolve());
-    });
-    process.exit(0);
-  }
-
-  process.once('SIGINT', () => {
-    void shutdown('SIGINT');
-  });
-  process.once('SIGTERM', () => {
-    void shutdown('SIGTERM');
-  });
 })().catch((error) => {
   runtimeState.ready = false;
   runtimeState.lastError = error?.message || 'startup_failed';
+  setStartupPhase('startup_failed');
   console.error(error);
+  if (server) {
+    server.close(() => process.exit(1));
+    return;
+  }
   process.exit(1);
 });

@@ -81,6 +81,7 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
   assert.equal(typeof output.data.conversationWorklist?.[0]?.toneConfidence, 'number');
   assert.equal(typeof output.data.conversationWorklist?.[0]?.hoursRemaining, 'number');
   assert.equal(typeof output.data.conversationWorklist?.[0]?.slaThreshold, 'number');
+  assert.equal(typeof output.data.conversationWorklist?.[0]?.hasUnreadInbound, 'boolean');
   assert.equal(typeof output.data.conversationWorklist?.[0]?.isUnanswered, 'boolean');
   assert.equal(typeof output.data.conversationWorklist?.[0]?.unansweredThresholdHours, 'number');
   assert.equal(
@@ -126,6 +127,7 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
   assert.equal(output.data.inboundFeed.length >= 1, true);
   assert.equal(output.data.outboundFeed.length >= 1, true);
   assert.equal(output.data.inboundFeed[0].direction, 'inbound');
+  assert.equal(['boolean', 'object', 'undefined'].includes(typeof output.data.inboundFeed[0].isRead), true);
   assert.equal(output.data.outboundFeed[0].direction, 'outbound');
   assert.match(
     String(output.data.outboundFeed[0].bodyHtml || ''),
@@ -146,6 +148,65 @@ test('AnalyzeInbox returns schema-valid output with max 5 suggested drafts', asy
   assert.equal(typeof firstDraft?.riskStackScore, 'number');
   assert.equal(typeof firstDraft?.riskStackExplanation, 'string');
   assert.equal(output.metadata.capability, 'AnalyzeInbox');
+});
+
+test('AnalyzeInbox surfaces unread inbound separately from unanswered state', async () => {
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-a',
+    actor: { id: 'owner-a', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-inbox-unread',
+    correlationId: 'corr-inbox-unread',
+    input: {
+      includeClosed: false,
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-unread-1',
+          subject: 'Kan ni hjälpa mig med pris?',
+          status: 'open',
+          messages: [
+            {
+              messageId: 'msg-unread-1',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              bodyPreview: 'Hej, jag vill veta mer om pris för behandling.',
+              isRead: false,
+            },
+          ],
+        },
+        {
+          conversationId: 'conv-read-1',
+          subject: 'Uppföljning efter svar',
+          status: 'open',
+          messages: [
+            {
+              messageId: 'msg-read-1',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+              bodyPreview: 'Tack, jag återkommer om jag har fler frågor.',
+              isRead: true,
+            },
+          ],
+        },
+      ],
+      timestamps: {
+        capturedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const unreadRow = output.data.conversationWorklist.find((item) => item.conversationId === 'conv-unread-1');
+  const readRow = output.data.conversationWorklist.find((item) => item.conversationId === 'conv-read-1');
+  const unreadFeed = output.data.inboundFeed.find((item) => item.conversationId === 'conv-unread-1');
+  const readFeed = output.data.inboundFeed.find((item) => item.conversationId === 'conv-read-1');
+
+  assert.equal(unreadRow?.hasUnreadInbound, true);
+  assert.equal(readRow?.hasUnreadInbound, false);
+  assert.equal(unreadFeed?.isRead, false);
+  assert.equal(readFeed?.isRead, true);
 });
 
 test('AnalyzeInbox adds medical safety disclaimer and avoids forbidden claims', async () => {
@@ -188,6 +249,158 @@ test('AnalyzeInbox adds medical safety disclaimer and avoids forbidden claims', 
   assert.equal(reply.includes('garanti'), false);
   assert.equal(reply.includes('100%'), false);
   assert.equal(reply.includes('diagnos'), false);
+});
+
+test('AnalyzeInbox derives preview from inbound bodyHtml and customer name from subject when sender is placeholder', async () => {
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-a',
+    actor: { id: 'owner-a', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-inbox-preview-fallback',
+    correlationId: 'corr-inbox-preview-fallback',
+    input: {
+      includeClosed: false,
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-preview-fallback',
+          subject: 'Noha Haj omar Kontaktformulär',
+          status: 'open',
+          sender: 'Okänd avsändare',
+          messages: [
+            {
+              messageId: 'msg-preview-fallback',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+              senderName: 'Okänd avsändare',
+              bodyPreview: '',
+              bodyHtml:
+                '<div>Hej. Min fråga är, är det möjligt att transplantera ögonbrynshår, och hur mycket kostar det?</div>',
+            },
+          ],
+        },
+      ],
+      timestamps: {
+        capturedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const row = output.data.conversationWorklist.find(
+    (item) => item.conversationId === 'conv-preview-fallback'
+  );
+
+  assert.equal(row?.customerSummary?.customerName, 'Noha Haj omar');
+  assert.match(String(row?.latestInboundPreview || ''), /ögonbrynshår/);
+});
+
+test('AnalyzeInbox bevarar lang outbound bodyHtml med inline-image over legacy 24000 cutoff', async () => {
+  const longDataImage = `data:image/png;base64,${'QUJD'.repeat(7000)}`;
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-a',
+    actor: { id: 'owner-a', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-inbox-long-inline-html',
+    correlationId: 'corr-inbox-long-inline-html',
+    input: {
+      includeClosed: false,
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-long-inline-html',
+          subject: 'Grafisk signatur',
+          status: 'open',
+          messages: [
+            {
+              messageId: 'msg-inline-html-in',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              bodyPreview: 'Hej, jag vill återkomma.',
+              senderEmail: 'patient@example.com',
+              senderName: 'Patient',
+            },
+            {
+              messageId: 'msg-inline-html-out',
+              direction: 'outbound',
+              sentAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+              bodyPreview: 'Hej! Här kommer mitt svar.',
+              bodyHtml: `<div><p>Hej!</p><img src="${longDataImage}" alt="Hair TP Clinic" /></div>`,
+              senderEmail: 'contact@hairtpclinic.com',
+              senderName: 'Contact',
+            },
+          ],
+        },
+      ],
+      timestamps: {
+        capturedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const bodyHtml = String(output.data.outboundFeed[0]?.bodyHtml || '');
+  assert.equal(bodyHtml.length > 24000, true);
+  assert.equal(bodyHtml.includes('data:image/png;base64,'), true);
+  assert.equal(bodyHtml.endsWith('</div>'), true);
+});
+
+test('AnalyzeInbox carries safe attachment metadata into inbound feed entries for live runtime previews', async () => {
+  const output = await new analyzeInboxCapability().execute({
+    tenantId: 'tenant-a',
+    actor: { id: 'owner-a', role: 'OWNER' },
+    channel: 'admin',
+    requestId: 'req-inbox-attachment-feed',
+    correlationId: 'corr-inbox-attachment-feed',
+    input: {
+      includeClosed: false,
+      maxDrafts: 1,
+    },
+    systemStateSnapshot: {
+      conversations: [
+        {
+          conversationId: 'conv-attachment-feed',
+          subject: 'Bifogad order',
+          status: 'open',
+          messages: [
+            {
+              messageId: 'msg-attachment-feed',
+              direction: 'inbound',
+              sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+              bodyPreview: 'Se bifogad order.',
+              bodyHtml: '<div>Se bifogad order.</div>',
+              hasAttachments: true,
+              attachments: [
+                {
+                  id: 'att-file-1',
+                  name: 'order.pdf',
+                  contentType: 'application/pdf',
+                  isInline: false,
+                  size: 12000,
+                  sourceType: 'graph_file_attachment',
+                  contentBytesAvailable: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      timestamps: {
+        capturedAt: new Date().toISOString(),
+      },
+    },
+  });
+
+  const inboundFeed = output.data.inboundFeed.find(
+    (item) => item.conversationId === 'conv-attachment-feed'
+  );
+  assert.equal(inboundFeed?.hasAttachments, true);
+  assert.equal(Array.isArray(inboundFeed?.attachments), true);
+  assert.equal(inboundFeed.attachments.length, 1);
+  assert.equal(inboundFeed.attachments[0]?.name, 'order.pdf');
+  assert.equal(inboundFeed.attachments[0]?.isInline, false);
 });
 
 test('AnalyzeInbox acute drafts include explicit escalation phrase required by policy floor', async () => {
@@ -374,7 +587,7 @@ test('AnalyzeInbox enriches SLA monitor statuses and keeps risk-word urgency sig
   }
 });
 
-test('AnalyzeInbox classifies systemmail and excludes it from sprint-driving buckets', async () => {
+test('AnalyzeInbox keeps systemmail out of the active worklist and sprint-driving buckets', async () => {
   const fixedNowMs = Date.parse('2026-03-03T12:00:00.000Z');
   const originalNow = Date.now;
   const hourMs = 60 * 60 * 1000;
@@ -431,8 +644,7 @@ test('AnalyzeInbox classifies systemmail and excludes it from sprint-driving buc
     const byConversation = new Map(
       output.data.conversationWorklist.map((item) => [item.conversationId, item])
     );
-    assert.equal(byConversation.has('conv-system-mail'), true);
-    assert.equal(byConversation.get('conv-system-mail')?.messageClassification, 'system_mail');
+    assert.equal(byConversation.has('conv-system-mail'), false);
     assert.equal(byConversation.get('conv-actionable-mail')?.messageClassification, 'actionable');
 
     const needsReplyIds = new Set(output.data.needsReplyToday.map((item) => item.conversationId));
@@ -448,6 +660,146 @@ test('AnalyzeInbox classifies systemmail and excludes it from sprint-driving buc
 
     const slaBreachIds = new Set(output.data.slaBreaches.map((item) => item.conversationId));
     assert.equal(slaBreachIds.has('conv-system-mail'), false);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('AnalyzeInbox keeps human clinic inquiries actionable even with system-mail markers in the text', async () => {
+  const fixedNowMs = Date.parse('2026-03-03T12:00:00.000Z');
+  const originalNow = Date.now;
+  const hourMs = 60 * 60 * 1000;
+  const isoAtOffset = (offsetMs) => new Date(fixedNowMs + offsetMs).toISOString();
+
+  Date.now = () => fixedNowMs;
+  try {
+    const output = await new analyzeInboxCapability().execute({
+      tenantId: 'tenant-a',
+      actor: { id: 'owner-a', role: 'OWNER' },
+      channel: 'admin',
+      requestId: 'req-inbox-human-inquiry',
+      correlationId: 'corr-inbox-human-inquiry',
+      input: {
+        maxDrafts: 5,
+      },
+      systemStateSnapshot: {
+        conversations: [
+          {
+            conversationId: 'conv-human-inquiry',
+            subject: 'Fråga om tvätt av hårbotten efter ingreppet',
+            status: 'open',
+            messages: [
+              {
+                messageId: 'msg-human-inquiry',
+                direction: 'inbound',
+                sentAt: isoAtOffset(-7 * hourMs),
+                senderEmail: 'alfred@example.com',
+                bodyPreview:
+                  'Hej, jag har en fråga om tvätt av hårbotten efter ingreppet. Längst ner står unsubscribe från min mailklient.',
+              },
+            ],
+          },
+        ],
+        timestamps: {
+          capturedAt: isoAtOffset(0),
+        },
+      },
+    });
+
+    const workItem = output.data.conversationWorklist.find(
+      (item) => item.conversationId === 'conv-human-inquiry'
+    );
+    assert.equal(workItem?.messageClassification, 'actionable');
+
+    const needsReplyIds = new Set(output.data.needsReplyToday.map((item) => item.conversationId));
+    assert.equal(needsReplyIds.has('conv-human-inquiry'), true);
+
+    const draftIds = new Set(output.data.suggestedDrafts.map((item) => item.conversationId));
+    assert.equal(draftIds.has('conv-human-inquiry'), true);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('AnalyzeInbox keeps generic external newsletters and order confirmations out of the active worklist', async () => {
+  const fixedNowMs = Date.parse('2026-03-03T12:00:00.000Z');
+  const originalNow = Date.now;
+  const hourMs = 60 * 60 * 1000;
+  const isoAtOffset = (offsetMs) => new Date(fixedNowMs + offsetMs).toISOString();
+
+  Date.now = () => fixedNowMs;
+  try {
+    const output = await new analyzeInboxCapability().execute({
+      tenantId: 'tenant-a',
+      actor: { id: 'owner-a', role: 'OWNER' },
+      channel: 'admin',
+      requestId: 'req-inbox-generic-external',
+      correlationId: 'corr-inbox-generic-external',
+      input: {
+        maxDrafts: 5,
+      },
+      systemStateSnapshot: {
+        conversations: [
+          {
+            conversationId: 'conv-foodora-order',
+            subject: 'Orderbekräftelse: (s2uh-2612-dj45)',
+            status: 'open',
+            messages: [
+              {
+                messageId: 'msg-foodora-order',
+                direction: 'inbound',
+                sentAt: isoAtOffset(-30 * hourMs),
+                senderEmail: 'orders@foodora.se',
+                bodyPreview: 'Din order är mottagen. Do-not-reply.',
+              },
+            ],
+          },
+          {
+            conversationId: 'conv-newsletter',
+            subject: 'Nyheter: Reflect-kollektionen',
+            status: 'open',
+            messages: [
+              {
+                messageId: 'msg-newsletter',
+                direction: 'inbound',
+                sentAt: isoAtOffset(-32 * hourMs),
+                senderEmail: 'updates@georgjensen.se',
+                bodyPreview: 'Nyheter och erbjudanden för dig som prenumererar på vårt nyhetsbrev.',
+              },
+            ],
+          },
+          {
+            conversationId: 'conv-real-patient',
+            subject: 'Fråga om pris för hårtransplantation',
+            status: 'open',
+            messages: [
+              {
+                messageId: 'msg-real-patient',
+                direction: 'inbound',
+                sentAt: isoAtOffset(-6 * hourMs),
+                senderEmail: 'patient@example.com',
+                bodyPreview: 'Hej, jag vill veta vad en hårtransplantation kostar och om ni har tider i april.',
+              },
+            ],
+          },
+        ],
+        timestamps: {
+          capturedAt: isoAtOffset(0),
+        },
+      },
+    });
+
+    const byConversation = new Map(
+      output.data.conversationWorklist.map((item) => [item.conversationId, item])
+    );
+    assert.equal(byConversation.has('conv-foodora-order'), false);
+    assert.equal(byConversation.has('conv-newsletter'), false);
+    assert.equal(byConversation.get('conv-real-patient')?.messageClassification, 'actionable');
+
+    const needsReplyIds = new Set(output.data.needsReplyToday.map((item) => item.conversationId));
+    assert.equal(needsReplyIds.has('conv-foodora-order'), false);
+    assert.equal(needsReplyIds.has('conv-newsletter'), false);
+    assert.equal(needsReplyIds.has('conv-real-patient'), true);
   } finally {
     Date.now = originalNow;
   }
@@ -573,14 +925,19 @@ test('AnalyzeInbox exposes contact as default sender and default signature profi
   });
 
   assert.equal(output.metadata.ccoDefaultSenderMailbox, 'contact@hairtpclinic.com');
-  assert.equal(output.metadata.ccoDefaultSignatureProfile, 'contact');
+  assert.equal(output.metadata.ccoDefaultSignatureProfile, 'fazli');
   assert.deepEqual(
     output.metadata.ccoSenderMailboxOptions,
-    ['contact@hairtpclinic.com', 'egzona@hairtpclinic.com', 'fazli@hairtpclinic.com']
+    [
+      'contact@hairtpclinic.com',
+      'kons@hairtpclinic.com',
+      'egzona@hairtpclinic.com',
+      'fazli@hairtpclinic.com',
+    ]
   );
   assert.deepEqual(
     output.metadata.ccoSignatureProfiles.map((item) => item.key),
-    ['contact', 'egzona', 'fazli']
+    ['egzona', 'fazli']
   );
 });
 

@@ -31,7 +31,7 @@ function getSourceUrl() {
 
 const publicConfigPromise = loadPublicConfig();
 const clientoState = { loading: false, loaded: false };
-const BRAND_LOGO_PATH = '/assets/hair-tp-clinic/hairtpclinic-mark.svg';
+const BRAND_LOGO_PATH = '/assets/hair-tp-clinic/hairtpclinic-mark-light.svg';
 
 function brandLabel() {
   const brand = publicConfig?.brand;
@@ -636,6 +636,9 @@ function ensureClientoLoaded() {
   const widgetSrc = typeof cliento.widgetSrc === 'string' && cliento.widgetSrc
     ? cliento.widgetSrc
     : 'https://cliento.com/widget-v2/cliento.js';
+  const serviceFilters = Array.isArray(cliento.serviceFilters)
+    ? cliento.serviceFilters.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
   const locale = typeof cliento.locale === 'string' ? cliento.locale : 'sv';
   const mergeLocations = Boolean(cliento.mergeLocations);
 
@@ -679,6 +682,9 @@ function ensureClientoLoaded() {
 
   const ids = accountIds.length === 1 ? accountIds[0] : accountIds;
   window.cbk('id', ids);
+  if (serviceFilters.length > 0) {
+    window.cbk('serviceFilter', serviceFilters);
+  }
   window.cbk('locale', locale);
   window.cbk('mergeLocations', mergeLocations);
   window.cbk('onCompleted', () => {

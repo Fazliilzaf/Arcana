@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { isDeepStrictEqual } = require('node:util');
 
 const { AnalyzeInboxCapability } = require('../capabilities/analyzeInbox');
 const { buildPilotReport } = require('../reports/pilotReport');
@@ -26,6 +27,7 @@ const { evaluateRedFlag } = require('../intelligence/redFlagEngine');
 const { resolveAdaptiveFocusState } = require('../intelligence/adaptiveFocusController');
 const { evaluateRecovery } = require('../intelligence/recoveryEngine');
 const { evaluateStrategicInsights } = require('../intelligence/strategicInsightsEngine');
+const { runClientoBackfill } = require('../../scripts/run-cliento-backfill');
 
 function nowIso() {
   return new Date().toISOString();
@@ -260,6 +262,7 @@ function createScheduler({
   capabilityAnalysisStore = null,
   runtimeMetricsStore = null,
   ccoHistoryStore = null,
+  ccoCustomerStore = null,
   graphReadConnector = null,
   secretRotationStore = null,
   sloTicketStore = null,
@@ -2055,6 +2058,55 @@ function createScheduler({
       });
     }
 
+    const historySyncSucceeded =
+      actionableMailboxes.length > 0 &&
+      skippedMailboxes.length === 0 &&
+      actionableMailboxes.every((item) => item?.complete === true);
+    let customerStateWriteBack = {
+      attempted: false,
+      persisted: false,
+      changed: false,
+      reason: 'history_sync_incomplete',
+    };
+    if (
+      historySyncSucceeded &&
+      ccoCustomerStore &&
+      typeof ccoCustomerStore.peekTenantCustomerState === 'function' &&
+      typeof ccoCustomerStore.getTenantCustomerState === 'function' &&
+      typeof ccoCustomerStore.saveTenantCustomerState === 'function'
+    ) {
+      const persistedCustomerState = await ccoCustomerStore.peekTenantCustomerState({
+        tenantId,
+      });
+      const materializedCustomerState = await ccoCustomerStore.getTenantCustomerState({
+        tenantId,
+      });
+      const changed = !isDeepStrictEqual(persistedCustomerState, materializedCustomerState);
+      if (changed) {
+        const savedCustomerState = await ccoCustomerStore.saveTenantCustomerState({
+          tenantId,
+          customerState: materializedCustomerState,
+        });
+        customerStateWriteBack = {
+          attempted: true,
+          persisted: true,
+          changed: true,
+          reason: 'history_sync_complete',
+          identityCount: Object.keys(savedCustomerState?.identityByKey || {}).length,
+          primaryEmailCount: Object.keys(savedCustomerState?.primaryEmailByKey || {}).length,
+        };
+      } else {
+        customerStateWriteBack = {
+          attempted: true,
+          persisted: false,
+          changed: false,
+          reason: 'history_sync_no_change',
+          identityCount: Object.keys(materializedCustomerState?.identityByKey || {}).length,
+          primaryEmailCount: Object.keys(materializedCustomerState?.primaryEmailByKey || {}).length,
+        };
+      }
+    }
+
     return {
       tenantId,
       mailboxId: mailboxIds[0] || null,
@@ -2070,9 +2122,59 @@ function createScheduler({
       totalMessageCount,
       missingWindowCount,
       customerReplyMaterializedCount,
-      complete:
-        actionableMailboxes.length > 0 &&
-        actionableMailboxes.every((item) => item?.complete === true),
+      customerStateWriteBack,
+      complete: historySyncSucceeded,
+    };
+  }
+
+  async function runCcoClientoBackfill({ tenantId, trigger = 'scheduled' }) {
+    if (!ccoCustomerStore || typeof ccoCustomerStore.getTenantCustomerImportCoverageReadout !== 'function') {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'cco_customer_store_unavailable',
+      };
+    }
+    const hasHistoryStore =
+      ccoHistoryStore &&
+      (typeof ccoHistoryStore.listMailboxMessages === 'function' ||
+        typeof ccoHistoryStore.listMessages === 'function');
+    if (!hasHistoryStore) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'cco_history_store_unavailable',
+      };
+    }
+    const configuredCsvPath = normalizeText(config?.schedulerCcoClientoBackfillCsvPath);
+    if (!configuredCsvPath) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'cliento_backfill_csv_path_missing',
+      };
+    }
+
+    const report = await runClientoBackfill({
+      tenantId,
+      csvPath: configuredCsvPath,
+      customerStorePath: config?.ccoCustomerStorePath || undefined,
+      truthStorePath: config?.ccoMailboxTruthStorePath || undefined,
+      allowEmpty: true,
+    });
+
+    return {
+      tenantId,
+      trigger,
+      selectedRowCount: Number(report?.selectedRowCount || 0),
+      before: report?.before || null,
+      after: report?.after || null,
+      truth: report?.truth || null,
+      consumer: report?.consumer || null,
+      shadow: report?.shadow || null,
+      sourceCounts: report?.sourceCounts || {},
+      coverageReadout: report?.afterCoverageReadout || report?.coverageReadout || null,
+      importSummary: report?.importSummary || null,
     };
   }
 
@@ -2318,6 +2420,12 @@ function createScheduler({
       name: 'CCO kons history sync',
       intervalMs: toHoursMs(config.schedulerCcoHistorySyncIntervalHours, 6),
       run: runCcoHistorySync,
+    },
+    {
+      id: 'cco_cliento_backfill',
+      name: 'CCO Cliento backfill',
+      intervalMs: toHoursMs(config.schedulerCcoClientoBackfillIntervalHours, 24),
+      run: runCcoClientoBackfill,
     },
     {
       id: 'cco_shadow_run',

@@ -207,6 +207,68 @@ test('MicrosoftGraphSendConnector sends a brand new message via sendMail', async
   assert.equal(response.sourceMailboxId, 'kons@hairtpclinic.com');
 });
 
+test('MicrosoftGraphSendConnector sends canonical compose documents with cc and bcc support', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url, options });
+    if (String(url).includes('/oauth2/v2.0/token')) {
+      return createJsonResponse({
+        body: {
+          access_token: 'token-send-compose-document-1',
+        },
+      });
+    }
+    if (String(url).includes('/users/contact%40hairtpclinic.com/sendMail')) {
+      return createJsonResponse({ status: 202, body: {} });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const connector = createMicrosoftGraphSendConnector({
+    tenantId: 'tenant-id-compose-document-1',
+    clientId: 'client-id-compose-document-1',
+    clientSecret: 'client-secret-compose-document-1',
+    fetchImpl,
+  });
+
+  const response = await connector.sendComposeDocument({
+    composeDocument: {
+      version: 'phase_5',
+      kind: 'mail_compose_document',
+      mode: 'compose',
+      sourceMailboxId: 'kons@hairtpclinic.com',
+      senderMailboxId: 'contact@hairtpclinic.com',
+      recipients: {
+        to: ['patient@example.com'],
+        cc: ['manager@example.com'],
+        bcc: ['audit@example.com'],
+      },
+      subject: 'Uppföljning från CCO',
+      content: {
+        bodyText: 'Hej! Detta skickas från canonical compose document.',
+        bodyHtml: '<p>Hej! Detta skickas från <strong>canonical compose document</strong>.</p>',
+      },
+      delivery: {
+        sendStrategy: 'send_mail',
+      },
+    },
+  });
+
+  assert.equal(calls.length, 2);
+  const payload = JSON.parse(String(calls[1].options?.body || '{}'));
+  assert.equal(payload?.message?.toRecipients?.[0]?.emailAddress?.address, 'patient@example.com');
+  assert.equal(payload?.message?.ccRecipients?.[0]?.emailAddress?.address, 'manager@example.com');
+  assert.equal(payload?.message?.bccRecipients?.[0]?.emailAddress?.address, 'audit@example.com');
+  assert.equal(
+    String(payload?.message?.body?.content || '').includes('canonical compose document'),
+    true
+  );
+  assert.equal(response.sendMode, 'send_mail');
+  assert.equal(response.composeDocumentVersion, 'phase_5');
+  assert.deepEqual(response.cc, ['manager@example.com']);
+  assert.deepEqual(response.bcc, ['audit@example.com']);
+});
+
 test('MicrosoftGraphSendConnector moves message to Deleted Items for safe delete', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {

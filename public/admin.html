@@ -1090,6 +1090,53 @@
     .kpi-meta.ok { color: var(--ok); }
     .kpi-meta.warn { color: var(--warn); }
     .kpi-meta.bad { color: var(--bad); }
+    .readiness-kpi-panel {
+      --section-tint: rgba(229, 177, 74, 0.14);
+    }
+    .readiness-kpi-panel .value {
+      letter-spacing: 0.01em;
+    }
+    .readiness-kpi-panel .kpi-meta {
+      max-width: 34ch;
+      line-height: 1.45;
+    }
+    .monitor-detail-card {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      background:
+        linear-gradient(160deg, var(--glass-layer-a), var(--glass-layer-b)),
+        radial-gradient(120% 90% at 8% -10%, var(--section-tint, var(--section-tint-default)) 0%, transparent 72%);
+      box-shadow: 0 14px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.16);
+      backdrop-filter: blur(10px) saturate(126%);
+      -webkit-backdrop-filter: blur(10px) saturate(126%);
+    }
+    .monitor-detail-card--history {
+      --section-tint: rgba(194, 170, 156, 0.14);
+    }
+    .monitor-detail-card--nogo {
+      --section-tint: rgba(217, 106, 106, 0.12);
+    }
+    .monitor-detail-card--remediation {
+      --section-tint: rgba(92, 191, 136, 0.1);
+    }
+    .monitor-detail-title {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted-2);
+    }
+    .monitor-detail-card .status-line {
+      min-height: 18px;
+      margin-bottom: 8px;
+    }
+    .monitor-detail-card .code-block {
+      margin-top: 0 !important;
+      max-height: 240px;
+    }
     .risk-detail-layout {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1146,14 +1193,122 @@
       margin-bottom: 2px;
     }
     .risk-detail-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .risk-detail-actions-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .risk-detail-actions-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted-2);
+    }
+    .risk-detail-actions-note {
+      max-width: 44ch;
+      font-size: 12px;
+      line-height: 1.45;
+      color: rgba(232, 221, 213, 0.78);
+    }
+    .risk-detail-actions-bar {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .risk-detail-action-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      flex: 1 1 100%;
+    }
+    .risk-detail-action-buttons .btn[data-owner-action] {
+      min-height: 48px;
+      justify-content: flex-start;
+      text-align: left;
+      padding: 10px 12px;
+      gap: 10px;
+    }
+    .risk-detail-action-buttons .btn[data-owner-action] .owner-action-icon {
+      position: relative;
+      z-index: 2;
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--accent-light);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .risk-detail-action-buttons .btn[data-owner-action] .owner-action-copy {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-width: 0;
+    }
+    .risk-detail-action-buttons .btn[data-owner-action] .owner-action-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action] .owner-action-meta {
+      font-size: 11px;
+      line-height: 1.35;
+      color: rgba(232, 221, 213, 0.78);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="request_revision"] {
+      border-color: rgba(229, 177, 74, 0.34);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="request_revision"] .owner-action-icon {
+      color: var(--warn);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="approve_exception"] {
+      border-color: rgba(92, 191, 136, 0.34);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="approve_exception"] .owner-action-icon {
+      color: var(--ok);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="mark_false_positive"] {
+      border-color: rgba(194, 170, 156, 0.34);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="mark_false_positive"] .owner-action-icon {
+      color: var(--accent-light);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="escalate"] {
+      border-color: rgba(217, 106, 106, 0.42);
+    }
+    .risk-detail-action-buttons .btn[data-owner-action="escalate"] .owner-action-icon {
+      color: var(--bad);
+    }
+    .risk-detail-action-buttons .btn.active .owner-action-icon {
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.24);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
     }
     #riskDetailNoteInput {
       min-width: 220px;
-      flex: 1 1 260px;
+      min-height: 42px;
+      flex: 1 1 100%;
+    }
+    @media (max-width: 980px) {
+      .risk-detail-action-buttons {
+        grid-template-columns: 1fr;
+      }
     }
     .audit-layout {
       display: grid;
@@ -12295,7 +12450,7 @@
           <div id="slaIndicatorValue" class="value">0</div>
           <div id="slaIndicatorMeta" class="kpi-meta">Inga öppna incidenter.</div>
         </article>
-        <article class="panel">
+        <article class="panel readiness-kpi-panel">
           <h3 data-i18n="kpi_readiness">Beredskap</h3>
           <div id="readinessBandValue" class="value">-</div>
           <div id="readinessBandMeta" class="kpi-meta">Väntar på monitor-data.</div>
@@ -13010,20 +13165,20 @@
             <div id="monitorSchedulerSummary" class="status-line"></div>
             <div id="monitorSchedulerResult" class="code-block" style="margin-top:8px">Ingen scheduler-data ännu.</div>
           </div>
-          <div style="margin-top:12px">
-            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700" data-i18n="monitor_readiness_history">Beredskapshistorik</h3>
+          <div class="monitor-detail-card monitor-detail-card--history">
+            <h3 class="monitor-detail-title" data-i18n="monitor_readiness_history">Beredskapshistorik</h3>
             <div id="monitorReadinessHistorySummary" class="status-line"></div>
-            <div id="monitorReadinessHistoryResult" class="code-block" style="margin-top:8px">Ingen beredskapshistorik ännu.</div>
+            <div id="monitorReadinessHistoryResult" class="code-block">Ingen beredskapshistorik ännu.</div>
           </div>
-          <div style="margin-top:12px">
-            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700" data-i18n="monitor_readiness_nogo">Beredskapsblockeringar (No-Go)</h3>
+          <div class="monitor-detail-card monitor-detail-card--nogo">
+            <h3 class="monitor-detail-title" data-i18n="monitor_readiness_nogo">Aktiva No-Go-blockeringar</h3>
             <div id="monitorReadinessNoGoSummary" class="status-line"></div>
-            <div id="monitorReadinessNoGoResult" class="code-block" style="margin-top:8px">Inga aktiva No-Go blockeringar.</div>
+            <div id="monitorReadinessNoGoResult" class="code-block">Inga aktiva No-Go-blockeringar.</div>
           </div>
-          <div style="margin-top:12px">
-            <h3 style="margin:0 0 6px 0;font-size:13px;font-weight:700">Beredskapsåtgärder (kritisk väg)</h3>
+          <div class="monitor-detail-card monitor-detail-card--remediation">
+            <h3 class="monitor-detail-title">Beredskapsåtgärder och kritisk väg</h3>
             <div id="monitorRemediationSummary" class="status-line"></div>
-            <div id="monitorRemediationResult" class="code-block" style="margin-top:8px">Ingen beredskapsåtgärd ännu.</div>
+            <div id="monitorRemediationResult" class="code-block">Ingen beredskapsåtgärd ännu.</div>
           </div>
         </section>
 
@@ -13423,11 +13578,19 @@
               <div id="riskDetailSummary" class="mini muted">Ingen detaljerad riskdata ännu.</div>
               <div id="riskDetailSla" class="mini muted" style="margin-top:8px">Ingen incident-SLA.</div>
               <div id="riskDetailQuickActions" class="risk-detail-actions">
-                <input id="riskDetailNoteInput" type="text" placeholder="Notering för ägaråtgärd (valfritt)" />
-                <button class="btn small" data-owner-action="request_revision">Begär revidering</button>
-                <button class="btn small" data-owner-action="approve_exception">Godkänn avvikelse</button>
-                <button class="btn small" data-owner-action="mark_false_positive">Markera falskt positiv</button>
-                <button class="btn small" data-owner-action="escalate">Eskalera</button>
+                <div class="risk-detail-actions-head">
+                  <div class="risk-detail-actions-title">Ägarbeslut</div>
+                  <div class="risk-detail-actions-note">Välj nästa beslut för vald riskutvärdering. Kort notering är valfri och sparas i historiken.</div>
+                </div>
+                <div class="risk-detail-actions-bar">
+                  <input id="riskDetailNoteInput" type="text" placeholder="Kort kontext till beslutet (valfritt)" />
+                  <div class="risk-detail-action-buttons">
+                    <button class="btn small" data-owner-action="request_revision">Begär revidering</button>
+                    <button class="btn small" data-owner-action="approve_exception">Godkänn avvikelse</button>
+                    <button class="btn small" data-owner-action="mark_false_positive">Markera falskt positiv</button>
+                    <button class="btn small" data-owner-action="escalate">Eskalera</button>
+                  </div>
+                </div>
               </div>
             </article>
             <article class="risk-detail-card">

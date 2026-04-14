@@ -9,6 +9,7 @@ const { createCapabilitiesRouter } = require('../../src/routes/capabilities');
 const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
 const { createAuthStore } = require('../../src/security/authStore');
 const { createCcoHistoryStore } = require('../../src/ops/ccoHistoryStore');
+const { createCcoMailboxTruthStore } = require('../../src/ops/ccoMailboxTruthStore');
 
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
@@ -49,6 +50,20 @@ function createMockAuth(role = 'OWNER') {
   return { requireAuth, requireRole };
 }
 
+function buildRecentIso({ daysAgo = 0, hours = 0, minutes = 0 } = {}) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - Number(daysAgo || 0));
+  date.setUTCHours(Number(hours || 0), Number(minutes || 0), 0, 0);
+  return date.toISOString();
+}
+
+const HISTORY_TEST_TIMESTAMPS = Object.freeze({
+  inbound: buildRecentIso({ daysAgo: 6, hours: 9, minutes: 0 }),
+  outbound: buildRecentIso({ daysAgo: 5, hours: 9, minutes: 30 }),
+  outboundCreated: buildRecentIso({ daysAgo: 5, hours: 9, minutes: 25 }),
+  secondaryInbound: buildRecentIso({ daysAgo: 7, hours: 8, minutes: 0 }),
+});
+
 function createHistorySnapshot(mailboxId = 'kons@hairtpclinic.com') {
   return {
     conversations: [
@@ -62,7 +77,7 @@ function createHistorySnapshot(mailboxId = 'kons@hairtpclinic.com') {
         messages: [
           {
             messageId: `msg-1-${mailboxId}`,
-            sentAt: '2026-03-10T09:00:00.000Z',
+            sentAt: HISTORY_TEST_TIMESTAMPS.inbound,
             direction: 'inbound',
             bodyPreview: 'Hej, jag vill boka om.',
             senderEmail: 'patient@example.com',
@@ -72,7 +87,7 @@ function createHistorySnapshot(mailboxId = 'kons@hairtpclinic.com') {
           },
           {
             messageId: `msg-2-${mailboxId}`,
-            sentAt: '2026-03-11T09:30:00.000Z',
+            sentAt: HISTORY_TEST_TIMESTAMPS.outbound,
             direction: 'outbound',
             bodyPreview: 'Vi kan erbjuda fredag.',
             senderEmail: mailboxId,
@@ -92,7 +107,7 @@ function createHistorySnapshot(mailboxId = 'kons@hairtpclinic.com') {
         messages: [
           {
             messageId: `msg-3-${mailboxId}`,
-            sentAt: '2026-03-09T08:00:00.000Z',
+            sentAt: HISTORY_TEST_TIMESTAMPS.secondaryInbound,
             direction: 'inbound',
             bodyPreview: 'Annan historik.',
             senderEmail: 'other@example.com',
@@ -103,6 +118,105 @@ function createHistorySnapshot(mailboxId = 'kons@hairtpclinic.com') {
         ],
       },
     ],
+  };
+}
+
+function createMailboxTruthPage(mailboxId = 'kons@hairtpclinic.com', folderType = 'inbox') {
+  const baseAccount = {
+    graphUserId: `graph-${mailboxId}`,
+    mailboxId,
+    mailboxAddress: mailboxId,
+    userPrincipalName: mailboxId,
+  };
+  const folderId = `${folderType}-${mailboxId}`;
+  if (folderType === 'drafts' || folderType === 'deleted') {
+    return {
+      account: baseAccount,
+      folder: {
+        folderType,
+        folderId,
+        folderName: folderType,
+        wellKnownName: folderType,
+        fetchStatus: 'success',
+        totalItemCount: 0,
+        unreadItemCount: 0,
+        messageCollectionCount: 0,
+      },
+      page: {
+        fetchedMessageCount: 0,
+        nextPageUrl: null,
+        pageSize: 500,
+        complete: true,
+        sourcePageUrl: `mock://${mailboxId}/${folderType}`,
+      },
+      messages: [],
+    };
+  }
+
+  const inbound = folderType === 'inbox';
+  return {
+    account: baseAccount,
+    folder: {
+      folderType,
+      folderId,
+      folderName: folderType,
+      wellKnownName: folderType,
+      fetchStatus: 'success',
+      totalItemCount: 1,
+      unreadItemCount: inbound ? 1 : 0,
+      messageCollectionCount: 1,
+    },
+    page: {
+      fetchedMessageCount: 1,
+      nextPageUrl: null,
+      pageSize: 500,
+      complete: true,
+      sourcePageUrl: `mock://${mailboxId}/${folderType}`,
+    },
+    messages: [
+      {
+        graphMessageId: `${folderType}-msg-${mailboxId}`,
+        mailboxId,
+        mailboxAddress: mailboxId,
+        userPrincipalName: mailboxId,
+        folderId,
+        folderName: folderType,
+        folderType,
+        wellKnownName: folderType,
+        conversationId: `conv-${mailboxId}`,
+        internetMessageId: `<${folderType}-${mailboxId}@example.com>`,
+        subject: inbound ? `Patientfråga ${mailboxId}` : `Svar ${mailboxId}`,
+        bodyPreview: inbound ? 'Hej, jag vill boka om.' : 'Vi kan erbjuda fredag.',
+        direction: inbound ? 'inbound' : 'outbound',
+        isRead: inbound ? false : true,
+        hasAttachments: false,
+        receivedAt: inbound ? HISTORY_TEST_TIMESTAMPS.inbound : null,
+        sentAt: inbound ? null : HISTORY_TEST_TIMESTAMPS.outbound,
+        createdAt: inbound
+          ? HISTORY_TEST_TIMESTAMPS.inbound
+          : HISTORY_TEST_TIMESTAMPS.outboundCreated,
+        lastModifiedAt: inbound ? HISTORY_TEST_TIMESTAMPS.inbound : HISTORY_TEST_TIMESTAMPS.outbound,
+        from: {
+          address: inbound ? 'patient@example.com' : mailboxId,
+          name: inbound ? 'Patient One' : mailboxId.split('@')[0],
+        },
+        toRecipients: [
+          {
+            address: inbound ? mailboxId : 'patient@example.com',
+            name: inbound ? mailboxId.split('@')[0] : 'Patient One',
+          },
+        ],
+        replyToRecipients: [],
+      },
+    ],
+  };
+}
+
+function createMailboxTruthConnector() {
+  return {
+    async fetchMailboxTruthFolderPage(options = {}) {
+      return createMailboxTruthPage(options.mailboxId, options.folderType);
+    },
   };
 }
 
@@ -158,6 +272,10 @@ test('runtime history route backfillar flera mailboxar en gång och läser sedan
       const firstPayload = await first.json();
       assert.equal(firstPayload.ok, true);
       assert.equal(firstPayload.messages.length, 4);
+      assert.equal(firstPayload.messages[0].mailDocument?.kind, 'mail_document');
+      assert.equal(firstPayload.messages[0].mailThreadMessage?.kind, 'mail_thread_message');
+      assert.equal(firstPayload.threadDocument?.kind, 'mail_thread_document');
+      assert.ok(firstPayload.messages[0].mailDocument?.primaryBodyText);
       assert.equal(firstPayload.summary.mailboxCount, 2);
       assert.deepEqual(firstPayload.mailboxIds, ['kons@hairtpclinic.com', 'info@hairtpclinic.com']);
       assert.equal(firstPayload.backfilledWindowCount, 2);
@@ -176,6 +294,220 @@ test('runtime history route backfillar flera mailboxar en gång och läser sedan
       assert.equal(secondPayload.backfilledWindowCount, 0);
       assert.equal(secondPayload.store.mailboxes.length, 2);
       assert.equal(graphCalls, 2);
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime history backfill with refresh=true reruns mailbox truth fetch even when coverage is already complete', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-refresh-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    let graphCalls = 0;
+    const graphReadConnector = {
+      async fetchMailboxTruthFolderPage(options = {}) {
+        graphCalls += 1;
+        return createMailboxTruthPage(options.mailboxId, options.folderType);
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoMailboxTruthStore,
+        graphReadConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const firstResponse = await fetch(`${baseUrl}/api/v1/cco/runtime/history/backfill`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          mailboxId: 'kons@hairtpclinic.com',
+          lookbackDays: 90,
+        }),
+      });
+      assert.equal(firstResponse.status, 200);
+      const firstPayload = await firstResponse.json();
+      assert.equal(firstPayload.ok, true);
+      assert.equal(firstPayload.backfilledFolderCount, 4);
+      assert.equal(graphCalls, 4);
+
+      const refreshResponse = await fetch(`${baseUrl}/api/v1/cco/runtime/history/backfill`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          mailboxId: 'kons@hairtpclinic.com',
+          lookbackDays: 90,
+          refresh: true,
+        }),
+      });
+      assert.equal(refreshResponse.status, 200);
+      const refreshPayload = await refreshResponse.json();
+      assert.equal(refreshPayload.ok, true);
+      assert.equal(refreshPayload.source, 'mailbox_truth_store');
+      assert.equal(graphCalls, 8);
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime history status, backfill and read route use mailbox truth store as the primary history source', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-truth-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    await ccoHistoryStore.upsertMailboxWindow({
+      tenantId: 'tenant-a',
+      mailboxId: 'kons@hairtpclinic.com',
+      windowStartIso: '2026-03-01T00:00:00.000Z',
+      windowEndIso: '2026-03-31T00:00:00.000Z',
+      messages: [
+        {
+          messageId: 'legacy-msg-1',
+          conversationId: 'legacy-conv-1',
+          subject: 'Legacy historik ska inte vinna',
+          customerEmail: 'legacy@example.com',
+          sentAt: '2026-03-05T10:00:00.000Z',
+          direction: 'inbound',
+          bodyPreview: 'Legacy historik.',
+          senderEmail: 'legacy@example.com',
+          recipients: ['kons@hairtpclinic.com'],
+        },
+      ],
+    });
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoHistoryStore,
+        ccoMailboxTruthStore,
+        graphReadConnector: createMailboxTruthConnector(),
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const initialStatusResponse = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history/status?mailboxIds=kons@hairtpclinic.com,info@hairtpclinic.com&lookbackDays=90`
+      );
+      assert.equal(initialStatusResponse.status, 200);
+      const initialStatusPayload = await initialStatusResponse.json();
+      assert.equal(initialStatusPayload.source, 'mailbox_truth_store');
+      assert.equal(initialStatusPayload.coverage.complete, false);
+
+      const backfillResponse = await fetch(`${baseUrl}/api/v1/cco/runtime/history/backfill`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          mailboxIds: ['kons@hairtpclinic.com', 'info@hairtpclinic.com'],
+          lookbackDays: 90,
+        }),
+      });
+      assert.equal(backfillResponse.status, 200);
+      const backfillPayload = await backfillResponse.json();
+      assert.equal(backfillPayload.source, 'mailbox_truth_store');
+      assert.equal(backfillPayload.backfilledFolderCount, 8);
+      assert.equal(backfillPayload.missingWindowCount, 0);
+
+      const refreshResponse = await fetch(`${baseUrl}/api/v1/cco/runtime/history/backfill`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          mailboxIds: ['kons@hairtpclinic.com', 'info@hairtpclinic.com'],
+          lookbackDays: 90,
+          refresh: true,
+        }),
+      });
+      assert.equal(refreshResponse.status, 200);
+      const refreshPayload = await refreshResponse.json();
+      assert.equal(refreshPayload.ok, true);
+      assert.equal(refreshPayload.source, 'mailbox_truth_store');
+
+      const statusResponse = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history/status?mailboxIds=kons@hairtpclinic.com,info@hairtpclinic.com&lookbackDays=90`
+      );
+      assert.equal(statusResponse.status, 200);
+      const statusPayload = await statusResponse.json();
+      assert.equal(statusPayload.source, 'mailbox_truth_store');
+      assert.equal(statusPayload.coverage.complete, true);
+      assert.equal(statusPayload.mailbox.messageCount, 2);
+
+      const historyResponse = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history?mailboxIds=kons@hairtpclinic.com,info@hairtpclinic.com&customerEmail=patient@example.com&lookbackDays=30`
+      );
+      assert.equal(historyResponse.status, 200);
+      const historyPayload = await historyResponse.json();
+      assert.equal(historyPayload.ok, true);
+      assert.equal(historyPayload.source, 'mailbox_truth_store');
+      assert.equal(historyPayload.messages.length, 4);
+      assert.equal(historyPayload.messages[0].mailDocument?.kind, 'mail_document');
+      assert.equal(historyPayload.messages[0].mailThreadMessage?.kind, 'mail_thread_message');
+      assert.equal(historyPayload.messages[0].mailDocument?.sourceStore, 'mailbox_truth_store');
+      assert.equal(historyPayload.threadDocument?.kind, 'mail_thread_document');
+      assert.equal(historyPayload.events.length, 4);
+      assert.equal(
+        historyPayload.messages.some((message) => message.subject.includes('Legacy historik')),
+        false
+      );
+      assert.equal(historyPayload.store.source, 'mailbox_truth_store');
+      assert.equal(historyPayload.store.missingWindowCount, 0);
     });
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -580,6 +912,501 @@ test('runtime history search route returnerar store-baserad multi-mailbox-histor
   }
 });
 
+test('runtime history search uses mailbox truth store for explicit message-only searches', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-truth-search-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    await ccoMailboxTruthStore.recordFolderPage({
+      account: {
+        mailboxId: 'kons@hairtpclinic.com',
+        mailboxAddress: 'kons@hairtpclinic.com',
+        userPrincipalName: 'kons@hairtpclinic.com',
+      },
+      folder: {
+        folderType: 'inbox',
+        folderId: 'folder-inbox',
+        folderName: 'Inbox',
+        wellKnownName: 'inbox',
+        totalItemCount: 1,
+        unreadItemCount: 1,
+        messageCollectionCount: 1,
+      },
+      messages: [
+        {
+          graphMessageId: 'truth-search-1',
+          mailboxId: 'kons@hairtpclinic.com',
+          mailboxAddress: 'kons@hairtpclinic.com',
+          userPrincipalName: 'kons@hairtpclinic.com',
+          folderType: 'inbox',
+          folderId: 'folder-inbox',
+          folderName: 'Inbox',
+          conversationId: 'conv-truth-search-1',
+          subject: 'PRP uppföljning',
+          bodyPreview: 'Hej, jag vill boka om min tid.',
+          direction: 'inbound',
+          isRead: false,
+          receivedAt: '2026-04-09T10:00:00.000Z',
+          from: {
+            address: 'patient@example.com',
+            name: 'Patient One',
+          },
+          toRecipients: [{ address: 'kons@hairtpclinic.com', name: 'Kons' }],
+          replyToRecipients: [],
+        },
+      ],
+      complete: true,
+    });
+    await ccoHistoryStore.recordAction({
+      tenantId: 'tenant-a',
+      conversationId: 'legacy-search-conv',
+      mailboxId: 'kons@hairtpclinic.com',
+      customerEmail: 'patient@example.com',
+      actionType: 'customer_replied',
+      actionLabel: 'Kunden svarade',
+      recordedAt: '2026-03-12T09:45:00.000Z',
+      subject: 'Legacy action',
+    });
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoHistoryStore,
+        ccoMailboxTruthStore,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history/search?mailboxIds=kons@hairtpclinic.com&customerEmail=patient@example.com&q=PRP&lookbackDays=365&resultTypes=message`
+      );
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.ok, true);
+      assert.equal(payload.source, 'mailbox_truth_store');
+      assert.equal(payload.resultCount, 1);
+      assert.equal(payload.results[0]?.resultType, 'message');
+      assert.equal(payload.results[0]?.subject, 'PRP uppföljning');
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime history route repairs cid bodyHtml from mailbox truth store before returning messages', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-truth-inline-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    await ccoMailboxTruthStore.recordFolderPage({
+      account: {
+        mailboxId: 'contact@hairtpclinic.com',
+        mailboxAddress: 'contact@hairtpclinic.com',
+        userPrincipalName: 'contact@hairtpclinic.com',
+      },
+      folder: {
+        folderType: 'inbox',
+        folderId: 'folder-inbox',
+        folderName: 'Inbox',
+        wellKnownName: 'inbox',
+        totalItemCount: 1,
+        unreadItemCount: 1,
+        messageCollectionCount: 1,
+      },
+      messages: [
+        {
+          graphMessageId: 'truth-inline-1',
+          mailboxId: 'contact@hairtpclinic.com',
+          mailboxAddress: 'contact@hairtpclinic.com',
+          userPrincipalName: 'contact@hairtpclinic.com',
+          folderType: 'inbox',
+          folderId: 'folder-inbox',
+          folderName: 'Inbox',
+          conversationId: 'conv-truth-inline-1',
+          subject: 'Ralph Hultman',
+          bodyPreview: 'Här kommer signaturen.',
+          bodyHtml:
+            '<div><p>Hej</p><img src="cid:image001.png@abc" alt="Hair TP Clinic" /></div>',
+          direction: 'inbound',
+          isRead: false,
+          receivedAt: '2026-04-09T10:00:00.000Z',
+          from: {
+            address: 'ralph@example.com',
+            name: 'Ralph Hultman',
+          },
+          toRecipients: [{ address: 'contact@hairtpclinic.com', name: 'Contact' }],
+          replyToRecipients: [],
+        },
+      ],
+      complete: true,
+    });
+
+    let assetCalls = 0;
+    let mimeCalls = 0;
+    const graphReadConnector = {
+      async fetchMailboxTruthFolderPage() {
+        throw new Error('not used in this test');
+      },
+      async enrichStoredMessagesWithMailAssets({ messages = [] } = {}) {
+        assetCalls += 1;
+        return messages.map((message) => ({
+          ...message,
+          attachments: [
+            {
+              id: 'att-inline-1',
+              name: 'logo.png',
+              contentType: 'image/png',
+              contentId: 'image001.png@abc',
+              isInline: true,
+              size: 1280,
+              contentBytesAvailable: true,
+              sourceType: 'graph_file_attachment',
+            },
+          ],
+          bodyHtml: String(message.bodyHtml || '').replace(
+            'cid:image001.png@abc',
+            'data:image/png;base64,YWJjMTIz'
+          ),
+        }));
+      },
+      async fetchMessageMimeContent() {
+        mimeCalls += 1;
+        return {
+          rawMime: [
+            'MIME-Version: 1.0',
+            'Content-Type: multipart/related; boundary="abc"',
+            '',
+            '--abc',
+            'Content-Type: text/html; charset=utf-8',
+            '',
+            '<html><body><table><tr><td><img src="cid:image001.png@abc" /></td><td>Hej Ralph</td></tr></table></body></html>',
+            '--abc',
+            'Content-Type: image/png; name="logo.png"',
+            'Content-ID: <image001.png@abc>',
+            'Content-Disposition: inline; filename="logo.png"',
+            'Content-Transfer-Encoding: base64',
+            '',
+            'QUJDRA==',
+            '--abc--',
+          ].join('\r\n'),
+          contentType: 'message/rfc822',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoHistoryStore,
+        ccoMailboxTruthStore,
+        graphReadConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history?mailboxIds=contact@hairtpclinic.com&customerEmail=ralph@example.com&lookbackDays=30`
+      );
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.ok, true);
+      assert.equal(payload.source, 'mailbox_truth_store');
+      assert.equal(assetCalls, 1);
+      assert.equal(mimeCalls, 1);
+      assert.match(String(payload.messages[0]?.bodyHtml || ''), /data:image\/png;base64,YWJjMTIz/);
+      assert.equal(payload.messages[0]?.mailDocument?.assets?.length >= 1, true);
+      assert.equal(payload.messages[0]?.mailDocument?.assetSummary?.attachmentCount, 1);
+      assert.deepEqual(payload.messages[0]?.mailDocument?.assetSummary?.familyCounts, {
+        attachment: 0,
+        inline: 1,
+        external: 0,
+      });
+      assert.equal(payload.messages[0]?.mailDocument?.assetSummary?.renderableInlineCount >= 1, true);
+      assert.equal(payload.messages[0]?.mailDocument?.mimeAvailable, true);
+      assert.equal(payload.messages[0]?.mailDocument?.sourceDepth, 'mime');
+      assert.equal(payload.messages[0]?.mailDocument?.mime?.contentType, 'message/rfc822');
+      assert.equal(payload.messages[0]?.mailDocument?.mime?.version, 'phase_b');
+      assert.equal(payload.messages[0]?.mailDocument?.mime?.parsed?.preferredBodyKind, 'html');
+      assert.equal(payload.messages[0]?.mailDocument?.mime?.parsed?.assets?.inlineAssets?.length, 1);
+      assert.match(String(payload.messages[0]?.mailDocument?.primaryBodyHtml || ''), /Hej Ralph/);
+      assert.equal(payload.messages[0]?.mailDocument?.fidelity?.mimePreferredBodyKind, 'html');
+      assert.equal(payload.messages[0]?.mailThreadMessage?.assets?.inlineAssetIds?.length >= 1, true);
+      assert.deepEqual(payload.messages[0]?.mailThreadMessage?.assets?.familyCounts, {
+        attachment: 0,
+        inline: 1,
+        external: 0,
+      });
+      assert.equal(payload.messages[0]?.mailThreadMessage?.assets?.mimeInlineAssetCount, 1);
+      assert.equal(payload.messages[0]?.mailThreadMessage?.mimeBacked, true);
+      assert.equal(payload.messages[0]?.mailThreadMessage?.contentSections?.source, 'mime_backed');
+      assert.equal(payload.messages[0]?.mailThreadMessage?.contentSections?.mimePreferredBodyKind, 'html');
+      assert.equal(payload.threadDocument?.hasMimeBackedMessages, true);
+      assert.equal(payload.threadDocument?.messageCount, 1);
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime history route can return thin mailbox history without bodyHtml on initial live load', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-thin-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    await ccoMailboxTruthStore.recordFolderPage({
+      account: {
+        mailboxId: 'contact@hairtpclinic.com',
+        mailboxAddress: 'contact@hairtpclinic.com',
+        userPrincipalName: 'contact@hairtpclinic.com',
+      },
+      folder: {
+        folderType: 'inbox',
+        folderId: 'folder-inbox',
+        folderName: 'Inbox',
+        wellKnownName: 'inbox',
+        totalItemCount: 1,
+        unreadItemCount: 1,
+        messageCollectionCount: 1,
+      },
+      messages: [
+        {
+          graphMessageId: 'truth-thin-1',
+          mailboxId: 'contact@hairtpclinic.com',
+          mailboxAddress: 'contact@hairtpclinic.com',
+          userPrincipalName: 'contact@hairtpclinic.com',
+          folderType: 'inbox',
+          folderId: 'folder-inbox',
+          folderName: 'Inbox',
+          conversationId: 'conv-truth-thin-1',
+          subject: 'Thin history load',
+          bodyPreview: 'Kort förhandsvisning',
+          bodyHtml:
+            '<div><p>Hej</p><img src="cid:image001.png@abc" alt="Hair TP Clinic" /></div>',
+          direction: 'inbound',
+          isRead: false,
+          receivedAt: '2026-04-09T10:00:00.000Z',
+          from: {
+            address: 'ralph@example.com',
+            name: 'Ralph Hultman',
+          },
+          toRecipients: [{ address: 'contact@hairtpclinic.com', name: 'Contact' }],
+          replyToRecipients: [],
+        },
+      ],
+      complete: true,
+    });
+
+    let repairCalls = 0;
+    const graphReadConnector = {
+      async fetchMailboxTruthFolderPage() {
+        throw new Error('not used in this test');
+      },
+      async enrichStoredMessagesWithInlineHtmlAssets({ messages = [] } = {}) {
+        repairCalls += 1;
+        return messages;
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoHistoryStore,
+        ccoMailboxTruthStore,
+        graphReadConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history?mailboxIds=contact@hairtpclinic.com&customerEmail=ralph@example.com&lookbackDays=30&includeBodyHtml=0`
+      );
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.ok, true);
+      assert.equal(payload.includeBodyHtml, false);
+      assert.equal(repairCalls, 0);
+      assert.equal(payload.messages[0]?.bodyPreview, 'Kort förhandsvisning');
+      assert.equal(payload.messages[0]?.bodyHtml, null);
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime history route matches mailbox-prefixed conversation ids even when mailbox casing differs', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-prefix-case-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const ccoHistoryStore = await createCcoHistoryStore({
+    filePath: path.join(tempDir, 'cco-history.json'),
+  });
+  const ccoMailboxTruthStore = await createCcoMailboxTruthStore({
+    filePath: path.join(tempDir, 'cco-mailbox-truth.json'),
+  });
+
+  try {
+    await ccoMailboxTruthStore.recordFolderPage({
+      account: {
+        mailboxId: 'marknad@hairtpclinic.com',
+        mailboxAddress: 'marknad@hairtpclinic.com',
+        userPrincipalName: 'marknad@hairtpclinic.com',
+      },
+      folder: {
+        folderType: 'sent',
+        folderId: 'folder-sent',
+        folderName: 'Sent',
+        wellKnownName: 'sent',
+        totalItemCount: 1,
+        unreadItemCount: 0,
+        messageCollectionCount: 1,
+      },
+      messages: [
+        {
+          graphMessageId: 'truth-prefix-case-1',
+          mailboxId: 'marknad@hairtpclinic.com',
+          mailboxAddress: 'marknad@hairtpclinic.com',
+          userPrincipalName: 'marknad@hairtpclinic.com',
+          folderType: 'sent',
+          folderId: 'folder-sent',
+          folderName: 'Sent',
+          conversationId: 'AAQkAGQzNWNiYWVkLTFiNzUtNDY4NC1hNWJhLWUzYzc1NjAzMDZjNgAQAL0wbM_Erd5Op_O39VIZIv8=',
+          mailboxConversationId:
+            'marknad@hairtpclinic.com:AAQkAGQzNWNiYWVkLTFiNzUtNDY4NC1hNWJhLWUzYzc1NjAzMDZjNgAQAL0wbM_Erd5Op_O39VIZIv8=',
+          subject: 'Sv: 8 månader update',
+          bodyPreview: 'Stort tack!',
+          bodyHtml:
+            '<div><p>Stort tack!</p><img src="https://example.com/logo.png" alt="logo" /></div>',
+          direction: 'outbound',
+          isRead: true,
+          sentAt: '2026-03-31T12:18:00.000Z',
+          createdAt: '2026-03-31T12:18:00.000Z',
+          lastModifiedAt: '2026-03-31T12:18:00.000Z',
+          from: {
+            address: 'marknad@hairtpclinic.com',
+            name: 'Marknad | Hair TP Clinic',
+          },
+          toRecipients: [{ address: 'perssonalma00@gmail.com', name: 'Alma Persson' }],
+          replyToRecipients: [],
+        },
+      ],
+      complete: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        ccoHistoryStore,
+        ccoMailboxTruthStore,
+        graphReadConnector: createMailboxTruthConnector(),
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/history?mailboxIds=marknad@hairtpclinic.com&conversationId=Marknad@hairtpclinic.com:AAQkAGQzNWNiYWVkLTFiNzUtNDY4NC1hNWJhLWUzYzc1NjAzMDZjNgAQAL0wbM_Erd5Op_O39VIZIv8=&lookbackDays=30`
+      );
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.ok, true);
+      assert.equal(payload.source, 'mailbox_truth_store');
+      assert.equal(payload.messages.length, 1);
+      assert.equal(payload.messages[0]?.subject, 'Sv: 8 månader update');
+      assert.match(String(payload.messages[0]?.bodyHtml || ''), /logo\.png/);
+    });
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('runtime calibration summary default scope includes fazli mailbox history', async () => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-history-fazli-default-'));
   const authStore = await createAuthStore({
@@ -806,6 +1633,94 @@ test('runtime shadow summary, readout and status expose shadow-run review on rea
       assert.equal(statusPayload.shadowReviewJob.id, 'cco_shadow_review');
     });
   } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('runtime mail asset route streams attachment content for focus attachment actions', async () => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-runtime-mail-asset-'));
+  const authStore = await createAuthStore({
+    filePath: path.join(tempDir, 'auth.json'),
+    sessionTtlMs: 12 * 60 * 60 * 1000,
+    sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+    loginTicketTtlMs: 10 * 60 * 1000,
+    auditAppendOnly: true,
+    auditMaxEntries: 5000,
+  });
+  const previousGraphReadEnabled = process.env.ARCANA_GRAPH_READ_ENABLED;
+  const previousGraphTenantId = process.env.ARCANA_GRAPH_TENANT_ID;
+  const previousGraphClientId = process.env.ARCANA_GRAPH_CLIENT_ID;
+  const previousGraphClientSecret = process.env.ARCANA_GRAPH_CLIENT_SECRET;
+  process.env.ARCANA_GRAPH_READ_ENABLED = 'true';
+  process.env.ARCANA_GRAPH_TENANT_ID = process.env.ARCANA_GRAPH_TENANT_ID || 'tenant-test';
+  process.env.ARCANA_GRAPH_CLIENT_ID = process.env.ARCANA_GRAPH_CLIENT_ID || 'client-test';
+  process.env.ARCANA_GRAPH_CLIENT_SECRET =
+    process.env.ARCANA_GRAPH_CLIENT_SECRET || 'secret-test';
+
+  try {
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {};
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        graphReadConnector: {
+          async fetchInboxSnapshot() {
+            return { conversations: [] };
+          },
+          async fetchMessageAttachmentContent({ userId, messageId, attachmentId }) {
+            assert.equal(userId, 'contact@hairtpclinic.com');
+            assert.equal(messageId, 'msg-asset-1');
+            assert.equal(attachmentId, 'att-file-1');
+            return {
+              name: 'price-list.pdf',
+              contentType: 'application/pdf',
+              buffer: Buffer.from('PDF-BYTES'),
+            };
+          },
+        },
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(
+        `${baseUrl}/api/v1/cco/runtime/mail-asset/content?mailboxId=contact@hairtpclinic.com&messageId=msg-asset-1&attachmentId=att-file-1&mode=download`
+      );
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-type'), 'application/pdf');
+      assert.match(String(response.headers.get('content-disposition') || ''), /attachment;/);
+      const buffer = Buffer.from(await response.arrayBuffer());
+      assert.equal(String(buffer), 'PDF-BYTES');
+    });
+  } finally {
+    if (previousGraphReadEnabled === undefined) {
+      delete process.env.ARCANA_GRAPH_READ_ENABLED;
+    } else {
+      process.env.ARCANA_GRAPH_READ_ENABLED = previousGraphReadEnabled;
+    }
+    if (previousGraphTenantId === undefined) {
+      delete process.env.ARCANA_GRAPH_TENANT_ID;
+    } else {
+      process.env.ARCANA_GRAPH_TENANT_ID = previousGraphTenantId;
+    }
+    if (previousGraphClientId === undefined) {
+      delete process.env.ARCANA_GRAPH_CLIENT_ID;
+    } else {
+      process.env.ARCANA_GRAPH_CLIENT_ID = previousGraphClientId;
+    }
+    if (previousGraphClientSecret === undefined) {
+      delete process.env.ARCANA_GRAPH_CLIENT_SECRET;
+    } else {
+      process.env.ARCANA_GRAPH_CLIENT_SECRET = previousGraphClientSecret;
+    }
     await fs.rm(tempDir, { recursive: true, force: true });
   }
 });

@@ -5,6 +5,7 @@
     buildIntelReadoutHref,
     buildReauthUrl,
     getSelectedRuntimeThread,
+    isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
     handleRuntimeHandledAction,
     laterStatus,
@@ -35,18 +36,44 @@
       ).catch(() => {});
     }
 
-    function openRuntimeStudio(mode = "reply") {
+    function openRuntimeStudio(mode = "reply", preferredThreadId = "", options = {}) {
       const normalizedMode = String(mode || "").trim().toLowerCase() || "reply";
+      const selectedThread = getSelectedRuntimeThread();
+      const readOnly =
+        normalizedMode !== "compose" &&
+        (options?.readOnly === true ||
+          (typeof isOfflineHistoryContextThread === "function" &&
+            isOfflineHistoryContextThread(selectedThread)));
       if (normalizedMode === "compose" && typeof prepareComposeStudioState === "function") {
-        prepareComposeStudioState(getSelectedRuntimeThread());
+        prepareComposeStudioState();
         setAppView("conversations");
+        state.studio.readOnly = false;
+      } else {
+        const lockedThreadId = String(preferredThreadId || selectedThread?.id || "").trim();
+        state.studio.mode = normalizedMode;
+        state.studio.threadId = lockedThreadId;
+        state.studio.replyContextThreadId = lockedThreadId;
+        state.studio.readOnly = readOnly;
       }
       applyStudioMode(mode);
+      applyFocusSection("conversation");
       setStudioOpen(true);
       setContextCollapsed(false);
     }
 
     function openRuntimeNote() {
+      const selectedThread = getSelectedRuntimeThread();
+      if (
+        typeof isOfflineHistoryContextThread === "function" &&
+        isOfflineHistoryContextThread(selectedThread)
+      ) {
+        setFeedback(
+          noteFeedback,
+          "error",
+          "Offline historik är läsläge. Öppna live-tråden för att skapa anteckningar."
+        );
+        return Promise.resolve(false);
+      }
       return loadOverlayBootstrap().finally(() => {
         setFeedback(noteFeedback, "", "");
         setNoteModeOpen(true);
@@ -54,6 +81,18 @@
     }
 
     function openRuntimeSchedule({ renderDraft = false } = {}) {
+      const selectedThread = getSelectedRuntimeThread();
+      if (
+        typeof isOfflineHistoryContextThread === "function" &&
+        isOfflineHistoryContextThread(selectedThread)
+      ) {
+        setFeedback(
+          scheduleFeedback,
+          "error",
+          "Offline historik är läsläge. Öppna live-tråden för att schemalägga uppföljning."
+        );
+        return Promise.resolve(false);
+      }
       return loadOverlayBootstrap().finally(() => {
         setFeedback(scheduleFeedback, "", "");
         if (renderDraft) {
@@ -95,9 +134,12 @@
       }
 
       if (action === "delete") {
+        const isQueueDeleteContext = Boolean(
+          button.closest(".queue-action-row") || button.closest(".queue-scope-strip")
+        );
         return Promise.resolve(
           handleRuntimeDeleteAction(
-            button.closest(".queue-action-row")
+            isQueueDeleteContext
               ? "major-arcana-queue-delete"
               : "major-arcana-focus-delete"
           )

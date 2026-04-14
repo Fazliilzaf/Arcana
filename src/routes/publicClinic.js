@@ -1,7 +1,11 @@
 const express = require('express');
 
 const { resolveBrandForHost } = require('../brand/resolveBrand');
-const { getClientoConfigForBrand } = require('../brand/runtimeConfig');
+const {
+  getClientoConfigForBrand,
+  getClientoApiConfigForBrand,
+} = require('../brand/runtimeConfig');
+const { createClientoApi, normalizeCsvParam } = require('../infra/clientoApi');
 const {
   buildDefaultPublicSiteProfile,
   normalizePublicSiteProfile,
@@ -56,9 +60,116 @@ function sanitizeService(service) {
   };
 }
 
+function resolveBrandFromRequest(req, config) {
+  const candidates = [];
+
+  const sourceUrl = typeof req.query?.sourceUrl === 'string' ? req.query.sourceUrl.trim() : '';
+  if (sourceUrl) {
+    try {
+      candidates.push(new URL(sourceUrl).hostname);
+    } catch {
+      // ignore invalid sourceUrl hints
+    }
+  }
+
+  const requestedHost = typeof req.query?.host === 'string' ? req.query.host.trim() : '';
+  if (requestedHost) candidates.push(requestedHost);
+
+  if (req.get('host')) candidates.push(req.get('host'));
+  if (req.hostname) candidates.push(req.hostname);
+
+  for (const candidate of candidates) {
+    const resolved = resolveBrandForHost(candidate, {
+      defaultBrand: config.brand,
+      brandByHost: config.brandByHost,
+    });
+    if (resolved) return resolved;
+  }
+
+  return config.brand;
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+async function handleClientoRequest(req, res, config, run) {
+  try {
+    const brand = resolveBrandFromRequest(req, config);
+    const clientoApiConfig = getClientoApiConfigForBrand(brand, config);
+
+    if (!clientoApiConfig.partnerId) {
+      return res.status(503).json({
+        ok: false,
+        error: 'cliento_partner_id_missing',
+      });
+    }
+
+    const clientoApi = createClientoApi(clientoApiConfig);
+    const payload = await run(clientoApi);
+    return res.json(payload);
+  } catch (error) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({
+        ok: false,
+        error: 'cliento_request_failed',
+        details: error.details ?? null,
+      });
+    }
+
+    console.error(error);
+    return res.status(500).json({
+      ok: false,
+      error: 'cliento_request_failed',
+    });
+  }
+}
+
 function createPublicClinicRouter({ tenantConfigStore, config }) {
   const router = express.Router();
   const aliasMap = normalizeAliasMap(config.publicClinicIdAliases);
+
+  router.get('/public/cliento/settings', async (req, res) =>
+    handleClientoRequest(req, res, config, (clientoApi) => clientoApi.getSettings())
+  );
+
+  router.get('/public/cliento/ref-data', async (req, res) =>
+    handleClientoRequest(req, res, config, (clientoApi) => clientoApi.getRefData())
+  );
+
+  router.get('/public/cliento/slots', async (req, res) => {
+    const fromDate = typeof req.query.fromDate === 'string' ? req.query.fromDate.trim() : '';
+    const toDate = typeof req.query.toDate === 'string' ? req.query.toDate.trim() : '';
+    const resIds = normalizeCsvParam(req.query.resIds);
+    const srvIds = normalizeCsvParam(req.query.srvIds);
+
+    if (!fromDate || !toDate || !resIds || !srvIds) {
+      return res.status(400).json({
+        ok: false,
+        error: 'cliento_slots_params_missing',
+      });
+    }
+
+    return handleClientoRequest(req, res, config, (clientoApi) =>
+      clientoApi.getSlots({
+        fromDate,
+        toDate,
+        resIds,
+        srvIds,
+      })
+    );
+  });
+
+  router.get('/public/cliento/reviews', async (req, res) =>
+    handleClientoRequest(req, res, config, (clientoApi) =>
+      clientoApi.getReviews({
+        offset: parsePositiveInt(req.query.offset, 0),
+        limit: parsePositiveInt(req.query.limit, 10),
+        stars: normalizeCsvParam(req.query.stars),
+      })
+    )
+  );
 
   router.get('/public/clinics/:clinicId', async (req, res) => {
     try {

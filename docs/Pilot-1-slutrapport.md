@@ -46,7 +46,7 @@ Plattformen har gått från prototyp-chat till fungerande intern Admin Core med 
 
 ### Admin UI + UX
 - Adminpanel med block/sektioner för templates, risk, ops, rapport, staff, sessions.
-- UI-designpaket i `docs/uiux/` (sitemap, wireframes, komponenter, tokens, journeys).
+- UI-designpaket i `docs/archives/uiux/` (sitemap, wireframes, komponenter, tokens, journeys).
 - Branding-uppdatering: Major Arcana-profil i adminytan.
 
 ## 3) Verifiering (senast bekräftad)

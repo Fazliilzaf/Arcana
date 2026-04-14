@@ -413,3 +413,219 @@ test('cco customers import preview and commit kan använda redigerade preview-ra
     await fs.rm(fixture.tempDir, { recursive: true, force: true });
   }
 });
+
+test('cco customers import med sourceSystem=cliento skapar stabil canonical identity och läcker inte personnummer', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await withServer(fixture.app, async (baseUrl) => {
+      const importText = [
+        'Namn,Telefon (mobil),Telefon (annat),Epost,Personnummer',
+        'Cliento Person,0701234567,,cliento.person@example.com,198001019876',
+      ].join('\n');
+
+      const firstCommitResponse = await fetch(`${baseUrl}/cco/customers/import/commit`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: importText,
+          fileName: 'hair-tp-clinic-customers.csv',
+          sourceSystem: 'cliento',
+        }),
+      });
+
+      assert.equal(firstCommitResponse.status, 200);
+      const firstCommitPayload = await firstCommitResponse.json();
+      const firstCoverageReadout =
+        firstCommitPayload.coverageReadout || firstCommitPayload.importSummary?.coverageReadout;
+      assert.equal(firstCommitPayload.importSummary.created, 1);
+      assert.equal(firstCommitPayload.importSummary.review, 0);
+      assert.equal(firstCommitPayload.importSummary.validRows, 1);
+      assert.ok(firstCoverageReadout);
+      assert.equal(firstCoverageReadout.identityCount, 1);
+      assert.equal(firstCoverageReadout.canonicalCount, 1);
+
+      const firstStateResponse = await fetch(`${baseUrl}/cco/customers/state`);
+      assert.equal(firstStateResponse.status, 200);
+      const firstStatePayload = await firstStateResponse.json();
+      const firstKeys = Object.keys(firstStatePayload.customerState.identityByKey);
+      assert.equal(firstKeys.length, 1);
+      const firstIdentity = firstStatePayload.customerState.identityByKey[firstKeys[0]];
+      assert.equal(firstIdentity.identitySource, 'cliento');
+      assert.equal(firstIdentity.provenance.source, 'cliento');
+      assert.ok(firstIdentity.canonicalCustomerId.startsWith('cliento_'));
+      assert.equal(firstIdentity.verifiedPersonalEmailNormalized, 'cliento.person@example.com');
+      assert.equal(firstIdentity.verifiedPhoneE164, '0701234567');
+      assert.equal(
+        JSON.stringify(firstStatePayload.customerState).includes('198001019876'),
+        false
+      );
+
+      const secondCommitResponse = await fetch(`${baseUrl}/cco/customers/import/commit`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: importText,
+          fileName: 'hair-tp-clinic-customers.csv',
+          sourceSystem: 'cliento',
+        }),
+      });
+
+      assert.equal(secondCommitResponse.status, 200);
+      const secondCommitPayload = await secondCommitResponse.json();
+      const secondCoverageReadout =
+        secondCommitPayload.coverageReadout || secondCommitPayload.importSummary?.coverageReadout;
+      assert.equal(secondCommitPayload.importSummary.updated, 1);
+      assert.equal(secondCommitPayload.importSummary.validRows, 1);
+      assert.ok(secondCoverageReadout);
+      assert.equal(secondCoverageReadout.identityCount, 1);
+      assert.equal(secondCoverageReadout.canonicalCount, 1);
+
+      const secondStateResponse = await fetch(`${baseUrl}/cco/customers/state`);
+      assert.equal(secondStateResponse.status, 200);
+      const secondStatePayload = await secondStateResponse.json();
+      const secondKeys = Object.keys(secondStatePayload.customerState.identityByKey);
+      assert.deepEqual(secondKeys, firstKeys);
+      const secondIdentity = secondStatePayload.customerState.identityByKey[secondKeys[0]];
+      assert.equal(secondIdentity.canonicalCustomerId, firstIdentity.canonicalCustomerId);
+      assert.equal(secondIdentity.identitySource, 'cliento');
+      assert.equal(
+        JSON.stringify(secondStatePayload.customerState).includes('198001019876'),
+        false
+      );
+
+      const statusResponse = await fetch(`${baseUrl}/cco/customers/import/status`);
+      assert.equal(statusResponse.status, 200);
+      const statusPayload = await statusResponse.json();
+      assert.ok(statusPayload.coverageReadout);
+      assert.equal(statusPayload.coverageReadout.identityCount, 1);
+      assert.equal(statusPayload.coverageReadout.canonicalCount, 1);
+      assert.equal(statusPayload.coverageReadout.reviewDecisionCount, 0);
+    });
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});
+
+test('cco customers import med flera kandidater går till review och sparar beslut', async () => {
+  const fixture = await createFixture();
+
+  try {
+    await fixture.customerStore.saveTenantCustomerState({
+      tenantId: 'tenant-a',
+      customerState: {
+        directory: {
+          candidate_a: {
+            name: 'Kandidat A',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+          candidate_b: {
+            name: 'Kandidat B',
+            vip: false,
+            emailCoverage: 1,
+            duplicateCandidate: false,
+            profileCount: 1,
+            customerValue: 0,
+            totalConversations: 1,
+            totalMessages: 1,
+          },
+        },
+        details: {
+          candidate_a: {
+            emails: ['shared.cliento@example.com'],
+            phone: '0701111111',
+            mailboxes: ['Kons'],
+          },
+          candidate_b: {
+            emails: ['shared.cliento@example.com'],
+            phone: '0702222222',
+            mailboxes: ['Contact'],
+          },
+        },
+        identityByKey: {
+          candidate_a: {
+            customerKey: 'candidate_a',
+            customerName: 'Kandidat A',
+            identitySource: 'cliento',
+            identityConfidence: 'strong',
+            canonicalCustomerId: 'cliento_candidate_a',
+            provenance: {
+              source: 'cliento',
+              mailboxIds: ['Kons'],
+              sourceRecordIds: ['candidate_a'],
+            },
+          },
+          candidate_b: {
+            customerKey: 'candidate_b',
+            customerName: 'Kandidat B',
+            identitySource: 'cliento',
+            identityConfidence: 'strong',
+            canonicalCustomerId: 'cliento_candidate_b',
+            provenance: {
+              source: 'cliento',
+              mailboxIds: ['Contact'],
+              sourceRecordIds: ['candidate_b'],
+            },
+          },
+        },
+        primaryEmailByKey: {
+          candidate_a: 'shared.cliento@example.com',
+          candidate_b: 'shared.cliento@example.com',
+        },
+      },
+    });
+
+    await withServer(fixture.app, async (baseUrl) => {
+      const importText = [
+        'Namn,Telefon (mobil),Epost,Personnummer',
+        'Ny Cliento,0703333333,shared.cliento@example.com,198501019999',
+      ].join('\n');
+
+      const commitResponse = await fetch(`${baseUrl}/cco/customers/import/commit`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: importText,
+          fileName: 'hair-tp-clinic-customers.csv',
+          sourceSystem: 'cliento',
+        }),
+      });
+
+      assert.equal(commitResponse.status, 200);
+      const commitPayload = await commitResponse.json();
+      const commitCoverageReadout =
+        commitPayload.coverageReadout || commitPayload.importSummary?.coverageReadout;
+      assert.equal(commitPayload.importSummary.review, 1);
+      assert.equal(commitPayload.importSummary.validRows, 1);
+      assert.ok(commitCoverageReadout);
+      assert.equal(commitCoverageReadout.reviewRequiredCount, 1);
+
+      const stateResponse = await fetch(`${baseUrl}/cco/customers/state`);
+      assert.equal(stateResponse.status, 200);
+      const statePayload = await stateResponse.json();
+      const reviewDecisionEntries = Object.values(
+        statePayload.customerState.mergeReviewDecisionsByPairId || {}
+      );
+      assert.ok(reviewDecisionEntries.length >= 1);
+      assert.equal(reviewDecisionEntries.some((entry) => entry.decision === 'review_required'), true);
+      assert.equal(
+        JSON.stringify(statePayload.customerState).includes('198501019999'),
+        false
+      );
+    });
+  } finally {
+    await fs.rm(fixture.tempDir, { recursive: true, force: true });
+  }
+});

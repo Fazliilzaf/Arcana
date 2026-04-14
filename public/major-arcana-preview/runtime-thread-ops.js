@@ -27,11 +27,16 @@
       return next;
     }
 
-    function patchStudioThreadAfterSend(thread, draftBody) {
+    function patchStudioThreadAfterSend(thread, draftBody, sendResult = null) {
       const recordedAt = new Date().toISOString();
       const senderLabel = titleCaseMailbox(
-        asText(getStudioSenderMailboxId(state.studio.selectedSignatureId, thread))
+        asText(
+          state.studio.composeMailboxId ||
+            getStudioSenderMailboxId(state.studio.selectedSignatureId, thread)
+        )
       );
+      const outboundConversationBody = asText(sendResult?.preview?.body, draftBody);
+      const outboundConversationBodyHtml = asText(sendResult?.preview?.bodyHtml);
       const nextActionSummary = "Invänta kundens svar och håll nästa steg kort och tydligt.";
       return updateRuntimeThread(thread.id, (current) => {
         current.messages = [
@@ -42,6 +47,8 @@
             time: formatConversationTime(recordedAt),
             recordedAt,
             body: draftBody,
+            conversationBody: outboundConversationBody,
+            conversationBodyHtml: outboundConversationBodyHtml,
             latest: true,
           },
           ...asArray(current.messages).map((message) => ({ ...message, latest: false })),
@@ -50,7 +57,7 @@
           {
             title: "E-post skickat",
             description: current.subject,
-            detail: compactRuntimeCopy(draftBody, draftBody, 220),
+            detail: compactRuntimeCopy(outboundConversationBody, draftBody, 220),
             time: formatConversationTime(recordedAt),
             recordedAt,
             conversationId: current.id,

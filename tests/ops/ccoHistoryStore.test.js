@@ -102,6 +102,47 @@ test('cco history store deduperar meddelanden och sammanfogar coverage-fönster'
   }
 });
 
+test('cco history store bevarar lang inline-image html utan att kapa bort avslutande markup', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-history-store-inline-html-'));
+  const filePath = path.join(tmpDir, 'cco-history.json');
+  const longDataImage = `data:image/png;base64,${'QUJD'.repeat(7000)}`;
+
+  try {
+    const store = await createCcoHistoryStore({ filePath });
+
+    await store.upsertMailboxWindow({
+      tenantId: 'tenant-a',
+      mailboxId: 'contact@hairtpclinic.com',
+      windowStartIso: '2026-04-01T00:00:00.000Z',
+      windowEndIso: '2026-04-30T00:00:00.000Z',
+      messages: [
+        {
+          messageId: 'msg-inline-html-1',
+          conversationId: 'conv-inline-html-1',
+          subject: 'Grafisk signatur',
+          customerEmail: 'patient@example.com',
+          sentAt: '2026-04-07T10:00:00.000Z',
+          direction: 'outbound',
+          bodyHtml: `<div><p>Hej!</p><img src="${longDataImage}" alt="Hair TP Clinic" /></div>`,
+          senderEmail: 'contact@hairtpclinic.com',
+          recipients: ['patient@example.com'],
+        },
+      ],
+    });
+
+    const messages = await store.listMailboxMessages({
+      tenantId: 'tenant-a',
+      mailboxId: 'contact@hairtpclinic.com',
+    });
+    const bodyHtml = String(messages[0]?.bodyHtml || '');
+    assert.equal(bodyHtml.length > 24000, true);
+    assert.equal(bodyHtml.includes('data:image/png;base64,'), true);
+    assert.equal(bodyHtml.endsWith('</div>'), true);
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test('cco history store sparar och listar kundutfall utan dubletter per konversation + utfallskod', async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-history-outcomes-'));
   const filePath = path.join(tmpDir, 'cco-history.json');

@@ -11,6 +11,7 @@ Senast uppdaterad: 2026-03-29
 - Offline preview: [http://localhost:3100/major-arcana-preview/](http://localhost:3100/major-arcana-preview/)
 - Live preview: [http://localhost:3200/major-arcana-preview/](http://localhost:3200/major-arcana-preview/)
 - Primär mailbox just nu: `kons@hairtpclinic.com`
+- Lokal upstream-arkivkopia: [`/Users/fazlikrasniqi/Desktop/Arcana-archive/cconext-upstream-20260329`](/Users/fazlikrasniqi/Desktop/Arcana-archive/cconext-upstream-20260329)
 
 ## Låsta beslut
 - `/cco-next` ska inte bytas ut ännu.
@@ -90,3 +91,4 @@ Senast uppdaterad: 2026-03-29
 - Actionbubblor ska finnas i alla tre kolumnerna.
 - Historikchips i vänster inline-historik ska ligga inne i korten.
 - Bubble-roller får justeras visuellt, men inte byggas om semantiskt utan uttryckligt beslut.
+- `vendor/cconext-upstream` har flyttats ur arbetsrepot till lokal arkivmapp på Mac Studio för att minska repo-belastning. Hämta tillbaka därifrån vid behov, inte från minnet eller chatten.

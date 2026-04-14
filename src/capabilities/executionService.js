@@ -24,6 +24,13 @@ const {
   ccoInboxAnalysisOutputSchema,
   composeCcoInboxAnalysis,
 } = require('../agents/ccoInboxAgent');
+const { buildCanonicalMailComposeDocument } = require('../ops/ccoMailComposeDocument');
+const {
+  CCO_DEFAULT_SENDER_MAILBOX,
+  CCO_BASE_SIGNATURE_PROFILES,
+  buildCanonicalCcoMailboxSettingsDocument,
+  resolveCcoMailboxSignatureProfile,
+} = require('../ops/ccoMailboxSettingsDocument');
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -111,6 +118,62 @@ function makeCapabilityError(code, message, details = null) {
   error.code = code;
   if (details) error.details = details;
   return error;
+}
+
+function summarizeComposeDocument(composeDocument = null) {
+  if (!composeDocument || typeof composeDocument !== 'object') return null;
+  return {
+    kind: normalizeText(composeDocument.kind) || null,
+    version: normalizeText(composeDocument.version) || null,
+    mode: normalizeText(composeDocument.mode) || null,
+    sourceMailboxId: normalizeText(composeDocument.sourceMailboxId) || null,
+    senderMailboxId: normalizeText(composeDocument.senderMailboxId) || null,
+    replyContext: composeDocument.replyContext
+      ? {
+          conversationId: normalizeText(composeDocument.replyContext?.conversationId) || null,
+          replyToMessageId: normalizeText(composeDocument.replyContext?.replyToMessageId) || null,
+        }
+      : null,
+    recipients: {
+      to: toStringArray(composeDocument.recipients?.to, 20),
+      cc: toStringArray(composeDocument.recipients?.cc, 20),
+      bcc: toStringArray(composeDocument.recipients?.bcc, 20),
+    },
+    subject: normalizeText(composeDocument.subject) || null,
+    signature: composeDocument.signature
+      ? {
+          key: normalizeText(composeDocument.signature?.key) || null,
+          label: normalizeText(composeDocument.signature?.label) || null,
+          fullName: normalizeText(composeDocument.signature?.fullName) || null,
+          title: normalizeText(composeDocument.signature?.title) || null,
+          email: normalizeText(composeDocument.signature?.email) || null,
+          senderMailboxId:
+            normalizeText(composeDocument.signature?.senderMailboxId) || null,
+          source: normalizeText(composeDocument.signature?.source) || null,
+        }
+      : null,
+    delivery: composeDocument.delivery
+      ? {
+          requiresExplicitRecipients:
+            composeDocument.delivery?.requiresExplicitRecipients === true,
+          sendStrategy: normalizeText(composeDocument.delivery?.sendStrategy) || null,
+          capabilityName: normalizeText(composeDocument.delivery?.capabilityName) || null,
+          intent: normalizeText(composeDocument.delivery?.intent) || null,
+        }
+      : null,
+    validation: composeDocument.validation
+      ? {
+          valid: composeDocument.validation?.valid === true,
+          errors: Array.isArray(composeDocument.validation?.errors)
+            ? composeDocument.validation.errors.map((error) => ({
+                field: normalizeText(error?.field) || null,
+                code: normalizeText(error?.code) || null,
+                message: normalizeText(error?.message) || null,
+              }))
+            : [],
+        }
+      : null,
+  };
 }
 
 function enforceCapabilityAccess({ capability, actorRole, channel }) {
@@ -207,39 +270,198 @@ function toCcoSendAllowlistSet(rawValue = '') {
   return new Set(entries);
 }
 
-const CCO_DEFAULT_SENDER_MAILBOX =
-  normalizeText(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) || 'contact@hairtpclinic.com';
 const CCO_SIGNATURE_SPLIT_PATTERN =
   /\n(?:Med vanliga halsningar,?|Med vanlig halsning,?|Basta halsningar,?|Bästa hälsningar,?)\n[\s\S]*$/i;
-const CCO_SIGNATURE_PROFILES = Object.freeze({
-  contact: Object.freeze({
-    key: 'contact',
-    fullName: 'Hair TP Clinic',
-    title: 'Patientservice',
-    senderMailboxId: 'contact@hairtpclinic.com',
-  }),
-  egzona: Object.freeze({
-    key: 'egzona',
-    fullName: 'Egzona Krasniqi',
-    title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
-    senderMailboxId: 'egzona@hairtpclinic.com',
-  }),
-  fazli: Object.freeze({
-    key: 'fazli',
-    fullName: 'Fazli Krasniqi',
-    title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
-    senderMailboxId: 'fazli@hairtpclinic.com',
-  }),
-});
+const CCO_SIGNATURE_PROFILES = Object.freeze(
+  Object.fromEntries(
+    CCO_BASE_SIGNATURE_PROFILES.map((profile) => [
+      normalizeText(profile?.key) || 'contact',
+      Object.freeze({
+        key: normalizeText(profile?.key) || 'contact',
+        label: normalizeText(profile?.label) || normalizeText(profile?.fullName) || 'Signatur',
+        fullName: normalizeText(profile?.fullName) || normalizeText(profile?.label) || '',
+        title: normalizeText(profile?.title),
+        html: normalizeText(profile?.html || profile?.bodyHtml || profile?.body_html),
+        displayEmail: normalizeText(
+          profile?.displayEmail || profile?.visibleEmail || profile?.email || profile?.senderMailboxId
+        ),
+        email:
+          normalizeText(profile?.email || profile?.senderMailboxId) || CCO_DEFAULT_SENDER_MAILBOX,
+        senderMailboxId:
+          normalizeText(profile?.senderMailboxId || profile?.email) || CCO_DEFAULT_SENDER_MAILBOX,
+        preferProvidedHtml: profile?.preferProvidedHtml === true,
+        source: normalizeText(profile?.source) || 'base_profile',
+      }),
+    ])
+  )
+);
+const APPROVED_CCO_SIGNATURE_PROFILE_KEYS = new Set(['fazli', 'egzona']);
 
-function resolveCcoSignatureProfile(rawProfile = '') {
+function getApprovedCcoSignatureProfile(profile = null, senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX) {
+  const candidate = profile && typeof profile === 'object' ? profile : {};
+  const candidateKey = normalizeText(candidate.key || candidate.id).toLowerCase();
+  const candidateMailboxId = normalizeText(
+    candidate.email || candidate.senderMailboxId || senderMailboxId
+  ).toLowerCase();
+  if (candidateKey && APPROVED_CCO_SIGNATURE_PROFILE_KEYS.has(candidateKey)) {
+    return CCO_SIGNATURE_PROFILES[candidateKey] || null;
+  }
+  if (candidateMailboxId === 'fazli@hairtpclinic.com') {
+    return CCO_SIGNATURE_PROFILES.fazli || null;
+  }
+  if (candidateMailboxId === 'egzona@hairtpclinic.com') {
+    return CCO_SIGNATURE_PROFILES.egzona || null;
+  }
+  return CCO_SIGNATURE_PROFILES.fazli || CCO_SIGNATURE_PROFILES.egzona || null;
+}
+
+function resolveCcoSignatureProfile(
+  rawProfile = '',
+  { mailboxSettingsDocument = null, fallbackMailboxIds = [] } = {}
+) {
+  if (mailboxSettingsDocument && typeof mailboxSettingsDocument === 'object') {
+    return (
+      resolveCcoMailboxSignatureProfile(mailboxSettingsDocument, rawProfile, {
+        fallbackMailboxIds,
+      }) || getApprovedCcoSignatureProfile()
+    );
+  }
   const normalized = normalizeText(rawProfile).toLowerCase();
-  if (normalized === 'contact' || normalized === 'sara') return CCO_SIGNATURE_PROFILES.contact;
   if (normalized === 'fazli') return CCO_SIGNATURE_PROFILES.fazli;
   if (normalized === 'egzona' || normalized === 'egzona@hairtpclinic.com') {
     return CCO_SIGNATURE_PROFILES.egzona;
   }
-  return CCO_SIGNATURE_PROFILES.contact;
+  return getApprovedCcoSignatureProfile();
+}
+
+function sanitizeCcoSignatureOverrideHtml(html = '') {
+  const normalizedHtml = normalizeText(html);
+  if (!normalizedHtml) return '';
+  const publicBaseUrl = normalizeText(
+    process.env.PUBLIC_BASE_URL || process.env.ARCANA_PUBLIC_BASE_URL
+  ).replace(/\/+$/, '') || 'https://arcana.hairtpclinic.se';
+
+  return normalizedHtml
+    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/vbscript:/gi, '')
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/@import/gi, '')
+    .replace(/behavior\s*:/gi, '')
+    .replace(
+      /https?:\/\/(?:127\.0\.0\.1|localhost):3000(?=\/assets\/hair-tp-clinic\/)/gi,
+      publicBaseUrl
+    )
+    .replace(
+      /\b(src|href)\s*=\s*(['"])(\/[^'"]+)\2/gi,
+      (_match, attributeName, quote, pathValue) =>
+        `${attributeName}=${quote}${publicBaseUrl}${pathValue}${quote}`
+    )
+    .trim();
+}
+
+function buildCcoSignatureOverride(rawInput = {}) {
+  const input = safeObject(rawInput);
+  const nestedOverride = safeObject(input.signatureOverride || input.signature_override);
+  const source = Object.keys(nestedOverride).length ? nestedOverride : input;
+  const key = normalizeText(
+    source.key ||
+      source.id ||
+      source.signatureOverrideKey ||
+      source.signature_override_key ||
+      source.signatureKey ||
+      source.signature_key
+  ).toLowerCase();
+  const label = normalizeText(
+    source.label || source.signatureOverrideLabel || source.signature_override_label
+  );
+  const fullName = normalizeText(
+    source.fullName || source.full_name || source.signatureOverrideFullName || source.signature_override_full_name
+  );
+  const title = normalizeText(
+    source.title || source.line || source.signatureOverrideTitle || source.signature_override_title
+  );
+  const email = normalizeText(
+    source.email ||
+      source.signatureOverrideEmail ||
+      source.signature_override_email ||
+      source.senderEmail ||
+      source.sender_email
+  ).toLowerCase();
+  const senderMailboxId = normalizeText(
+    source.senderMailboxId ||
+      source.sender_mailbox_id ||
+      source.signatureOverrideSenderMailboxId ||
+      source.signature_override_sender_mailbox_id
+  ).toLowerCase();
+  const html = sanitizeCcoSignatureOverrideHtml(
+    source.html ||
+      source.bodyHtml ||
+      source.body_html ||
+      source.signatureOverrideHtml ||
+      source.signature_override_html
+  );
+
+  if (!key && !label && !fullName && !title && !senderMailboxId && !html) {
+    return null;
+  }
+
+  const approvedProfile = getApprovedCcoSignatureProfile(
+    {
+      key,
+      id: key,
+      label,
+      fullName,
+      title,
+      email,
+      senderMailboxId,
+    },
+    email || senderMailboxId
+  );
+  if (!approvedProfile) {
+    return null;
+  }
+
+  return {
+    key: approvedProfile.key,
+    label: approvedProfile.label,
+    fullName: approvedProfile.fullName,
+    title: approvedProfile.title || title,
+    html: approvedProfile.html || html,
+    email: approvedProfile.email || approvedProfile.senderMailboxId || CCO_DEFAULT_SENDER_MAILBOX,
+    senderMailboxId:
+      approvedProfile.senderMailboxId || approvedProfile.email || CCO_DEFAULT_SENDER_MAILBOX,
+    source: 'override',
+  };
+}
+
+function resolveCcoSignatureSelection(
+  rawInput = {},
+  { mailboxSettingsDocument = null, fallbackMailboxIds = [], actorEmail = '' } = {}
+) {
+  const input = safeObject(rawInput);
+  const override = buildCcoSignatureOverride(input);
+  if (override) {
+    return override;
+  }
+  return resolveCcoSignatureProfile(
+    input.signatureProfile || input.signature_profile || input.profile,
+    {
+      mailboxSettingsDocument,
+      fallbackMailboxIds: [
+        actorEmail,
+        ...fallbackMailboxIds,
+        input.senderMailboxId,
+        input.sender_mailbox_id,
+        input.sourceMailboxId,
+        input.source_mailbox_id,
+        input.mailboxId,
+        input.mailbox_id,
+      ],
+    }
+  );
 }
 
 function removeCcoSignature(body = '') {
@@ -263,75 +485,50 @@ function formatTextAsHtml(value = '') {
   return escaped.replace(/\r?\n/g, '<br />');
 }
 
+function normalizeCcoSignatureTitle(value = '') {
+  return normalizeText(value).replace(
+    /\bHårspecialist\s+[Ii]\s+Hårtransplantationer\s*&\s*PRP-injektioner\b/i,
+    'Hårspecialist | Hårtransplantationer & PRP-injektioner'
+  );
+}
+
 function buildCcoSignature({
-  profile = CCO_SIGNATURE_PROFILES.contact,
+  profile = getApprovedCcoSignatureProfile(),
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
-  const safeProfile =
-    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.contact;
-  const safeSenderMailbox = normalizeText(senderMailboxId) || CCO_DEFAULT_SENDER_MAILBOX;
+  const safeProfile = getApprovedCcoSignatureProfile(profile, senderMailboxId);
+  const safeDisplayEmail =
+    normalizeText(
+      safeProfile.displayEmail || safeProfile.signatureEmail || safeProfile.email || safeProfile.senderMailboxId
+    ).toLowerCase() || CCO_DEFAULT_SENDER_MAILBOX;
   const safeTitle =
-    normalizeText(safeProfile.title) || 'Hårspecialist I Hårtransplantationer & PRP-injektioner';
+    normalizeCcoSignatureTitle(safeProfile.title) ||
+    'Hårspecialist | Hårtransplantationer & PRP-injektioner';
   return [
-    'Bästa hälsningar',
+    'Bästa hälsningar,',
     safeProfile.fullName,
     safeTitle,
     '031-88 11 66',
-    safeSenderMailbox,
+    safeDisplayEmail,
     'Vasaplatsen 2, 411 34 Göteborg',
   ].join('\n');
 }
 
 function buildCcoSignatureHtml({
-  profile = CCO_SIGNATURE_PROFILES.contact,
+  profile = getApprovedCcoSignatureProfile(),
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
-  const safeProfile =
-    profile && typeof profile === 'object' ? profile : CCO_SIGNATURE_PROFILES.contact;
-  const safeSenderMailbox = normalizeText(senderMailboxId) || CCO_DEFAULT_SENDER_MAILBOX;
-  const safeTitle =
-    normalizeText(safeProfile.title) || 'Hårspecialist I Hårtransplantationer & PRP-injektioner';
-  const safeName = normalizeText(safeProfile.fullName) || 'Hair TP Clinic';
-  const websiteUrl = 'https://hairtpclinic.se';
-  const instagramUrl = 'https://www.instagram.com/hairtpclinic/';
-  const facebookUrl = 'https://www.facebook.com/hairtpclinic';
-  const publicBaseUrl = normalizeText(
-    process.env.PUBLIC_BASE_URL || process.env.ARCANA_PUBLIC_BASE_URL
-  ).replace(/\/+$/, '');
-  const logoBaseUrl = publicBaseUrl || 'https://arcana.hairtpclinic.se';
-  const logoUrl = `${logoBaseUrl}/assets/hair-tp-clinic/hairtpclinic-mark-light.svg`;
-  const linkStyle = 'color:#b9a89d;text-decoration:none;';
-  const separatorStyle = 'color:#d8cec6;padding:0 6px;';
-
-  return `
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;font-family:Arial,sans-serif;color:#2f2f33;">
-  <tr>
-    <td colspan="3" style="padding-bottom:4px;font-size:11px;line-height:1.15;color:#6a635d;white-space:nowrap;">Bästa hälsningar</td>
-  </tr>
-  <tr>
-    <td style="vertical-align:top;width:94px;padding-right:6px;">
-      <img src="${escapeHtml(logoUrl)}" alt="Hair TP Clinic" width="94" style="display:block;border:0;outline:none;text-decoration:none;width:94px;height:auto;" />
-    </td>
-    <td style="vertical-align:top;width:10px;padding-left:0;padding-right:8px;">
-      <div style="width:1px;height:88px;margin:0 auto;background:#e2dbd4;"></div>
-    </td>
-    <td style="vertical-align:top;padding-top:0;padding-left:0;">
-      <div style="font-size:12px;line-height:1.05;color:#b9a89d;font-weight:700;">${escapeHtml(safeName)}</div>
-      <div style="margin-top:3px;font-size:10px;line-height:1.16;color:#2f2f33;font-weight:700;max-width:260px;">${escapeHtml(safeTitle)}</div>
-      <div style="margin-top:6px;font-size:10px;line-height:1.22;color:#2f2f33;">031-88 11 66</div>
-      <div style="font-size:10px;line-height:1.22;color:#2f2f33;">${escapeHtml(safeSenderMailbox)}</div>
-      <div style="margin-top:2px;font-size:10px;line-height:1.22;color:#2f2f33;">Vasaplatsen 2, 411 34 Göteborg</div>
-      <div style="margin-top:8px;font-size:10px;line-height:1.2;color:#b9a89d;white-space:nowrap;">
-        <a href="${escapeHtml(websiteUrl)}" title="Webb" style="${linkStyle}">Webb</a><span style="${separatorStyle}">·</span><a href="${escapeHtml(instagramUrl)}" title="Instagram" style="${linkStyle}">Instagram</a><span style="${separatorStyle}">·</span><a href="${escapeHtml(facebookUrl)}" title="Facebook" style="${linkStyle}">Facebook</a>
-      </div>
-    </td>
-  </tr>
-</table>`.trim();
+  const safeProfile = getApprovedCcoSignatureProfile(profile, senderMailboxId);
+  const overrideHtml = sanitizeCcoSignatureOverrideHtml(
+    safeProfile.html || safeProfile.bodyHtml || safeProfile.body_html
+  );
+  if (overrideHtml) return overrideHtml;
+  return '';
 }
 
 function applyCcoSignature({
   body = '',
-  profile = CCO_SIGNATURE_PROFILES.contact,
+  profile = getApprovedCcoSignatureProfile(),
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
   const withoutSignature = removeCcoSignature(body);
@@ -342,14 +539,17 @@ function applyCcoSignature({
 
 function applyCcoSignatureHtml({
   body = '',
-  profile = CCO_SIGNATURE_PROFILES.contact,
+  bodyHtml = '',
+  profile = getApprovedCcoSignatureProfile(),
   senderMailboxId = CCO_DEFAULT_SENDER_MAILBOX,
 }) {
+  const normalizedBodyHtml = normalizeText(bodyHtml);
   const withoutSignature = removeCcoSignature(body);
   const signatureHtml = buildCcoSignatureHtml({ profile, senderMailboxId });
-  const bodyHtml = formatTextAsHtml(withoutSignature);
-  if (!bodyHtml) return signatureHtml;
-  return `${bodyHtml}<br /><br />${signatureHtml}`;
+  const formattedBodyHtml = normalizedBodyHtml || formatTextAsHtml(withoutSignature);
+  if (!signatureHtml) return formattedBodyHtml;
+  if (!formattedBodyHtml) return signatureHtml;
+  return `${formattedBodyHtml}<br /><br />${signatureHtml}`;
 }
 
 function createCapabilityExecutor({
@@ -357,6 +557,7 @@ function createCapabilityExecutor({
   authStore,
   tenantConfigStore,
   capabilityAnalysisStore = null,
+  ccoSettingsStore = null,
   buildVersion = 'dev',
 }) {
   const runCapabilityThroughGateway = bindGatewayRunCapability(executionGateway);
@@ -365,6 +566,24 @@ function createCapabilityExecutor({
   }
   if (!tenantConfigStore || typeof tenantConfigStore.getTenantConfig !== 'function') {
     throw new Error('Capability executor kräver tenantConfigStore.getTenantConfig.');
+  }
+
+  async function getMailboxSettingsDocument({
+    tenantId,
+    graphSendEnabled = false,
+    graphSendAllowlist = '',
+  }) {
+    const tenantSettings =
+      ccoSettingsStore && typeof ccoSettingsStore.getTenantSettings === 'function'
+        ? await ccoSettingsStore.getTenantSettings({ tenantId })
+        : {};
+    return buildCanonicalCcoMailboxSettingsDocument({
+      tenantSettings,
+      defaultSenderMailboxId:
+        normalizeText(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) || CCO_DEFAULT_SENDER_MAILBOX,
+      sendAllowlistMailboxIds: graphSendAllowlist,
+      graphSendEnabled,
+    });
   }
 
   async function writeAudit({
@@ -1200,72 +1419,103 @@ function createCapabilityExecutor({
       throw makeCapabilityError('CAPABILITY_CHANNEL_DENIED', 'CCO send tillater endast admin-channel.');
     }
 
-    const signatureProfile = resolveCcoSignatureProfile(
-      normalizedInput.signatureProfile || normalizedInput.signature_profile
-    );
-    const sourceMailboxId = normalizeText(
-      normalizedInput.sourceMailboxId ||
-        normalizedInput.source_mailbox_id ||
-        normalizedInput.mailboxId ||
-        normalizedInput.mailbox_id
-    );
-    const senderMailboxId = normalizeText(
-      normalizedInput.senderMailboxId ||
-        normalizedInput.sender_mailbox_id ||
-        signatureProfile?.senderMailboxId ||
-        process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
-        CCO_DEFAULT_SENDER_MAILBOX ||
-        sourceMailboxId
-    );
-    const replyToMessageId = normalizeText(
-      normalizedInput.replyToMessageId || normalizedInput.reply_to_message_id
-    );
-    const conversationId = normalizeText(
-      normalizedInput.conversationId || normalizedInput.conversation_id
-    );
-    const subject = normalizeText(normalizedInput.subject);
+    const mailboxSettingsDocument = await getMailboxSettingsDocument({
+      tenantId: normalizedTenantId,
+      graphSendEnabled,
+      graphSendAllowlist,
+    });
+    const mailboxSettingsDefaults = safeObject(mailboxSettingsDocument?.defaults);
+    const signatureProfile = resolveCcoSignatureSelection(normalizedInput, {
+      mailboxSettingsDocument,
+      actorEmail: normalizeText(actor?.email),
+      fallbackMailboxIds: [
+        mailboxSettingsDefaults.replySenderMailboxId,
+        mailboxSettingsDefaults.composeSenderMailboxId,
+        mailboxSettingsDefaults.senderMailboxId,
+      ],
+    });
     const body = normalizeText(normalizedInput.body);
     const bodyWithSignature = applyCcoSignature({
       body,
       profile: signatureProfile,
-      senderMailboxId,
+      senderMailboxId:
+        normalizeText(
+          normalizedInput.senderMailboxId ||
+            normalizedInput.sender_mailbox_id ||
+            signatureProfile?.senderMailboxId ||
+            mailboxSettingsDefaults.composeSenderMailboxId ||
+            mailboxSettingsDefaults.senderMailboxId ||
+            process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
+            CCO_DEFAULT_SENDER_MAILBOX ||
+            normalizedInput.sourceMailboxId ||
+            normalizedInput.source_mailbox_id ||
+            normalizedInput.mailboxId ||
+            normalizedInput.mailbox_id
+        ) || CCO_DEFAULT_SENDER_MAILBOX,
     });
     const bodyWithSignatureHtml = applyCcoSignatureHtml({
       body,
       profile: signatureProfile,
-      senderMailboxId,
+      senderMailboxId:
+        normalizeText(
+          normalizedInput.senderMailboxId ||
+            normalizedInput.sender_mailbox_id ||
+            signatureProfile?.senderMailboxId ||
+            mailboxSettingsDefaults.composeSenderMailboxId ||
+            mailboxSettingsDefaults.senderMailboxId ||
+            process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
+            CCO_DEFAULT_SENDER_MAILBOX ||
+            normalizedInput.sourceMailboxId ||
+            normalizedInput.source_mailbox_id ||
+            normalizedInput.mailboxId ||
+            normalizedInput.mailbox_id
+        ) || CCO_DEFAULT_SENDER_MAILBOX,
     });
-    const to = toStringArray(normalizedInput.to, 20);
-    const requestedMode = normalizeText(
-      normalizedInput.mode || normalizedInput.sendMode || normalizedInput.send_mode
-    ).toLowerCase();
-    const isComposeMode =
-      requestedMode === 'compose' || (!replyToMessageId && !conversationId);
-    const capabilityName = isComposeMode ? 'CCO.SendCompose' : 'CCO.SendReply';
-    const sendIntent = isComposeMode ? 'cco.send.compose' : 'cco.send.reply';
-    const requiresExplicitRecipients =
-      isComposeMode || sourceMailboxId.toLowerCase() !== senderMailboxId.toLowerCase();
+    const composeDocument = buildCanonicalMailComposeDocument(normalizedInput, {
+      signatureProfile,
+      renderedBodyText: bodyWithSignature,
+      renderedBodyHtml: bodyWithSignatureHtml,
+      defaultSenderMailboxId:
+        mailboxSettingsDefaults.composeSenderMailboxId ||
+        mailboxSettingsDefaults.senderMailboxId ||
+        process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
+        CCO_DEFAULT_SENDER_MAILBOX,
+    });
+    const sourceMailboxId = normalizeText(composeDocument.sourceMailboxId);
+    const senderMailboxId = normalizeText(composeDocument.senderMailboxId);
+    const replyToMessageId = normalizeText(composeDocument.replyContext?.replyToMessageId);
+    const conversationId = normalizeText(composeDocument.replyContext?.conversationId);
+    const subject = normalizeText(composeDocument.subject);
+    const to = toStringArray(composeDocument.recipients?.to, 20);
+    const cc = toStringArray(composeDocument.recipients?.cc, 20);
+    const bcc = toStringArray(composeDocument.recipients?.bcc, 20);
+    const isComposeMode = composeDocument.mode === 'compose';
+    const capabilityName =
+      normalizeText(composeDocument.delivery?.capabilityName) ||
+      (isComposeMode ? 'CCO.SendCompose' : 'CCO.SendReply');
+    const sendIntent =
+      normalizeText(composeDocument.delivery?.intent) ||
+      (isComposeMode ? 'cco.send.compose' : 'cco.send.reply');
+    const sendStrategy =
+      normalizeText(composeDocument.delivery?.sendStrategy) ||
+      (isComposeMode ? 'send_mail' : 'reply_draft');
+    const composeDocumentSummary = summarizeComposeDocument(composeDocument);
+    const composeValidationErrors = Array.isArray(composeDocument.validation?.errors)
+      ? composeDocument.validation.errors
+      : [];
 
-    if (!sourceMailboxId) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'mailboxId kravs.');
-    }
-    if (!senderMailboxId) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'senderMailboxId kravs.');
-    }
-    if (!isComposeMode && !replyToMessageId) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'replyToMessageId kravs.');
-    }
-    if (!isComposeMode && !conversationId) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'conversationId kravs.');
-    }
-    if (!subject) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'subject kravs.');
-    }
-    if (!body) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'body kravs.');
-    }
-    if (requiresExplicitRecipients && !to.length) {
-      throw makeCapabilityError('CCO_SEND_INPUT_INVALID', 'to[] kravs.');
+    if (composeDocument.validation?.valid !== true) {
+      const primaryError = composeValidationErrors[0] || {
+        message: 'composeDocument ar ogiltigt.',
+      };
+      throw makeCapabilityError(
+        'CCO_SEND_INPUT_INVALID',
+        normalizeText(primaryError.message) || 'composeDocument ar ogiltigt.',
+        {
+          composeDocument: composeDocumentSummary,
+          validationErrors: composeValidationErrors,
+        }
+      );
     }
     if (!normalizedIdempotencyKey) {
       throw makeCapabilityError(
@@ -1282,9 +1532,10 @@ function createCapabilityExecutor({
     }
     if (
       !graphSendConnector ||
-      (isComposeMode
-        ? typeof graphSendConnector.sendNewMessage !== 'function'
-        : typeof graphSendConnector.sendReply !== 'function')
+      (typeof graphSendConnector.sendComposeDocument !== 'function' &&
+        (isComposeMode
+          ? typeof graphSendConnector.sendNewMessage !== 'function'
+          : typeof graphSendConnector.sendReply !== 'function'))
     ) {
       throw makeCapabilityError(
         'CCO_SEND_CONNECTOR_UNAVAILABLE',
@@ -1321,9 +1572,13 @@ function createCapabilityExecutor({
         senderMailboxId,
         signatureProfile: signatureProfile.key,
         mode: isComposeMode ? 'compose' : 'reply',
+        sendStrategy,
         conversationId,
         replyToMessageId,
         to,
+        cc,
+        bcc,
+        composeDocumentVersion: composeDocumentSummary?.version || null,
         correlationId: normalizedCorrelationId,
         channel: normalizedChannel,
       },
@@ -1345,10 +1600,14 @@ function createCapabilityExecutor({
             replyToMessageId,
             conversationId,
             to,
+            cc,
+            bcc,
             subject,
-            body: bodyWithSignature,
+            body: composeDocument.content?.bodyText || '',
+            bodyHtml: composeDocument.content?.bodyHtml || '',
             signatureProfile: signatureProfile.key,
             mode: isComposeMode ? 'compose' : 'reply',
+            composeDocument: composeDocumentSummary,
           },
           correlation_id: normalizedCorrelationId,
           idempotency_key: normalizedIdempotencyKey,
@@ -1381,11 +1640,14 @@ function createCapabilityExecutor({
               replyToMessageId,
               conversationId,
               to,
+              cc,
+              bcc,
               subject,
-              body: bodyWithSignature,
-              bodyHtml: bodyWithSignatureHtml,
+              body: composeDocument.content?.bodyText || '',
+              bodyHtml: composeDocument.content?.bodyHtml || '',
               signatureProfile: signatureProfile.key,
               mode: isComposeMode ? 'compose' : 'reply',
+              composeDocument: composeDocumentSummary,
               confidenceLevel: 'High',
             },
           }),
@@ -1418,24 +1680,59 @@ function createCapabilityExecutor({
               throw decisionError;
             }
 
-            const sendResult = isComposeMode
-              ? await graphSendConnector.sendNewMessage({
-                  mailboxId: senderMailboxId,
-                  sourceMailboxId,
-                  body: String(agentResult?.output?.body || ''),
-                  bodyHtml: String(agentResult?.output?.bodyHtml || ''),
-                  subject: String(agentResult?.output?.subject || ''),
-                  to,
-                })
-              : await graphSendConnector.sendReply({
-                  mailboxId: senderMailboxId,
-                  sourceMailboxId,
-                  replyToMessageId,
-                  body: String(agentResult?.output?.body || ''),
-                  bodyHtml: String(agentResult?.output?.bodyHtml || ''),
-                  subject: String(agentResult?.output?.subject || ''),
-                  to,
-                });
+            const persistedComposeDocument = buildCanonicalMailComposeDocument(
+              {
+                ...normalizedInput,
+                mode: isComposeMode ? 'compose' : 'reply',
+                sourceMailboxId,
+                senderMailboxId,
+                replyToMessageId,
+                conversationId,
+                to,
+                cc,
+                bcc,
+                subject: String(agentResult?.output?.subject || ''),
+                body: String(agentResult?.output?.body || ''),
+              },
+              {
+                signatureProfile,
+                renderedBodyText: String(agentResult?.output?.body || ''),
+                renderedBodyHtml: String(agentResult?.output?.bodyHtml || ''),
+                defaultSenderMailboxId:
+                  mailboxSettingsDefaults.composeSenderMailboxId ||
+                  mailboxSettingsDefaults.senderMailboxId ||
+                  process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX ||
+                  CCO_DEFAULT_SENDER_MAILBOX,
+              }
+            );
+
+            const sendResult =
+              typeof graphSendConnector.sendComposeDocument === 'function'
+                ? await graphSendConnector.sendComposeDocument({
+                    composeDocument: persistedComposeDocument,
+                  })
+                : isComposeMode
+                  ? await graphSendConnector.sendNewMessage({
+                      mailboxId: senderMailboxId,
+                      sourceMailboxId,
+                      body: String(agentResult?.output?.body || ''),
+                      bodyHtml: String(agentResult?.output?.bodyHtml || ''),
+                      subject: String(agentResult?.output?.subject || ''),
+                      to,
+                      cc,
+                      bcc,
+                    })
+                  : await graphSendConnector.sendReply({
+                      mailboxId: senderMailboxId,
+                      sourceMailboxId,
+                      replyToMessageId,
+                      body: String(agentResult?.output?.body || ''),
+                      bodyHtml: String(agentResult?.output?.bodyHtml || ''),
+                      subject: String(agentResult?.output?.subject || ''),
+                      to,
+                      cc,
+                      bcc,
+                    });
 
             if (!capabilityAnalysisStore || typeof capabilityAnalysisStore.append !== 'function') {
               const storeError = makeCapabilityError(
@@ -1464,10 +1761,13 @@ function createCapabilityExecutor({
                 replyToMessageId,
                 conversationId,
                 to,
+                cc,
+                bcc,
                 subject: maskInboxText(subject, 180),
-                bodyPreview: maskInboxText(bodyWithSignature, 360),
-                bodyHtmlPreview: maskInboxText(bodyWithSignatureHtml, 360),
+                bodyPreview: maskInboxText(composeDocument.content?.bodyText || '', 360),
+                bodyHtmlPreview: maskInboxText(composeDocument.content?.bodyHtml || '', 360),
                 signatureProfile: signatureProfile.key,
+                composeDocument: composeDocumentSummary,
               },
               output: {
                 provider: sendResult.provider,
@@ -1476,8 +1776,10 @@ function createCapabilityExecutor({
                 replyToMessageId: sendResult.replyToMessageId,
                 conversationId,
                 to: sendResult.to,
+                cc: Array.isArray(sendResult.cc) ? sendResult.cc : [],
+                bcc: Array.isArray(sendResult.bcc) ? sendResult.bcc : [],
                 subject: maskInboxText(subject, 180),
-                bodyPreview: maskInboxText(bodyWithSignature, 360),
+                bodyPreview: maskInboxText(composeDocument.content?.bodyText || '', 360),
                 sentAt: sendResult.sentAt,
                 sendMode: sendResult.sendMode || 'reply',
               },
@@ -1495,6 +1797,8 @@ function createCapabilityExecutor({
                 sendMode: 'manual',
                 signatureProfile: signatureProfile.key,
                 composeMode: isComposeMode,
+                sendStrategy,
+                composeDocumentVersion: composeDocumentSummary?.version || null,
               },
             });
 
@@ -1526,11 +1830,13 @@ function createCapabilityExecutor({
               mode: 'manual',
               composeMode: isComposeMode,
               signatureProfile: signatureProfile.key,
+              sendStrategy,
             },
+            composeDocument: composeDocumentSummary,
             preview: {
               subject,
-              body: bodyWithSignature,
-              bodyHtml: bodyWithSignatureHtml,
+              body: composeDocument.content?.bodyText || '',
+              bodyHtml: composeDocument.content?.bodyHtml || '',
             },
             decision,
             riskSummary: {
@@ -1560,8 +1866,10 @@ function createCapabilityExecutor({
           senderMailboxId,
           signatureProfile: signatureProfile.key,
           mode: isComposeMode ? 'compose' : 'reply',
+          sendStrategy,
           conversationId,
           replyToMessageId,
+          composeDocumentVersion: composeDocumentSummary?.version || null,
           correlationId: normalizedCorrelationId,
           errorCode: error?.code || null,
           errorMessage: normalizeText(error?.message) || 'cco_send_error',
@@ -1586,8 +1894,10 @@ function createCapabilityExecutor({
         senderMailboxId,
         signatureProfile: signatureProfile.key,
         mode: isComposeMode ? 'compose' : 'reply',
+        sendStrategy,
         conversationId,
         replyToMessageId,
+        composeDocumentVersion: composeDocumentSummary?.version || null,
         correlationId: normalizedCorrelationId,
         decision: gatewayResult?.decision || null,
         gatewayRunId: gatewayResult?.run_id || null,
@@ -1614,4 +1924,5 @@ module.exports = {
   buildCcoSignatureHtml,
   applyCcoSignatureHtml,
   resolveCcoSignatureProfile,
+  resolveCcoSignatureSelection,
 };

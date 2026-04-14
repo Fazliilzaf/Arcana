@@ -1,0 +1,61 @@
+# Major Arcana Index
+
+Det här är en samlad ingång till Major Arcana-materialet i repo:t.
+
+Regel:
+- Originalfilerna här under ska inte skrivas om eller flyttas.
+- Det här indexet är bara en pekare och läsordning.
+- Om något senare ska konsolideras ska vi göra det genom nya sammanfattningar, inte genom att förstöra källorna.
+
+## Läsordning
+
+1. Ursprung och mål
+   - [Arcana-mal-original-2026-02-25.txt](./archives/input/arcana-mal-original-2026-02-25.txt)
+   - Beskriver varför Arcana blev ett OS och inte bara en chatt.
+
+2. Pilot 1 och vad som faktiskt levererades
+   - [Pilot-1-slutrapport.md](./Pilot-1-slutrapport.md)
+   - Summerar vad som redan är byggt och verifierat.
+
+3. Fas 2 och prioriteringsordning
+   - [strategy/arcana-phase-2-masterplan.md](./strategy/arcana-phase-2-masterplan.md)
+   - Låser ordningen för hårdning, incident/SLA, automation, risk precision och patientkanal.
+
+4. Drift, release och slutlås
+   - [ops/arcana-finalization-runbook.md](./ops/arcana-finalization-runbook.md)
+   - Visar hur Arcana ska driftsättas, verifieras och låsas inför bredare go-live.
+
+5. UI, brand och Major Arcana-ytan
+   - [major-arcana-color-inventory.md](./major-arcana-color-inventory.md)
+   - Används som visuell referens för Major Arcana-språket och tokeninventering.
+
+6. CCO och operativ struktur
+   - [cco-active-index.md](./cco-active-index.md)
+   - [cco-mail-foundation-status.md](./cco-mail-foundation-status.md)
+   - [cco-mail-foundation-working-sequence.md](./cco-mail-foundation-working-sequence.md)
+   - Bra för att förstå hur Major Arcana kopplas till den operativa CCO-ytan.
+
+7. Övriga stödmaterial
+   - [cco-next-migration-prep.md](./cco-next-migration-prep.md)
+   - [cco-new-salvage-matrix.md](./cco-new-salvage-matrix.md)
+   - [cco-mail-mime-fidelity-plan.md](./cco-mail-mime-fidelity-plan.md)
+
+## Canon i kort form
+
+Om du vill läsa Major Arcana som en enda berättelse, använd denna sammanfattning:
+
+- Arcana är ett säkert, spårbart, multi-tenant operativsystem för kliniker.
+- Först intern adminnytta och kontrollsystem.
+- Sedan interna agenter och driftautomation.
+- Sist patientkanal, när hårdning och risk är klar.
+- AI får generera utkast, men inte publicera själv.
+- Allt viktigt ska vara versionerat, auditerbart och tenant-separerat.
+
+## Var man ska börja om man tappat tråden
+
+- För strategi: läs målfilen först.
+- För leveransstatus: läs pilotrapporten.
+- För nästa steg: läs phase 2 masterplanen.
+- För drift och release: läs runbooken.
+- För CCO/informationsstruktur: läs CCO-indexet.
+

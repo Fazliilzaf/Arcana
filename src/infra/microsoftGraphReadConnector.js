@@ -5,16 +5,91 @@ function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+const DEFAULT_STORED_BODY_HTML_MAX_LENGTH = 24000;
+const INLINE_IMAGE_BODY_HTML_MAX_LENGTH = 240000;
+
+function resolveStoredBodyHtmlMaxLength(value = '') {
+  const html = normalizeText(value);
+  if (!html) return DEFAULT_STORED_BODY_HTML_MAX_LENGTH;
+  return /<img\b|data:image\/|cid:/i.test(html)
+    ? INLINE_IMAGE_BODY_HTML_MAX_LENGTH
+    : DEFAULT_STORED_BODY_HTML_MAX_LENGTH;
+}
+
 function sanitizeStoredBodyHtml(value = '') {
   const html = normalizeText(value);
   if (!html) return '';
-  return html
+  const sanitized = html
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
     .replace(/<\s*(script|style|iframe|object|embed|form|input|button|textarea|select|meta|link|base)[^>]*\/?\s*>/gi, '')
     .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
     .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-    .replace(/\s(src|href)\s*=\s*(['"])\s*(javascript:|data:text\/html)[\s\S]*?\2/gi, ' $1="#"')
-    .slice(0, 24000);
+    .replace(/\s(src|href)\s*=\s*(['"])\s*(javascript:|data:text\/html)[\s\S]*?\2/gi, ' $1="#"');
+  const maxLength = resolveStoredBodyHtmlMaxLength(sanitized);
+  return sanitized.length <= maxLength ? sanitized : sanitized.slice(0, maxLength);
+}
+
+function extractInlineCidReferences(bodyHtml = '') {
+  const html = normalizeText(bodyHtml);
+  if (!html) return [];
+  const matches = Array.from(html.matchAll(/<img\b[^>]*\bsrc\s*=\s*(['"])\s*cid:([^'"]+)\1/gi));
+  const values = new Set();
+  for (const match of matches) {
+    const raw = normalizeText(match?.[2]);
+    if (!raw) continue;
+    values.add(raw);
+  }
+  return Array.from(values);
+}
+
+function normalizeInlineCidValue(value = '') {
+  const normalized = normalizeText(value)
+    .replace(/^cid:/i, '')
+    .replace(/^<|>$/g, '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return [];
+  const candidates = new Set([normalized]);
+  if (normalized.includes('/')) {
+    candidates.add(normalized.split('/')[0]);
+  }
+  return Array.from(candidates).filter(Boolean);
+}
+
+function buildInlineAttachmentReplacementMap(attachments = []) {
+  const replacements = new Map();
+  for (const attachment of asArray(attachments)) {
+    const contentType = normalizeText(attachment?.contentType).toLowerCase();
+    const contentBytes = normalizeText(attachment?.contentBytes);
+    if (!contentType.startsWith('image/') || !contentBytes) continue;
+    const cidCandidates = [
+      ...normalizeInlineCidValue(attachment?.contentId),
+      ...normalizeInlineCidValue(attachment?.id),
+      ...normalizeInlineCidValue(attachment?.name),
+    ];
+    if (!cidCandidates.length) continue;
+    const dataUrl = `data:${contentType};base64,${contentBytes}`;
+    cidCandidates.forEach((candidate) => {
+      if (!replacements.has(candidate)) replacements.set(candidate, dataUrl);
+    });
+  }
+  return replacements;
+}
+
+function resolveInlineCidImages(bodyHtml = '', attachments = []) {
+  const html = normalizeText(bodyHtml);
+  if (!html) return '';
+  const replacementMap = buildInlineAttachmentReplacementMap(attachments);
+  if (replacementMap.size === 0) return html;
+  return html.replace(
+    /(<img\b[^>]*\bsrc\s*=\s*['"])\s*cid:([^'"]+)(['"][^>]*>)/gi,
+    (match, prefix, rawCid, suffix) => {
+      const cidCandidates = normalizeInlineCidValue(rawCid);
+      const resolved = cidCandidates.find((candidate) => replacementMap.has(candidate));
+      if (!resolved) return match;
+      return `${prefix}${replacementMap.get(resolved)}${suffix}`;
+    }
+  );
 }
 
 function toNumber(value, fallback = 0) {
@@ -24,6 +99,21 @@ function toNumber(value, fallback = 0) {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function toSafeAttachmentMetadata(attachments = []) {
+  return asArray(attachments).map((item) => ({
+    id: normalizeText(item?.id) || null,
+    name: normalizeText(item?.name) || null,
+    contentType: normalizeText(item?.contentType) || null,
+    contentId: normalizeText(item?.contentId) || null,
+    isInline: item?.isInline === true,
+    size: toNumber(item?.size, 0),
+    sourceType:
+      normalizeText(item?.sourceType || item?.['@odata.type'] || 'graph_file_attachment') ||
+      'graph_file_attachment',
+    contentBytesAvailable: Boolean(normalizeText(item?.contentBytes)),
+  }));
 }
 
 function clampInt(value, min, max, fallback) {
@@ -134,6 +224,22 @@ function toRecipientList(value = []) {
   const source = Array.isArray(value) ? value : [];
   return source
     .map((item) => normalizeText(item?.emailAddress?.address))
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function toNamedRecipients(value = []) {
+  const source = Array.isArray(value) ? value : [];
+  return source
+    .map((item) => {
+      const address = normalizeText(item?.emailAddress?.address).toLowerCase();
+      const name = normalizeText(item?.emailAddress?.name);
+      if (!address && !name) return null;
+      return {
+        address: address || null,
+        name: name || null,
+      };
+    })
     .filter(Boolean)
     .slice(0, 20);
 }
@@ -326,6 +432,11 @@ function parseGraphError(payload = {}, fallback = 'request_failed') {
   );
 }
 
+function parseGraphServiceCode(payload = {}) {
+  const graphError = payload && typeof payload.error === 'object' ? payload.error : {};
+  return normalizeText(graphError.code || payload?.error || '');
+}
+
 function createGraphError(message, { code = '', status = 0, retryAfterSeconds = null, details = null } = {}) {
   const error = new Error(normalizeText(message) || 'graph_request_failed');
   if (code) error.code = code;
@@ -369,6 +480,52 @@ async function parseJsonResponse(response, label = 'request') {
     code: 'GRAPH_REQUEST_FAILED',
     status,
     details: payload,
+  });
+}
+
+async function parseTextResponse(response, label = 'request') {
+  let payload = '';
+  try {
+    payload = (await response.text()) || '';
+  } catch (_error) {
+    payload = '';
+  }
+  if (response?.ok) {
+    return {
+      text: payload,
+      contentType: normalizeText(response?.headers?.get('content-type')) || null,
+    };
+  }
+  const status = Number(response?.status || 0);
+  throw createGraphError(
+    `${label} failed (${status || 'n/a'}): ${normalizeText(payload) || 'graph_request_failed'}`,
+    {
+      code: 'GRAPH_REQUEST_FAILED',
+      status,
+      details: { body: payload },
+    }
+  );
+}
+
+async function parseBinaryResponse(response, label = 'request') {
+  let payload = null;
+  try {
+    const buffer = await response.arrayBuffer();
+    payload = Buffer.from(buffer);
+  } catch (_error) {
+    payload = null;
+  }
+  if (response?.ok) {
+    return {
+      buffer: payload || Buffer.alloc(0),
+      contentType: normalizeText(response?.headers?.get('content-type')) || null,
+      contentDisposition: normalizeText(response?.headers?.get('content-disposition')) || null,
+    };
+  }
+  const status = Number(response?.status || 0);
+  throw createGraphError(`${label} failed (${status || 'n/a'}): graph_request_failed`, {
+    code: 'GRAPH_REQUEST_FAILED',
+    status,
   });
 }
 
@@ -475,10 +632,7 @@ function toNormalizedMessage(
   const conversationId = toScopedConversationId(rawConversationId, mailboxKey) || rawConversationId;
   const subject = maskInboxText(raw.subject, 180) || '(utan amne)';
   const bodyPreview = maskInboxText(raw.bodyPreview, 360);
-  const bodyHtml =
-    normalizedDirection === 'outbound'
-      ? sanitizeStoredBodyHtml(raw?.body?.content)
-      : '';
+  const bodyHtml = sanitizeStoredBodyHtml(raw?.body?.content);
   const sentAt =
     toIso(
       normalizedDirection === 'outbound'
@@ -508,6 +662,7 @@ function toNormalizedMessage(
     recipients,
     replyToRecipients,
   });
+  const attachments = toSafeAttachmentMetadata(raw?.attachments);
 
   return {
     messageId,
@@ -518,6 +673,11 @@ function toNormalizedMessage(
     bodyHtml: bodyHtml || null,
     sentAt,
     direction: normalizedDirection,
+    hasAttachments: raw?.hasAttachments === true || attachments.length > 0,
+    isRead:
+      normalizedDirection === 'inbound' && typeof raw?.isRead === 'boolean'
+        ? raw.isRead
+        : null,
     senderEmail: senderEmail || null,
     senderName: senderName || null,
     recipients,
@@ -526,6 +686,7 @@ function toNormalizedMessage(
     internetMessageId,
     inReplyTo,
     references: dedupedReferences,
+    attachments,
     riskWords,
     mailboxId: normalizeText(mailboxId) || null,
     mailboxAddress: normalizeText(mailboxAddress) || null,
@@ -667,9 +828,12 @@ function toConversationSnapshots(messages = []) {
     entry.messages.push({
       messageId: message.messageId,
       direction: messageDirection,
+      isRead: typeof message.isRead === 'boolean' ? message.isRead : null,
       sentAt: message.sentAt,
       bodyPreview: message.bodyPreview,
       bodyHtml: normalizeText(message.bodyHtml) || null,
+      hasAttachments: message.hasAttachments === true,
+      attachments: toSafeAttachmentMetadata(message.attachments),
       mailboxId: normalizeText(message.mailboxId) || null,
       mailboxAddress: normalizeText(message.mailboxAddress) || null,
       userPrincipalName: normalizeText(message.userPrincipalName) || null,
@@ -788,6 +952,315 @@ function matchesMailboxIdFilter(user = {}, rawFilter = '') {
     }
   }
   return false;
+}
+
+const MAILBOX_TRUTH_FOLDER_SPECS = Object.freeze([
+  Object.freeze({
+    folderType: 'inbox',
+    graphFolderName: 'inbox',
+    fallbackDisplayName: 'Inbox',
+    dateField: 'receivedDateTime',
+    orderBy: 'receivedDateTime desc',
+    includeReadFilterSupported: true,
+  }),
+  Object.freeze({
+    folderType: 'sent',
+    graphFolderName: 'SentItems',
+    fallbackDisplayName: 'Sent Items',
+    dateField: 'sentDateTime',
+    orderBy: 'sentDateTime desc',
+    includeReadFilterSupported: false,
+  }),
+  Object.freeze({
+    folderType: 'drafts',
+    graphFolderName: 'Drafts',
+    fallbackDisplayName: 'Drafts',
+    dateField: 'lastModifiedDateTime',
+    orderBy: 'lastModifiedDateTime desc',
+    includeReadFilterSupported: false,
+  }),
+  Object.freeze({
+    folderType: 'deleted',
+    graphFolderName: 'DeletedItems',
+    fallbackDisplayName: 'Deleted Items',
+    dateField: 'lastModifiedDateTime',
+    orderBy: 'lastModifiedDateTime desc',
+    includeReadFilterSupported: false,
+  }),
+]);
+
+function resolveMailboxTruthFolderSpecs(requestedFolders = null) {
+  const requested = Array.isArray(requestedFolders)
+    ? requestedFolders
+        .map((item) => normalizeText(item).toLowerCase())
+        .filter(Boolean)
+    : [];
+  if (requested.length === 0) return MAILBOX_TRUTH_FOLDER_SPECS.slice();
+  const requestedSet = new Set(requested);
+  return MAILBOX_TRUTH_FOLDER_SPECS.filter((item) => requestedSet.has(item.folderType));
+}
+
+function toFolderMetadataUrl({
+  graphBaseUrl,
+  userId,
+  graphFolderName,
+}) {
+  const folderUrl = new URL(
+    `${graphBaseUrl}/users/${encodeURIComponent(userId)}/mailFolders/${encodeURIComponent(
+      graphFolderName
+    )}`
+  );
+  folderUrl.searchParams.set(
+    '$select',
+    ['id', 'displayName', 'totalItemCount', 'unreadItemCount'].join(',')
+  );
+  return folderUrl;
+}
+
+function toFolderMessagesUrl({
+  graphBaseUrl,
+  userId,
+  graphFolderName,
+  maxMessages,
+  dateField,
+  startIso,
+  endIso,
+  orderBy,
+  includeReadMessages,
+  includeReadFilterSupported,
+  includeCount = false,
+}) {
+  const messagesUrl = new URL(
+    `${graphBaseUrl}/users/${encodeURIComponent(userId)}/mailFolders/${encodeURIComponent(
+      graphFolderName
+    )}/messages`
+  );
+  messagesUrl.searchParams.set('$top', String(maxMessages));
+  messagesUrl.searchParams.set(
+    '$select',
+    [
+      'id',
+      'conversationId',
+      'subject',
+      'bodyPreview',
+      'body',
+      'receivedDateTime',
+      'sentDateTime',
+      'createdDateTime',
+      'lastModifiedDateTime',
+      'isRead',
+      'isDraft',
+      'from',
+      'toRecipients',
+      'ccRecipients',
+      'bccRecipients',
+      'replyTo',
+      'internetMessageId',
+      'internetMessageHeaders',
+      'hasAttachments',
+      'parentFolderId',
+    ].join(',')
+  );
+  messagesUrl.searchParams.set('$orderby', orderBy);
+  const filterParts = [];
+  const safeStartIso = normalizeText(startIso);
+  if (safeStartIso) filterParts.push(`${dateField} ge ${safeStartIso}`);
+  const safeEndIso = normalizeText(endIso);
+  if (safeEndIso) filterParts.push(`${dateField} lt ${safeEndIso}`);
+  if (includeReadFilterSupported && !includeReadMessages) filterParts.push('isRead eq false');
+  if (filterParts.length > 0) {
+    messagesUrl.searchParams.set('$filter', filterParts.join(' and '));
+  }
+  if (includeCount) {
+    messagesUrl.searchParams.set('$count', 'true');
+  }
+  return messagesUrl;
+}
+
+function toFolderMessagesDeltaUrl({
+  graphBaseUrl,
+  userId,
+  graphFolderName,
+  maxMessages,
+}) {
+  const messagesUrl = new URL(
+    `${graphBaseUrl}/users/${encodeURIComponent(userId)}/mailFolders/${encodeURIComponent(
+      graphFolderName
+    )}/messages/delta`
+  );
+  messagesUrl.searchParams.set('$top', String(maxMessages));
+  messagesUrl.searchParams.set(
+    '$select',
+    [
+      'id',
+      'conversationId',
+      'subject',
+      'bodyPreview',
+      'body',
+      'receivedDateTime',
+      'sentDateTime',
+      'createdDateTime',
+      'lastModifiedDateTime',
+      'isRead',
+      'isDraft',
+      'from',
+      'toRecipients',
+      'ccRecipients',
+      'bccRecipients',
+      'replyTo',
+      'internetMessageId',
+      'internetMessageHeaders',
+      'hasAttachments',
+      'parentFolderId',
+    ].join(',')
+  );
+  return messagesUrl;
+}
+
+function inferMailboxTruthDirection({
+  raw = {},
+  folderType = 'unknown',
+  mailboxAliases = [],
+}) {
+  if (folderType === 'inbox') return 'inbound';
+  if (folderType === 'sent') return 'outbound';
+  if (folderType === 'drafts') return 'draft';
+
+  const safeAliases = Array.isArray(mailboxAliases)
+    ? mailboxAliases.map((item) => normalizeText(item).toLowerCase()).filter(Boolean)
+    : [];
+  const sender = normalizeText(raw?.from?.emailAddress?.address).toLowerCase();
+  if (sender && safeAliases.includes(sender)) return 'outbound';
+
+  const recipients = [
+    ...toRecipientList(raw?.toRecipients),
+    ...toRecipientList(raw?.ccRecipients),
+    ...toRecipientList(raw?.bccRecipients),
+    ...toReplyToList(raw?.replyTo),
+  ]
+    .map((item) => normalizeText(item).toLowerCase())
+    .filter(Boolean);
+  if (recipients.some((item) => safeAliases.includes(item))) return 'inbound';
+  return 'unknown';
+}
+
+function toMailboxTruthRawMessage(
+  raw = {},
+  {
+    folderType = 'unknown',
+    folderId = '',
+    folderName = '',
+    wellKnownName = '',
+    mailboxId = '',
+    mailboxAddress = '',
+    userPrincipalName = '',
+  } = {}
+) {
+  const graphMessageId = normalizeText(raw.id);
+  if (!graphMessageId) return null;
+
+  const internetHeaders = Array.isArray(raw?.internetMessageHeaders)
+    ? raw.internetMessageHeaders
+    : [];
+  const inReplyTo =
+    normalizeHeaderMessageId(raw?.inReplyTo) ||
+    normalizeHeaderMessageId(toHeaderValue(internetHeaders, 'in-reply-to')) ||
+    null;
+  const references = [
+    ...toReferenceIds(raw?.references),
+    ...toReferenceIds(toHeaderValue(internetHeaders, 'references')),
+  ];
+  const mailboxAliases = [mailboxId, mailboxAddress, userPrincipalName];
+  const attachments = toSafeAttachmentMetadata(raw?.attachments);
+
+  return {
+    graphMessageId,
+    mailboxId: normalizeText(mailboxId).toLowerCase() || null,
+    mailboxAddress: normalizeText(mailboxAddress).toLowerCase() || null,
+    userPrincipalName: normalizeText(userPrincipalName).toLowerCase() || null,
+    folderId: normalizeText(raw.parentFolderId || folderId) || null,
+    folderName: normalizeText(folderName) || null,
+    folderType,
+    wellKnownName: normalizeText(wellKnownName) || null,
+    conversationId: normalizeText(raw.conversationId) || null,
+    subject: maskInboxText(raw.subject, 180) || '(utan amne)',
+    bodyPreview: maskInboxText(raw.bodyPreview, 360),
+    bodyHtml: sanitizeStoredBodyHtml(raw?.body?.content) || null,
+    direction: inferMailboxTruthDirection({
+      raw,
+      folderType,
+      mailboxAliases,
+    }),
+    isRead: typeof raw?.isRead === 'boolean' ? raw.isRead : null,
+    isDraft: raw?.isDraft === true || folderType === 'drafts',
+    hasAttachments: raw?.hasAttachments === true || attachments.length > 0,
+    receivedAt: toIso(raw?.receivedDateTime) || null,
+    sentAt: toIso(raw?.sentDateTime) || null,
+    createdAt: toIso(raw?.createdDateTime) || null,
+    lastModifiedAt: toIso(raw?.lastModifiedDateTime) || null,
+    from: {
+      address: normalizeText(raw?.from?.emailAddress?.address).toLowerCase() || null,
+      name: normalizeText(raw?.from?.emailAddress?.name) || null,
+    },
+    toRecipients: toNamedRecipients(raw?.toRecipients),
+    ccRecipients: toNamedRecipients(raw?.ccRecipients),
+    bccRecipients: toNamedRecipients(raw?.bccRecipients),
+    replyToRecipients: toNamedRecipients(raw?.replyTo),
+    internetMessageId: normalizeHeaderMessageId(raw?.internetMessageId) || null,
+    inReplyTo,
+    references: Array.from(new Set(references)).filter(Boolean),
+    attachments,
+  };
+}
+
+function toMailboxTruthDeltaChange(
+  raw = {},
+  {
+    folderType = 'unknown',
+    folderId = '',
+    folderName = '',
+    wellKnownName = '',
+    mailboxId = '',
+    mailboxAddress = '',
+    userPrincipalName = '',
+  } = {}
+) {
+  const graphMessageId = normalizeText(raw?.id);
+  if (!graphMessageId) return null;
+  const removed = raw && typeof raw === 'object' ? raw['@removed'] : null;
+  if (removed && typeof removed === 'object') {
+    return {
+      changeType: 'deleted',
+      graphMessageId,
+      mailboxId: normalizeText(mailboxId).toLowerCase() || null,
+      mailboxAddress: normalizeText(mailboxAddress).toLowerCase() || null,
+      userPrincipalName: normalizeText(userPrincipalName).toLowerCase() || null,
+      folderId: normalizeText(folderId) || null,
+      folderName: normalizeText(folderName) || null,
+      folderType,
+      wellKnownName: normalizeText(wellKnownName) || null,
+      removalReason: normalizeText(removed?.reason) || 'deleted',
+    };
+  }
+  const normalizedMessage = toMailboxTruthRawMessage(raw, {
+    folderType,
+    folderId,
+    folderName,
+    wellKnownName,
+    mailboxId,
+    mailboxAddress,
+    userPrincipalName,
+  });
+  if (!normalizedMessage) return null;
+  return {
+    changeType: 'upsert',
+    graphMessageId: normalizedMessage.graphMessageId,
+    mailboxId: normalizedMessage.mailboxId,
+    mailboxAddress: normalizedMessage.mailboxAddress,
+    userPrincipalName: normalizedMessage.userPrincipalName,
+    folderType: normalizedMessage.folderType,
+    message: normalizedMessage,
+  };
 }
 
 function toInboxMessagesUrl({
@@ -975,6 +1448,118 @@ function createMicrosoftGraphReadConnector(config = {}) {
     throw lastError || new Error(`${label} failed without explicit error.`);
   }
 
+  async function fetchGraphTextWithRetry({
+    url,
+    accessToken,
+    label,
+    timeoutMs,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+    accept = 'message/rfc822',
+  }) {
+    const safeRetries = clampInt(requestMaxRetries, 0, 6, 2);
+    const maxAttempts = safeRetries + 1;
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt < maxAttempts) {
+      attempt += 1;
+      try {
+        const response = await fetchWithTimeout(
+          fetchImpl,
+          url,
+          {
+            method: 'GET',
+            headers: {
+              authorization: `Bearer ${accessToken}`,
+              accept,
+            },
+          },
+          timeoutMs
+        );
+
+        if (Number(response?.status || 0) === 429) {
+          throw createGraphError(`${label} failed (429): rate_limit_hit`, {
+            code: 'GRAPH_RATE_LIMITED',
+            status: 429,
+            retryAfterSeconds: parseRetryAfterSeconds(response),
+          });
+        }
+        return await parseTextResponse(response, label);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableGraphError(error) || attempt >= maxAttempts) {
+          throw error;
+        }
+        const delayMs = toRetryDelayMs({
+          error,
+          attempt,
+          retryBaseDelayMs,
+          retryMaxDelayMs,
+        });
+        await sleep(delayMs);
+      }
+    }
+    throw lastError || new Error(`${label} failed without explicit error.`);
+  }
+
+  async function fetchGraphBinaryWithRetry({
+    url,
+    accessToken,
+    label,
+    timeoutMs,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+    accept = '*/*',
+  }) {
+    const safeRetries = clampInt(requestMaxRetries, 0, 6, 2);
+    const maxAttempts = safeRetries + 1;
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt < maxAttempts) {
+      attempt += 1;
+      try {
+        const response = await fetchWithTimeout(
+          fetchImpl,
+          url,
+          {
+            method: 'GET',
+            headers: {
+              authorization: `Bearer ${accessToken}`,
+              accept,
+            },
+          },
+          timeoutMs
+        );
+
+        if (Number(response?.status || 0) === 429) {
+          throw createGraphError(`${label} failed (429): rate_limit_hit`, {
+            code: 'GRAPH_RATE_LIMITED',
+            status: 429,
+            retryAfterSeconds: parseRetryAfterSeconds(response),
+          });
+        }
+        return await parseBinaryResponse(response, label);
+      } catch (error) {
+        lastError = error;
+        if (!isRetryableGraphError(error) || attempt >= maxAttempts) {
+          throw error;
+        }
+        const delayMs = toRetryDelayMs({
+          error,
+          attempt,
+          retryBaseDelayMs,
+          retryMaxDelayMs,
+        });
+        await sleep(delayMs);
+      }
+    }
+    throw lastError || new Error(`${label} failed without explicit error.`);
+  }
+
   async function fetchGraphCollection({
     initialUrl,
     accessToken,
@@ -1039,6 +1624,676 @@ function createMicrosoftGraphReadConnector(config = {}) {
       value,
       pageCount,
       truncatedByLimit,
+    };
+  }
+
+  async function fetchMessageAttachments({
+    graphBaseUrl,
+    userId,
+    messageId,
+    accessToken,
+    label,
+    timeoutMs,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  }) {
+    const safeUserId = normalizeText(userId);
+    const safeMessageId = normalizeText(messageId);
+    if (!safeUserId || !safeMessageId) return [];
+    const url = new URL(
+      `${graphBaseUrl}/users/${encodeURIComponent(safeUserId)}/messages/${encodeURIComponent(
+        safeMessageId
+      )}/attachments`
+    );
+    const payload = await fetchGraphCollection({
+      initialUrl: url.toString(),
+      accessToken,
+      label,
+      timeoutMs,
+      maxItems: 20,
+      maxPages: 2,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+    const attachments = Array.isArray(payload?.value) ? payload.value : [];
+    const maxInlineImageBytes = 1024 * 1024;
+    const maxTotalInlineImageBytes = Math.floor(2.5 * 1024 * 1024);
+    let totalInlineImageBytes = 0;
+    return attachments
+      .map((item) => ({
+        id: normalizeText(item?.id) || null,
+        name: normalizeText(item?.name) || null,
+        contentType: normalizeText(item?.contentType) || null,
+        contentId: normalizeText(item?.contentId) || null,
+        isInline: item?.isInline === true,
+        size: toNumber(item?.size, 0),
+        sourceType: normalizeText(item?.['@odata.type'] || 'graph_file_attachment') || 'graph_file_attachment',
+        contentBytes: (() => {
+          const contentType = normalizeText(item?.contentType).toLowerCase();
+          const contentBytes = normalizeText(item?.contentBytes);
+          const size = toNumber(item?.size, 0);
+          if (!contentType.startsWith('image/')) return null;
+          if (item?.isInline !== true) return null;
+          if (!contentBytes) return null;
+          if (size <= 0 || size > maxInlineImageBytes) return null;
+          if (totalInlineImageBytes + size > maxTotalInlineImageBytes) return null;
+          totalInlineImageBytes += size;
+          return contentBytes;
+        })(),
+      }))
+      .filter(
+        (item) =>
+          Boolean(item?.id || item?.name || item?.contentType || item?.contentId || item?.size)
+      );
+  }
+
+  async function fetchMessageMimeContent({
+    userId,
+    messageId,
+    label = 'Microsoft Graph open-mail MIME request',
+    timeoutMs = 7000,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  }) {
+    const safeUserId = normalizeText(userId);
+    const safeMessageId = normalizeText(messageId);
+    if (!safeUserId || !safeMessageId) {
+      return {
+        rawMime: '',
+        contentType: null,
+      };
+    }
+    const accessToken = await fetchAccessToken();
+    const url = `${graphBaseUrl}/users/${encodeURIComponent(safeUserId)}/messages/${encodeURIComponent(
+      safeMessageId
+    )}/$value`;
+    const payload = await fetchGraphTextWithRetry({
+      url,
+      accessToken,
+      label,
+      timeoutMs,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+      accept: 'message/rfc822',
+    });
+    return {
+      rawMime: normalizeText(payload?.text),
+      contentType: normalizeText(payload?.contentType) || null,
+    };
+  }
+
+  async function fetchMessageAttachmentContent({
+    userId,
+    messageId,
+    attachmentId,
+    label = 'Microsoft Graph open-mail attachment request',
+    timeoutMs = 7000,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  }) {
+    const safeUserId = normalizeText(userId);
+    const safeMessageId = normalizeText(messageId);
+    const safeAttachmentId = normalizeText(attachmentId);
+    if (!safeUserId || !safeMessageId || !safeAttachmentId) {
+      return {
+        attachmentId: safeAttachmentId || null,
+        name: null,
+        contentType: null,
+        size: 0,
+        isInline: false,
+        contentId: null,
+        buffer: Buffer.alloc(0),
+        sourceType: null,
+      };
+    }
+    const accessToken = await fetchAccessToken();
+    const metadataUrl = `${graphBaseUrl}/users/${encodeURIComponent(
+      safeUserId
+    )}/messages/${encodeURIComponent(safeMessageId)}/attachments/${encodeURIComponent(
+      safeAttachmentId
+    )}`;
+    const metadata = await fetchGraphPageWithRetry({
+      url: metadataUrl,
+      accessToken,
+      label,
+      timeoutMs,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+
+    const contentBytes = normalizeText(metadata?.contentBytes);
+    const contentBuffer = contentBytes
+      ? Buffer.from(contentBytes, 'base64')
+      : (
+          await fetchGraphBinaryWithRetry({
+            url: `${metadataUrl}/$value`,
+            accessToken,
+            label: `${label} binary`,
+            timeoutMs,
+            requestMaxRetries,
+            retryBaseDelayMs,
+            retryMaxDelayMs,
+            accept: normalizeText(metadata?.contentType) || '*/*',
+          })
+        ).buffer;
+
+    return {
+      attachmentId: safeAttachmentId,
+      name: normalizeText(metadata?.name) || null,
+      contentType: normalizeText(metadata?.contentType) || null,
+      size: toNumber(metadata?.size, contentBuffer.length),
+      isInline: metadata?.isInline === true,
+      contentId: normalizeText(metadata?.contentId) || null,
+      buffer: contentBuffer,
+      sourceType:
+        normalizeText(metadata?.sourceType || metadata?.['@odata.type'] || 'graph_file_attachment') ||
+        'graph_file_attachment',
+    };
+  }
+
+  async function fetchInlineImageAttachments(options = {}) {
+    const attachments = await fetchMessageAttachments(options);
+    return attachments.filter((item) => {
+      const contentType = normalizeText(item?.contentType).toLowerCase();
+      return contentType.startsWith('image/') && normalizeText(item?.contentBytes);
+    });
+  }
+
+  function sanitizeResolvedAttachmentMetadata(attachments = []) {
+    return toSafeAttachmentMetadata(attachments);
+  }
+
+  async function enrichMessagesWithInlineHtmlAssets({
+    rawMessages = [],
+    graphBaseUrl,
+    userId,
+    accessToken,
+    timeoutMs,
+    label,
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  }) {
+    const safeMessages = Array.isArray(rawMessages) ? rawMessages : [];
+    const enriched = [];
+    for (const rawMessage of safeMessages) {
+      const safeMessage = rawMessage && typeof rawMessage === 'object' ? { ...rawMessage } : rawMessage;
+      const bodyContent = normalizeText(safeMessage?.body?.content);
+      const cidReferences = extractInlineCidReferences(bodyContent);
+      const shouldFetchAttachments =
+        safeMessage?.hasAttachments === true || cidReferences.length > 0;
+      if (!shouldFetchAttachments) {
+        enriched.push(safeMessage);
+        continue;
+      }
+      try {
+        const resolvedAttachments = await fetchMessageAttachments({
+          graphBaseUrl,
+          userId,
+          messageId: safeMessage?.id,
+          accessToken,
+          label,
+          timeoutMs,
+          requestMaxRetries,
+          retryBaseDelayMs,
+          retryMaxDelayMs,
+        });
+        if (resolvedAttachments.length) {
+          safeMessage.attachments = sanitizeResolvedAttachmentMetadata(resolvedAttachments);
+        }
+        if (cidReferences.length && resolvedAttachments.length) {
+          safeMessage.body = {
+            ...(safeMessage?.body && typeof safeMessage.body === 'object' ? safeMessage.body : {}),
+            content: resolveInlineCidImages(bodyContent, resolvedAttachments),
+          };
+        }
+      } catch (_error) {
+      }
+      enriched.push(safeMessage);
+    }
+    return enriched;
+  }
+
+  async function enrichStoredMessagesWithInlineHtmlAssets({
+    messages = [],
+    timeoutMs = 5000,
+    label = 'Microsoft Graph stored inline attachment repair',
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  } = {}) {
+    return enrichStoredMessagesWithMailAssets({
+      messages,
+      timeoutMs,
+      label,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+  }
+
+  async function enrichStoredMessagesWithMailAssets({
+    messages = [],
+    timeoutMs = 5000,
+    label = 'Microsoft Graph stored mail asset enrichment',
+    requestMaxRetries = 2,
+    retryBaseDelayMs = 500,
+    retryMaxDelayMs = 5000,
+  } = {}) {
+    const safeMessages = Array.isArray(messages) ? messages : [];
+    if (safeMessages.length === 0) return [];
+    const accessToken = await fetchAccessToken();
+    const enriched = [];
+    for (const message of safeMessages) {
+      const safeMessage = message && typeof message === 'object' ? { ...message } : message;
+      const graphMessageId = normalizeText(
+        safeMessage?.graphMessageId || safeMessage?.messageId
+      );
+      const targetUserId = normalizeText(
+        safeMessage?.userPrincipalName ||
+          safeMessage?.mailboxAddress ||
+          safeMessage?.mailboxId ||
+          userId
+      );
+      const bodyHtml = normalizeText(safeMessage?.bodyHtml);
+      const cidReferences = extractInlineCidReferences(bodyHtml);
+      const shouldFetchAttachments =
+        safeMessage?.hasAttachments === true || cidReferences.length > 0;
+      if (!graphMessageId || !targetUserId || !shouldFetchAttachments) {
+        enriched.push(safeMessage);
+        continue;
+      }
+      try {
+        const resolvedAttachments = await fetchMessageAttachments({
+          graphBaseUrl,
+          userId: targetUserId,
+          messageId: graphMessageId,
+          accessToken,
+          label,
+          timeoutMs,
+          requestMaxRetries,
+          retryBaseDelayMs,
+          retryMaxDelayMs,
+        });
+        if (resolvedAttachments.length) {
+          safeMessage.attachments = sanitizeResolvedAttachmentMetadata(resolvedAttachments);
+        }
+        if (cidReferences.length && resolvedAttachments.length) {
+          safeMessage.bodyHtml = sanitizeStoredBodyHtml(
+            resolveInlineCidImages(bodyHtml, resolvedAttachments)
+          );
+        }
+      } catch (_error) {
+      }
+      enriched.push(safeMessage);
+    }
+    return enriched;
+  }
+
+  async function fetchMailboxTruthFolderPage(options = {}) {
+    const nowMs = Number(now());
+    if (!Number.isFinite(nowMs)) {
+      throw new Error('MicrosoftGraphReadConnector now() must return a finite timestamp.');
+    }
+
+    const targetUserId = normalizeText(options.userId || userId);
+    if (!targetUserId) {
+      throw new Error('MicrosoftGraphReadConnector fetchMailboxTruthFolderPage requires userId.');
+    }
+    const requestedFolderType = normalizeText(options.folderType).toLowerCase();
+    const folderSpec = resolveMailboxTruthFolderSpecs([requestedFolderType])[0];
+    if (!folderSpec) {
+      throw new Error(`MicrosoftGraphReadConnector unknown mailbox truth folderType: ${requestedFolderType || 'missing'}.`);
+    }
+
+    const includeReadMessages = options.includeRead !== false;
+    const explicitSinceIso = toIso(options.sinceIso);
+    const explicitUntilIso = toIso(options.untilIso);
+    if (
+      explicitSinceIso &&
+      explicitUntilIso &&
+      Date.parse(explicitUntilIso) <= Date.parse(explicitSinceIso)
+    ) {
+      throw new Error('MicrosoftGraphReadConnector untilIso must be later than sinceIso.');
+    }
+
+    const windowDays = clampInt(options.days, 1, 180, 30);
+    const fallbackSinceIso = toIsoFromMs(nowMs - windowDays * 24 * 60 * 60 * 1000);
+    const startIso = explicitSinceIso || fallbackSinceIso;
+    const endIso = explicitUntilIso || '';
+    const pageSize = clampInt(options.pageSize, 1, 500, 200);
+    const mailboxTimeoutMs = clampInt(options.mailboxTimeoutMs, 1000, 15000, 5000);
+    const requestMaxRetries = clampInt(options.requestMaxRetries, 0, 6, 2);
+    const retryBaseDelayMs = clampInt(options.retryBaseDelayMs, 100, 10000, 500);
+    const retryMaxDelayMs = clampInt(options.retryMaxDelayMs, 200, 30000, 5000);
+    const nextPageUrl = normalizeText(options.nextPageUrl);
+
+    const providedIdentity = {
+      id: normalizeText(options.graphUserId) || targetUserId,
+      mail:
+        normalizeText(options.mailboxAddress) ||
+        normalizeText(options.mailboxId) ||
+        targetUserId,
+      userPrincipalName: normalizeText(options.userPrincipalName) || targetUserId,
+    };
+    const identity = toMailboxIdentity(providedIdentity, targetUserId);
+    const accessToken = await fetchAccessToken();
+
+    let folderMetadata = options.folderMetadata && typeof options.folderMetadata === 'object'
+      ? {
+          folderId: normalizeText(options.folderMetadata.folderId || options.folderMetadata.id) || null,
+          folderName:
+            normalizeText(options.folderMetadata.folderName || options.folderMetadata.displayName) ||
+            folderSpec.fallbackDisplayName,
+          wellKnownName:
+            normalizeText(options.folderMetadata.wellKnownName) || folderSpec.graphFolderName,
+          totalItemCount: toNumber(options.folderMetadata.totalItemCount, 0),
+          unreadItemCount: toNumber(options.folderMetadata.unreadItemCount, 0),
+        }
+      : null;
+
+    if (!folderMetadata || !normalizeText(folderMetadata.folderId)) {
+      const metadataPayload = await fetchGraphPageWithRetry({
+        url: toFolderMetadataUrl({
+          graphBaseUrl,
+          userId: targetUserId,
+          graphFolderName: folderSpec.graphFolderName,
+        }).toString(),
+        accessToken,
+        label: `Microsoft Graph folder metadata request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType})`,
+        timeoutMs: mailboxTimeoutMs,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+      folderMetadata = {
+        folderId: normalizeText(metadataPayload?.id) || null,
+        folderName:
+          normalizeText(metadataPayload?.displayName) || folderSpec.fallbackDisplayName,
+        wellKnownName:
+          normalizeText(metadataPayload?.wellKnownName) || folderSpec.graphFolderName,
+        totalItemCount: toNumber(metadataPayload?.totalItemCount, 0),
+        unreadItemCount: toNumber(metadataPayload?.unreadItemCount, 0),
+      };
+    }
+
+    const pageUrl = nextPageUrl
+      ? nextPageUrl
+      : toFolderMessagesUrl({
+          graphBaseUrl,
+          userId: targetUserId,
+          graphFolderName: folderSpec.graphFolderName,
+          maxMessages: pageSize,
+          dateField: folderSpec.dateField,
+          startIso,
+          endIso,
+          orderBy: folderSpec.orderBy,
+          includeReadMessages,
+          includeReadFilterSupported: folderSpec.includeReadFilterSupported,
+          includeCount: true,
+        }).toString();
+
+    const payload = await fetchGraphPageWithRetry({
+      url: pageUrl,
+      accessToken,
+      label: `Microsoft Graph mailbox truth page request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType})`,
+      timeoutMs: mailboxTimeoutMs,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+
+    const enrichedRawMessages = await enrichMessagesWithInlineHtmlAssets({
+      rawMessages: payload?.value,
+      graphBaseUrl,
+      userId: targetUserId,
+      accessToken,
+      timeoutMs: mailboxTimeoutMs,
+      label: `Microsoft Graph inline attachment request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType})`,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+
+    const messages = Array.isArray(enrichedRawMessages)
+      ? enrichedRawMessages
+          .map((raw) =>
+            toMailboxTruthRawMessage(raw, {
+              folderType: folderSpec.folderType,
+              folderId: folderMetadata.folderId,
+              folderName: folderMetadata.folderName,
+              wellKnownName: folderMetadata.wellKnownName,
+              mailboxId: identity.mailboxId,
+              mailboxAddress: identity.mail,
+              userPrincipalName: identity.userPrincipalName,
+            })
+          )
+          .filter(Boolean)
+      : [];
+
+    return {
+      account: {
+        graphUserId: identity.id,
+        mailboxId: identity.mailboxId,
+        mailboxAddress: identity.mail,
+        userPrincipalName: identity.userPrincipalName,
+      },
+      folder: {
+        folderType: folderSpec.folderType,
+        folderId: folderMetadata.folderId,
+        folderName: folderMetadata.folderName,
+        wellKnownName: folderMetadata.wellKnownName,
+        fetchStatus: 'success',
+        totalItemCount: folderMetadata.totalItemCount,
+        unreadItemCount: folderMetadata.unreadItemCount,
+        messageCollectionCount: toNumber(payload?.['@odata.count'], NaN),
+      },
+      page: {
+        fetchedMessageCount: messages.length,
+        nextPageUrl: normalizeText(payload?.['@odata.nextLink']) || null,
+        pageSize,
+        complete: !normalizeText(payload?.['@odata.nextLink']),
+        sourcePageUrl: pageUrl,
+        windowStartIso: startIso,
+        windowEndIso: endIso || null,
+      },
+      messages,
+    };
+  }
+
+  async function fetchMailboxTruthFolderDeltaPage(options = {}) {
+    const targetUserId = normalizeText(options.userId || userId);
+    if (!targetUserId) {
+      throw new Error('MicrosoftGraphReadConnector fetchMailboxTruthFolderDeltaPage requires userId.');
+    }
+    const requestedFolderType = normalizeText(options.folderType).toLowerCase();
+    const folderSpec = resolveMailboxTruthFolderSpecs([requestedFolderType])[0];
+    if (!folderSpec) {
+      throw new Error(
+        `MicrosoftGraphReadConnector unknown mailbox truth delta folderType: ${requestedFolderType || 'missing'}.`
+      );
+    }
+
+    const pageSize = clampInt(options.pageSize, 1, 500, 200);
+    const mailboxTimeoutMs = clampInt(options.mailboxTimeoutMs, 1000, 15000, 5000);
+    const requestMaxRetries = clampInt(options.requestMaxRetries, 0, 6, 2);
+    const retryBaseDelayMs = clampInt(options.retryBaseDelayMs, 100, 10000, 500);
+    const retryMaxDelayMs = clampInt(options.retryMaxDelayMs, 200, 30000, 5000);
+    const cursorUrl = normalizeText(options.cursorUrl || options.nextPageUrl || options.deltaLink);
+    const refreshFolderMetadata = options.refreshFolderMetadata === true || !cursorUrl;
+
+    const providedIdentity = {
+      id: normalizeText(options.graphUserId) || targetUserId,
+      mail:
+        normalizeText(options.mailboxAddress) ||
+        normalizeText(options.mailboxId) ||
+        targetUserId,
+      userPrincipalName: normalizeText(options.userPrincipalName) || targetUserId,
+    };
+    const identity = toMailboxIdentity(providedIdentity, targetUserId);
+    const accessToken = await fetchAccessToken();
+
+    let folderMetadata =
+      options.folderMetadata && typeof options.folderMetadata === 'object'
+        ? {
+            folderId: normalizeText(options.folderMetadata.folderId || options.folderMetadata.id) || null,
+            folderName:
+              normalizeText(options.folderMetadata.folderName || options.folderMetadata.displayName) ||
+              folderSpec.fallbackDisplayName,
+            wellKnownName:
+              normalizeText(options.folderMetadata.wellKnownName) || folderSpec.graphFolderName,
+            totalItemCount: toNumber(options.folderMetadata.totalItemCount, 0),
+            unreadItemCount: toNumber(options.folderMetadata.unreadItemCount, 0),
+          }
+        : null;
+
+    if (refreshFolderMetadata || !folderMetadata || !normalizeText(folderMetadata.folderId)) {
+      const metadataPayload = await fetchGraphPageWithRetry({
+        url: toFolderMetadataUrl({
+          graphBaseUrl,
+          userId: targetUserId,
+          graphFolderName: folderSpec.graphFolderName,
+        }).toString(),
+        accessToken,
+        label: `Microsoft Graph folder metadata request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType} delta)`,
+        timeoutMs: mailboxTimeoutMs,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+      folderMetadata = {
+        folderId: normalizeText(metadataPayload?.id) || null,
+        folderName:
+          normalizeText(metadataPayload?.displayName) || folderSpec.fallbackDisplayName,
+        wellKnownName:
+          normalizeText(metadataPayload?.wellKnownName) || folderSpec.graphFolderName,
+        totalItemCount: toNumber(metadataPayload?.totalItemCount, 0),
+        unreadItemCount: toNumber(metadataPayload?.unreadItemCount, 0),
+      };
+    }
+
+    const pageUrl = cursorUrl
+      ? cursorUrl
+      : toFolderMessagesDeltaUrl({
+          graphBaseUrl,
+          userId: targetUserId,
+          graphFolderName: folderSpec.graphFolderName,
+          maxMessages: pageSize,
+        }).toString();
+
+    let payload = null;
+    try {
+      payload = await fetchGraphPageWithRetry({
+        url: pageUrl,
+        accessToken,
+        label: `Microsoft Graph mailbox truth delta request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType})`,
+        timeoutMs: mailboxTimeoutMs,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+    } catch (error) {
+      const graphServiceCode = parseGraphServiceCode(error?.details).toLowerCase();
+      if (
+        Number(error?.status || 0) === 410 ||
+        graphServiceCode === 'syncstatenotfound' ||
+        graphServiceCode === 'syncstateinvalid'
+      ) {
+        throw createGraphError(
+          `Microsoft Graph mailbox truth delta request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType}) failed: delta token invalid`,
+          {
+            code: 'GRAPH_DELTA_TOKEN_INVALID',
+            status: Number(error?.status || 410),
+            details: error?.details || null,
+          }
+        );
+      }
+      throw error;
+    }
+
+    const rawDeltaEntries = Array.isArray(payload?.value) ? payload.value : [];
+    const rawDeltaUpserts = rawDeltaEntries.filter((item) => {
+      const safeItem = item && typeof item === 'object' ? item : null;
+      return !(safeItem && typeof safeItem['@removed'] === 'object');
+    });
+    const enrichedDeltaUpserts = await enrichMessagesWithInlineHtmlAssets({
+      rawMessages: rawDeltaUpserts,
+      graphBaseUrl,
+      userId: targetUserId,
+      accessToken,
+      timeoutMs: mailboxTimeoutMs,
+      label: `Microsoft Graph inline attachment request (${identity.mailboxId || targetUserId} · ${folderSpec.folderType} delta)`,
+      requestMaxRetries,
+      retryBaseDelayMs,
+      retryMaxDelayMs,
+    });
+    const enrichedDeltaUpsertMap = new Map(
+      asArray(enrichedDeltaUpserts)
+        .map((item) => [normalizeText(item?.id), item])
+        .filter((entry) => entry[0])
+    );
+
+    const changes = rawDeltaEntries.length
+      ? rawDeltaEntries
+          .map((raw) => {
+            const rawId = normalizeText(raw?.id);
+            const safeRaw =
+              raw &&
+              typeof raw === 'object' &&
+              !(raw['@removed'] && typeof raw['@removed'] === 'object') &&
+              rawId &&
+              enrichedDeltaUpsertMap.has(rawId)
+                ? enrichedDeltaUpsertMap.get(rawId)
+                : raw;
+            return toMailboxTruthDeltaChange(safeRaw, {
+              folderType: folderSpec.folderType,
+              folderId: folderMetadata.folderId,
+              folderName: folderMetadata.folderName,
+              wellKnownName: folderMetadata.wellKnownName,
+              mailboxId: identity.mailboxId,
+              mailboxAddress: identity.mail,
+              userPrincipalName: identity.userPrincipalName,
+            });
+          })
+          .filter(Boolean)
+      : [];
+
+    const nextDeltaPageUrl = normalizeText(payload?.['@odata.nextLink']) || null;
+    const deltaLink = normalizeText(payload?.['@odata.deltaLink']) || null;
+
+    return {
+      account: {
+        graphUserId: identity.id,
+        mailboxId: identity.mailboxId,
+        mailboxAddress: identity.mail,
+        userPrincipalName: identity.userPrincipalName,
+      },
+      folder: {
+        folderType: folderSpec.folderType,
+        folderId: folderMetadata.folderId,
+        folderName: folderMetadata.folderName,
+        wellKnownName: folderMetadata.wellKnownName,
+        fetchStatus: 'success',
+        totalItemCount: folderMetadata.totalItemCount,
+        unreadItemCount: folderMetadata.unreadItemCount,
+      },
+      page: {
+        changeCount: changes.length,
+        upsertCount: changes.filter((item) => item.changeType === 'upsert').length,
+        deleteCount: changes.filter((item) => item.changeType === 'deleted').length,
+        nextPageUrl: nextDeltaPageUrl,
+        deltaLink,
+        pageSize,
+        complete: Boolean(deltaLink) && !nextDeltaPageUrl,
+        sourcePageUrl: pageUrl,
+      },
+      changes,
     };
   }
 
@@ -1165,8 +2420,31 @@ function createMicrosoftGraphReadConnector(config = {}) {
         retryMaxDelayMs,
       });
 
-      const normalizedInboundMessages = Array.isArray(inboxPayload.value)
-        ? inboxPayload.value
+      const enrichedInboundRawMessages = await enrichMessagesWithInlineHtmlAssets({
+        rawMessages: inboxPayload.value,
+        graphBaseUrl,
+        userId,
+        accessToken,
+        timeoutMs: mailboxTimeoutMs,
+        label: `Microsoft Graph inline attachment request (${identity.mailboxId || userId} · inbox)`,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+      const enrichedOutboundRawMessages = await enrichMessagesWithInlineHtmlAssets({
+        rawMessages: sentPayload.value,
+        graphBaseUrl,
+        userId,
+        accessToken,
+        timeoutMs: mailboxTimeoutMs,
+        label: `Microsoft Graph inline attachment request (${identity.mailboxId || userId} · sent)`,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+
+      const normalizedInboundMessages = Array.isArray(enrichedInboundRawMessages)
+        ? enrichedInboundRawMessages
             .map((raw) =>
               toNormalizedMessage(raw, {
                 mailboxId: identity.mailboxId,
@@ -1178,8 +2456,8 @@ function createMicrosoftGraphReadConnector(config = {}) {
             )
             .filter(Boolean)
         : [];
-      const normalizedOutboundMessages = Array.isArray(sentPayload.value)
-        ? sentPayload.value
+      const normalizedOutboundMessages = Array.isArray(enrichedOutboundRawMessages)
+        ? enrichedOutboundRawMessages
             .map((raw) =>
               toNormalizedMessage(raw, {
                 mailboxId: identity.mailboxId,
@@ -1309,8 +2587,31 @@ function createMicrosoftGraphReadConnector(config = {}) {
             retryMaxDelayMs,
           });
 
-          const normalizedInboundMessages = Array.isArray(inboxPayload.value)
-            ? inboxPayload.value
+          const enrichedInboundRawMessages = await enrichMessagesWithInlineHtmlAssets({
+            rawMessages: inboxPayload.value,
+            graphBaseUrl,
+            userId: user.id,
+            accessToken,
+            timeoutMs: mailboxTimeoutMs,
+            label: `Microsoft Graph inline attachment request (${user.mailboxId || user.id} · inbox)`,
+            requestMaxRetries,
+            retryBaseDelayMs,
+            retryMaxDelayMs,
+          });
+          const enrichedOutboundRawMessages = await enrichMessagesWithInlineHtmlAssets({
+            rawMessages: sentPayload.value,
+            graphBaseUrl,
+            userId: user.id,
+            accessToken,
+            timeoutMs: mailboxTimeoutMs,
+            label: `Microsoft Graph inline attachment request (${user.mailboxId || user.id} · sent)`,
+            requestMaxRetries,
+            retryBaseDelayMs,
+            retryMaxDelayMs,
+          });
+
+          const normalizedInboundMessages = Array.isArray(enrichedInboundRawMessages)
+            ? enrichedInboundRawMessages
                 .map((raw) =>
                   toNormalizedMessage(raw, {
                     ...user,
@@ -1320,8 +2621,8 @@ function createMicrosoftGraphReadConnector(config = {}) {
                 )
                 .filter(Boolean)
             : [];
-          const normalizedOutboundMessages = Array.isArray(sentPayload.value)
-            ? sentPayload.value
+          const normalizedOutboundMessages = Array.isArray(enrichedOutboundRawMessages)
+            ? enrichedOutboundRawMessages
                 .map((raw) =>
                   toNormalizedMessage(raw, {
                     ...user,
@@ -1448,8 +2749,349 @@ function createMicrosoftGraphReadConnector(config = {}) {
     return snapshot;
   }
 
+  async function fetchMailboxTruthSnapshot(options = {}) {
+    const nowMs = Number(now());
+    if (!Number.isFinite(nowMs)) {
+      throw new Error('MicrosoftGraphReadConnector now() must return a finite timestamp.');
+    }
+
+    const windowDays = clampInt(options.days, 1, 180, 30);
+    const includeReadMessages = options.includeRead !== false;
+    const explicitSinceIso = toIso(options.sinceIso);
+    const explicitUntilIso = toIso(options.untilIso);
+    if (
+      explicitSinceIso &&
+      explicitUntilIso &&
+      Date.parse(explicitUntilIso) <= Date.parse(explicitSinceIso)
+    ) {
+      throw new Error('MicrosoftGraphReadConnector untilIso must be later than sinceIso.');
+    }
+    const fallbackSinceIso = toIsoFromMs(nowMs - windowDays * 24 * 60 * 60 * 1000);
+    const startIso = explicitSinceIso || fallbackSinceIso;
+    const endIso = explicitUntilIso || '';
+    const fullTenant = toBoolean(options.fullTenant, configuredFullTenant);
+    const userScope = normalizeUserScope(options.userScope, configuredUserScope);
+    const fullTenantMode = fullTenant && userScope === 'all';
+    const maxUsers = clampInt(options.maxUsers, 1, 200, 50);
+    const mailboxIdFilter = normalizeMailboxIds(options.mailboxIds, 500);
+    const mailboxIndexes = normalizeMailboxIndexes(options.mailboxIndexes, maxUsers);
+    const requestMaxRetries = clampInt(options.requestMaxRetries, 0, 6, 2);
+    const retryBaseDelayMs = clampInt(options.retryBaseDelayMs, 100, 10000, 500);
+    const retryMaxDelayMs = clampInt(options.retryMaxDelayMs, 200, 30000, 5000);
+    const mailboxTimeoutMs = clampInt(options.mailboxTimeoutMs, 1000, 15000, 5000);
+    const runTimeoutMs = clampInt(options.runTimeoutMs, 5000, 120000, 30000);
+    const maxMailboxErrors = clampInt(options.maxMailboxErrors, 1, 20, 5);
+    const maxPagesPerCollection = clampInt(options.maxPagesPerCollection, 1, 2000, 200);
+    const maxMessagesPerFolder = clampInt(options.maxMessagesPerFolder, 1, 500, 200);
+    const maxMessagesPerFolderPerUser = clampInt(
+      options.maxMessagesPerFolderPerUser,
+      1,
+      500,
+      maxMessagesPerFolder
+    );
+    const folderSpecs = resolveMailboxTruthFolderSpecs(options.folders);
+    const accessToken = await fetchAccessToken();
+    const capturedAt = toIsoFromMs(nowMs) || new Date(nowMs).toISOString();
+
+    const warnings = [];
+    const accounts = [];
+    const processedMailboxIds = new Set();
+    let mailboxErrors = 0;
+    let folderErrors = 0;
+    let fetchedMessages = 0;
+    let truncatedFolderCount = 0;
+
+    const fetchFolderPayload = async ({
+      user,
+      folderSpec,
+      maxMessages,
+    }) => {
+      const metadataPayload = await fetchGraphPageWithRetry({
+        url: toFolderMetadataUrl({
+          graphBaseUrl,
+          userId: user.id,
+          graphFolderName: folderSpec.graphFolderName,
+        }).toString(),
+        accessToken,
+        label: `Microsoft Graph folder metadata request (${user.mailboxId || user.id} · ${folderSpec.folderType})`,
+        timeoutMs: mailboxTimeoutMs,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+
+      const messagesPayload = await fetchGraphCollection({
+        initialUrl: toFolderMessagesUrl({
+          graphBaseUrl,
+          userId: user.id,
+          graphFolderName: folderSpec.graphFolderName,
+          maxMessages,
+          dateField: folderSpec.dateField,
+          startIso,
+          endIso,
+          orderBy: folderSpec.orderBy,
+          includeReadMessages,
+          includeReadFilterSupported: folderSpec.includeReadFilterSupported,
+        }).toString(),
+        accessToken,
+        label: `Microsoft Graph mailbox truth request (${user.mailboxId || user.id} · ${folderSpec.folderType})`,
+        timeoutMs: mailboxTimeoutMs,
+        maxItems: maxMessages,
+        maxPages: maxPagesPerCollection,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+
+      return {
+        metadata: metadataPayload,
+        messages: messagesPayload,
+      };
+    };
+
+    const normalizeAccountFolders = async (user, maxMessages) => {
+      const folders = [];
+      let successfulFolderCount = 0;
+      for (const folderSpec of folderSpecs) {
+        try {
+          const payload = await fetchFolderPayload({
+            user,
+            folderSpec,
+            maxMessages,
+          });
+          const folderMetadata = payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {};
+          const enrichedRawMessages = await enrichMessagesWithInlineHtmlAssets({
+            rawMessages: payload.messages?.value,
+            graphBaseUrl,
+            userId: user.id,
+            accessToken,
+            timeoutMs: mailboxTimeoutMs,
+            label: `Microsoft Graph inline attachment request (${user.mailboxId || user.id} · ${folderSpec.folderType})`,
+            requestMaxRetries,
+            retryBaseDelayMs,
+            retryMaxDelayMs,
+          });
+          const folderMessages = Array.isArray(enrichedRawMessages)
+            ? enrichedRawMessages
+                .map((raw) =>
+                  toMailboxTruthRawMessage(raw, {
+                    folderType: folderSpec.folderType,
+                    folderId: normalizeText(folderMetadata.id),
+                    folderName:
+                      normalizeText(folderMetadata.displayName) || folderSpec.fallbackDisplayName,
+                    wellKnownName:
+                      normalizeText(folderMetadata.wellKnownName) || folderSpec.graphFolderName,
+                    mailboxId: user.mailboxId,
+                    mailboxAddress: user.mail,
+                    userPrincipalName: user.userPrincipalName,
+                  })
+                )
+                .filter(Boolean)
+            : [];
+          const truncatedByLimit = payload.messages?.truncatedByLimit === true;
+          if (truncatedByLimit) truncatedFolderCount += 1;
+          fetchedMessages += folderMessages.length;
+          successfulFolderCount += 1;
+          folders.push({
+            folderType: folderSpec.folderType,
+            folderId: normalizeText(folderMetadata.id) || null,
+            folderName:
+              normalizeText(folderMetadata.displayName) || folderSpec.fallbackDisplayName,
+            wellKnownName:
+              normalizeText(folderMetadata.wellKnownName) || folderSpec.graphFolderName,
+            fetchStatus: 'success',
+            totalItemCount: toNumber(folderMetadata.totalItemCount, 0),
+            unreadItemCount: toNumber(folderMetadata.unreadItemCount, 0),
+            fetchedMessageCount: folderMessages.length,
+            truncatedByLimit,
+            messages: folderMessages,
+          });
+        } catch (error) {
+          folderErrors += 1;
+          warnings.push(
+            `Mailbox ${normalizeText(user.mailboxId) || 'unknown'} folder ${folderSpec.folderType} kunde inte lasas (${normalizeText(
+              error?.message
+            ) || 'request_failed'}).`
+          );
+          folders.push({
+            folderType: folderSpec.folderType,
+            folderId: null,
+            folderName: folderSpec.fallbackDisplayName,
+            wellKnownName: folderSpec.graphFolderName,
+            fetchStatus: 'error',
+            totalItemCount: 0,
+            unreadItemCount: 0,
+            fetchedMessageCount: 0,
+            truncatedByLimit: false,
+            errorCode: normalizeText(error?.code) || null,
+            errorMessage: normalizeText(error?.message) || 'request_failed',
+            messages: [],
+          });
+        }
+      }
+
+      if (successfulFolderCount === 0) {
+        mailboxErrors += 1;
+        if (mailboxErrors > maxMailboxErrors) {
+          throw createGraphError(
+            `Mailbox truth ingest aborted: mailbox error budget exceeded (${mailboxErrors}/${maxMailboxErrors}).`,
+            {
+              code: 'GRAPH_MAILBOX_ERROR_BUDGET_EXCEEDED',
+            }
+          );
+        }
+      }
+      return folders;
+    };
+
+    if (!fullTenantMode) {
+      const identity = toMailboxIdentity({}, userId);
+      const folders = await normalizeAccountFolders(identity, maxMessagesPerFolder);
+      [
+        normalizeText(identity.mailboxId),
+        normalizeText(identity.mail),
+        normalizeText(identity.userPrincipalName),
+        normalizeText(userId),
+      ]
+        .filter(Boolean)
+        .forEach((mailboxId) => processedMailboxIds.add(mailboxId));
+      accounts.push({
+        graphUserId: identity.id,
+        mailboxId: identity.mailboxId,
+        mailboxAddress: identity.mail,
+        userPrincipalName: identity.userPrincipalName,
+        fetchStatus: folders.some((folder) => folder.fetchStatus === 'error') ? 'partial' : 'success',
+        folders,
+      });
+    } else {
+      const runStartedAt = Date.now();
+      const mailboxIdFilterActive = mailboxIdFilter.length > 0;
+      const usersListingTop = mailboxIdFilterActive ? Math.max(200, maxUsers) : maxUsers;
+      const usersListingMaxItems = mailboxIdFilterActive ? Math.max(500, usersListingTop) : maxUsers;
+
+      const usersUrl = new URL(`${graphBaseUrl}/users`);
+      usersUrl.searchParams.set('$top', String(Math.min(999, usersListingTop)));
+      usersUrl.searchParams.set('$select', 'id,mail,userPrincipalName');
+
+      const usersPayload = await fetchGraphCollection({
+        initialUrl: usersUrl.toString(),
+        accessToken,
+        label: 'Microsoft Graph user listing request',
+        timeoutMs: mailboxTimeoutMs,
+        maxItems: usersListingMaxItems,
+        maxPages: maxPagesPerCollection,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+      });
+
+      const users = Array.isArray(usersPayload.value)
+        ? usersPayload.value.map((rawUser) => toMailboxIdentity(rawUser)).filter((item) => item.id)
+        : [];
+      const limitedUsers = users.slice(0, maxUsers);
+      const selectedUsers = (() => {
+        if (mailboxIndexes.length === 0 && mailboxIdFilter.length === 0) return limitedUsers;
+        const selected = [];
+        const seen = new Set();
+        const includeUser = (user) => {
+          if (!user || !user.id || seen.has(user.id)) return;
+          seen.add(user.id);
+          selected.push(user);
+        };
+        if (mailboxIndexes.length > 0) {
+          mailboxIndexes
+            .map((index) => limitedUsers[index - 1])
+            .filter(Boolean)
+            .forEach(includeUser);
+        }
+        if (mailboxIdFilter.length > 0) {
+          const mailboxMatchPool = users.length > 0 ? users : limitedUsers;
+          mailboxIdFilter.forEach((mailboxId) => {
+            const matched = mailboxMatchPool.find((user) => matchesMailboxIdFilter(user, mailboxId));
+            if (matched) includeUser(matched);
+          });
+        }
+        return selected;
+      })();
+
+      for (const user of selectedUsers) {
+        const elapsedMs = Date.now() - runStartedAt;
+        if (elapsedMs > runTimeoutMs) {
+          throw createGraphError(`Full-tenant ingest exceeded run timeout (${runTimeoutMs}ms).`, {
+            code: 'GRAPH_RUN_TIMEOUT',
+          });
+        }
+
+        const folders = await normalizeAccountFolders(user, maxMessagesPerFolderPerUser);
+        [normalizeText(user.mailboxId), normalizeText(user.mail), normalizeText(user.userPrincipalName)]
+          .filter(Boolean)
+          .forEach((mailboxId) => processedMailboxIds.add(mailboxId));
+        accounts.push({
+          graphUserId: user.id,
+          mailboxId: user.mailboxId,
+          mailboxAddress: user.mail,
+          userPrincipalName: user.userPrincipalName,
+          fetchStatus: folders.some((folder) => folder.fetchStatus === 'error') ? 'partial' : 'success',
+          folders,
+        });
+      }
+
+      if (selectedUsers.length === 0) {
+        warnings.push('Full-tenant mailbox truth ingest hittade inga mailbox-anvandare i user-listing.');
+      }
+    }
+
+    return {
+      snapshotVersion: 'graph.mailbox.truth.snapshot.v1',
+      source: 'microsoft-graph',
+      timestamps: {
+        capturedAt,
+        sourceGeneratedAt: capturedAt,
+      },
+      accounts,
+      metadata: {
+        connector: 'MicrosoftGraphReadConnector',
+        windowDays,
+        windowStartIso: startIso,
+        windowEndIso: endIso || null,
+        includeReadMessages,
+        fullTenantMode,
+        userScope,
+        maxUsers,
+        maxMailboxErrors,
+        requestMaxRetries,
+        retryBaseDelayMs,
+        retryMaxDelayMs,
+        mailboxTimeoutMs,
+        runTimeoutMs,
+        maxPagesPerCollection,
+        maxMessagesPerFolder,
+        maxMessagesPerFolderPerUser,
+        folderTypes: folderSpecs.map((folder) => folder.folderType),
+        mailboxIndexes,
+        mailboxIdFilter,
+        mailboxIds: Array.from(processedMailboxIds),
+        accountCount: accounts.length,
+        folderCount: accounts.reduce((sum, account) => sum + asArray(account.folders).length, 0),
+        messageCount: fetchedMessages,
+        fetchedMessages,
+        mailboxErrors,
+        folderErrors,
+        truncatedFolderCount,
+      },
+      warnings: warnings.slice(0, 50),
+    };
+  }
+
   return {
     fetchInboxSnapshot,
+    enrichStoredMessagesWithMailAssets,
+    enrichStoredMessagesWithInlineHtmlAssets,
+    fetchMessageAttachmentContent,
+    fetchMessageMimeContent,
+    fetchMailboxTruthFolderPage,
+    fetchMailboxTruthFolderDeltaPage,
+    fetchMailboxTruthSnapshot,
   };
 }
 

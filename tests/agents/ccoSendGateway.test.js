@@ -9,6 +9,7 @@ const { createCapabilitiesRouter } = require('../../src/routes/capabilities');
 const { createExecutionGateway } = require('../../src/gateway/executionGateway');
 const { createAuthStore } = require('../../src/security/authStore');
 const { createCapabilityAnalysisStore } = require('../../src/capabilities/analysisStore');
+const { createCcoSettingsStore } = require('../../src/ops/ccoSettingsStore');
 
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
@@ -28,12 +29,16 @@ async function withServer(app, run) {
   }
 }
 
-function createMockAuth(role = 'OWNER') {
+function createMockAuth(role = 'OWNER', email = 'owner@hairtpclinic.se') {
   function requireAuth(req, _res, next) {
     req.auth = {
       tenantId: 'tenant-a',
       userId: 'owner-a',
       role,
+    };
+    req.currentUser = {
+      id: 'owner-a',
+      email,
     };
     next();
   }
@@ -155,17 +160,27 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
     assert.equal(typeof firstBody.preview?.bodyHtml, 'string');
     assert.equal(String(firstBody.preview?.bodyHtml || '').includes('<img'), true);
     assert.equal(
-      String(firstBody.preview?.bodyHtml || '').includes('hairtpclinic-mark-light.svg'),
+      String(firstBody.preview?.bodyHtml || '').includes(
+        'img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png'
+      ),
+      true
+    );
+    assert.equal(
+      String(firstBody.preview?.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
+      true
+    );
+    assert.equal(
+      String(firstBody.preview?.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
+      true
+    );
+    assert.equal(
+      String(firstBody.preview?.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
       true
     );
     assert.equal(String(firstBody.preview?.bodyHtml || '').includes('<svg'), false);
-    assert.equal(
-      String(firstBody.preview?.bodyHtml || '').includes('signature-web-icon.svg'),
-      false
-    );
-    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Webb<'), true);
-    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Instagram<'), true);
-    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Facebook<'), true);
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Webb<'), false);
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Instagram<'), false);
+    assert.equal(String(firstBody.preview?.bodyHtml || '').includes('>Facebook<'), false);
 
     const second = await fetch(`${baseUrl}/api/v1/cco/send`, {
       method: 'POST',
@@ -181,13 +196,16 @@ test('CCO send route uses gateway enforcement, writes audit, and idempotency pre
   });
 
   assert.equal(sendCalls, 1);
-  assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
+  assert.equal(lastSendArgs.mailboxId, 'fazli@hairtpclinic.com');
   assert.equal(lastSendArgs.sourceMailboxId, 'owner@hairtpclinic.se');
   assert.equal(lastSendArgs.replyToMessageId, longReplyToMessageId);
   assert.equal(String(lastSendArgs.body || '').includes('Bästa hälsningar'), true);
-  assert.equal(String(lastSendArgs.body || '').includes('Hair TP Clinic'), true);
-  assert.equal(String(lastSendArgs.body || '').includes('Patientservice'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Fazli Krasniqi'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Contact'), false);
+  assert.equal(String(lastSendArgs.body || '').includes('Patientservice'), false);
   assert.equal(String(lastSendArgs.body || '').includes('contact@hairtpclinic.com'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Vasaplatsen 2, 411 34 Göteborg'), true);
+  assert.equal(String(lastSendArgs.body || '').includes('Webb · Instagram · Facebook'), false);
 
   const entries = await analysisStore.list({
     tenantId: 'tenant-a',
@@ -396,6 +414,164 @@ test('CCO send route allows compose mode without conversationId or replyToMessag
   });
 });
 
+test('CCO send route materializes canonical compose document in active send chain', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-compose-document-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastComposeDocument = null;
+    const graphSendConnector = {
+      async sendComposeDocument({ composeDocument }) {
+        sendCalls += 1;
+        lastComposeDocument = composeDocument;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: composeDocument.senderMailboxId,
+          sourceMailboxId: composeDocument.sourceMailboxId,
+          replyToMessageId: composeDocument.replyContext?.replyToMessageId || null,
+          subject: composeDocument.subject,
+          to: composeDocument.recipients?.to || [],
+          cc: composeDocument.recipients?.cc || [],
+          bcc: composeDocument.recipients?.bcc || [],
+          sentAt: new Date().toISOString(),
+          sendMode: composeDocument.delivery?.sendStrategy || 'send_mail',
+          composeDocumentVersion: composeDocument.version,
+        };
+      },
+      async sendNewMessage(args) {
+        return this.sendComposeDocument({
+          composeDocument: {
+            version: 'phase_5',
+            kind: 'mail_compose_document',
+            mode: 'compose',
+            sourceMailboxId: args.sourceMailboxId || args.mailboxId,
+            senderMailboxId: args.mailboxId,
+            replyContext: null,
+            recipients: {
+              to: args.to || [],
+              cc: args.cc || [],
+              bcc: args.bcc || [],
+            },
+            subject: args.subject || '',
+            content: {
+              bodyText: args.body || '',
+              bodyHtml: args.bodyHtml || null,
+            },
+            delivery: {
+              sendStrategy: 'send_mail',
+            },
+          },
+        });
+      },
+      async sendReply(args) {
+        return this.sendComposeDocument({
+          composeDocument: {
+            version: 'phase_5',
+            kind: 'mail_compose_document',
+            mode: 'reply',
+            sourceMailboxId: args.sourceMailboxId || args.mailboxId,
+            senderMailboxId: args.mailboxId,
+            replyContext: {
+              conversationId: args.conversationId || '__legacy_reply__',
+              replyToMessageId: args.replyToMessageId,
+            },
+            recipients: {
+              to: args.to || [],
+              cc: args.cc || [],
+              bcc: args.bcc || [],
+            },
+            subject: args.subject || '',
+            content: {
+              bodyText: args.body || '',
+              bodyHtml: args.bodyHtml || null,
+            },
+            delivery: {
+              sendStrategy: 'reply_draft',
+            },
+          },
+        });
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-compose-document-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mode: 'compose',
+          mailboxId: 'kons@hairtpclinic.com',
+          senderMailboxId: 'contact@hairtpclinic.com',
+          to: ['patient@example.com'],
+          cc: ['manager@example.com'],
+          bcc: ['audit@example.com'],
+          subject: 'Canonical compose',
+          body: 'Hej, detta skickas via Phase 5 compose foundation.',
+          idempotencyKey: 'send-compose-document-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+      assert.equal(payload.composeDocument?.kind, 'mail_compose_document');
+      assert.equal(payload.composeDocument?.version, 'phase_5');
+      assert.equal(payload.composeDocument?.delivery?.sendStrategy, 'send_mail');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastComposeDocument?.kind, 'mail_compose_document');
+    assert.equal(lastComposeDocument?.version, 'phase_5');
+    assert.equal(lastComposeDocument?.sourceMailboxId, 'kons@hairtpclinic.com');
+    assert.equal(lastComposeDocument?.senderMailboxId, 'contact@hairtpclinic.com');
+    assert.deepEqual(lastComposeDocument?.recipients?.to, ['patient@example.com']);
+    assert.deepEqual(lastComposeDocument?.recipients?.cc, ['manager@example.com']);
+    assert.deepEqual(lastComposeDocument?.recipients?.bcc, ['audit@example.com']);
+    assert.equal(
+      String(lastComposeDocument?.content?.bodyText || '').includes('Phase 5 compose foundation'),
+      true
+    );
+  });
+});
+
 test('CCO send route uses explicit signature override mailbox when senderMailboxId is omitted', async () => {
   await withSendEnv(async () => {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-signature-override-'));
@@ -483,7 +659,367 @@ test('CCO send route uses explicit signature override mailbox when senderMailbox
     assert.equal(lastSendArgs.mailboxId, 'fazli@hairtpclinic.com');
     assert.equal(lastSendArgs.sourceMailboxId, 'contact@hairtpclinic.com');
     assert.equal(String(lastSendArgs.body || '').includes('Fazli Krasniqi'), true);
-    assert.equal(String(lastSendArgs.body || '').includes('fazli@hairtpclinic.com'), true);
+    assert.equal(String(lastSendArgs.body || '').includes('contact@hairtpclinic.com'), true);
+    assert.equal(String(lastSendArgs.bodyHtml || '').includes('Fazli Krasniqi'), true);
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('mailto:contact@hairtpclinic.com'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('Vasaplatsen 2, 411 34 Göteborg'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes(
+        'img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png'
+      ),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes(
+        'img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png'
+      ),
+      true
+    );
+    assert.equal(String(lastSendArgs.bodyHtml || '').includes('>Webb<'), false);
+  });
+});
+
+test('CCO send route uses explicit Egzona profile html when senderMailboxId is omitted', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-egzona-profile-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'reply',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-egzona-profile-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          signatureProfile: 'egzona',
+          replyToMessageId: 'msg-egzona-profile-1',
+          conversationId: 'conv-egzona-profile-1',
+          to: ['patient@example.com'],
+          subject: 'Egzona uppföljning',
+          body: 'Hej, jag återkommer personligen med nästa steg.',
+          idempotencyKey: 'send-egzona-profile-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'egzona@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'contact@hairtpclinic.com');
+    assert.equal(String(lastSendArgs.body || '').includes('Egzona Krasniqi'), true);
+    assert.equal(String(lastSendArgs.body || '').includes('egzona@hairtpclinic.com'), true);
+    assert.equal(String(lastSendArgs.bodyHtml || '').includes('Egzona Krasniqi'), true);
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('mailto:egzona@hairtpclinic.com'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('Vasaplatsen 2, 411 34 Göteborg'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes(
+        'img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png'
+      ),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes(
+        'img2.gimm.io/9e99c2fb-11b4-402b-8a43-6022ede8aa2b/image.png'
+      ),
+      true
+    );
+    assert.equal(String(lastSendArgs.bodyHtml || '').includes('>Webb<'), false);
+  });
+});
+
+test('CCO send route can infer personal signature from actor email on shared mailbox replies', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-actor-email-profile-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'reply',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER', 'fazli@hairtpclinic.com');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-actor-email-profile-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          sourceMailboxId: 'contact@hairtpclinic.com',
+          replyToMessageId: 'msg-actor-email-profile-1',
+          conversationId: 'conv-actor-email-profile-1',
+          to: ['patient@example.com'],
+          subject: 'Svar från shared mailbox',
+          body: 'Hej, detta svar ska använda Fazlis personliga signatur.',
+          idempotencyKey: 'send-actor-email-profile-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'fazli@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'contact@hairtpclinic.com');
+    assert.equal(String(lastSendArgs.body || '').includes('Fazli Krasniqi'), true);
+    assert.equal(String(lastSendArgs.bodyHtml || '').includes('Fazli Krasniqi'), true);
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('mailto:contact@hairtpclinic.com'),
+      true
+    );
+  });
+});
+
+test('CCO send route honors structured signature overrides from mailbox-admin signatures', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-structured-signature-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+
+    let sendCalls = 0;
+    let lastSendArgs = null;
+    const graphSendConnector = {
+      async sendReply(args) {
+        sendCalls += 1;
+        lastSendArgs = args;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: args.mailboxId,
+          sourceMailboxId: args.sourceMailboxId,
+          replyToMessageId: args.replyToMessageId,
+          subject: args.subject,
+          to: args.to || [],
+          sentAt: new Date().toISOString(),
+          sendMode: 'reply',
+        };
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-structured-signature-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          senderMailboxId: 'contact@hairtpclinic.com',
+          signatureProfile: 'mailbox-signature:egzona-personal',
+          signatureOverride: {
+            key: 'mailbox-signature:egzona-personal',
+            label: 'Egzona',
+            fullName: 'Egzona Krasniqi',
+            title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+            email: 'egzona@hairtpclinic.com',
+            senderMailboxId: 'contact@hairtpclinic.com',
+            html:
+              '<table role="presentation"><tr><td><strong>Egzona Krasniqi</strong></td></tr><tr><td><a href="mailto:egzona@hairtpclinic.com">egzona@hairtpclinic.com</a></td></tr></table>',
+          },
+          replyToMessageId: 'msg-structured-signature-1',
+          conversationId: 'conv-structured-signature-1',
+          to: ['patient@example.com'],
+          subject: 'Personlig uppföljning',
+          body: 'Hej, jag återkommer personligen med nästa steg inom kort.',
+          idempotencyKey: 'send-structured-signature-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      const payload = await response.json();
+      assert.equal(payload.decision, 'allow');
+    });
+
+    assert.equal(sendCalls, 1);
+    assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
+    assert.equal(lastSendArgs.sourceMailboxId, 'contact@hairtpclinic.com');
+    assert.equal(String(lastSendArgs.body || '').includes('Egzona Krasniqi'), true);
+    assert.equal(String(lastSendArgs.body || '').includes('egzona@hairtpclinic.com'), true);
+    assert.equal(
+      String(lastSendArgs.body || '').includes('Hårspecialist | Hårtransplantationer & PRP-injektioner'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('Egzona Krasniqi'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('mailto:egzona@hairtpclinic.com'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('data:image/svg+xml;charset=utf-8'),
+      true
+    );
+    assert.equal(
+      String(lastSendArgs.bodyHtml || '').includes('Hårspecialist I Hårtransplantationer & PRP-injektioner'),
+      false
+    );
   });
 });
 
@@ -557,7 +1093,7 @@ test('CCO send route honors explicit sourceMailboxId for cross-mailbox replies',
           channel: 'admin',
           mailboxId: 'contact@hairtpclinic.com',
           sourceMailboxId: 'kons@hairtpclinic.com',
-          signatureProfile: 'contact',
+          signatureProfile: 'fazli',
           replyToMessageId: 'msg-cross-mailbox-1',
           conversationId: 'conv-cross-mailbox-1',
           to: ['egzona@hairtpclinic.com'],
@@ -572,7 +1108,7 @@ test('CCO send route honors explicit sourceMailboxId for cross-mailbox replies',
     });
 
     assert.equal(sendCalls, 1);
-    assert.equal(lastSendArgs.mailboxId, 'contact@hairtpclinic.com');
+    assert.equal(lastSendArgs.mailboxId, 'fazli@hairtpclinic.com');
     assert.equal(lastSendArgs.sourceMailboxId, 'kons@hairtpclinic.com');
     assert.deepEqual(lastSendArgs.to, ['egzona@hairtpclinic.com']);
   });
@@ -814,5 +1350,123 @@ test('CCO send route fail-closes when policy/risk blocks unsafe body', async () 
     });
     const actions = new Set(audits.map((item) => item.action));
     assert.equal(actions.has('cco.send.blocked'), true);
+  });
+});
+
+test('CCO send route uses server-backed mailbox defaults and custom signatures', async () => {
+  await withSendEnv(async () => {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'arcana-cco-send-settings-'));
+    const authStore = await createAuthStore({
+      filePath: path.join(tempDir, 'auth.json'),
+      sessionTtlMs: 12 * 60 * 60 * 1000,
+      sessionIdleTtlMs: 3 * 60 * 60 * 1000,
+      loginTicketTtlMs: 10 * 60 * 1000,
+      auditAppendOnly: true,
+      auditMaxEntries: 5000,
+    });
+    const analysisStore = await createCapabilityAnalysisStore({
+      filePath: path.join(tempDir, 'capability-analysis.json'),
+      maxEntries: 2000,
+    });
+    const settingsStore = await createCcoSettingsStore({
+      filePath: path.join(tempDir, 'cco-settings.json'),
+    });
+    await settingsStore.saveTenantSettings({
+      tenantId: 'tenant-a',
+      settings: {
+        mailFoundation: {
+          defaults: {
+            senderMailboxId: 'egzona@hairtpclinic.com',
+          },
+          customMailboxes: [
+            {
+              id: 'egzona@hairtpclinic.com',
+              email: 'egzona@hairtpclinic.com',
+              label: 'Egzona',
+              signature: {
+                label: 'Egzona signatur',
+                fullName: 'Egzona Krasniqi',
+                title: 'Hårspecialist',
+                html: '<div>Egzona Signature</div>',
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    let lastComposeDocument = null;
+    const graphSendConnector = {
+      async sendComposeDocument({ composeDocument }) {
+        lastComposeDocument = composeDocument;
+        return {
+          provider: 'microsoft_graph',
+          mailboxId: composeDocument.senderMailboxId,
+          sourceMailboxId: composeDocument.sourceMailboxId,
+          replyToMessageId: null,
+          subject: composeDocument.subject,
+          to: composeDocument.recipients.to,
+          cc: composeDocument.recipients.cc,
+          bcc: composeDocument.recipients.bcc,
+          sentAt: new Date().toISOString(),
+          sendMode: 'compose',
+        };
+      },
+      async sendReply() {
+        throw new Error('sendReply should not be used in this test');
+      },
+      async sendNewMessage() {
+        throw new Error('sendNewMessage should not be used in this test');
+      },
+    };
+
+    const app = express();
+    app.use(express.json());
+    const auth = createMockAuth('OWNER');
+    app.use(
+      '/api/v1',
+      createCapabilitiesRouter({
+        authStore,
+        tenantConfigStore: {
+          async getTenantConfig() {
+            return {
+              riskSensitivityModifier: 0,
+              riskThresholdVersion: 1,
+            };
+          },
+        },
+        ccoSettingsStore: settingsStore,
+        requireAuth: auth.requireAuth,
+        requireRole: auth.requireRole,
+        executionGateway: createExecutionGateway({ buildVersion: 'test-build' }),
+        capabilityAnalysisStore: analysisStore,
+        templateStore: null,
+        graphSendConnector,
+      })
+    );
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/cco/send`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-idempotency-key': 'send-settings-defaults-1',
+        },
+        body: JSON.stringify({
+          channel: 'admin',
+          mailboxId: 'contact@hairtpclinic.com',
+          sendMode: 'compose',
+          to: ['patient@example.com'],
+          subject: 'Ny kontakt',
+          body: 'Hej! Detta är ett testutskick.',
+          idempotencyKey: 'send-settings-defaults-1',
+        }),
+      });
+      assert.equal(response.status, 200);
+      assert.ok(lastComposeDocument, 'composeDocument ska skickas genom den canonical send-pathen.');
+      assert.equal(lastComposeDocument.senderMailboxId, 'egzona@hairtpclinic.com');
+      assert.equal(lastComposeDocument.signature.key, 'egzona');
+      assert.equal(lastComposeDocument.signature.fullName, 'Egzona Krasniqi');
+    });
   });
 });

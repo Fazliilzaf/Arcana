@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+const { normalizeCcoMailFoundation } = require('./ccoMailboxSettingsDocument');
+
 const DEFAULT_TOGGLES = Object.freeze({
   googleCalendarSync: true,
   outlookIntegration: false,
@@ -138,14 +140,20 @@ function buildDefaultSettings() {
     profileName: 'Ditt namn',
     profileEmail: 'din.email@hairtp.com',
     toggles: { ...DEFAULT_TOGGLES },
+    mailFoundation: normalizeCcoMailFoundation(),
     deleteRequestedAt: null,
   };
 }
 
-function normalizeSettingsRecord(input = {}) {
+function normalizeSettingsRecord(input = {}, previousRecord = {}) {
   const defaults = buildDefaultSettings();
   const normalizedTheme = THEME_ALIASES[normalizeKey(input.theme)] || defaults.theme;
   const normalizedDensity = DENSITY_ALIASES[normalizeKey(input.density)] || defaults.density;
+  const previousSettings = previousRecord && typeof previousRecord === 'object' ? previousRecord : {};
+  const previousMailFoundation = normalizeCcoMailFoundation(previousSettings.mailFoundation);
+  const nextMailFoundation = Object.prototype.hasOwnProperty.call(input, 'mailFoundation')
+    ? normalizeCcoMailFoundation(input.mailFoundation)
+    : previousMailFoundation;
   return {
     theme: normalizedTheme,
     density: normalizedDensity,
@@ -153,6 +161,7 @@ function normalizeSettingsRecord(input = {}) {
     profileName: normalizeText(input.profileName) || defaults.profileName,
     profileEmail: normalizeText(input.profileEmail) || defaults.profileEmail,
     toggles: normalizeToggles(input.toggles),
+    mailFoundation: nextMailFoundation,
     deleteRequestedAt: normalizeText(input.deleteRequestedAt) || null,
     updatedAt: normalizeText(input.updatedAt) || nowIso(),
   };
@@ -195,13 +204,13 @@ async function createCcoSettingsStore({ filePath }) {
 
   async function getTenantSettings({ tenantId }) {
     const tenantState = ensureTenantState(tenantId);
-    tenantState.settings = normalizeSettingsRecord(tenantState.settings);
+    tenantState.settings = normalizeSettingsRecord(tenantState.settings, tenantState.settings);
     return { ...tenantState.settings };
   }
 
   async function saveTenantSettings({ tenantId, settings }) {
     const tenantState = ensureTenantState(tenantId);
-    tenantState.settings = normalizeSettingsRecord(settings);
+    tenantState.settings = normalizeSettingsRecord(settings, tenantState.settings);
     tenantState.updatedAt = nowIso();
     await save();
     return { ...tenantState.settings };
@@ -213,7 +222,7 @@ async function createCcoSettingsStore({ filePath }) {
       ...tenantState.settings,
       deleteRequestedAt: nowIso(),
       updatedAt: nowIso(),
-    });
+    }, tenantState.settings);
     tenantState.updatedAt = nowIso();
     await save();
     return {

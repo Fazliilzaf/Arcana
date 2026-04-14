@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { isDeepStrictEqual } = require('node:util');
 const XLSX = require('xlsx');
 
 const DEFAULT_CUSTOMER_SETTINGS = Object.freeze({
@@ -168,6 +169,567 @@ function normalizeSuggestionId(value) {
   return parts.sort().join('::');
 }
 
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function normalizeIdentityScalar(value) {
+  const normalized = normalizeText(value);
+  return normalized ? normalized : null;
+}
+
+function normalizeMergeReviewDecisionValue(value) {
+  const decision = normalizeText(value).toLowerCase();
+  if (decision === 'approved' || decision === 'dismissed' || decision === 'review_required') {
+    return decision;
+  }
+  return '';
+}
+
+function normalizeHardConflictSignals(values) {
+  const allowedTypes = new Set([
+    'canonicalcustomerid',
+    'canonicalcontactid',
+    'explicitmergegroupid',
+    'verifiedpersonalemailnormalized',
+    'verifiedphonee164',
+  ]);
+  return asArray(values)
+    .map((entry) => {
+      const signal = asObject(entry);
+      const type = normalizeText(signal.type).toLowerCase();
+      if (!allowedTypes.has(type)) return null;
+      const left = normalizeIdentityScalar(signal.left);
+      const right = normalizeIdentityScalar(signal.right);
+      const reason = normalizeIdentityScalar(signal.reason);
+      if (!left && !right && !reason) return null;
+      return {
+        type,
+        left,
+        right,
+        reason,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function normalizeIdentityEnvelope(input = {}) {
+  const provenance = asObject(input.provenance);
+  const identitySource = normalizeText(input.identitySource).toLowerCase();
+  const allowCanonical = identitySource === 'backend' || identitySource === 'cliento';
+  const allowExplicitMergeGroup =
+    identitySource === 'backend' || identitySource === 'explicit_merge' || identitySource === 'cliento';
+  return {
+    customerKey: normalizeIdentityScalar(input.customerKey),
+    customerName: normalizeIdentityScalar(input.customerName),
+    customerEmail: normalizeEmail(input.customerEmail) || null,
+    customerPhone: normalizePhone(input.customerPhone) || null,
+    canonicalCustomerId: allowCanonical ? normalizeIdentityScalar(input.canonicalCustomerId) : null,
+    canonicalContactId: allowCanonical ? normalizeIdentityScalar(input.canonicalContactId) : null,
+    explicitMergeGroupId: allowExplicitMergeGroup
+      ? normalizeIdentityScalar(input.explicitMergeGroupId)
+      : null,
+    verifiedPersonalEmailNormalized: normalizeEmail(input.verifiedPersonalEmailNormalized) || null,
+    verifiedPhoneE164: normalizePhone(input.verifiedPhoneE164) || null,
+    identitySource: ['backend', 'cliento', 'derived', 'explicit_merge', 'history', 'unknown'].includes(
+      identitySource
+    )
+      ? identitySource
+      : 'unknown',
+    identityConfidence: ['strong', 'review', 'uncertain', 'derived', 'weak', 'unknown'].includes(
+      normalizeText(input.identityConfidence).toLowerCase()
+    )
+      ? normalizeText(input.identityConfidence).toLowerCase()
+      : 'unknown',
+    hardConflictSignals: normalizeHardConflictSignals(input.hardConflictSignals),
+    provenance: {
+      source: ['backend', 'cliento', 'history', 'derived', 'mailbox_truth', 'unknown'].includes(
+        normalizeText(provenance.source).toLowerCase()
+      )
+        ? normalizeText(provenance.source).toLowerCase()
+        : 'derived',
+      mailboxIds: normalizeStringArray(provenance.mailboxIds, normalizeMailboxLabel),
+      conversationIds: normalizeStringArray(provenance.conversationIds, normalizeText),
+      sourceRecordIds: normalizeStringArray(provenance.sourceRecordIds, normalizeText),
+    },
+  };
+}
+
+function normalizeIdentityByKey(values = {}) {
+  const input = asObject(values);
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([key, value]) => {
+        const normalizedKey = normalizeKey(key);
+        if (!normalizedKey) return null;
+        return [normalizedKey, normalizeIdentityEnvelope({ ...asObject(value), customerKey: normalizedKey })];
+      })
+      .filter(Boolean)
+  );
+}
+
+function normalizeMergeReviewDecision(input = {}) {
+  const decision = normalizeMergeReviewDecisionValue(input.decision);
+  const pairId = normalizeText(input.pairId).toLowerCase();
+  if (!decision || !pairId) return null;
+  return {
+    pairId,
+    decision,
+    decidedAt: normalizeText(input.decidedAt) || nowIso(),
+    decidedBy: normalizeIdentityScalar(input.decidedBy),
+    reasonCode: normalizeIdentityScalar(input.reasonCode),
+    signalSnapshot: asObject(input.signalSnapshot),
+    identitySnapshot: asObject(input.identitySnapshot),
+  };
+}
+
+function normalizeMergeReviewDecisionMap(values = {}) {
+  const input = asObject(values);
+  return Object.fromEntries(
+    Object.entries(input)
+      .map(([key, value]) => {
+        const normalizedKey = normalizeText(key).toLowerCase();
+        if (!normalizedKey) return null;
+        const normalizedDecision = normalizeMergeReviewDecision({ ...asObject(value), pairId: normalizedKey });
+        if (!normalizedDecision) return null;
+        return [normalizedKey, normalizedDecision];
+      })
+      .filter(Boolean)
+  );
+}
+
+function sameNormalizedValue(left, right, mapper = normalizeText) {
+  const normalizedLeft = mapper(left);
+  const normalizedRight = mapper(right);
+  return Boolean(normalizedLeft) && normalizedLeft === normalizedRight;
+}
+
+function buildIdentityEnvelopeFromRecord(customerState, customerKey) {
+  const resolvedKey = resolveCustomerKey(customerState, customerKey);
+  const directoryEntry = customerState.directory?.[resolvedKey] || {};
+  const detailEntry = customerState.details?.[resolvedKey] || {};
+  const existingEnvelope = normalizeIdentityEnvelope(customerState.identityByKey?.[resolvedKey] || {});
+  const detailsEmails = normalizeStringArray(detailEntry.emails, normalizeEmail).map(normalizeEmail);
+  const detailsMailboxes = normalizeStringArray(detailEntry.mailboxes, normalizeMailboxLabel);
+  const primaryEmail =
+    normalizeEmail(customerState.primaryEmailByKey?.[resolvedKey]) || detailsEmails[0] || null;
+  const latestMailboxIds = normalizeStringArray(
+    [
+      ...asArray(existingEnvelope.provenance.mailboxIds),
+      ...detailsMailboxes,
+    ],
+    normalizeMailboxLabel
+  );
+  return normalizeIdentityEnvelope({
+    ...existingEnvelope,
+    customerKey: resolvedKey,
+    customerName: normalizeText(directoryEntry.name) || existingEnvelope.customerName || resolvedKey,
+    customerEmail: existingEnvelope.customerEmail || primaryEmail || null,
+    customerPhone: existingEnvelope.customerPhone || normalizePhone(detailEntry.phone) || null,
+    provenance: {
+      source: existingEnvelope.provenance.source || 'derived',
+      mailboxIds: latestMailboxIds,
+      conversationIds: existingEnvelope.provenance.conversationIds,
+      sourceRecordIds: [
+        ...asArray(existingEnvelope.provenance.sourceRecordIds),
+        resolvedKey,
+      ],
+    },
+  });
+}
+
+function normalizePersonnummer(value) {
+  return normalizeText(value).replace(/[^\d]+/g, '');
+}
+
+function buildBootstrapSourceRecordId(importedRow, sourceSystem = 'cliento') {
+  const seed = [
+    normalizeText(sourceSystem).toLowerCase(),
+    normalizeText(importedRow.personnummer),
+    normalizeStringArray(importedRow.emails, normalizeEmail).map(normalizeEmail).sort().join('|'),
+    normalizeStringArray(asArray(importedRow.phones), normalizePhone).map(normalizePhone).sort().join('|'),
+    normalizePhone(importedRow.phone),
+    normalizeText(importedRow.name),
+  ]
+    .filter(Boolean)
+    .join('::');
+  return crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24);
+}
+
+function buildClientoBootstrapSeed(importedRow) {
+  const normalizedPersonnummer = normalizePersonnummer(importedRow.personnummer);
+  if (normalizedPersonnummer) {
+    return `pnr:${normalizedPersonnummer}`;
+  }
+
+  const emails = normalizeStringArray(importedRow.emails, normalizeEmail).map(normalizeEmail);
+  const phones = normalizeStringArray(
+    [...asArray(importedRow.phones), normalizeText(importedRow.phone)],
+    normalizePhone
+  ).map(normalizePhone);
+  if (emails.length && phones.length) {
+    return `email:${emails.sort().join('|')}|phone:${phones.sort().join('|')}`;
+  }
+  if (emails.length) {
+    return `email:${emails.sort().join('|')}`;
+  }
+  if (phones.length) {
+    return `phone:${phones.sort().join('|')}`;
+  }
+  return '';
+}
+
+function buildClientoCanonicalCustomerId(importedRow) {
+  const seed = buildClientoBootstrapSeed(importedRow);
+  if (!seed) return '';
+  return `cliento_${crypto.createHash('sha256').update(seed).digest('hex').slice(0, 24)}`;
+}
+
+function buildClientoReviewPairId(primaryKey, secondaryKeys, importedRow) {
+  const tokens = [
+    `source:${normalizeText(importedRow.sourceSystem).toLowerCase() || 'cliento'}`,
+    `canonical:${normalizeText(primaryKey).toLowerCase()}`,
+    ...normalizeStringArray(secondaryKeys, normalizeText).map((entry) => `candidate:${entry.toLowerCase()}`),
+  ].sort();
+  return crypto.createHash('sha256').update(tokens.join('|')).digest('hex').slice(0, 32);
+}
+
+function hasMergeReviewDecision(customerState, pairId) {
+  const normalizedPairId = normalizeText(pairId).toLowerCase();
+  if (!normalizedPairId) return false;
+  return Boolean(
+    normalizeMergeReviewDecision(customerState?.mergeReviewDecisionsByPairId?.[normalizedPairId])
+  );
+}
+
+function buildMergePairId(primaryRecord, secondaryRecord) {
+  const strongTokens = [];
+  const addStrongToken = (token, left, right) => {
+    if (sameNormalizedValue(left, right)) {
+      strongTokens.push(`${token}:${normalizeText(left).toLowerCase()}`);
+    }
+  };
+  addStrongToken(
+    'canonicalCustomerId',
+    primaryRecord.identity?.canonicalCustomerId,
+    secondaryRecord.identity?.canonicalCustomerId
+  );
+  addStrongToken(
+    'canonicalContactId',
+    primaryRecord.identity?.canonicalContactId,
+    secondaryRecord.identity?.canonicalContactId
+  );
+  addStrongToken(
+    'explicitMergeGroupId',
+    primaryRecord.identity?.explicitMergeGroupId,
+    secondaryRecord.identity?.explicitMergeGroupId
+  );
+  if (strongTokens.length) {
+    return strongTokens.sort().join('|');
+  }
+
+  const contactTokens = [];
+  const addContactToken = (token, left, right) => {
+    if (sameNormalizedValue(left, right, normalizeEmail)) {
+      contactTokens.push(`${token}:${normalizeEmail(left)}`);
+      return true;
+    }
+    return false;
+  };
+
+  const sharedVerifiedEmail = addContactToken(
+    'verifiedPersonalEmailNormalized',
+    primaryRecord.identity?.verifiedPersonalEmailNormalized,
+    secondaryRecord.identity?.verifiedPersonalEmailNormalized
+  );
+  const sharedExactEmail = addContactToken(
+    'email',
+    primaryRecord.customerEmail || primaryRecord.emails?.[0] || '',
+    secondaryRecord.customerEmail || secondaryRecord.emails?.[0] || ''
+  );
+  const sharedVerifiedPhone = sameNormalizedValue(
+    primaryRecord.identity?.verifiedPhoneE164,
+    secondaryRecord.identity?.verifiedPhoneE164,
+    normalizePhone
+  );
+  if (sharedVerifiedPhone) {
+    contactTokens.push(`verifiedPhoneE164:${normalizePhone(primaryRecord.identity?.verifiedPhoneE164)}`);
+  }
+  const sharedExactPhone = sameNormalizedValue(primaryRecord.phone, secondaryRecord.phone, normalizePhone);
+  if (sharedExactPhone) {
+    contactTokens.push(`phone:${normalizePhone(primaryRecord.phone)}`);
+  }
+
+  if (contactTokens.length) {
+    return contactTokens.sort().join('|');
+  }
+
+  return '';
+}
+
+function hasStrongIdentityMatch(primaryRecord, secondaryRecord) {
+  const sameCustomerId =
+    sameNormalizedValue(
+      primaryRecord.identity?.canonicalCustomerId,
+      secondaryRecord.identity?.canonicalCustomerId,
+      normalizeText
+    ) && Boolean(normalizeIdentityScalar(primaryRecord.identity?.canonicalCustomerId));
+  const sameContactId =
+    sameNormalizedValue(
+      primaryRecord.identity?.canonicalContactId,
+      secondaryRecord.identity?.canonicalContactId,
+      normalizeText
+    ) && Boolean(normalizeIdentityScalar(primaryRecord.identity?.canonicalContactId));
+  const sameGroupId =
+    sameNormalizedValue(
+      primaryRecord.identity?.explicitMergeGroupId,
+      secondaryRecord.identity?.explicitMergeGroupId,
+      normalizeText
+    ) && Boolean(normalizeIdentityScalar(primaryRecord.identity?.explicitMergeGroupId));
+  return sameCustomerId || sameContactId || sameGroupId;
+}
+
+function collectHardConflictSignals(primaryRecord, secondaryRecord) {
+  const conflicts = [];
+  const addConflict = (type, left, right, reason) => {
+    const normalizedLeft = normalizeIdentityScalar(left);
+    const normalizedRight = normalizeIdentityScalar(right);
+    if (!normalizedLeft || !normalizedRight || normalizedLeft === normalizedRight) return;
+    conflicts.push({
+      type,
+      left: normalizedLeft,
+      right: normalizedRight,
+      reason,
+    });
+  };
+
+  addConflict(
+    'canonicalcustomerid',
+    primaryRecord.identity?.canonicalCustomerId,
+    secondaryRecord.identity?.canonicalCustomerId,
+    'Olika canonicalCustomerId'
+  );
+  addConflict(
+    'canonicalcontactid',
+    primaryRecord.identity?.canonicalContactId,
+    secondaryRecord.identity?.canonicalContactId,
+    'Olika canonicalContactId'
+  );
+  addConflict(
+    'explicitmergegroupid',
+    primaryRecord.identity?.explicitMergeGroupId,
+    secondaryRecord.identity?.explicitMergeGroupId,
+    'Olika explicitMergeGroupId'
+  );
+  addConflict(
+    'verifiedpersonalemailnormalized',
+    primaryRecord.identity?.verifiedPersonalEmailNormalized,
+    secondaryRecord.identity?.verifiedPersonalEmailNormalized,
+    'Olika verifierad e-post'
+  );
+  addConflict(
+    'verifiedphonee164',
+    primaryRecord.identity?.verifiedPhoneE164,
+    secondaryRecord.identity?.verifiedPhoneE164,
+    'Olika verifierad telefon'
+  );
+
+  return conflicts;
+}
+
+function hasHardConflict(primaryRecord, secondaryRecord) {
+  return collectHardConflictSignals(primaryRecord, secondaryRecord).length > 0;
+}
+
+function scoreMergeReviewCandidate(primaryRecord, secondaryRecord) {
+  const reasons = [];
+  const categories = [];
+  let identityAdjacent = 0;
+  let provenance = 0;
+  let operational = 0;
+  let contactIdentitySignal = false;
+
+  const sharedVerifiedEmail =
+    sameNormalizedValue(
+      primaryRecord.identity?.verifiedPersonalEmailNormalized,
+      secondaryRecord.identity?.verifiedPersonalEmailNormalized,
+      normalizeEmail
+    ) && Boolean(normalizeIdentityScalar(primaryRecord.identity?.verifiedPersonalEmailNormalized));
+  if (sharedVerifiedEmail) {
+    identityAdjacent += 24;
+    contactIdentitySignal = true;
+    reasons.push(`Verifierad e-post: ${normalizeEmail(primaryRecord.identity?.verifiedPersonalEmailNormalized)}`);
+  }
+
+  const sharedEmail = primaryRecord.emails.some((email) =>
+    secondaryRecord.emails.some((candidate) => normalizeEmail(candidate) === normalizeEmail(email))
+  );
+  if (sharedEmail) {
+    identityAdjacent += 20;
+    contactIdentitySignal = true;
+    reasons.push(`Delad e-post: ${normalizeEmail(primaryRecord.emails.find((email) =>
+      secondaryRecord.emails.some((candidate) => normalizeEmail(candidate) === normalizeEmail(email))
+    ))}`);
+  }
+
+  const sharedVerifiedPhone =
+    sameNormalizedValue(
+      primaryRecord.identity?.verifiedPhoneE164,
+      secondaryRecord.identity?.verifiedPhoneE164,
+      normalizePhone
+    ) && Boolean(normalizeIdentityScalar(primaryRecord.identity?.verifiedPhoneE164));
+  if (sharedVerifiedPhone) {
+    identityAdjacent += 24;
+    contactIdentitySignal = true;
+    reasons.push(`Verifierad telefon: ${normalizePhone(primaryRecord.identity?.verifiedPhoneE164)}`);
+  }
+
+  const sharedPhone = sameNormalizedValue(primaryRecord.phone, secondaryRecord.phone, normalizePhone);
+  if (sharedPhone) {
+    identityAdjacent += 20;
+    contactIdentitySignal = true;
+    reasons.push(`Samma telefon: ${normalizePhone(primaryRecord.phone)}`);
+  }
+
+  const sharedName = sameNormalizedValue(primaryRecord.name, secondaryRecord.name, normalizeNameSignature);
+  if (sharedName) {
+    identityAdjacent += 4;
+    reasons.push('Samma kundnamn');
+  }
+
+  const sharedCustomerKey = sameNormalizedValue(primaryRecord.key, secondaryRecord.key, normalizeKey);
+  if (sharedCustomerKey) {
+    identityAdjacent += 2;
+    reasons.push('Samma kundnyckel');
+  }
+
+  const sharedMailbox = primaryRecord.mailboxes.filter((mailbox) =>
+    secondaryRecord.mailboxes.some((candidate) => normalizeMailboxLabel(candidate) === normalizeMailboxLabel(mailbox))
+  );
+  if (sharedMailbox.length) {
+    provenance += 8;
+    reasons.push(`Samma inboxspår: ${sharedMailbox[0]}`);
+  }
+
+  const primaryConversationIds = normalizeStringArray(
+    asArray(primaryRecord.identity?.provenance?.conversationIds),
+    normalizeText
+  );
+  const secondaryConversationIds = normalizeStringArray(
+    asArray(secondaryRecord.identity?.provenance?.conversationIds),
+    normalizeText
+  );
+  const sharedConversationIds = primaryConversationIds.filter((conversationId) =>
+    secondaryConversationIds.includes(conversationId)
+  );
+  if (sharedConversationIds.length) {
+    provenance += 2;
+    reasons.push('Delad historik');
+  }
+
+  const operationalHints = [
+    primaryRecord.operationalHint,
+    secondaryRecord.operationalHint,
+  ].filter(Boolean);
+  if (operationalHints.length) {
+    operational += 0;
+  }
+
+  if (identityAdjacent) categories.push('identity_adjacent');
+  if (provenance) categories.push('provenance');
+  if (operational) categories.push('operational');
+
+  const score = identityAdjacent + provenance + operational;
+  return {
+    score,
+    categories,
+    identityAdjacent,
+    provenance,
+    operational,
+    contactIdentitySignal,
+    reasons: normalizeStringArray(reasons, normalizeText).slice(0, 5),
+  };
+}
+
+function determineMergeDisposition(primaryRecord, secondaryRecord, customerState = null) {
+  const hardConflictSignals = collectHardConflictSignals(primaryRecord, secondaryRecord);
+  if (hardConflictSignals.length) {
+    return {
+      decision: 'DO_NOT_MERGE',
+      pairId: buildMergePairId(primaryRecord, secondaryRecord),
+      scoreSnapshot: scoreMergeReviewCandidate(primaryRecord, secondaryRecord),
+      hardConflictSignals,
+      reasonCode: 'hard_conflict',
+    };
+  }
+
+  if (hasStrongIdentityMatch(primaryRecord, secondaryRecord)) {
+    return {
+      decision: 'AUTO_MERGE',
+      pairId: buildMergePairId(primaryRecord, secondaryRecord),
+      scoreSnapshot: scoreMergeReviewCandidate(primaryRecord, secondaryRecord),
+      hardConflictSignals: [],
+      reasonCode: 'strong_identity',
+    };
+  }
+
+  const pairId = buildMergePairId(primaryRecord, secondaryRecord);
+  const scoreSnapshot = scoreMergeReviewCandidate(primaryRecord, secondaryRecord);
+  if (!pairId || !scoreSnapshot.contactIdentitySignal) {
+    return {
+      decision: 'DO_NOT_MERGE',
+      pairId,
+      scoreSnapshot,
+      hardConflictSignals: [],
+      reasonCode: 'weak_identity',
+    };
+  }
+
+  if (hasMergeReviewDecision(customerState, pairId)) {
+    return {
+      decision: 'DO_NOT_MERGE',
+      pairId,
+      scoreSnapshot,
+      hardConflictSignals: [],
+      reasonCode: 'review_recorded',
+    };
+  }
+
+  if (scoreSnapshot.score < 30 || scoreSnapshot.categories.length < 2 || !scoreSnapshot.contactIdentitySignal) {
+    return {
+      decision: 'DO_NOT_MERGE',
+      pairId,
+      scoreSnapshot,
+      hardConflictSignals: [],
+      reasonCode: 'below_threshold',
+    };
+  }
+
+  return {
+    decision: 'SUGGEST_FOR_REVIEW',
+    pairId,
+    scoreSnapshot,
+    hardConflictSignals: [],
+    reasonCode: 'review_candidate',
+  };
+}
+
+function recordMergeReviewDecision(customerState, decisionPayload = {}) {
+  const normalized = normalizeMergeReviewDecision(decisionPayload);
+  if (!normalized) return false;
+  customerState.mergeReviewDecisionsByPairId = customerState.mergeReviewDecisionsByPairId || {};
+  customerState.mergeReviewDecisionsByPairId[normalized.pairId] = normalized;
+  return true;
+}
+
+function isMergeReviewDecisionDismissed(customerState, pairId) {
+  const normalizedPairId = normalizeText(pairId).toLowerCase();
+  if (!normalizedPairId) return false;
+  const existing = normalizeMergeReviewDecision(customerState?.mergeReviewDecisionsByPairId?.[normalizedPairId]);
+  return Boolean(existing && existing.decision === 'dismissed');
+}
+
 function stripDiacritics(value) {
   return normalizeText(value)
     .normalize('NFKD')
@@ -181,24 +743,12 @@ function normalizeNameSignature(value) {
     .trim();
 }
 
-function getNameTokens(value) {
-  return normalizeNameSignature(value)
-    .split(/\s+/g)
-    .filter(Boolean);
-}
-
 function normalizePhone(value) {
   return normalizeText(value).replace(/[^\d+]+/g, '');
 }
 
 function normalizeMailboxLabel(value) {
   return normalizeText(value).toLowerCase();
-}
-
-function getEmailLocalPart(value) {
-  const normalized = normalizeEmail(value);
-  if (!normalized.includes('@')) return '';
-  return normalized.split('@')[0].split('+')[0] || '';
 }
 
 function normalizeHeader(value) {
@@ -259,13 +809,22 @@ function parseCsvLine(line) {
 function buildImportedRow(input = {}, rowNumber = 1, options = {}) {
   const record = input && typeof input === 'object' ? input : {};
   const emails = [];
+  const phones = [];
   const mailboxes = [];
+  let personnummer = '';
   const defaultMailboxId = normalizeEmail(options.defaultMailboxId);
 
   const pushEmails = (value) => {
     splitMultiValue(value).forEach((entry) => {
       const normalized = normalizeEmail(entry);
       if (normalized) emails.push(normalized);
+    });
+  };
+
+  const pushPhones = (value) => {
+    splitMultiValue(value).forEach((entry) => {
+      const normalized = normalizePhone(entry);
+      if (normalized) phones.push(normalized);
     });
   };
 
@@ -282,10 +841,22 @@ function buildImportedRow(input = {}, rowNumber = 1, options = {}) {
   pushEmails(record.secondaryEmail);
   pushEmails(record.secondary_email);
   pushEmails(record.emails);
+  pushEmails(record.epost);
+  pushPhones(record.phone);
+  pushPhones(record.phoneNumber);
+  pushPhones(record.phone_number);
+  pushPhones(record.telefon);
+  pushPhones(record.telefon_mobil);
+  pushPhones(record.telefon_annat);
   pushMailboxes(record.mailbox);
   pushMailboxes(record.mailboxes);
   pushMailboxes(record.mailboxLabel);
   pushMailboxes(record.mailboxLabels);
+  personnummer =
+    normalizeText(record.personnummer) ||
+    normalizeText(record.personNumber) ||
+    normalizeText(record.person_number) ||
+    normalizeText(record.pnr);
 
   Object.entries(record).forEach(([key, value]) => {
     const header = normalizeHeader(key);
@@ -297,6 +868,14 @@ function buildImportedRow(input = {}, rowNumber = 1, options = {}) {
       header.includes('e_post')
     ) {
       pushEmails(value);
+      return;
+    }
+    if (header.startsWith('telefon') || header.includes('phone') || header.includes('mobil')) {
+      pushPhones(value);
+      return;
+    }
+    if (header.includes('personnummer') || header === 'pnr' || header.includes('person_number')) {
+      personnummer = normalizeText(value) || personnummer;
       return;
     }
     if (header.startsWith('mailbox') || header.endsWith('_mailbox')) {
@@ -312,9 +891,11 @@ function buildImportedRow(input = {}, rowNumber = 1, options = {}) {
   }
 
   const normalizedEmails = normalizeStringArray(emails, normalizeEmail).map(normalizeEmail);
+  const normalizedPhones = normalizeStringArray(phones, normalizePhone).map(normalizePhone);
   const normalizedMailboxes = normalizeStringArray(mailboxes, normalizeKey);
   const name =
     normalizeText(record.name) ||
+    normalizeText(record.namn) ||
     normalizeText(record.customerName) ||
     normalizeText(record.customer_name) ||
     normalizeText(record.fullName) ||
@@ -330,11 +911,9 @@ function buildImportedRow(input = {}, rowNumber = 1, options = {}) {
     rowNumber,
     name,
     emails: normalizedEmails,
-    phone:
-      normalizeText(record.phone) ||
-      normalizeText(record.phoneNumber) ||
-      normalizeText(record.phone_number) ||
-      normalizeText(record.telefon),
+    phones: normalizedPhones,
+    personnummer: normalizeText(personnummer),
+    phone: normalizedPhones[0] || '',
     mailboxes: normalizedMailboxes,
     vip:
       normalizeBoolean(vipCandidate, false) ||
@@ -513,14 +1092,6 @@ function resolveCustomerKey(customerState, customerKey) {
 function findMatchingCustomerKeys(customerState, importedRow, { strictEmail = false } = {}) {
   const matches = new Set();
   const activeKeys = getActiveCustomerKeys(customerState);
-  const importedRecord = {
-    key: `row_${importedRow.rowNumber}`,
-    name: importedRow.name,
-    emails: importedRow.emails,
-    phone: importedRow.phone,
-    mailboxes: importedRow.mailboxes,
-    profileCount: Math.max(1, importedRow.emails.length || 1),
-  };
 
   if (importedRow.emails.length) {
     activeKeys.forEach((customerKey) => {
@@ -535,11 +1106,13 @@ function findMatchingCustomerKeys(customerState, importedRow, { strictEmail = fa
     });
   }
 
-  if (!strictEmail && !matches.size) {
+  if (!strictEmail && !matches.size && importedRow.phone) {
     activeKeys.forEach((customerKey) => {
       const existingRecord = createIdentityRecord(customerState, customerKey);
-      const evidence = evaluateCustomerIdentityLink(existingRecord, importedRecord);
-      if (evidence.confidence >= 68) {
+      if (
+        normalizePhone(existingRecord.phone) &&
+        normalizePhone(existingRecord.phone) === normalizePhone(importedRow.phone)
+      ) {
         matches.add(resolveCustomerKey(customerState, customerKey));
       }
     });
@@ -551,6 +1124,7 @@ function findMatchingCustomerKeys(customerState, importedRow, { strictEmail = fa
 function mergeCustomerProfiles(customerState, primaryKey, secondaryKeys, options = {}) {
   customerState.mergedInto = customerState.mergedInto || {};
   customerState.primaryEmailByKey = customerState.primaryEmailByKey || {};
+  customerState.identityByKey = customerState.identityByKey || {};
   const directory = customerState.directory || {};
   const details = customerState.details || {};
   const profileCounts = customerState.profileCounts || {};
@@ -567,6 +1141,8 @@ function mergeCustomerProfiles(customerState, primaryKey, secondaryKeys, options
     const secondary = directory[resolvedSecondary];
     const secondaryDetail = details[resolvedSecondary];
     if (!secondary || !secondaryDetail) return;
+    const currentPrimaryIdentity = buildIdentityEnvelopeFromRecord(customerState, primaryKey);
+    const secondaryIdentity = buildIdentityEnvelopeFromRecord(customerState, resolvedSecondary);
 
     if (keepEmails) {
       primaryDetail.emails = normalizeStringArray(
@@ -605,6 +1181,78 @@ function mergeCustomerProfiles(customerState, primaryKey, secondaryKeys, options
     customerState.mergedInto[resolvedSecondary] = primaryKey;
     profileCounts[primaryKey] = primary.profileCount;
     delete customerState.primaryEmailByKey[resolvedSecondary];
+    customerState.identityByKey[primaryKey] = normalizeIdentityEnvelope({
+      ...currentPrimaryIdentity,
+      customerKey: primaryKey,
+      customerName: normalizeText(primary.name) || normalizeText(secondary.name) || primaryKey,
+      customerEmail:
+        currentPrimaryIdentity.customerEmail ||
+        secondaryIdentity.customerEmail ||
+        primaryDetail.emails[0] ||
+        secondaryDetail.emails[0] ||
+        null,
+      customerPhone:
+        currentPrimaryIdentity.customerPhone ||
+        secondaryIdentity.customerPhone ||
+        normalizePhone(primaryDetail.phone) ||
+        normalizePhone(secondaryDetail.phone) ||
+        null,
+      canonicalCustomerId:
+        currentPrimaryIdentity.canonicalCustomerId || secondaryIdentity.canonicalCustomerId,
+      canonicalContactId:
+        currentPrimaryIdentity.canonicalContactId || secondaryIdentity.canonicalContactId,
+      explicitMergeGroupId:
+        currentPrimaryIdentity.explicitMergeGroupId || secondaryIdentity.explicitMergeGroupId,
+      verifiedPersonalEmailNormalized:
+        currentPrimaryIdentity.verifiedPersonalEmailNormalized ||
+        secondaryIdentity.verifiedPersonalEmailNormalized,
+      verifiedPhoneE164:
+        currentPrimaryIdentity.verifiedPhoneE164 || secondaryIdentity.verifiedPhoneE164,
+      identitySource:
+        currentPrimaryIdentity.identitySource !== 'unknown'
+          ? currentPrimaryIdentity.identitySource
+          : secondaryIdentity.identitySource,
+      identityConfidence:
+        currentPrimaryIdentity.identityConfidence !== 'unknown'
+          ? currentPrimaryIdentity.identityConfidence
+          : secondaryIdentity.identityConfidence,
+      hardConflictSignals: normalizeHardConflictSignals([
+        ...asArray(currentPrimaryIdentity.hardConflictSignals),
+        ...asArray(secondaryIdentity.hardConflictSignals),
+      ]),
+      provenance: {
+        source:
+          currentPrimaryIdentity.provenance.source !== 'unknown'
+            ? currentPrimaryIdentity.provenance.source
+            : secondaryIdentity.provenance.source,
+        mailboxIds: normalizeStringArray(
+          [
+            ...asArray(currentPrimaryIdentity.provenance.mailboxIds),
+            ...asArray(secondaryIdentity.provenance.mailboxIds),
+            ...asArray(primaryDetail.mailboxes),
+            ...asArray(secondaryDetail.mailboxes),
+          ],
+          normalizeMailboxLabel
+        ),
+        conversationIds: normalizeStringArray(
+          [
+            ...asArray(currentPrimaryIdentity.provenance.conversationIds),
+            ...asArray(secondaryIdentity.provenance.conversationIds),
+          ],
+          normalizeText
+        ),
+        sourceRecordIds: normalizeStringArray(
+          [
+            ...asArray(currentPrimaryIdentity.provenance.sourceRecordIds),
+            ...asArray(secondaryIdentity.provenance.sourceRecordIds),
+            primaryKey,
+            resolvedSecondary,
+          ],
+          normalizeText
+        ),
+      },
+    });
+    delete customerState.identityByKey[resolvedSecondary];
   });
 
   if (!customerState.primaryEmailByKey[primaryKey] && primaryDetail.emails[0]) {
@@ -870,6 +1518,290 @@ function applyImportedRowToCustomerState(customerState, importedRow, options = {
   };
 }
 
+function findClientoBootstrapCandidateKeys(customerState, importedRow, targetKey) {
+  const matches = new Set();
+  const activeKeys = getActiveCustomerKeys(customerState);
+  const normalizedEmails = normalizeStringArray(importedRow.emails, normalizeEmail).map(normalizeEmail);
+  const normalizedPhones = normalizeStringArray(
+    [...asArray(importedRow.phones), normalizeText(importedRow.phone)],
+    normalizePhone
+  ).map(normalizePhone);
+  const normalizedTargetKey = normalizeText(targetKey).toLowerCase();
+
+  activeKeys.forEach((customerKey) => {
+    const resolvedKey = resolveCustomerKey(customerState, customerKey);
+    if (!resolvedKey) return;
+    const identity = normalizeIdentityEnvelope(customerState.identityByKey?.[resolvedKey] || {});
+    const existingEmails = normalizeStringArray(
+      asArray(customerState.details?.[resolvedKey]?.emails),
+      normalizeEmail
+    ).map(normalizeEmail);
+    const existingPhone = normalizePhone(customerState.details?.[resolvedKey]?.phone);
+    const existingTargetKey = normalizeText(resolvedKey).toLowerCase();
+    const existingCanonicalId = normalizeText(identity.canonicalCustomerId).toLowerCase();
+
+    if (existingTargetKey && existingTargetKey === normalizedTargetKey) {
+      matches.add(resolvedKey);
+      return;
+    }
+
+    if (existingCanonicalId && existingCanonicalId === normalizedTargetKey) {
+      matches.add(resolvedKey);
+      return;
+    }
+
+    if (
+      normalizedEmails.some((email) => existingEmails.some((candidate) => normalizeEmail(candidate) === email))
+    ) {
+      matches.add(resolvedKey);
+      return;
+    }
+
+    if (
+      normalizedPhones.length &&
+      existingPhone &&
+      normalizedPhones.some((phone) => normalizePhone(existingPhone) === phone)
+    ) {
+      matches.add(resolvedKey);
+    }
+  });
+
+  return Array.from(matches).filter(Boolean);
+}
+
+function buildClientoIdentityEnvelope(customerState, targetKey, importedRow, { certainty = 'review' } = {}) {
+  const seed = buildClientoBootstrapSeed(importedRow);
+  const canonicalCustomerId = targetKey || buildClientoCanonicalCustomerId(importedRow);
+  const sourceRecordId = buildBootstrapSourceRecordId(importedRow, 'cliento');
+  const primaryEmail = normalizeStringArray(importedRow.emails, normalizeEmail).map(normalizeEmail)[0] || '';
+  const primaryPhone = normalizeStringArray(
+    [...asArray(importedRow.phones), normalizeText(importedRow.phone)],
+    normalizePhone
+  ).map(normalizePhone)[0] || '';
+  return normalizeIdentityEnvelope({
+    customerKey: targetKey,
+    customerName: normalizeText(importedRow.name) || primaryEmail || targetKey,
+    customerEmail: primaryEmail || null,
+    customerPhone: primaryPhone || null,
+    canonicalCustomerId,
+    canonicalContactId: null,
+    explicitMergeGroupId: null,
+    verifiedPersonalEmailNormalized: primaryEmail || null,
+    verifiedPhoneE164: primaryPhone || null,
+    identitySource: 'cliento',
+    identityConfidence: certainty,
+    hardConflictSignals: [],
+    provenance: {
+      source: 'cliento',
+      mailboxIds: normalizeStringArray(importedRow.mailboxes, normalizeMailboxLabel),
+      conversationIds: [],
+      sourceRecordIds: [sourceRecordId],
+      bootstrapSeed: seed,
+    },
+  });
+}
+
+function applyClientoImportedRowToCustomerState(customerState, importedRow, options = {}) {
+  const directory = customerState.directory || {};
+  const details = customerState.details || {};
+  const profileCounts = customerState.profileCounts || {};
+
+  const bootstrapSeed = buildClientoBootstrapSeed(importedRow);
+  if (!bootstrapSeed) {
+    return {
+      action: 'invalid',
+      rowNumber: importedRow.rowNumber,
+      message: 'Raden saknar verifierbara bootstrap-fält.',
+      targetKey: '',
+      matchedKeys: [],
+      input: {
+        rowNumber: importedRow.rowNumber,
+        name: importedRow.name,
+        emails: [...importedRow.emails],
+        phones: [...asArray(importedRow.phones)],
+        personnummer: '',
+      },
+    };
+  }
+
+  const derivedKey = buildClientoCanonicalCustomerId(importedRow);
+  let targetKey = derivedKey;
+  const candidateKeys = findClientoBootstrapCandidateKeys(customerState, importedRow, targetKey);
+  let action = 'create';
+  const hasBootstrapPersonnummer = Boolean(normalizePersonnummer(importedRow.personnummer));
+  const hasBootstrapEmail = normalizeStringArray(importedRow.emails, normalizeEmail).length > 0;
+  const hasBootstrapPhone =
+    normalizeStringArray(
+      [...asArray(importedRow.phones), normalizeText(importedRow.phone)],
+      normalizePhone
+    ).length > 0;
+  const bootstrapMode = hasBootstrapPersonnummer
+    ? 'personnummer'
+    : hasBootstrapEmail && hasBootstrapPhone
+      ? 'email_phone'
+      : hasBootstrapEmail
+        ? 'email'
+        : 'phone';
+
+  if (candidateKeys.length === 1) {
+    targetKey = candidateKeys[0];
+    action = 'update';
+  } else if (candidateKeys.length > 1) {
+    action = 'review';
+  }
+
+  if (action === 'review') {
+    const reviewPairId = buildClientoReviewPairId(targetKey, candidateKeys, {
+      ...importedRow,
+      sourceSystem: 'cliento',
+    });
+    if (!hasMergeReviewDecision(customerState, reviewPairId)) {
+      recordMergeReviewDecision(customerState, {
+        pairId: reviewPairId,
+        decision: 'review_required',
+        decidedBy: 'system',
+        reasonCode: 'cliento_import_conflict',
+        signalSnapshot: {
+          sourceSystem: 'cliento',
+          bootstrapMode,
+          candidateCount: candidateKeys.length,
+          emails: normalizeStringArray(importedRow.emails, normalizeEmail).map(normalizeEmail),
+          phones: normalizeStringArray(
+            [...asArray(importedRow.phones), normalizeText(importedRow.phone)],
+            normalizePhone
+          ).map(normalizePhone),
+        },
+        identitySnapshot: {
+          targetKey,
+          candidates: candidateKeys,
+        },
+      });
+    }
+  }
+
+  if (!directory[targetKey]) {
+    directory[targetKey] = {
+      name: normalizeText(importedRow.name) || targetKey,
+      vip: Boolean(importedRow.vip),
+      emailCoverage: importedRow.emails.length,
+      duplicateCandidate: false,
+      profileCount: 1,
+      customerValue: normalizeCount(importedRow.customerValue, 0),
+      totalConversations: normalizeCount(importedRow.totalConversations, 0),
+      totalMessages: normalizeCount(importedRow.totalMessages, 0),
+    };
+  }
+  if (!details[targetKey]) {
+    details[targetKey] = {
+      emails: [],
+      phone: '',
+      mailboxes: [],
+    };
+  }
+
+  const record = directory[targetKey];
+  const detail = details[targetKey];
+  record.name = normalizeText(importedRow.name) || record.name || targetKey;
+  record.vip = Boolean(record.vip || importedRow.vip);
+  record.customerValue = Math.max(
+    normalizeCount(record.customerValue, 0),
+    normalizeCount(importedRow.customerValue, 0)
+  );
+  record.totalConversations = Math.max(
+    normalizeCount(record.totalConversations, 0),
+    normalizeCount(importedRow.totalConversations, 0)
+  );
+  record.totalMessages = Math.max(
+    normalizeCount(record.totalMessages, 0),
+    normalizeCount(importedRow.totalMessages, 0)
+  );
+  detail.emails = normalizeStringArray(
+    [...asArray(detail.emails), ...asArray(importedRow.emails)],
+    normalizeEmail
+  ).map(normalizeEmail);
+  detail.mailboxes = normalizeStringArray(
+    [...asArray(detail.mailboxes), ...asArray(importedRow.mailboxes)],
+    normalizeKey
+  );
+  if (!normalizeText(detail.phone) && normalizeText(importedRow.phone)) {
+    detail.phone = importedRow.phone;
+  }
+
+  record.emailCoverage = Math.max(
+    normalizeCount(record.emailCoverage, 0),
+    detail.emails.length
+  );
+  record.profileCount = Math.max(
+    1,
+    normalizeCount(record.profileCount, 1),
+    detail.emails.length || 1
+  );
+  record.duplicateCandidate = detail.emails.length > 1;
+  profileCounts[targetKey] = record.profileCount;
+  if (!customerState.primaryEmailByKey) {
+    customerState.primaryEmailByKey = {};
+  }
+  if (!customerState.primaryEmailByKey[targetKey] && detail.emails[0]) {
+    customerState.primaryEmailByKey[targetKey] = detail.emails[0];
+  }
+
+  customerState.identityByKey = customerState.identityByKey || {};
+  const hasPersonnummer = Boolean(normalizePersonnummer(importedRow.personnummer));
+  const hasEmail = normalizeStringArray(importedRow.emails, normalizeEmail).length > 0;
+  const hasPhone =
+    normalizeStringArray([...asArray(importedRow.phones), normalizeText(importedRow.phone)], normalizePhone)
+      .length > 0;
+  const certainty = hasPersonnummer || (hasEmail && hasPhone) ? 'strong' : 'review';
+  customerState.identityByKey[targetKey] = buildClientoIdentityEnvelope(
+    customerState,
+    targetKey,
+    importedRow,
+    {
+      certainty,
+    }
+  );
+
+  const importName = importedRow.name || detail.emails[0] || targetKey;
+  const message =
+    action === 'create'
+      ? `Skapar ${importName}.`
+      : action === 'review'
+        ? `Markerar ${importName} för review.`
+        : `Uppdaterar ${record.name}.`;
+
+  return {
+    action,
+    rowNumber: importedRow.rowNumber,
+    message,
+    targetKey,
+    matchedKeys: candidateKeys,
+    input: {
+      rowNumber: importedRow.rowNumber,
+      name: importedRow.name,
+      emails: [...importedRow.emails],
+      phones: [...asArray(importedRow.phones)],
+      personnummer: '',
+      vip: Boolean(importedRow.vip),
+      customerValue: normalizeCount(importedRow.customerValue, 0),
+      totalConversations: normalizeCount(importedRow.totalConversations, 0),
+      totalMessages: normalizeCount(importedRow.totalMessages, 0),
+    },
+    record: {
+      name: record.name,
+      emails: [...detail.emails],
+      mailboxes: [...detail.mailboxes],
+      vip: Boolean(record.vip),
+      phone: normalizeText(detail.phone),
+      customerValue: normalizeCount(record.customerValue, 0),
+      totalConversations: normalizeCount(record.totalConversations, 0),
+      totalMessages: normalizeCount(record.totalMessages, 0),
+      canonicalCustomerId: normalizeText(customerState.identityByKey[targetKey]?.canonicalCustomerId),
+      identitySource: normalizeText(customerState.identityByKey[targetKey]?.identitySource),
+      identityConfidence: normalizeText(customerState.identityByKey[targetKey]?.identityConfidence),
+    },
+  };
+}
+
 function buildImportSummary(previewRows = [], format = 'json', fileName = '') {
   const summary = {
     format,
@@ -879,6 +1811,7 @@ function buildImportSummary(previewRows = [], format = 'json', fileName = '') {
     created: 0,
     updated: 0,
     merged: 0,
+    review: 0,
     invalid: 0,
     rows: previewRows,
   };
@@ -887,10 +1820,45 @@ function buildImportSummary(previewRows = [], format = 'json', fileName = '') {
     if (row.action === 'create') summary.created += 1;
     else if (row.action === 'update') summary.updated += 1;
     else if (row.action === 'merge') summary.merged += 1;
+    else if (row.action === 'review') summary.review += 1;
     else summary.invalid += 1;
   });
-  summary.validRows = summary.created + summary.updated + summary.merged;
+  summary.validRows = summary.created + summary.updated + summary.merged + summary.review;
   return summary;
+}
+
+function buildCustomerImportCoverageReadout(customerState = {}) {
+  const normalizedState = normalizeCustomerState(customerState);
+  const identityByKey = asObject(normalizedState.identityByKey);
+  const reviewDecisionMap = asObject(normalizedState.mergeReviewDecisionsByPairId);
+  const directory = asObject(normalizedState.directory);
+  const primaryEmailByKey = asObject(normalizedState.primaryEmailByKey);
+  const identityEntries = Object.values(identityByKey);
+  const canonicalCount = identityEntries.filter((entry) =>
+    Boolean(
+      normalizeText(entry?.canonicalCustomerId) ||
+        normalizeText(entry?.canonicalContactId) ||
+        normalizeText(entry?.explicitMergeGroupId)
+    )
+  ).length;
+  const sourceCounts = identityEntries.reduce((acc, entry) => {
+    const source = normalizeText(entry?.identitySource).toLowerCase() || 'unknown';
+    acc[source] = (acc[source] || 0) + 1;
+    return acc;
+  }, {});
+  const reviewRequiredCount = Object.values(reviewDecisionMap).filter(
+    (entry) => normalizeMergeReviewDecisionValue(entry?.decision) === 'review_required'
+  ).length;
+
+  return {
+    customerCount: Object.keys(directory).length,
+    identityCount: identityEntries.length,
+    canonicalCount,
+    primaryEmailCount: Object.keys(primaryEmailByKey).length,
+    reviewDecisionCount: Object.keys(reviewDecisionMap).length,
+    reviewRequiredCount,
+    sourceCounts,
+  };
 }
 
 function planCustomerImport({
@@ -900,6 +1868,7 @@ function planCustomerImport({
   binaryBase64 = '',
   fileName,
   defaultMailboxId = '',
+  sourceSystem = '',
 }) {
   const baseState = cloneCustomerState(customerState);
   const { format, rows: parsedRows } = parseCustomerImportRows({
@@ -913,8 +1882,11 @@ function planCustomerImport({
     baseState.customerSettings?.strict_email,
     DEFAULT_CUSTOMER_SETTINGS.strict_email
   );
+  const normalizedSourceSystem = normalizeText(sourceSystem).toLowerCase();
   const previewRows = parsedRows.map((row) =>
-    applyImportedRowToCustomerState(baseState, row, { strictEmail })
+    normalizedSourceSystem === 'cliento'
+      ? applyClientoImportedRowToCustomerState(baseState, { ...row, sourceSystem: normalizedSourceSystem })
+      : applyImportedRowToCustomerState(baseState, row, { strictEmail })
   );
   const importSummary = buildImportSummary(previewRows, format, fileName);
   return {
@@ -928,6 +1900,8 @@ function buildDefaultCustomerState() {
     mergedInto: {},
     dismissedSuggestionIds: [],
     acceptedSuggestionIds: [],
+    mergeReviewDecisionsByPairId: {},
+    identityByKey: {},
     directory: {},
     details: {},
     profileCounts: {},
@@ -943,6 +1917,10 @@ function normalizeCustomerState(input = {}) {
     mergedInto: normalizeLookup(input.mergedInto, normalizeKey),
     dismissedSuggestionIds: normalizeStringArray(input.dismissedSuggestionIds, normalizeSuggestionId),
     acceptedSuggestionIds: normalizeStringArray(input.acceptedSuggestionIds, normalizeSuggestionId),
+    mergeReviewDecisionsByPairId: normalizeMergeReviewDecisionMap(
+      input.mergeReviewDecisionsByPairId
+    ),
+    identityByKey: normalizeIdentityByKey(input.identityByKey),
     directory: Object.keys(input.directory || {}).length
       ? normalizeDirectory(input.directory)
       : defaults.directory,
@@ -1010,6 +1988,8 @@ function syncDerivedCustomerState(customerState) {
       delete next.primaryEmailByKey[customerKey];
     }
     next.profileCounts[customerKey] = directoryEntry.profileCount;
+    next.identityByKey = next.identityByKey || {};
+    next.identityByKey[customerKey] = buildIdentityEnvelopeFromRecord(next, customerKey);
   });
 
   return next;
@@ -1029,74 +2009,7 @@ function createIdentityRecord(customerState, customerKey) {
       1,
       normalizeCount(customerState.profileCounts?.[resolvedKey], normalizeCount(directoryEntry.profileCount, 1))
     ),
-  };
-}
-
-function evaluateCustomerIdentityLink(primaryRecord, secondaryRecord) {
-  const reasons = [];
-  let confidence = 0;
-
-  const primaryNameSignature = normalizeNameSignature(primaryRecord.name);
-  const secondaryNameSignature = normalizeNameSignature(secondaryRecord.name);
-  const primaryNameTokens = getNameTokens(primaryRecord.name);
-  const secondaryNameTokens = getNameTokens(secondaryRecord.name);
-  const sharedNameTokens = primaryNameTokens.filter((token) => secondaryNameTokens.includes(token));
-  const sharedPhone =
-    normalizePhone(primaryRecord.phone) &&
-    normalizePhone(primaryRecord.phone) === normalizePhone(secondaryRecord.phone);
-  const sharedEmails = primaryRecord.emails.filter((email) =>
-    secondaryRecord.emails.some((candidate) => normalizeEmail(candidate) === normalizeEmail(email))
-  );
-  const primaryLocalParts = normalizeStringArray(primaryRecord.emails, getEmailLocalPart).filter(Boolean);
-  const secondaryLocalParts = normalizeStringArray(secondaryRecord.emails, getEmailLocalPart).filter(Boolean);
-  const sharedLocalParts = primaryLocalParts.filter((part) => secondaryLocalParts.includes(part));
-  const sharedMailboxes = primaryRecord.mailboxes.filter((mailbox) =>
-    secondaryRecord.mailboxes.some((candidate) => normalizeMailboxLabel(candidate) === normalizeMailboxLabel(mailbox))
-  );
-  const mailboxCoverage = normalizeStringArray(
-    [...primaryRecord.mailboxes, ...secondaryRecord.mailboxes],
-    normalizeMailboxLabel
-  );
-  const exactName = primaryNameSignature && primaryNameSignature === secondaryNameSignature;
-  const likelySamePersonAlias =
-    sharedLocalParts.length > 0 &&
-    (!sharedEmails.length || sharedLocalParts[0] !== sharedEmails[0].split('@')[0].split('+')[0]);
-
-  if (sharedEmails.length) {
-    reasons.push(`Delad kundadress: ${sharedEmails[0]}`);
-    confidence += 60;
-  }
-  if (sharedPhone) {
-    reasons.push('Samma telefonnummer');
-    confidence += 42;
-  }
-  if (exactName) {
-    reasons.push('Samma kundnamn');
-    confidence += 26;
-  } else if (sharedNameTokens.length >= 2) {
-    reasons.push('Liknande namn');
-    confidence += 14;
-  }
-  if (sharedLocalParts.length) {
-    reasons.push(`Liknande mejlalias: ${sharedLocalParts[0]}`);
-    confidence += 20;
-  }
-  if (sharedMailboxes.length) {
-    reasons.push(`Samma inboxspår: ${sharedMailboxes[0]}`);
-    confidence += 10;
-  }
-  if (mailboxCoverage.length > 1 && (sharedEmails.length || sharedPhone || exactName)) {
-    reasons.push('Aktiv över flera inboxar');
-    confidence += 8;
-  }
-  if (exactName && sharedPhone) confidence += 18;
-  if (exactName && likelySamePersonAlias) confidence += 20;
-  if (sharedEmails.length && mailboxCoverage.length > 1) confidence += 10;
-  if (sharedNameTokens.length >= 2 && sharedLocalParts.length) confidence += 8;
-
-  return {
-    confidence,
-    reasons: normalizeStringArray(reasons, normalizeText).slice(0, 4),
+    identity: buildIdentityEnvelopeFromRecord(customerState, resolvedKey),
   };
 }
 
@@ -1104,6 +2017,7 @@ function buildCustomerIdentitySuggestions(customerState) {
   const nextState = syncDerivedCustomerState(customerState);
   const activeKeys = getActiveCustomerKeys(nextState);
   const groups = Object.fromEntries(activeKeys.map((key) => [key, []]));
+  const pairSuggestions = [];
 
   activeKeys.forEach((customerKey) => {
     if (nextState.directory[customerKey]) {
@@ -1119,16 +2033,44 @@ function buildCustomerIdentitySuggestions(customerState) {
       const secondaryKey = activeKeys[compareIndex];
       const primaryRecord = createIdentityRecord(nextState, primaryKey);
       const secondaryRecord = createIdentityRecord(nextState, secondaryKey);
-      const identityEvidence = evaluateCustomerIdentityLink(primaryRecord, secondaryRecord);
-      if (!identityEvidence.reasons.length || identityEvidence.confidence < 68) continue;
-
-      const pairId = normalizeSuggestionId(`${primaryKey}::${secondaryKey}`);
-      const suggestionPayload = {
+      const disposition = determineMergeDisposition(primaryRecord, secondaryRecord, nextState);
+      if (disposition.decision === 'DO_NOT_MERGE' || !disposition.pairId) continue;
+      const pairId = disposition.pairId;
+      const decision = disposition.decision;
+      const scoreSnapshot = disposition.scoreSnapshot || {};
+      const pairReview = {
         id: pairId,
         pairId,
-        confidence: Math.min(98, identityEvidence.confidence),
-        reasons: identityEvidence.reasons,
+        decision,
+        confidence: Math.min(
+          98,
+          decision === 'AUTO_MERGE'
+            ? 98
+            : Math.max(30, normalizeCount(scoreSnapshot.score, 0))
+        ),
+        score: normalizeCount(scoreSnapshot.score, 0),
+        reasons: normalizeStringArray(scoreSnapshot.reasons, normalizeText),
+        signalSnapshot: {
+          score: normalizeCount(scoreSnapshot.score, 0),
+          categories: normalizeStringArray(scoreSnapshot.categories, normalizeText),
+          identityAdjacent: normalizeCount(scoreSnapshot.identityAdjacent, 0),
+          provenance: normalizeCount(scoreSnapshot.provenance, 0),
+          operational: normalizeCount(scoreSnapshot.operational, 0),
+          contactIdentitySignal: Boolean(scoreSnapshot.contactIdentitySignal),
+        },
+        identitySnapshot: {
+          primary: primaryRecord.identity,
+          secondary: secondaryRecord.identity,
+        },
       };
+      if (isMergeReviewDecisionDismissed(nextState, pairId)) continue;
+      const suggestionPayload = {
+        ...pairReview,
+      };
+      pairSuggestions.push({
+        pairId,
+        suggestionPayload,
+      });
       groups[primaryKey].push({
         ...suggestionPayload,
         primaryKey,
@@ -1146,7 +2088,7 @@ function buildCustomerIdentitySuggestions(customerState) {
     }
   }
 
-  const duplicateCount = Object.values(groups).reduce((count, items) => count + asArray(items).length, 0) / 2;
+  const duplicateCount = pairSuggestions.length;
   return {
     customerState: nextState,
     suggestionGroups: groups,
@@ -1316,6 +2258,11 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
     return JSON.parse(JSON.stringify(customerState));
   }
 
+  async function peekTenantCustomerState({ tenantId }) {
+    const tenantState = ensureTenantState(tenantId);
+    return JSON.parse(JSON.stringify(tenantState.customerState));
+  }
+
   async function previewTenantCustomerIdentity({ tenantId, customerState = null }) {
     const baseState = await materializeTenantCustomerState({ tenantId, customerState });
     const payload = buildCustomerIdentitySuggestions(baseState);
@@ -1324,10 +2271,15 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
 
   async function saveTenantCustomerState({ tenantId, customerState }) {
     const tenantState = ensureTenantState(tenantId);
-    tenantState.customerState = await materializeTenantCustomerState({
+    const nextCustomerState = await materializeTenantCustomerState({
       tenantId,
       customerState,
     });
+    const currentCustomerState = normalizeCustomerState(tenantState.customerState);
+    if (isDeepStrictEqual(currentCustomerState, nextCustomerState)) {
+      return JSON.parse(JSON.stringify(currentCustomerState));
+    }
+    tenantState.customerState = nextCustomerState;
     tenantState.updatedAt = nowIso();
     await save();
     return JSON.parse(JSON.stringify(tenantState.customerState));
@@ -1340,6 +2292,7 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
     binaryBase64 = '',
     fileName,
     defaultMailboxId = '',
+    sourceSystem = '',
   }) {
     const planned = planCustomerImport({
       customerState: await materializeTenantCustomerState({ tenantId }),
@@ -1348,8 +2301,14 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
       binaryBase64,
       fileName,
       defaultMailboxId,
+      sourceSystem,
     });
-    return JSON.parse(JSON.stringify(planned.importSummary));
+    return JSON.parse(
+      JSON.stringify({
+        ...planned.importSummary,
+        coverageReadout: buildCustomerImportCoverageReadout(planned.customerState),
+      })
+    );
   }
 
   async function commitTenantCustomerImport({
@@ -1359,6 +2318,7 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
     binaryBase64 = '',
     fileName,
     defaultMailboxId = '',
+    sourceSystem = '',
   }) {
     const tenantState = ensureTenantState(tenantId);
     const planned = planCustomerImport({
@@ -1368,11 +2328,13 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
       binaryBase64,
       fileName,
       defaultMailboxId,
+      sourceSystem,
     });
     if (!planned.importSummary.validRows) {
       return {
         customerState: JSON.parse(JSON.stringify(tenantState.customerState)),
         importSummary: JSON.parse(JSON.stringify(planned.importSummary)),
+        coverageReadout: buildCustomerImportCoverageReadout(tenantState.customerState),
       };
     }
     tenantState.customerState = buildCustomerIdentitySuggestions(planned.customerState).customerState;
@@ -1381,7 +2343,13 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
     return {
       customerState: JSON.parse(JSON.stringify(tenantState.customerState)),
       importSummary: JSON.parse(JSON.stringify(planned.importSummary)),
+      coverageReadout: buildCustomerImportCoverageReadout(tenantState.customerState),
     };
+  }
+
+  async function getTenantCustomerImportCoverageReadout({ tenantId }) {
+    const customerState = await materializeTenantCustomerState({ tenantId });
+    return JSON.parse(JSON.stringify(buildCustomerImportCoverageReadout(customerState)));
   }
 
   async function mergeTenantCustomerProfiles({
@@ -1401,8 +2369,42 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
     if (!resolvedPrimary || !resolvedSecondaryKeys.length) {
       throw new Error('Minst två kundprofiler krävs för att slå ihop.');
     }
+    const primaryRecord = createIdentityRecord(nextState, resolvedPrimary);
+    const dispositionChecks = resolvedSecondaryKeys.map((resolvedSecondary) => {
+      const secondaryRecord = createIdentityRecord(nextState, resolvedSecondary);
+      return {
+        ...determineMergeDisposition(primaryRecord, secondaryRecord, nextState),
+        secondaryRecordIdentity: secondaryRecord.identity,
+      };
+    });
+    if (dispositionChecks.some((entry) => entry.decision === 'DO_NOT_MERGE')) {
+      throw new Error('Kunde inte slå ihop kundprofilerna på grund av identitetskonflikt.');
+    }
     mergeCustomerProfiles(nextState, resolvedPrimary, resolvedSecondaryKeys, options);
-    acceptCustomerSuggestion(nextState, suggestionId || `${resolvedPrimary}::${resolvedSecondaryKeys[0]}`);
+    dispositionChecks.forEach((entry) => {
+      if (!entry.pairId) return;
+      recordMergeReviewDecision(nextState, {
+        pairId: entry.pairId,
+        decision: 'approved',
+        decidedBy: 'system',
+        reasonCode: 'manual_merge',
+        signalSnapshot: {
+          score: normalizeCount(entry.scoreSnapshot?.score, 0),
+          categories: normalizeStringArray(entry.scoreSnapshot?.categories, normalizeText),
+          identityAdjacent: normalizeCount(entry.scoreSnapshot?.identityAdjacent, 0),
+          provenance: normalizeCount(entry.scoreSnapshot?.provenance, 0),
+          operational: normalizeCount(entry.scoreSnapshot?.operational, 0),
+          contactIdentitySignal: Boolean(entry.scoreSnapshot?.contactIdentitySignal),
+        },
+        identitySnapshot: {
+          primary: primaryRecord.identity,
+          secondary: entry.secondaryRecordIdentity || {},
+        },
+      });
+    });
+    if (suggestionId) {
+      acceptCustomerSuggestion(nextState, suggestionId);
+    }
     const payload = buildCustomerIdentitySuggestions(nextState);
     tenantState.customerState = payload.customerState;
     tenantState.updatedAt = nowIso();
@@ -1454,9 +2456,24 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
   }) {
     const tenantState = ensureTenantState(tenantId);
     const nextState = await materializeTenantCustomerState({ tenantId, customerState });
-    if (!dismissCustomerSuggestion(nextState, suggestionId)) {
+    const preview = buildCustomerIdentitySuggestions(nextState);
+    const matchingSuggestion = Object.values(preview.suggestionGroups || {})
+      .flatMap((group) => asArray(group))
+      .find(
+        (entry) =>
+          normalizeText(entry?.pairId || entry?.id).toLowerCase() === normalizeText(suggestionId).toLowerCase()
+      );
+    if (!dismissCustomerSuggestion(nextState, matchingSuggestion?.pairId || suggestionId)) {
       throw new Error('Förslaget kunde inte markeras.');
     }
+    recordMergeReviewDecision(nextState, {
+      pairId: normalizeText(matchingSuggestion?.pairId || suggestionId).toLowerCase(),
+      decision: 'dismissed',
+      decidedBy: 'system',
+      reasonCode: 'manual_dismiss',
+      signalSnapshot: matchingSuggestion?.signalSnapshot || {},
+      identitySnapshot: matchingSuggestion?.identitySnapshot || {},
+    });
     const payload = buildCustomerIdentitySuggestions(nextState);
     tenantState.customerState = payload.customerState;
     tenantState.updatedAt = nowIso();
@@ -1466,10 +2483,12 @@ async function createCcoCustomerStore({ filePath, historyStore = null }) {
 
   return {
     getTenantCustomerState,
+    peekTenantCustomerState,
     previewTenantCustomerIdentity,
     saveTenantCustomerState,
     previewTenantCustomerImport,
     commitTenantCustomerImport,
+    getTenantCustomerImportCoverageReadout,
     mergeTenantCustomerProfiles,
     splitTenantCustomerProfile,
     setTenantCustomerPrimaryEmail,

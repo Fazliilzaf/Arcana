@@ -5,6 +5,10 @@ const { classifyIntent } = require('../intelligence/intentClassifier');
 const { detectTone } = require('../intelligence/toneDetector');
 const { resolveWritingIdentityProfile } = require('../intelligence/writingIdentityRegistry');
 const {
+  buildApprovedEgzonaSignatureHtml,
+  buildApprovedFazliSignatureHtml,
+} = require('../ops/ccoMailboxSettingsDocument');
+const {
   computePriorityScore: computeWeightedPriorityScore,
 } = require('../intelligence/priorityScoreEngine');
 const { composeContextAwareDraft } = require('../intelligence/draftComposer');
@@ -82,11 +86,104 @@ function capText(value, maxLength = 240) {
   return `${text.slice(0, Math.max(1, maxLength - 3)).trim()}...`;
 }
 
+function decodeHtmlEntities(value = '') {
+  return normalizeText(value)
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const parsed = Number.parseInt(code, 16);
+      return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : ' ';
+    })
+    .replace(/&#([0-9]+);/g, (_, code) => {
+      const parsed = Number.parseInt(code, 10);
+      return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : ' ';
+    });
+}
+
+function extractTextFromHtml(value = '') {
+  const html = normalizeText(value);
+  if (!html) return '';
+  const stripped = decodeHtmlEntities(html)
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clampTextLength(stripped, 4000);
+}
+
+function extractMessagePreviewText(message = {}) {
+  const safeMessage = asObject(message);
+  const directPreview = [
+    safeMessage.bodyPreview,
+    safeMessage.preview,
+    safeMessage.text,
+    safeMessage.content,
+    safeMessage.body,
+    safeMessage.excerpt,
+    safeMessage.summary,
+    safeMessage.detail,
+  ]
+    .map((value) => normalizeText(value))
+    .find(Boolean);
+  if (directPreview) return directPreview;
+  return extractTextFromHtml(safeMessage.bodyHtml);
+}
+
 function clampTextLength(value, maxLength = 3000) {
   const text = normalizeText(value);
   if (!text) return '';
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(1, maxLength - 3)).trim()}...`;
+}
+
+const DEFAULT_BODY_HTML_MAX_LENGTH = 24000;
+const INLINE_IMAGE_BODY_HTML_MAX_LENGTH = 240000;
+
+function clampBodyHtmlLength(value, fallbackMaxLength = DEFAULT_BODY_HTML_MAX_LENGTH) {
+  const html = normalizeText(value);
+  if (!html) return '';
+  const maxLength = /<img\b|data:image\/|cid:/i.test(html)
+    ? INLINE_IMAGE_BODY_HTML_MAX_LENGTH
+    : fallbackMaxLength;
+  if (html.length <= maxLength) return html;
+  return html.slice(0, maxLength);
+}
+
+function toSafeAttachmentMetadata(value = []) {
+  return asArray(value)
+    .map((attachment) => {
+      const safeAttachment = asObject(attachment);
+      const id = normalizeText(safeAttachment.id);
+      const name = normalizeText(safeAttachment.name);
+      const contentType = normalizeText(safeAttachment.contentType);
+      const contentId = normalizeText(safeAttachment.contentId);
+      const sourceType = normalizeText(safeAttachment.sourceType);
+      const size = Math.max(0, toNumber(safeAttachment.size, 0));
+      const isInline = safeAttachment.isInline === true;
+      const contentBytesAvailable = safeAttachment.contentBytesAvailable === true;
+      if (!id && !name && !contentType && !contentId && !sourceType && size <= 0) {
+        return null;
+      }
+      return {
+        id: id || null,
+        name: name || null,
+        contentType: contentType || null,
+        contentId: contentId || null,
+        isInline,
+        size,
+        sourceType: sourceType || null,
+        contentBytesAvailable,
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeIdentifier(value, maxLength = 120) {
@@ -127,6 +224,35 @@ function maskSender(sender = '') {
   const domain = emailMatch[2];
   const visible = local.slice(0, 1);
   return `${visible}***@${domain}`;
+}
+
+function isUnknownSenderLabel(value = '') {
+  const normalized = normalizeText(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return [
+    'okand_avsandare',
+    'okand_kund',
+    'unknown',
+    'unknown_customer',
+    'unknown_sender',
+  ].includes(normalized);
+}
+
+function deriveCustomerNameFromSubject(value = '') {
+  const subject = sanitizeSubject(value).replace(/^(?:(?:re|fw|fwd)\s*:\s*)+/gi, '').trim();
+  if (!subject || subject === '(utan ämne)') return '';
+  const contactFormMatch = subject.match(/^(.+?)\s+kontaktformul[aä]r\b/i);
+  if (contactFormMatch?.[1]) {
+    return capText(normalizeText(contactFormMatch[1]), 120);
+  }
+  if (/\b(?:qa|cco|live|inspect|reply|send|telefon|phone|test|verify|verification)\b/i.test(subject)) {
+    return capText(subject, 120);
+  }
+  return '';
 }
 
 function normalizeDirection(value = '') {
@@ -202,8 +328,13 @@ const SYSTEM_MAIL_PATTERNS = Object.freeze([
   'do-not-reply',
   'unsubscribe',
   'newsletter',
+  'nyheter:',
   'kampanj',
   'campaign',
+  'erbjudande',
+  'cashback',
+  'påminnelse',
+  'paminnelse',
   'verify your email',
   'bekräfta din e-post',
   'bekrafta din e-post',
@@ -215,6 +346,8 @@ const SYSTEM_MAIL_PATTERNS = Object.freeze([
   'receipt',
   'faktura',
   'invoice',
+  'förfaller snart',
+  'forfaller snart',
   'microsoft 365',
   'du får inte ofta e-post',
   'du far inte ofta e-post',
@@ -222,26 +355,38 @@ const SYSTEM_MAIL_PATTERNS = Object.freeze([
   'get more done with apps like word',
 ]);
 
+const HUMAN_INQUIRY_PATTERN =
+  /\?|fråga|fraga|förfrågan|forfragan|behandling|ingrepp|hårtransplantation|hartransplantation|hårbotten|harbotten|symptom|svullnad|smärta|smarta|pris|bokning|boka|avboka|omboka|konsultation|patient/i;
+
+const ACTIONABLE_SYSTEM_INTENTS = new Set([
+  'booking_request',
+  'pricing_question',
+  'anxiety_pre_op',
+  'complaint',
+  'cancellation',
+  'follow_up',
+]);
+
 const CCO_DEFAULT_SENDER_MAILBOX =
   normalizeText(process.env.ARCANA_CCO_DEFAULT_SENDER_MAILBOX) || 'contact@hairtpclinic.com';
 const CCO_SIGNATURE_PROFILES = Object.freeze([
   Object.freeze({
-    key: 'contact',
-    fullName: 'Hair TP Clinic',
-    title: 'Patientservice',
-    senderMailboxId: 'contact@hairtpclinic.com',
-  }),
-  Object.freeze({
     key: 'egzona',
     fullName: 'Egzona Krasniqi',
-    title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+    title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
     senderMailboxId: 'egzona@hairtpclinic.com',
+    email: 'egzona@hairtpclinic.com',
+    displayEmail: 'egzona@hairtpclinic.com',
+    html: buildApprovedEgzonaSignatureHtml(),
   }),
   Object.freeze({
     key: 'fazli',
     fullName: 'Fazli Krasniqi',
-    title: 'Hårspecialist I Hårtransplantationer & PRP-injektioner',
+    title: 'Hårspecialist | Hårtransplantationer & PRP-injektioner',
     senderMailboxId: 'fazli@hairtpclinic.com',
+    email: 'fazli@hairtpclinic.com',
+    displayEmail: 'contact@hairtpclinic.com',
+    html: buildApprovedFazliSignatureHtml(),
   }),
 ]);
 
@@ -317,16 +462,10 @@ function buildSnapshotDebugInfo(snapshot = {}, derived = {}) {
 
 function toMessageSnapshot(message = {}) {
   const direction = normalizeDirection(message.direction || message.role || message.type);
-  const bodyRaw =
-    normalizeText(message.bodyPreview) ||
-    normalizeText(message.preview) ||
-    normalizeText(message.text) ||
-    normalizeText(message.content);
+  const bodyRaw = extractMessagePreviewText(message);
   const bodyMasked = maskBodyPreview(bodyRaw);
-  const bodyHtml =
-    direction === 'outbound'
-      ? clampTextLength(normalizeText(message.bodyHtml), 24000) || null
-      : null;
+  const bodyHtml = clampBodyHtmlLength(message.bodyHtml) || null;
+  const attachments = toSafeAttachmentMetadata(message.attachments);
   const senderEmail =
     normalizeText(message.senderEmail) ||
     normalizeText(message.fromEmail) ||
@@ -343,9 +482,12 @@ function toMessageSnapshot(message = {}) {
       normalizeOpaqueId(message.id) ||
       null,
     direction,
+    isRead: direction === 'inbound' && typeof message.isRead === 'boolean' ? message.isRead : null,
     sentAt: toIso(message.sentAt || message.createdAt || message.ts) || null,
     bodyPreview: bodyMasked,
     bodyHtml,
+    hasAttachments: message.hasAttachments === true || attachments.length > 0,
+    attachments,
     bodyLength: Math.max(0, Math.min(8000, bodyRaw.length)),
     masked: Boolean(bodyRaw && bodyRaw !== bodyMasked),
     mailboxId:
@@ -592,6 +734,10 @@ function toFeedCounterpartLabel(conversation = {}, message = {}, direction = 'in
   );
 }
 
+function toSafeFeedAttachments(value = []) {
+  return toSafeAttachmentMetadata(value);
+}
+
 function toConversationFeedEntries(conversation = {}) {
   const safeConversation = asObject(conversation);
   const conversationId = normalizeText(safeConversation.conversationId);
@@ -633,6 +779,7 @@ function toConversationFeedEntries(conversation = {}) {
       normalizeText(safeMessage.mailboxId) ||
       fallbackMailboxAddress;
     const counterpart = toFeedCounterpartLabel(safeConversation, safeMessage, direction);
+    const attachments = toSafeFeedAttachments(safeMessage.attachments);
     const feedEntry = {
       feedId: normalizeIdentifier(
         `${conversationId}:${direction}:${messageId || sentAt || index}`,
@@ -647,8 +794,15 @@ function toConversationFeedEntries(conversation = {}) {
       sentAt,
       preview,
     };
-    if (direction === 'outbound') {
-      feedEntry.bodyHtml = clampTextLength(normalizeText(safeMessage.bodyHtml), 24000) || null;
+    if (direction === 'inbound' && typeof safeMessage.isRead === 'boolean') {
+      feedEntry.isRead = safeMessage.isRead;
+    }
+    feedEntry.bodyHtml = clampBodyHtmlLength(safeMessage.bodyHtml) || null;
+    if (safeMessage.hasAttachments === true || attachments.length > 0) {
+      feedEntry.hasAttachments = true;
+    }
+    if (attachments.length > 0) {
+      feedEntry.attachments = attachments;
     }
     if (direction === 'outbound') {
       outbound.push(feedEntry);
@@ -712,14 +866,22 @@ function resolveCustomerIdentity(conversation = {}) {
       conversation.senderEmail ||
       ''
   );
-  const candidateName =
-    normalizeText(inbound.senderName) ||
-    normalizeText(outbound.senderName) ||
-    normalizeText(conversation.customerName);
+  const candidateName = [
+    inbound.senderName,
+    outbound.senderName,
+    conversation.customerName,
+  ]
+    .map((value) => normalizeText(value))
+    .find((value) => value && !isUnknownSenderLabel(value));
+  const subjectFallbackName = deriveCustomerNameFromSubject(
+    conversation.rawSubject || conversation.subject
+  );
+  const senderFallback = normalizeText(conversation.sender);
   const senderLabel =
     candidateName ||
+    subjectFallbackName ||
     maskSender(candidateEmail) ||
-    normalizeText(conversation.sender) ||
+    (!isUnknownSenderLabel(senderFallback) ? senderFallback : '') ||
     'Okänd kund';
   const customerKey = normalizeIdentifier(
     candidateEmail ||
@@ -783,7 +945,6 @@ function classifyConversationMessage({
   inboundPreview = '',
   sender = '',
   intent = 'unclear',
-  priorityLevel = 'Low',
 } = {}) {
   const haystack = [subject, inboundPreview, sender]
     .map((item) => normalizeText(item).toLowerCase())
@@ -794,16 +955,8 @@ function classifyConversationMessage({
   if (!looksLikeSystemMail) return 'actionable';
 
   const normalizedIntent = normalizeText(intent).toLowerCase();
-  const normalizedPriority = normalizeText(priorityLevel).toLowerCase();
-  const highPriority = ['critical', 'high'].includes(normalizedPriority);
-  const actionIntents = new Set([
-    'booking_request',
-    'pricing_question',
-    'anxiety_pre_op',
-    'complaint',
-    'cancellation',
-  ]);
-  if (highPriority || actionIntents.has(normalizedIntent)) return 'actionable';
+  const looksHumanInquiry = HUMAN_INQUIRY_PATTERN.test(haystack);
+  if (ACTIONABLE_SYSTEM_INTENTS.has(normalizedIntent) || looksHumanInquiry) return 'actionable';
   return 'system_mail';
 }
 
@@ -1103,6 +1256,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 'slaStatus',
                 'hoursRemaining',
                 'slaThreshold',
+                'hasUnreadInbound',
                 'stagnated',
                 'stagnationHours',
                 'followUpSuggested',
@@ -1124,6 +1278,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 slaStatus: { type: 'string', enum: ['safe', 'warning', 'breach'] },
                 hoursRemaining: { type: 'number' },
                 slaThreshold: { type: 'number', minimum: 1 },
+                hasUnreadInbound: { type: 'boolean' },
                 stagnated: { type: 'boolean' },
                 stagnationHours: { type: 'number', minimum: 0 },
                 followUpSuggested: { type: 'boolean' },
@@ -1171,6 +1326,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 'slaStatus',
                 'hoursRemaining',
                 'slaThreshold',
+                'hasUnreadInbound',
                 'stagnated',
                 'stagnationHours',
                 'followUpSuggested',
@@ -1199,6 +1355,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 slaStatus: { type: 'string', enum: ['safe', 'warning', 'breach'] },
                 hoursRemaining: { type: 'number' },
                 slaThreshold: { type: 'number', minimum: 1 },
+                hasUnreadInbound: { type: 'boolean' },
                 isUnanswered: { type: 'boolean' },
                 unansweredThresholdHours: { type: 'number', minimum: 1 },
                 stagnated: { type: 'boolean' },
@@ -1252,6 +1409,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 'slaStatus',
                 'hoursRemaining',
                 'slaThreshold',
+                'hasUnreadInbound',
                 'stagnated',
                 'stagnationHours',
                 'followUpSuggested',
@@ -1297,6 +1455,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 slaStatus: { type: 'string', enum: ['safe', 'warning', 'breach'] },
                 hoursRemaining: { type: 'number' },
                 slaThreshold: { type: 'number', minimum: 1 },
+                hasUnreadInbound: { type: 'boolean' },
                 isUnanswered: { type: 'boolean' },
                 unansweredThresholdHours: { type: 'number', minimum: 1 },
                 stagnated: { type: 'boolean' },
@@ -1489,6 +1648,27 @@ class AnalyzeInboxCapability extends BaseCapability {
                 mailboxAddress: { type: 'string', minLength: 1, maxLength: 320 },
                 sentAt: { type: 'string', maxLength: 50 },
                 preview: { type: 'string', minLength: 1, maxLength: 360 },
+                isRead: { type: ['boolean', 'null'] },
+                bodyHtml: { type: ['string', 'null'], maxLength: 240000 },
+                hasAttachments: { type: 'boolean' },
+                attachments: {
+                  type: 'array',
+                  maxItems: 20,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      id: { type: ['string', 'null'], maxLength: 1024 },
+                      name: { type: ['string', 'null'], maxLength: 512 },
+                      contentType: { type: ['string', 'null'], maxLength: 256 },
+                      contentId: { type: ['string', 'null'], maxLength: 1024 },
+                      isInline: { type: 'boolean' },
+                      size: { type: 'number', minimum: 0 },
+                      sourceType: { type: ['string', 'null'], maxLength: 256 },
+                      contentBytesAvailable: { type: 'boolean' },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1518,7 +1698,26 @@ class AnalyzeInboxCapability extends BaseCapability {
                 mailboxAddress: { type: 'string', minLength: 1, maxLength: 320 },
                 sentAt: { type: 'string', maxLength: 50 },
                 preview: { type: 'string', minLength: 1, maxLength: 360 },
-                bodyHtml: { type: ['string', 'null'], maxLength: 24000 },
+                bodyHtml: { type: ['string', 'null'], maxLength: 240000 },
+                hasAttachments: { type: 'boolean' },
+                attachments: {
+                  type: 'array',
+                  maxItems: 20,
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      id: { type: ['string', 'null'], maxLength: 1024 },
+                      name: { type: ['string', 'null'], maxLength: 512 },
+                      contentType: { type: ['string', 'null'], maxLength: 256 },
+                      contentId: { type: ['string', 'null'], maxLength: 1024 },
+                      isInline: { type: 'boolean' },
+                      size: { type: 'number', minimum: 0 },
+                      sourceType: { type: ['string', 'null'], maxLength: 256 },
+                      contentBytesAvailable: { type: 'boolean' },
+                    },
+                  },
+                },
               },
             },
           },
@@ -1570,6 +1769,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 'slaStatus',
                 'hoursRemaining',
                 'slaThreshold',
+                'hasUnreadInbound',
                 'stagnated',
                 'stagnationHours',
                 'followUpSuggested',
@@ -1618,6 +1818,7 @@ class AnalyzeInboxCapability extends BaseCapability {
                 slaStatus: { type: 'string', enum: ['safe', 'warning', 'breach'] },
                 hoursRemaining: { type: 'number' },
                 slaThreshold: { type: 'number', minimum: 1 },
+                hasUnreadInbound: { type: 'boolean' },
                 isUnanswered: { type: 'boolean' },
                 unansweredThresholdHours: { type: 'number', minimum: 1 },
                 stagnated: { type: 'boolean' },
@@ -1985,6 +2186,15 @@ class AnalyzeInboxCapability extends BaseCapability {
       if (!includeClosed && normalizeText(conversation.status) === 'closed') continue;
       const inbound = asObject(conversation.latestInboundMessage);
       const outbound = asObject(conversation.latestOutboundMessage);
+      const hasUnreadInbound =
+        inbound.isRead === false ||
+        asArray(conversation.messages).some((message) => {
+          const safeMessage = asObject(message);
+          const direction = normalizeDirection(
+            safeMessage.direction || safeMessage.role || safeMessage.type
+          );
+          return direction === 'inbound' && safeMessage.isRead === false;
+        });
       const inboundAtMs = toTimestampMs(conversation.lastInboundAt || inbound.sentAt);
       const outboundAtMs = toTimestampMs(conversation.lastOutboundAt || outbound.sentAt);
       const unanswered =
@@ -2265,6 +2475,7 @@ class AnalyzeInboxCapability extends BaseCapability {
           slaStatus,
           hoursRemaining,
           slaThreshold,
+          hasUnreadInbound,
           isUnanswered,
           unansweredThresholdHours,
           stagnated,
@@ -2299,6 +2510,7 @@ class AnalyzeInboxCapability extends BaseCapability {
           slaStatus,
           hoursRemaining,
           slaThreshold,
+          hasUnreadInbound,
           stagnated,
           stagnationHours,
           followUpSuggested,
@@ -2332,6 +2544,7 @@ class AnalyzeInboxCapability extends BaseCapability {
         slaStatus,
         hoursRemaining,
         slaThreshold,
+        hasUnreadInbound,
         isUnanswered,
         unansweredThresholdHours,
         stagnated,
@@ -2371,7 +2584,7 @@ class AnalyzeInboxCapability extends BaseCapability {
         needsReplyStatus,
       };
 
-      if (unanswered) {
+      if (unanswered && workItem.messageClassification !== 'system_mail') {
         conversationWorklist.push({
           conversationId: workItem.conversationId,
           messageId: workItem.messageId,
@@ -2387,6 +2600,7 @@ class AnalyzeInboxCapability extends BaseCapability {
           slaStatus: workItem.slaStatus,
           hoursRemaining: workItem.hoursRemaining,
           slaThreshold: workItem.slaThreshold,
+          hasUnreadInbound: workItem.hasUnreadInbound,
           isUnanswered: workItem.isUnanswered,
           unansweredThresholdHours: workItem.unansweredThresholdHours,
           stagnated: workItem.stagnated,
@@ -2488,6 +2702,7 @@ class AnalyzeInboxCapability extends BaseCapability {
         slaStatus: item.slaStatus,
         hoursRemaining: item.hoursRemaining,
         slaThreshold: item.slaThreshold,
+        hasUnreadInbound: item.hasUnreadInbound,
         isUnanswered: item.isUnanswered,
         unansweredThresholdHours: item.unansweredThresholdHours,
         stagnated: item.stagnated,
@@ -2581,15 +2796,19 @@ class AnalyzeInboxCapability extends BaseCapability {
       ccoSenderMailboxOptions: Array.from(
         new Set([
           CCO_DEFAULT_SENDER_MAILBOX,
+          'kons@hairtpclinic.com',
           ...CCO_SIGNATURE_PROFILES.map((item) => item.senderMailboxId),
         ])
       ),
-      ccoDefaultSignatureProfile: 'contact',
+      ccoDefaultSignatureProfile: 'fazli',
       ccoSignatureProfiles: CCO_SIGNATURE_PROFILES.map((item) => ({
         key: item.key,
         fullName: item.fullName,
         title: item.title,
         senderMailboxId: item.senderMailboxId,
+        email: item.email,
+        displayEmail: item.displayEmail,
+        html: item.html,
       })),
       sourceMailboxIds,
       snapshotDebug: debugMode

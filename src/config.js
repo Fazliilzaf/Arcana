@@ -183,6 +183,11 @@ const config = {
     stateRoot,
     fileName: 'cco-history.json',
   }),
+  ccoMailboxTruthStorePath: resolveStatePath({
+    explicitPath: process.env.ARCANA_CCO_MAILBOX_TRUTH_STORE_PATH,
+    stateRoot,
+    fileName: 'cco-mailbox-truth.json',
+  }),
   ccoNoteStorePath: resolveStatePath({
     explicitPath: process.env.ARCANA_CCO_NOTE_STORE_PATH,
     stateRoot,
@@ -457,6 +462,13 @@ const config = {
     process.env.ARCANA_SCHEDULER_CCO_FORWARD_OUTLOOK_INTERVAL_HOURS,
     6
   ),
+  schedulerCcoClientoBackfillIntervalHours: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_CLIENTO_BACKFILL_INTERVAL_HOURS,
+    24
+  ),
+  schedulerCcoClientoBackfillCsvPath: asNonEmptyString(
+    process.env.ARCANA_SCHEDULER_CCO_CLIENTO_BACKFILL_CSV_PATH
+  ),
   schedulerCcoHistorySyncIntervalHours: asInt(
     process.env.ARCANA_SCHEDULER_CCO_HISTORY_SYNC_INTERVAL_HOURS,
     6
@@ -601,8 +613,18 @@ const config = {
     process.env.CLIENTO_WIDGET_SRC,
     'https://cliento.com/widget-v2/cliento.js'
   ),
+  clientoServiceFilters: asStringArray(process.env.CLIENTO_SERVICE_FILTERS),
   clientoMergeLocations: asBool(process.env.CLIENTO_MERGE_LOCATIONS, false),
   clientoLocale: asNonEmptyString(process.env.CLIENTO_LOCALE, 'sv'),
+  clientoPartnerId: asNonEmptyString(process.env.CLIENTO_PARTNER_ID),
+  clientoApiBaseUrl: asNonEmptyString(
+    process.env.CLIENTO_API_BASE_URL,
+    'https://cliento.com/api/v2/partner/cliento'
+  ),
+  clientoApiKey: asNonEmptyString(process.env.CLIENTO_API_KEY),
+  clientoApiAuthHeader: asNonEmptyString(process.env.CLIENTO_API_AUTH_HEADER, 'Authorization'),
+  clientoApiAuthScheme: asNonEmptyString(process.env.CLIENTO_API_AUTH_SCHEME, 'Bearer'),
+  clientoApiTimeoutMs: asInt(process.env.CLIENTO_API_TIMEOUT_MS, 10000),
 };
 
 if (config.aiProvider === 'openai' && !config.openaiApiKey) {

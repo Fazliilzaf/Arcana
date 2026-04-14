@@ -4,6 +4,7 @@
     QUEUE_LANE_ORDER,
     asArray,
     asText,
+    canonicalizeMailboxId,
     normalizeKey,
     normalizeMailboxId,
     state,
@@ -29,7 +30,15 @@
 
     function normalizeMailboxIds(mailboxIds) {
       return Array.from(
-        new Set(asArray(mailboxIds).map(normalizeMailboxId).filter(Boolean))
+        new Set(
+          asArray(mailboxIds)
+            .map((mailboxId) =>
+              typeof canonicalizeMailboxId === "function"
+                ? canonicalizeMailboxId(mailboxId)
+                : normalizeMailboxId(mailboxId)
+            )
+            .filter(Boolean)
+        )
       );
     }
 
