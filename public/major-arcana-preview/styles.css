@@ -14514,34 +14514,6 @@ button {
   font-weight: 700;
 }
 
-.queue-filter-chip--mailbox-toggle {
-  --queue-filter-color: #b07a12;
-  --queue-filter-wash: rgba(176, 122, 18, 0.11);
-  --queue-filter-wash-strong: rgba(176, 122, 18, 0.16);
-  border-color: rgba(221, 191, 133, 0.72);
-  box-shadow:
-    0 2px 6px rgba(87, 61, 26, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-}
-
-.queue-filter-chip--mailbox-toggle.is-active {
-  border-color: rgba(206, 161, 68, 0.74);
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 251, 240, 0.98) 0%,
-      rgba(248, 235, 199, 0.94) 100%
-    );
-  box-shadow:
-    0 8px 16px rgba(115, 85, 27, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.96);
-  color: #9a6707;
-}
-
-.queue-filter-chip--mailbox-toggle.is-active > span {
-  font-weight: 760;
-}
-
 .queue-filter-chip:hover {
   transform: translateY(-1px);
 }
