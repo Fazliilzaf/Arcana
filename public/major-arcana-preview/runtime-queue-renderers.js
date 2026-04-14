@@ -1991,11 +1991,61 @@
         const historyViewMode = normalizeKey(state.runtime?.queueHistory?.viewMode || "history");
         queueHistoryList.dataset.queueListMode = historyViewMode === "mailbox" ? "mailbox" : "history";
       }
+      const historyViewMode = normalizeKey(state.runtime?.queueHistory?.viewMode || "history");
       queueHistoryList.innerHTML = asArray(items)
-        .map((item) =>
-          buildQueueHistoryCardMarkup(item, {
-            selectedConversationId: state.runtime.queueHistory?.selectedConversationId,
-          })
+        .map((item, index) =>
+          historyViewMode === "mailbox" && typeof buildThreadCardMarkup === "function"
+            ? buildThreadCardMarkup(
+                {
+                  ...item,
+                  id: asText(item.runtimeThreadId || item.conversationId || item.id || `queue-mailbox-${index}`),
+                  customerName: asText(
+                    item.counterpartyLabel || item.customerName || item.mailboxLabel || "Okänd avsändare"
+                  ),
+                  displaySubject: asText(
+                    item.title || item.subject || item.displaySubject || item.counterpartyLabel || item.mailboxLabel || "Alla mejl"
+                  ),
+                  subject: asText(
+                    item.title || item.subject || item.displaySubject || item.counterpartyLabel || item.mailboxLabel || "Alla mejl"
+                  ),
+                  preview: asText(item.detail || item.preview || item.displayDetail || ""),
+                  systemPreview: asText(item.detail || item.preview || item.displayDetail || ""),
+                  lastActivityAt: asText(item.recordedAt || item.lastActivityAt || ""),
+                  lastActivityLabel: asText(item.time || item.lastActivityLabel || item.recordedLabel || ""),
+                  ownerLabel: asText(item.ownerLabel || item.owner || "Ej tilldelad"),
+                  displayOwnerLabel: asText(item.ownerLabel || item.owner || "Ej tilldelad"),
+                  mailboxLabel: asText(item.mailboxLabel || item.mailboxAddress || "Alla mejl"),
+                  mailboxAddress: asText(item.mailboxAddress || ""),
+                  mailboxProvenanceLabel: asText(item.mailboxProvenanceLabel || ""),
+                  mailboxProvenanceDetail: asText(item.mailboxProvenanceDetail || ""),
+                  nextActionSummary: asText(item.nextActionSummary || item.detail || item.preview || ""),
+                  systemHint: asText(item.nextActionSummary || item.detail || item.preview || ""),
+                  primaryLaneId: asText(item.primaryLaneId || item.laneId || ""),
+                  rowFamily: asText(item.rowFamily || "human_mail"),
+                  tags: asArray(item.tags),
+                  isUnread: item.isUnread === true,
+                  unread: item.isUnread === true,
+                  crossMailboxProvenanceEvidence: item.crossMailboxProvenanceEvidence === true,
+                  foundationState:
+                    item.foundationState && typeof item.foundationState === "object"
+                      ? item.foundationState
+                      : null,
+                  raw: item.raw && typeof item.raw === "object" ? item.raw : {},
+                },
+                index,
+                Boolean(
+                  item?.conversationId &&
+                    typeof runtimeConversationIdsMatch === "function" &&
+                    runtimeConversationIdsMatch(
+                      asText(item.conversationId),
+                      asText(state.runtime.queueHistory?.selectedConversationId)
+                    )
+                )
+              )
+            : buildQueueHistoryCardMarkup(item, {
+                selectedConversationId: state.runtime.queueHistory?.selectedConversationId,
+                useThreadCardClass: true,
+              })
         )
         .join("");
       if (typeof decorateStaticPills === "function") decorateStaticPills();
