@@ -1292,6 +1292,27 @@
     return sanitizeAllowedLevels(levels, null).map(getLevelLabel).join(" + ");
   }
 
+  function renderLevelSummaryTokens(levels) {
+    const sanitizedLevels = sanitizeAllowedLevels(levels, null);
+
+    if (sanitizedLevels.length === 0) {
+      return '<span class="owned-card-level-token owned-card-level-token--empty">No levels selected</span>';
+    }
+
+    return sanitizedLevels
+      .map((level, index) => {
+        const separator = index > 0 ? '<span class="owned-card-level-token-separator" aria-hidden="true">+</span>' : "";
+        return `
+          ${separator}
+          <span class="owned-card-level-token owned-card-level-token--${escapeHtml(level)}">
+            <span class="owned-card-level-token-dot" aria-hidden="true"></span>
+            <span>${escapeHtml(getLevelLabel(level))}</span>
+          </span>
+        `;
+      })
+      .join("");
+  }
+
   function isLevelAllowedForProduct(product, level, catalogId) {
     return getProductAllowedLevels(product, catalogId).includes(level);
   }
@@ -3133,6 +3154,7 @@
                   const isPopoverOpen = state.openLibraryLevelPickerId === item.id;
                   const isActiveProduct = activeCatalogId === item.id;
                   const activeSummary = allowedLevels.length > 0 ? getLevelDescription(allowedLevels) : "No levels selected";
+                  const activeSummaryTokens = renderLevelSummaryTokens(allowedLevels);
                   const matchingBottles = getBottlesForCatalog(item.id);
                   const bottleChipLabels = getBottleChipLabels(matchingBottles);
                   const hasPlacedBottles = matchingBottles.length > 0;
@@ -3148,9 +3170,9 @@
                       </span>
                     </button>
                     <button class="owned-card-levels-trigger" type="button" data-open-level-picker="${escapeHtml(item.id)}" aria-expanded="${isPopoverOpen ? "true" : "false"}" aria-label="Choose Head, Heart, or Base for ${escapeHtml(item.name)}">
-                      <span class="owned-card-levels-label">Layering levels</span>
+                      <span class="owned-card-levels-label">Levels</span>
                       <span class="owned-card-levels-summary" aria-label="${escapeHtml(activeSummary)}">
-                        ${escapeHtml(activeSummary)}
+                        ${activeSummaryTokens}
                       </span>
                     </button>
                     ${hasPlacedBottles ? `
