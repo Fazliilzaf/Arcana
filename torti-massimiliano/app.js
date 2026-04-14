@@ -3151,9 +3151,6 @@
                   const isActiveProduct = activeCatalogId === item.id;
                   const activeSummary = allowedLevels.length > 0 ? getLevelDescription(allowedLevels) : "No levels selected";
                   const activeSummaryTokens = renderLevelSummaryTokens(allowedLevels);
-                  const matchingBottles = getBottlesForCatalog(item.id);
-                  const bottleChipLabels = getBottleChipLabels(matchingBottles);
-                  const hasPlacedBottles = matchingBottles.length > 0;
 
                   return `
                   <article class="owned-card${state.pendingCatalogId === item.id ? " is-pending" : ""}${isPopoverOpen ? " is-level-open" : ""}${isActiveProduct ? " is-active-product" : ""}" data-library-level-shell="${escapeHtml(item.id)}">
@@ -3174,25 +3171,6 @@
                           ${activeSummaryTokens}
                         </span>
                       </button>
-                      ${hasPlacedBottles ? `
-                        <div class="owned-card-placed">
-                          <span class="owned-card-placed-label">Placed in ${escapeHtml(getActiveLayer().name)}</span>
-                          <div class="owned-card-placed-list">
-                            ${matchingBottles
-                              .map((bottle, index) => `
-                                <button
-                                  class="owned-card-placed-chip${activeBottleId === bottle.id ? " is-active" : ""}"
-                                  type="button"
-                                  data-select-library-bottle="${escapeHtml(item.id)}::${escapeHtml(bottle.id)}"
-                                  aria-pressed="${activeBottleId === bottle.id ? "true" : "false"}"
-                                >
-                                  ${escapeHtml(bottleChipLabels[index] || `Bottle ${index + 1}`)}
-                                </button>
-                              `)
-                              .join("")}
-                          </div>
-                        </div>
-                      ` : ""}
                     </div>
                     ${isPopoverOpen ? `
                       <div class="library-level-popover" role="dialog" aria-label="Choose levels for ${escapeHtml(item.name)}">
@@ -3270,19 +3248,6 @@
       });
     });
 
-    customerLibraryPanel.querySelectorAll("[data-select-library-bottle]").forEach((button) => {
-      button.addEventListener("click", function () {
-        const raw = button.getAttribute("data-select-library-bottle") || "";
-        const splitIndex = raw.lastIndexOf("::");
-        if (splitIndex <= 0) {
-          return;
-        }
-
-        const catalogId = raw.slice(0, splitIndex);
-        const bottleId = raw.slice(splitIndex + 2);
-        selectLibraryBottle(catalogId, bottleId);
-      });
-    });
   }
 
   function renderProductScroller() {
