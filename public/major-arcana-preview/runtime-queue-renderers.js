@@ -28,6 +28,7 @@
       queueFeedCountNodes = [],
       queueHistoryCount,
       queueHistoryHead,
+      queueHistoryModeBadge,
       queueHistoryCompleteButton,
       queueHistoryDeleteButton,
       queueHistoryList,
@@ -2046,6 +2047,8 @@
 
     function renderQueueHistorySection() {
       if (!queueHistoryPanel || !queueHistoryToggle) return;
+      const queueHistoryModeBadgeNode =
+        typeof queueHistoryModeBadge === "undefined" ? null : queueHistoryModeBadge;
       const queueMailboxToggleNode =
         typeof queueMailboxToggle === "undefined" ? null : queueMailboxToggle;
       const queueMailboxCountNode =
@@ -2207,6 +2210,13 @@
       }
       queueHistoryPanel.hidden = !isOpen;
       queueHistoryPanel.classList.toggle("is-open", isOpen);
+      queueHistoryPanel.classList.toggle("is-mailbox-view", isMailboxView);
+      if (queueHistoryModeBadgeNode) {
+        queueHistoryModeBadgeNode.hidden = !isMailboxView;
+        queueHistoryModeBadgeNode.textContent = isMailboxView
+          ? "Alla mejl · full mailboxvy"
+          : "Historik · vald tråd";
+      }
       if (queuePrimaryLaneTag) queuePrimaryLaneTag.hidden = isOpen;
       if (queueContent) queueContent.hidden = useUnifiedQueueList || isOpen;
       if (isOpen) {
