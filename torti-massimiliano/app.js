@@ -1289,7 +1289,7 @@
   }
 
   function getLevelDescription(levels) {
-    return sanitizeAllowedLevels(levels, null).map(getLevelLabel).join(" + ");
+    return sanitizeAllowedLevels(levels, null).map(getLevelLabel).join(" ");
   }
 
   function renderLevelSummaryTokens(levels) {
@@ -1300,12 +1300,9 @@
     }
 
     return sanitizedLevels
-      .map((level, index) => {
-        const separator = index > 0 ? '<span class="owned-card-level-token-separator" aria-hidden="true">+</span>' : "";
+      .map((level) => {
         return `
-          ${separator}
           <span class="owned-card-level-token owned-card-level-token--${escapeHtml(level)}">
-            <span class="owned-card-level-token-dot" aria-hidden="true"></span>
             <span>${escapeHtml(getLevelLabel(level))}</span>
           </span>
         `;
@@ -1570,10 +1567,10 @@
     }
 
     if (compactZones.length === 2) {
-      return `${levelLabel} · ${compactZones[0]} + ${compactZones[1]}`;
+      return `${levelLabel} · ${compactZones[0]} and ${compactZones[1]}`;
     }
 
-    return `${levelLabel} · ${compactZones[0]} + ${compactZones[1]} +${compactZones.length - 2}`;
+    return `${levelLabel} · ${compactZones[0]} and ${compactZones[1]} and ${compactZones.length - 2} more`;
   }
 
   function getBottleChipLabels(bottles) {
@@ -1615,7 +1612,7 @@
         <span class="sheet-bottle-zones-label">Spray areas</span>
         <span class="sheet-bottle-zones-list">
           ${visibleNames.map((name) => `<span class="sheet-bottle-zone-item">${escapeHtml(name)}</span>`).join("")}
-          ${remainingCount > 0 ? `<span class="sheet-bottle-zone-more">+${remainingCount} more</span>` : ""}
+          ${remainingCount > 0 ? `<span class="sheet-bottle-zone-more">${remainingCount} more</span>` : ""}
         </span>
       </span>
     `;
@@ -2989,7 +2986,7 @@
       return;
     }
 
-    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library. Products can be marked for one or several levels, such as Head + Heart.`;
+    sheetStatus.textContent = `${activeLayerLabel} is active. Click a bottle in Search collection to add it to the customer library. Products can be marked for one or several levels, such as Head and Heart.`;
     if (adjustLabelsButton) {
       adjustLabelsButton.hidden = true;
       adjustLabelsButton.classList.remove("is-active");
