@@ -2236,6 +2236,30 @@
       const isTruthDrivenReadOnly =
         focusReadState?.truthDriven === true && focusReadState?.readOnly === true;
       const focusWaveLabel = asText(focusReadState?.waveLabel, "Wave 1");
+      const isStartupLocked =
+        state.runtime.startupLocked === true &&
+        state.runtime.authRequired !== true &&
+        state.runtime.offline !== true;
+      if (isStartupLocked) {
+        applyFocusWaitingState(true);
+        focusTitle.textContent = "Synkar live-läget";
+        focusStatusLine.textContent =
+          "Livekön startar upp. Väntar på att mailboxscopen ska stabiliseras.";
+        focusBadgeRow.innerHTML = "";
+        focusBadgeRow.hidden = true;
+        focusWorkrail.innerHTML = "";
+        focusConversationSection.innerHTML = `
+          <article class="conversation-entry conversation-entry-empty">
+            <div class="conversation-empty-card">
+              <div class="conversation-empty-meta-row">
+                <span class="conversation-state-pill">Synkar</span>
+              </div>
+              <h4 class="conversation-empty-title">Synkar live-läget</h4>
+              <p class="conversation-empty-text">Väntar på att livekön och mailboxscopen ska bli klara innan konversationen visas.</p>
+            </div>
+          </article>`;
+        return;
+      }
       if (!thread) {
         applyFocusWaitingState(true);
         const isLoading = state.runtime.loading === true;
@@ -2548,6 +2572,56 @@
       const isTruthDrivenReadOnly =
         focusReadState?.truthDriven === true && focusReadState?.readOnly === true;
       const focusWaveLabel = asText(focusReadState?.waveLabel, "Wave 1");
+      const isStartupLocked =
+        state.runtime.startupLocked === true &&
+        state.runtime.authRequired !== true &&
+        state.runtime.offline !== true;
+      if (isStartupLocked) {
+        renderFocusSummaryCards(focusCustomerSummary, [], "customer");
+        if (focusCustomerHistoryTitle) {
+          focusCustomerHistoryTitle.textContent = "Synkar kundkontext";
+        }
+        if (focusCustomerHistoryDescription) {
+          focusCustomerHistoryDescription.textContent =
+            "Livekön startar upp. Kundprofil och historik fylls tillbaka när mailboxscopen är klar.";
+        }
+        focusCustomerHero.innerHTML = `
+          <div class="focus-customer-hero-main">
+            <div class="focus-customer-avatar">CCO</div>
+            <div class="focus-customer-copy">
+              <h3>Synkar kundkontext</h3>
+              <div class="focus-customer-contact-line">
+                <span>Väntar på att livekön ska bli klar innan kundytan öppnas.</span>
+              </div>
+              <div class="focus-customer-chip-row">
+                <span class="focus-customer-chip focus-customer-chip--violet">Synkar live</span>
+              </div>
+            </div>
+          </div>`;
+        focusCustomerStats.innerHTML = `
+          <article class="focus-customer-stat-card"><span class="focus-customer-stat-label">ÄRENDEN</span><strong>-</strong><p>synkar live data</p></article>
+          <article class="focus-customer-stat-card"><span class="focus-customer-stat-label">LTV</span><strong>-</strong><p>hämtar kundprofil</p></article>
+          <article class="focus-customer-stat-card"><span class="focus-customer-stat-label">STATUS</span><strong>Synkar</strong><p>uppdaterar live-state</p></article>`;
+        focusCustomerGrid.innerHTML = `
+          <article class="focus-customer-data-card"><h4>Mailhistorik</h4><dl>
+            <div><dt>Mailboxar</dt><dd>-</dd></div>
+            <div><dt>Första mail</dt><dd>-</dd></div>
+            <div><dt>Senaste mail</dt><dd>-</dd></div>
+            <div><dt>Mail</dt><dd>-</dd></div>
+          </dl></article>`;
+        if (focusCustomerHistoryCount) {
+          focusCustomerHistoryCount.textContent = "Synkar…";
+        }
+        if (focusCustomerHistoryMeta) {
+          focusCustomerHistoryMeta.textContent = "Livekön startar upp.";
+        }
+        setCustomerHistoryState("Synkar live", "violet");
+        setCustomerHistoryListState(
+          "Synkar live",
+          "Väntar på att livekön ska bli klar innan historiken visas."
+        );
+        return;
+      }
       if (!thread) {
         const isLoading = state.runtime.loading === true;
         renderFocusSummaryCards(focusCustomerSummary, [], "customer");
@@ -3265,6 +3339,30 @@
       const isTruthDrivenReadOnly =
         focusReadState?.truthDriven === true && focusReadState?.readOnly === true;
       const focusWaveLabel = asText(focusReadState?.waveLabel, "Wave 1");
+      const isStartupLocked =
+        state.runtime.startupLocked === true &&
+        state.runtime.authRequired !== true &&
+        state.runtime.offline !== true;
+      if (isStartupLocked) {
+        applyIntelWaitingState(true);
+        focusIntelTitle.textContent = "Operativt stöd";
+        setRuntimeActionRowsVisibility("[data-intel-actions]", false);
+        intelDateButton.innerHTML = `<span>synkar live-läget</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.3 6.5 8 9.2l2.7-2.7" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" /></svg>`;
+        intelCustomer.innerHTML = `
+          <div class="focus-intel-monogram">CCO</div>
+          <div class="focus-intel-customer-copy">
+            <div class="focus-intel-name-row">
+              <h4>Synkar live-läget</h4>
+              <span class="focus-intel-queue-pill" data-pill-icon="bolt">Synkar</span>
+            </div>
+            <p class="focus-intel-support-copy">Väntar på att livekön ska bli klar innan kunddata och historik visas.</p>
+          </div>`;
+        intelGrid.innerHTML = `
+          <article class="focus-intel-card"><h4>Kund</h4><p>Synkar live-läget</p></article>
+          <article class="focus-intel-card"><h4>Historik</h4><p>Väntar på live-data</p></article>
+          <article class="focus-intel-card"><h4>Nu</h4><p>Väntar på live-tråd</p></article>`;
+        return;
+      }
       if (!thread) {
         applyIntelWaitingState(true);
         const isLoading = state.runtime.loading === true;

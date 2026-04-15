@@ -900,7 +900,9 @@
       }
     }
 
-    async function waitForRuntimeAuthToken({ timeoutMs = 1800, intervalMs = 60 } = {}) {
+    async function waitForRuntimeAuthToken({ timeoutMs = 6000, intervalMs = 60 } = {}) {
+      // Give the admin session a small startup grace window so we do not flash
+      // "session krävs" before the live token has had a chance to hydrate.
       const readToken = () =>
         normalizeText(typeof getAdminToken === "function" ? getAdminToken() : "");
       const existingToken = readToken();
@@ -1958,6 +1960,7 @@
       isCurrentRequest = () => true,
     } = {}) {
       clearRuntimeLiveRefreshTimer();
+      state.runtime.startupLocked = false;
       const historyParams = new URLSearchParams();
       historyParams.set("mailboxIds", runtimeMailboxIds.join(","));
       historyParams.set("lookbackDays", String(FULL_MAILBOX_LOOKBACK_DAYS));
@@ -2406,6 +2409,7 @@
       const preferredThreadId = asText(options.preferredThreadId);
       const runtimeRequestSequence = ++liveRuntimeRequestSequence;
       const isCurrentRequest = () => runtimeRequestSequence === liveRuntimeRequestSequence;
+      state.runtime.startupLocked = true;
       state.runtime.loading = true;
       state.runtime.truthPrimaryLegacyThreads = [];
       state.runtime.liveHydratedThreadIds = [];
@@ -2449,6 +2453,7 @@
         if (!adminToken) {
           state.runtime.loading = false;
           state.runtime.loaded = false;
+          state.runtime.startupLocked = false;
           state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
             phase: "auth_required",
             requestedMailboxIds: runtimeMailboxIds,
@@ -2675,6 +2680,7 @@
         if (!isCurrentRequest()) return;
         state.runtime.loading = false;
         state.runtime.loaded = true;
+        state.runtime.startupLocked = false;
         setRuntimeModeState("live", {
           live: true,
           offline: false,
@@ -2720,6 +2726,7 @@
         const statusCode = Number(error?.statusCode || error?.status || 0);
         state.runtime.loading = false;
         state.runtime.loaded = false;
+        state.runtime.startupLocked = false;
         state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
           phase: isAuthFailure(statusCode, message) ? "auth_required" : "runtime_error",
           requestedMailboxIds: runtimeMailboxIds,
@@ -3785,6 +3792,7 @@
     }
 
     function initializeWorkspaceSurface() {
+      state.runtime.startupLocked = true;
       bindWorkspaceInteractions();
       DEFAULT_WORKSPACE.left =
         Math.round(readPxVariable("--workspace-left-width")) || DEFAULT_WORKSPACE.left;

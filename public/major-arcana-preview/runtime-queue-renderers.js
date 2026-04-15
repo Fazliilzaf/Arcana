@@ -2085,6 +2085,29 @@
           queueHistoryHead.hidden = !showHead;
         }
       };
+      const applyQueueHistoryProjectionAttributes = (projection = null) => {
+        const projectionSource = asText(projection?.sourceStore);
+        const projectionPipeline = asText(projection?.pipeline);
+        const projectionKind = asText(projection?.kind);
+        const projectionSurface = asText(projection?.surface);
+        const projectionMailboxIds = asArray(projection?.mailboxIds)
+          .map((value) => asText(value))
+          .filter(Boolean)
+          .join(",");
+        [queueHistoryPanel, queueHistoryList].forEach((element) => {
+          if (!element?.dataset) return;
+          if (projectionSource) element.dataset.queueProjectionSource = projectionSource;
+          else delete element.dataset.queueProjectionSource;
+          if (projectionPipeline) element.dataset.queueProjectionPipeline = projectionPipeline;
+          else delete element.dataset.queueProjectionPipeline;
+          if (projectionKind) element.dataset.queueProjectionKind = projectionKind;
+          else delete element.dataset.queueProjectionKind;
+          if (projectionSurface) element.dataset.queueProjectionSurface = projectionSurface;
+          else delete element.dataset.queueProjectionSurface;
+          if (projectionMailboxIds) element.dataset.queueProjectionMailboxIds = projectionMailboxIds;
+          else delete element.dataset.queueProjectionMailboxIds;
+        });
+      };
       const syncQueueHistoryActionButton = (
         button,
         { visible = false, disabled = true, label = "", action = "handled" } = {}
@@ -2105,6 +2128,7 @@
         button.setAttribute("title", description);
       };
       const historyState = state.runtime.queueHistory;
+      applyQueueHistoryProjectionAttributes(historyState?.projection || null);
       const leftColumnState =
         typeof getRuntimeLeftColumnState === "function"
           ? getRuntimeLeftColumnState()
@@ -2173,6 +2197,10 @@
         Boolean(selectedThread) &&
         runtimeMode !== "offline_history" &&
         !isOfflineHistoryThread;
+      const isStartupLocked =
+        state.runtime.startupLocked === true &&
+        state.runtime.authRequired !== true &&
+        state.runtime.offline !== true;
       queueHistoryToggle.classList.toggle("is-active", isHistoryOpen);
       queueHistoryToggle.setAttribute("aria-expanded", String(isHistoryOpen));
       queueHistoryPanel.hidden = !isOpen;
@@ -2204,10 +2232,31 @@
 
       if (!isOpen) return;
 
+      if (isStartupLocked) {
+        if (queueHistoryList?.dataset) {
+          queueHistoryList.dataset.queueListMode = "live";
+        }
+        applyQueueHistoryProjectionAttributes(null);
+        if (queueTitle) {
+          queueTitle.textContent = "Arbetslista (0)";
+        }
+        setQueueHistoryMeta("Synkar live-läget…", { showHead: false });
+        syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
+        syncQueueHistoryActionButton(deleteActionButton, {
+          visible: false,
+          disabled: true,
+          action: "delete",
+        });
+        renderQueueInlineLaneList(buildUnifiedQueueLoadingItems());
+        if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
+        return;
+      }
+
       if (isHistoryOpen) {
         if (queueHistoryList?.dataset) {
           queueHistoryList.dataset.queueListMode = "history";
         }
+        applyQueueHistoryProjectionAttributes(historyState?.projection || null);
         if (queueTitle) {
           queueTitle.textContent = `Historik (${asArray(historyState.items).length})`;
         }
@@ -2271,6 +2320,7 @@
         if (queueHistoryList?.dataset) {
           queueHistoryList.dataset.queueListMode = "live";
         }
+        applyQueueHistoryProjectionAttributes(null);
         const loadingThreads = getQueueScopedRuntimeThreads();
         if (loadingThreads.length) {
           if (queueTitle) {
@@ -2306,6 +2356,7 @@
         if (queueHistoryList?.dataset) {
           queueHistoryList.dataset.queueListMode = "live";
         }
+        applyQueueHistoryProjectionAttributes(null);
         if (queueTitle) {
           queueTitle.textContent = "Arbetslista (0)";
         }
@@ -2346,6 +2397,7 @@
         if (queueHistoryList?.dataset) {
           queueHistoryList.dataset.queueListMode = "live";
         }
+        applyQueueHistoryProjectionAttributes(null);
         const feedThreads = getMailFeedRuntimeThreads(inlineFeedKey);
         const feedLabel = inlineFeedKey === "sent" ? "Skickade" : inlineFeedKey;
         if (queueTitle) {
@@ -2378,6 +2430,7 @@
         if (queueHistoryList?.dataset) {
           queueHistoryList.dataset.queueListMode = "live";
         }
+        applyQueueHistoryProjectionAttributes(null);
         const laneId = normalizeKey(leftColumnState.laneId || state.runtime.activeLaneId || "all");
         const laneThreads = getQueueLaneThreads(laneId, getQueueScopedRuntimeThreads());
         if (queueTitle) {
