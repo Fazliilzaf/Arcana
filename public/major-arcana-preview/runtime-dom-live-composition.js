@@ -1127,6 +1127,44 @@
       return nextMailboxIds;
     }
 
+    function runtimeMailboxScopeMatches(left = [], right = []) {
+      const normalizedLeft = asArray(left)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+        .sort();
+      const normalizedRight = asArray(right)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean)
+        .sort();
+      return (
+        normalizedLeft.length === normalizedRight.length &&
+        normalizedLeft.every((mailboxId, index) => mailboxId === normalizedRight[index])
+      );
+    }
+
+    function shouldPreserveStableRuntimeWorkspace(nextMailboxIds = []) {
+      const normalizedNextMailboxIds = asArray(nextMailboxIds)
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean);
+      const selectedMailboxIds = asArray(workspaceSourceOfTruth.getSelectedMailboxIds())
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean);
+      const requestedMailboxIds = asArray(getRequestedRuntimeMailboxIds())
+        .map((value) => canonicalizeRuntimeMailboxId(value))
+        .filter(Boolean);
+      const referenceMailboxIds = selectedMailboxIds.length
+        ? selectedMailboxIds
+        : requestedMailboxIds;
+      const hasStableThreads = asArray(state.runtime?.threads).length > 0;
+      const hasStableRuntimeSurface =
+        (state.runtime?.live === true || state.runtime?.loaded === true) &&
+        state.runtime?.authRequired !== true &&
+        hasStableThreads;
+      if (!hasStableRuntimeSurface) return false;
+      if (!referenceMailboxIds.length || !normalizedNextMailboxIds.length) return false;
+      return runtimeMailboxScopeMatches(referenceMailboxIds, normalizedNextMailboxIds);
+    }
+
     function hasRuntimeHistoryPayloadContent(historyPayload = null) {
       if (!historyPayload || typeof historyPayload !== "object") return false;
       if (asArray(historyPayload?.messages).length > 0) return true;
@@ -2450,10 +2488,11 @@
       const runtimeMailboxIds = requestedMailboxIds.length
         ? requestedMailboxIds
         : getRequestedRuntimeMailboxIds();
+      const preserveStableWorkspace = shouldPreserveStableRuntimeWorkspace(runtimeMailboxIds);
       const preferredThreadId = asText(options.preferredThreadId);
       const runtimeRequestSequence = ++liveRuntimeRequestSequence;
       const isCurrentRequest = () => runtimeRequestSequence === liveRuntimeRequestSequence;
-      state.runtime.startupLocked = true;
+      state.runtime.startupLocked = !preserveStableWorkspace;
       state.runtime.loading = true;
       state.runtime.truthPrimaryLegacyThreads = [];
       state.runtime.liveHydratedThreadIds = [];
@@ -2487,7 +2526,7 @@
         phase: "loading",
         requestedMailboxIds: runtimeMailboxIds,
       });
-      if (!deferInitialRender) {
+      if (!deferInitialRender || preserveStableWorkspace) {
         renderRuntimeConversationShell();
       }
 
