@@ -4198,7 +4198,7 @@
     if (runtimeMode === "auth_required") {
       parts.push("Läs: auth-låst");
     } else if (runtimeMode === "offline_history") {
-      parts.push("Läs: offline historik · läsläge");
+      parts.push("Läs: historikkälla");
     } else {
       parts.push(capability?.readAvailable ? "Läs: livekälla" : "Läs: spärrad");
     }
@@ -5789,9 +5789,6 @@
       summaryParts.push("Reply-context: låst");
     } else if (studioTruthState?.inConfiguredScope && studioTruthState?.waveLabel) {
       summaryParts.push(studioTruthState.waveLabel);
-    }
-    if (!isComposeMode && isOfflineHistoryContextThread(thread)) {
-      summaryParts.push("Läge: Offline historik");
     }
     const signatureLabel = getStudioSignatureProfile(studioState.selectedSignatureId).label;
     if (signatureLabel) {
@@ -11645,15 +11642,6 @@
       };
     }
 
-    if (getRuntimeMode() === "offline_history") {
-      return {
-        mode: "offline_history",
-        feedKey: "",
-        laneId: activeLaneId,
-        open: false,
-      };
-    }
-
     return {
       mode: "default",
       feedKey: "",
@@ -11698,13 +11686,10 @@
     return {
       ...thread,
       offlineHistorySelection: true,
-      offlineContextMode: "read_only",
-      offlineContextLabel: "Offline historik",
       historyQueueItem: historyItem || null,
       raw: {
         ...(thread.raw && typeof thread.raw === "object" ? thread.raw : {}),
         offlineHistorySelection: true,
-        offlineContextLabel: "Offline historik",
       },
     };
   }
@@ -11749,16 +11734,18 @@
       ) || null;
     const historyItem = getQueueHistoryItemByConversationId(conversationId);
     if (runtimeThread) {
-      return createOfflineHistoryContextThread(runtimeThread, historyItem);
+      return {
+        ...runtimeThread,
+        historyQueueItem: historyItem || null,
+      };
     }
     return buildOfflineHistoryFallbackThread(historyItem);
   }
 
   function isOfflineHistoryReadOnlyMode() {
-    return (
-      getRuntimeLeftColumnState().mode === "history" &&
-      Boolean(asText(getSelectedQueueHistoryConversationId()))
-    );
+    if (getRuntimeLeftColumnState().mode !== "history") return false;
+    if (!asText(getSelectedQueueHistoryConversationId())) return false;
+    return isOfflineHistoryContextThread(getSelectedOfflineHistoryThread());
   }
 
   function isOfflineHistorySelectionActive() {
@@ -21086,7 +21073,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra studioutkastet.", "error");
+      setStudioFeedback("Öppna en live-tråd för att ändra studioutkastet.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21117,7 +21104,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att växla responsspår.", "error");
+      setStudioFeedback("Öppna en live-tråd för att växla responsspår.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21147,7 +21134,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra tonfilter.", "error");
+      setStudioFeedback("Öppna en live-tråd för att ändra tonfilter.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21174,7 +21161,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att finjustera svaret.", "error");
+      setStudioFeedback("Öppna en live-tråd för att finjustera svaret.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21217,7 +21204,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Verktygen låses upp när live-tråden är tillgänglig.", "error");
+      setStudioFeedback("Öppna en live-tråd för att använda verktygen.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);

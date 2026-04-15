@@ -2405,35 +2405,41 @@
       const preferredThreadId = asText(options.preferredThreadId);
       const runtimeRequestSequence = ++liveRuntimeRequestSequence;
       const isCurrentRequest = () => runtimeRequestSequence === liveRuntimeRequestSequence;
+      const preserveStableWorkspace =
+        state.runtime.loaded === true &&
+        state.runtime.live === true &&
+        asArray(state.runtime.threads).length > 0;
       state.runtime.loading = true;
-      state.runtime.truthPrimaryLegacyThreads = [];
-      state.runtime.liveHydratedThreadIds = [];
       clearRuntimeAuthRecoveryTimer();
       resetRuntimeOpenFlowDiagnostics({
         requestSequence: runtimeRequestSequence,
         reason: "live_runtime_load",
       });
-      state.runtime.truthPrimaryCutover = {
-        enabled: false,
-        configuredMailboxIds: [],
-        activeMailboxIds: [],
-        fallbackReason: "",
-        lastAppliedAt: "",
-      };
-      state.runtime.focusTruthPrimary = {
-        enabled: false,
-        configuredMailboxIds: [],
-        activeMailboxIds: [],
-        fallbackReason: "",
-        readOnly: true,
-        lastAppliedAt: "",
-      };
-      setRuntimeModeState("", {
-        error: "",
-        live: false,
-        offline: false,
-        authRequired: false,
-      });
+      if (!preserveStableWorkspace) {
+        state.runtime.truthPrimaryLegacyThreads = [];
+        state.runtime.liveHydratedThreadIds = [];
+        state.runtime.truthPrimaryCutover = {
+          enabled: false,
+          configuredMailboxIds: [],
+          activeMailboxIds: [],
+          fallbackReason: "",
+          lastAppliedAt: "",
+        };
+        state.runtime.focusTruthPrimary = {
+          enabled: false,
+          configuredMailboxIds: [],
+          activeMailboxIds: [],
+          fallbackReason: "",
+          readOnly: true,
+          lastAppliedAt: "",
+        };
+        setRuntimeModeState("", {
+          error: "",
+          live: false,
+          offline: false,
+          authRequired: false,
+        });
+      }
       state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
         phase: "loading",
         requestedMailboxIds: runtimeMailboxIds,
@@ -2444,6 +2450,14 @@
         const adminToken = await waitForRuntimeAuthToken();
         if (!isCurrentRequest()) return;
         if (!adminToken) {
+          if (preserveStableWorkspace) {
+            state.runtime.loading = false;
+            scheduleRuntimeAuthRecovery({
+              requestedMailboxIds: runtimeMailboxIds,
+            });
+            renderRuntimeConversationShell();
+            return;
+          }
           state.runtime.loading = false;
           state.runtime.loaded = false;
           state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
@@ -2715,6 +2729,22 @@
         if (!isCurrentRequest()) return;
         const message = error instanceof Error ? error.message : String(error);
         const statusCode = Number(error?.statusCode || error?.status || 0);
+        const authFailure = isAuthFailure(statusCode, message);
+        if (preserveStableWorkspace && (authFailure || normalizeKey(message).includes("offline"))) {
+          state.runtime.loading = false;
+          if (authFailure) {
+            scheduleRuntimeAuthRecovery({
+              requestedMailboxIds: runtimeMailboxIds,
+            });
+          } else {
+            scheduleRuntimeLiveRefresh({
+              requestedMailboxIds: runtimeMailboxIds,
+              preferredThreadId,
+            });
+          }
+          renderRuntimeConversationShell();
+          return;
+        }
         state.runtime.loading = false;
         state.runtime.loaded = false;
         state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
@@ -2722,17 +2752,14 @@
           requestedMailboxIds: runtimeMailboxIds,
           error: message,
         });
-        setRuntimeModeState(
-          isAuthFailure(statusCode, message) ? "auth_required" : "runtime_error",
-          {
-            error: message,
-            live: false,
-            offline: normalizeKey(message).includes("offline"),
-            authRequired: isAuthFailure(statusCode, message),
-          }
-        );
+        setRuntimeModeState(authFailure ? "auth_required" : "runtime_error", {
+          error: message,
+          live: false,
+          offline: normalizeKey(message).includes("offline"),
+          authRequired: authFailure,
+        });
         clearRuntimeLiveRefreshTimer();
-        if (isAuthFailure(statusCode, message)) {
+        if (authFailure) {
           if (hasMeaningfulRuntimeReentryState()) {
             captureRuntimeReentrySnapshot("auth_failure");
           }
