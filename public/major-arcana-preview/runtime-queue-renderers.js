@@ -2197,7 +2197,7 @@
     function getQueueInlineFeedMeta(feedKey, count) {
       const normalizedFeedKey = normalizeKey(feedKey || "");
       if (normalizedFeedKey === "sent") {
-        return `Visar ${count} skickade mejl i valt mailbox- och ägarscope.`;
+        return "";
       }
       return `Visar ${count} mejl i samma vänsterarbetsyta.`;
     }
@@ -2512,7 +2512,10 @@
         if (queueTitle) {
           queueTitle.textContent = `${feedLabel} (${feedThreads.length})`;
         }
-        setQueueHistoryMeta(getQueueInlineFeedMeta(inlineFeedKey, feedThreads.length));
+        const queueInlineFeedMeta = getQueueInlineFeedMeta(inlineFeedKey, feedThreads.length);
+        setQueueHistoryMeta(queueInlineFeedMeta, {
+          showHead: inlineFeedKey === "sent" ? true : Boolean(queueInlineFeedMeta),
+        });
         if (!feedThreads.length) {
           renderQueueInlineLaneList([
             buildUnifiedStateThread({
