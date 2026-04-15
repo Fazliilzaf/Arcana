@@ -20410,10 +20410,16 @@
     const activeViewLaneId = normalizeKey(
       leftColumnState.mode === "lane" ? leftColumnState.laneId || activeLaneId || "all" : activeLaneId
     ) || "all";
+    const activeFeedKey = normalizeKey(leftColumnState.feedKey || "");
+    const isFeedViewActive = leftColumnState.mode === "feed" && Boolean(activeFeedKey);
     const isHistoryViewActive = leftColumnState.mode === "history";
     const activeLaneLabel = isHistoryViewActive
       ? "Historik"
-      : QUEUE_LANE_LABELS[activeViewLaneId] || QUEUE_LANE_LABELS.all;
+      : isFeedViewActive
+        ? activeFeedKey === "sent"
+          ? "Skickade"
+          : activeFeedKey
+        : QUEUE_LANE_LABELS[activeViewLaneId] || QUEUE_LANE_LABELS.all;
     const shortcutActions = QUEUE_ACTIONS.filter(
       (item) => item.action === "handled" || item.action === "delete"
     );
@@ -20431,6 +20437,10 @@
       if (labelNode) {
         const activeLabelSource = isHistoryViewActive
           ? queueHistoryToggle
+          : isFeedViewActive
+            ? queueViewJumpButtons.find(
+                (button) => normalizeKey(button.dataset.queueViewJump || "") === activeFeedKey
+              ) || null
           : queueLaneButtons.find(
               (button) => normalizeKey(button.dataset.queueLane || "all") === activeViewLaneId
             ) ||
