@@ -936,6 +936,46 @@
       return Boolean(normalizeText(getAdminToken?.() || ""));
     }
 
+    function clearRuntimeStoredAdminToken() {
+      try {
+        windowObject.localStorage?.removeItem?.("ARCANA_ADMIN_TOKEN");
+      } catch {}
+      try {
+        windowObject.sessionStorage?.removeItem?.("ARCANA_ADMIN_TOKEN");
+      } catch {}
+    }
+
+    async function verifyRuntimeAdminToken(adminToken = "") {
+      const normalizedToken = normalizeText(adminToken);
+      if (!normalizedToken) {
+        return { ok: false, definitive: true };
+      }
+      if (
+        normalizedToken === "__preview_local__" ||
+        (typeof isLocalPreviewHost === "function" && isLocalPreviewHost())
+      ) {
+        return { ok: true, definitive: true };
+      }
+      try {
+        const response = await windowObject.fetch("/api/v1/auth/me", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: {
+            Authorization: `Bearer ${normalizedToken}`,
+          },
+        });
+        if (response.ok) {
+          return { ok: true, definitive: true };
+        }
+        if (response.status === 401 || response.status === 403) {
+          return { ok: false, definitive: true };
+        }
+        return { ok: true, definitive: false };
+      } catch {
+        return { ok: true, definitive: false };
+      }
+    }
+
     function getRuntimeReentryThreadId() {
       return asText(
         state.runtime?.queueHistory?.selectedConversationId ||
@@ -3863,18 +3903,68 @@
       setNoteModeOpen(false);
       setFeedback(noteFeedback, "", "");
       setFeedback(scheduleFeedback, "", "");
+      renderRuntimeConversationShell();
 
-      loadBootstrap({
-        preserveActiveDestination: true,
-        applyWorkspacePrefs: true,
-        quiet: true,
-      }).catch((error) => {
-        console.warn("CCO workspace bootstrap misslyckades.", error);
-      });
+      windowObject.setTimeout(async () => {
+        const adminToken = normalizeText(getAdminToken?.() || "");
+        if (!adminToken) {
+          state.runtime.startupLocked = false;
+          state.runtime.loading = false;
+          state.runtime.loaded = false;
+          state.runtime.live = false;
+          state.runtime.authRequired = true;
+          state.runtime.error =
+            "Logga in i admin för att läsa livekö, historikfallback och mailboxstatus.";
+          state.runtime.threads = [];
+          state.runtime.truthPrimaryLegacyThreads = [];
+          state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
+            phase: "auth_required",
+            requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+            error: state.runtime.error,
+          });
+          renderRuntimeConversationShell();
+          scheduleRuntimeAuthRecovery({
+            requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+          });
+          return;
+        }
 
-      loadLiveRuntime({ deferInitialRender: true }).catch((error) => {
-        console.warn("CCO live runtime misslyckades.", error);
-      });
+        const tokenState = await verifyRuntimeAdminToken(adminToken);
+        if (!tokenState.ok && tokenState.definitive) {
+          clearRuntimeStoredAdminToken();
+          state.runtime.startupLocked = false;
+          state.runtime.loading = false;
+          state.runtime.loaded = false;
+          state.runtime.live = false;
+          state.runtime.authRequired = true;
+          state.runtime.error =
+            "Admin-sessionen har gått ut. Logga in igen för att läsa livekö och mailboxstatus.";
+          state.runtime.threads = [];
+          state.runtime.truthPrimaryLegacyThreads = [];
+          state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
+            phase: "auth_required",
+            requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+            error: state.runtime.error,
+          });
+          renderRuntimeConversationShell();
+          scheduleRuntimeAuthRecovery({
+            requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+          });
+          return;
+        }
+
+        loadBootstrap({
+          preserveActiveDestination: true,
+          applyWorkspacePrefs: true,
+          quiet: true,
+        }).catch((error) => {
+          console.warn("CCO workspace bootstrap misslyckades.", error);
+        });
+
+        loadLiveRuntime({ deferInitialRender: true }).catch((error) => {
+          console.warn("CCO live runtime misslyckades.", error);
+        });
+      }, 0);
     }
 
     return Object.freeze({

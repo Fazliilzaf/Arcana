@@ -20300,6 +20300,17 @@
     renderWorkspaceRuntimeContext();
     renderAnalyticsRuntime();
     renderRuntimeIntel(selectedFocusThread, focusReadState);
+    const shouldKeepColdStartHidden =
+      state.runtime.startupLocked === true &&
+      state.runtime.authRequired !== true &&
+      state.runtime.loaded !== true &&
+      state.runtime.live !== true &&
+      state.runtime.offline !== true;
+    if (shouldKeepColdStartHidden) {
+      document.body.classList.add("runtime-cold-start");
+    } else {
+      document.body.classList.remove("runtime-cold-start");
+    }
     if (
       (state.runtime.loaded === true ||
         state.runtime.live === true ||
