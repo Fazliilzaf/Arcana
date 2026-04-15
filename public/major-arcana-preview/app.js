@@ -13879,6 +13879,28 @@
     force = false,
   } = {}) {
     if (!isTruthWorklistViewFeatureEnabled()) return;
+    const adminToken = normalizeText(getAdminToken?.() || "");
+    if (!adminToken) {
+      const currentState =
+        state.runtime && typeof state.runtime.truthWorklistView === "object"
+          ? state.runtime.truthWorklistView
+          : {};
+      state.runtime.truthWorklistView = {
+        ...currentState,
+        loading: false,
+        loaded: true,
+        authRequired: true,
+        error: "Logga in igen i admin for att lasa truth-driven worklistdata i denna assistvy.",
+        scopeKey: getTruthWorklistScopeKey(mailboxIds),
+        scopeMode,
+        mailboxIds: asArray(mailboxIds)
+          .map((item) => normalizeMailboxId(item))
+          .filter(Boolean),
+        payload: null,
+      };
+      renderTruthWorklistView();
+      return;
+    }
     const normalizedMailboxIds = asArray(mailboxIds)
       .map((item) => normalizeMailboxId(item))
       .filter(Boolean);
@@ -13986,6 +14008,11 @@
 
   function ensureTruthWorklistViewLoaded({ force = false } = {}) {
     if (!isTruthWorklistViewFeatureEnabled()) {
+      renderTruthWorklistView();
+      return;
+    }
+    const adminToken = normalizeText(getAdminToken?.() || "");
+    if (!adminToken) {
       renderTruthWorklistView();
       return;
     }

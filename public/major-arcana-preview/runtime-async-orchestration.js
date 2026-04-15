@@ -112,6 +112,19 @@
       quiet = false,
       forceReload = false,
     } = {}) {
+      const adminToken = normalizeText(getAdminToken?.() || "");
+      if (!adminToken) {
+        const error = new Error("Logga in i admin för att läsa workspace bootstrap.");
+        state.bootstrapError = error.message;
+        if (!quiet) {
+          loadBootstrapFeedback("error", error.message);
+        }
+        return Promise.resolve({
+          authRequired: true,
+          skipped: true,
+          error: error.message,
+        });
+      }
       if (forceReload) {
         refs.bootstrapPromise = null;
       }

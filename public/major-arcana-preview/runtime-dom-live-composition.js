@@ -932,6 +932,10 @@
       }
     }
 
+    function hasRuntimeAdminToken() {
+      return Boolean(normalizeText(getAdminToken?.() || ""));
+    }
+
     function getRuntimeReentryThreadId() {
       return asText(
         state.runtime?.queueHistory?.selectedConversationId ||
@@ -3815,6 +3819,29 @@
       workspaceLimits.right.min = DEFAULT_WORKSPACE.right;
 
       normalizeWorkspaceState();
+
+      if (!hasRuntimeAdminToken()) {
+        state.runtime.startupLocked = false;
+        state.runtime.loading = false;
+        state.runtime.loaded = false;
+        state.runtime.live = false;
+        state.runtime.authRequired = true;
+        state.runtime.error =
+          "Logga in i admin för att läsa livekö, historikfallback och mailboxstatus.";
+        state.runtime.threads = [];
+        state.runtime.truthPrimaryLegacyThreads = [];
+        state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
+          phase: "auth_required",
+          requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+          error: state.runtime.error,
+        });
+        renderRuntimeConversationShell();
+        scheduleRuntimeAuthRecovery({
+          requestedMailboxIds: getRequestedRuntimeMailboxIds(),
+        });
+        return;
+      }
+
       decorateStaticPills();
       renderThreadContextRows();
       renderQueueLaneShortcutRows(queueActionRows);
