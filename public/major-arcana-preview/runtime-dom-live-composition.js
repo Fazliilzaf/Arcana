@@ -3793,6 +3793,14 @@
 
     function initializeWorkspaceSurface() {
       state.runtime.startupLocked = true;
+      state.runtime.loading = true;
+      state.runtime.loaded = false;
+      state.runtime.live = false;
+      state.runtime.authRequired = false;
+      state.runtime.error = "";
+      state.runtime.selectedThreadId = "";
+      state.runtime.historyContextThreadId = "";
+      state.runtime.threads = [];
       bindWorkspaceInteractions();
       DEFAULT_WORKSPACE.left =
         Math.round(readPxVariable("--workspace-left-width")) || DEFAULT_WORKSPACE.left;
