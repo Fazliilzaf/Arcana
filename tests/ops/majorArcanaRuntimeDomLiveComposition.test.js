@@ -319,9 +319,9 @@ test('runtime-dom-live-composition bär vidare customerIdentity genom live-threa
   );
   assert.ok(
     source.includes(
-      'const threads = carryRuntimeCustomerIdentity(\n          buildLiveThreads(mergedWorklistData, {\n            historyMessages: [],\n            historyEvents: [],\n          })'
+      'const threads = carryRuntimeCustomerIdentity(\n          buildLiveThreads(mergedWorklistData, {'
     ),
-    'Förväntade att live-load utan historik också behåller identity-envelope om den redan finns i worklist payloaden.'
+    'Förväntade att live-load också bär vidare identity-envelope när merged worklist byggs, oavsett om tunn historik redan har förladdats för mailboxscope.'
   );
 });
 
@@ -375,6 +375,11 @@ test('mailboxscope-byte debounce:ar tomma mellanlägen så workspace inte nollst
   );
   assert.match(
     source,
+    /async function fetchRuntimeThinHistoryPayload\(runtimeMailboxIds = \[\]\)[\s\S]*\/api\/v1\/cco\/runtime\/history\?/,
+    'Förväntade en återanvänd tunn historik-helper så att mailboxyta kan få CCO-förädlat mailboxspår utan att duplicera fetch-logik.'
+  );
+  assert.match(
+    source,
     /const pendingMailboxIds = getPendingRuntimeMailboxSelectionIds\(\);[\s\S]*!pendingMailboxIds\.length && currentMailboxIds\.length[\s\S]*MAILBOX_SCOPE_EMPTY_COMMIT_DELAY_MS/,
     'Förväntade att tomt mellanläge bara committas efter ett längre debounce-fönster när det redan finns ett aktivt mailboxscope.'
   );
@@ -412,6 +417,16 @@ test('mailboxscope-byte debounce:ar tomma mellanlägen så workspace inte nollst
     source,
     /const shouldCommitMailboxScopeOnSuccess =[\s\S]*options\.commitMailboxScopeOnSuccess === true[\s\S]*workspaceSourceOfTruth\.setSelectedMailboxIds\(runtimeMailboxIds\)/,
     'Förväntade att det nya mailboxscopet committas först när live-loaden faktiskt lyckas i stället för att rensa ytan direkt.'
+  );
+  assert.match(
+    source,
+    /if \(options\.commitMailboxScopeOnSuccess === true && runtimeMailboxIds\.length\)[\s\S]*initialHistoryPayload = await fetchRuntimeThinHistoryPayload\(runtimeMailboxIds\)/,
+    'Förväntade att mailboxbyte förladdar tunn mailboxhistorik innan det nya scopet committas, så att workspace inte först faller till tom live-yta.'
+  );
+  assert.match(
+    source,
+    /buildLiveThreads\(liveData,\s*\{[\s\S]*historyMessages:\s*initialHistoryMessages[\s\S]*historyEvents:\s*initialHistoryEvents[\s\S]*buildLiveThreads\(mergedWorklistData,\s*\{[\s\S]*historyMessages:\s*initialHistoryMessages[\s\S]*historyEvents:\s*initialHistoryEvents/s,
+    'Förväntade att både legacy- och merged live-trådar kan byggas direkt med tunn mailboxhistorik under mailboxbyte.'
   );
 });
 
@@ -565,13 +580,13 @@ test('loadLiveRuntime öppnar live-listan först och värmer sedan tunn/rik hist
   );
   assert.match(
     loadLiveRuntimeSource,
-    /buildLiveThreads\(liveData,\s*\{\s*historyMessages:\s*\[\],\s*historyEvents:\s*\[\],\s*\}\)/,
-    'Förväntade att initial live-render kan byggas utan att vänta på full tunn historik.'
+    /if \(options\.commitMailboxScopeOnSuccess === true && runtimeMailboxIds\.length\)[\s\S]*initialHistoryPayload = await fetchRuntimeThinHistoryPayload\(runtimeMailboxIds\)/,
+    'Förväntade att mailboxbyte kan förladda tunn historik innan nytt mailboxscope committas, så att workspace inte först kollapsar till tom live-yta.'
   );
   assert.match(
     loadLiveRuntimeSource,
     /await finalizeRuntimeLoad\(\{[\s\S]*scheduleRuntimeThinHistoryRefresh\(\{[\s\S]*scheduleRuntimeHistoryCoverageWarmup\(runtimeMailboxIds,\s*\{[\s\S]*await requestRuntimeThreadHydration\(preferredThreadId,\s*\{\s*mailboxIds:\s*runtimeMailboxIds,\s*\}\);/,
-    'Förväntade att tunn historik, historikvärmning och rik trådhydrering nu triggas efter att initial live-load har finaliserats, även om selection-to-hydration-handoffen behöver ett smalt retry-spår.'
+    'Förväntade att tunn historik, historikvärmning och rik trådhydrering fortfarande triggas efter live-load, även när mailboxbyte kan förladda ett tunt mailboxspår före commit.'
   );
   assert.match(
     source,

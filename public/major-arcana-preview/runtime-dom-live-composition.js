@@ -2134,13 +2134,7 @@
 
       windowObject.setTimeout(async () => {
         try {
-          const historyParams = new URLSearchParams();
-          historyParams.set("mailboxIds", runtimeMailboxIds.join(","));
-          historyParams.set("lookbackDays", String(FULL_MAILBOX_LOOKBACK_DAYS));
-          historyParams.set("includeBodyHtml", "0");
-          const historyPayload = await apiRequest(
-            `/api/v1/cco/runtime/history?${historyParams.toString()}`
-          );
+          const historyPayload = await fetchRuntimeThinHistoryPayload(runtimeMailboxIds);
           if (!isCurrentRequest()) return;
 
           const legacyThreads = carryRuntimeCustomerIdentity(
@@ -2207,6 +2201,14 @@
           );
         }
       }, 0);
+    }
+
+    async function fetchRuntimeThinHistoryPayload(runtimeMailboxIds = []) {
+      const historyParams = new URLSearchParams();
+      historyParams.set("mailboxIds", runtimeMailboxIds.join(","));
+      historyParams.set("lookbackDays", String(FULL_MAILBOX_LOOKBACK_DAYS));
+      historyParams.set("includeBodyHtml", "0");
+      return apiRequest(`/api/v1/cco/runtime/history?${historyParams.toString()}`);
     }
 
     function scheduleRuntimeHistoryCoverageWarmup(
@@ -2861,10 +2863,24 @@
           }
         }
 
+        let initialHistoryPayload = null;
+        if (options.commitMailboxScopeOnSuccess === true && runtimeMailboxIds.length) {
+          try {
+            initialHistoryPayload = await fetchRuntimeThinHistoryPayload(runtimeMailboxIds);
+            if (!isCurrentRequest()) return;
+          } catch (initialHistoryError) {
+            console.warn(
+              "CCO kunde inte läsa tunn mailboxhistorik före mailboxscope-commit. Fortsätter med live-worklist.",
+              initialHistoryError
+            );
+          }
+        }
+        const initialHistoryMessages = asArray(initialHistoryPayload?.messages);
+        const initialHistoryEvents = asArray(initialHistoryPayload?.events);
         const legacyThreads = carryRuntimeCustomerIdentity(
           buildLiveThreads(liveData, {
-            historyMessages: [],
-            historyEvents: [],
+            historyMessages: initialHistoryMessages,
+            historyEvents: initialHistoryEvents,
           })
         );
         const mergedWorklistData =
@@ -2875,8 +2891,8 @@
             : liveData;
         const threads = carryRuntimeCustomerIdentity(
           buildLiveThreads(mergedWorklistData, {
-            historyMessages: [],
-            historyEvents: [],
+            historyMessages: initialHistoryMessages,
+            historyEvents: initialHistoryEvents,
           })
         );
         const activeFocusTruthMailboxIds = configuredFocusTruthMailboxIds.filter((mailboxId) =>
@@ -2989,7 +3005,7 @@
           mergedWorklistData,
           threads: appliedThreads,
           legacyThreads: appliedLegacyThreads,
-          historyPayload: null,
+          historyPayload: initialHistoryPayload,
           truthPrimaryPayload,
           configuredTruthPrimaryMailboxIds,
           activeTruthPrimaryMailboxIds,
