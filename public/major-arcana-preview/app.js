@@ -20407,10 +20407,14 @@
         state.runtime.authRequired === true ||
         Boolean(asText(state.runtime.error)));
     const activeLaneId = normalizePrimaryQueueLaneId(state.runtime.activeLaneId || "all");
+    const activeViewLaneId =
+      leftColumnState.mode === "lane"
+        ? normalizePrimaryQueueLaneId(leftColumnState.laneId || activeLaneId || "all")
+        : activeLaneId;
     const isHistoryViewActive = leftColumnState.mode === "history";
     const activeLaneLabel = isHistoryViewActive
       ? "Historik"
-      : QUEUE_LANE_LABELS[activeLaneId] || QUEUE_LANE_LABELS.all;
+      : QUEUE_LANE_LABELS[activeViewLaneId] || QUEUE_LANE_LABELS.all;
     const shortcutActions = QUEUE_ACTIONS.filter(
       (item) => item.action === "handled" || item.action === "delete"
     );
@@ -20430,7 +20434,7 @@
           ? queueHistoryToggle
           : queueLaneButtons.find(
               (button) =>
-                normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === activeLaneId
+                normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === activeViewLaneId
             ) ||
             queueLaneButtons.find(
               (button) => normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === "all"
