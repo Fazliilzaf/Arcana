@@ -2129,9 +2129,10 @@ input {
 
 .product-card {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 14px;
   cursor: grab;
+  min-height: 146px;
 }
 
 .product-card:active {
@@ -2146,8 +2147,11 @@ input {
 
 .product-copy {
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 4px;
+  min-height: 0;
 }
 
 .product-copy strong {
@@ -2178,7 +2182,9 @@ input {
 .product-card-flags {
   display: grid;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+  align-content: end;
 }
 
 .product-level-badges {
