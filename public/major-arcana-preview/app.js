@@ -20407,10 +20407,9 @@
         state.runtime.authRequired === true ||
         Boolean(asText(state.runtime.error)));
     const activeLaneId = normalizePrimaryQueueLaneId(state.runtime.activeLaneId || "all");
-    const activeViewLaneId =
-      leftColumnState.mode === "lane"
-        ? normalizePrimaryQueueLaneId(leftColumnState.laneId || activeLaneId || "all")
-        : activeLaneId;
+    const activeViewLaneId = normalizeKey(
+      leftColumnState.mode === "lane" ? leftColumnState.laneId || activeLaneId || "all" : activeLaneId
+    ) || "all";
     const isHistoryViewActive = leftColumnState.mode === "history";
     const activeLaneLabel = isHistoryViewActive
       ? "Historik"
@@ -20433,11 +20432,10 @@
         const activeLabelSource = isHistoryViewActive
           ? queueHistoryToggle
           : queueLaneButtons.find(
-              (button) =>
-                normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === activeViewLaneId
+              (button) => normalizeKey(button.dataset.queueLane || "all") === activeViewLaneId
             ) ||
             queueLaneButtons.find(
-              (button) => normalizePrimaryQueueLaneId(button.dataset.queueLane || "all") === "all"
+              (button) => normalizeKey(button.dataset.queueLane || "all") === "all"
             ) ||
             null;
         const activeLaneIcon = activeLabelSource?.querySelector("svg")?.cloneNode(true) || null;
