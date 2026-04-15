@@ -1237,6 +1237,12 @@
     }
 
     function shouldPreserveStableRuntimeWorkspace(nextMailboxIds = []) {
+      const hasStableThreads = asArray(state.runtime?.threads).length > 0;
+      const hasStableRuntimeSurface =
+        (state.runtime?.live === true || state.runtime?.loaded === true) &&
+        state.runtime?.authRequired !== true &&
+        hasStableThreads;
+      if (!hasStableRuntimeSurface) return false;
       const normalizedNextMailboxIds = asArray(nextMailboxIds)
         .map((value) => canonicalizeRuntimeMailboxId(value))
         .filter(Boolean);
@@ -1249,14 +1255,16 @@
       const referenceMailboxIds = selectedMailboxIds.length
         ? selectedMailboxIds
         : requestedMailboxIds;
-      const hasStableThreads = asArray(state.runtime?.threads).length > 0;
-      const hasStableRuntimeSurface =
-        (state.runtime?.live === true || state.runtime?.loaded === true) &&
-        state.runtime?.authRequired !== true &&
-        hasStableThreads;
-      if (!hasStableRuntimeSurface) return false;
       if (!referenceMailboxIds.length || !normalizedNextMailboxIds.length) return false;
       return runtimeMailboxScopeMatches(referenceMailboxIds, normalizedNextMailboxIds);
+    }
+
+    function hasStableRuntimeWorkspaceSurface() {
+      return (
+        ((state.runtime?.live === true || state.runtime?.loaded === true) &&
+          state.runtime?.authRequired !== true &&
+          asArray(state.runtime?.threads).length > 0) === true
+      );
     }
 
     function hasRuntimeHistoryPayloadContent(historyPayload = null) {
@@ -1312,38 +1320,20 @@
         state.runtime.mailboxScopePinned = normalizedNextSelectedMailboxIds.length > 0;
         return normalizedNextSelectedMailboxIds;
       }
-      const committedMailboxIds = workspaceSourceOfTruth.setSelectedMailboxIds(
-        normalizedNextSelectedMailboxIds
-      );
-      state.runtime.mailboxScopePinned = committedMailboxIds.length > 0;
-      workspaceSourceOfTruth.setSelectedThreadId("");
-      state.runtime.historyContextThreadId = "";
-      state.runtime.queueInlinePanel = {
-        ...state.runtime.queueInlinePanel,
-        open: false,
-        laneId: "",
-        feedKey: "",
-      };
-      state.runtime.queueHistory = {
-        ...state.runtime.queueHistory,
-        open: false,
-        loading: false,
-        loaded: false,
-        error: "",
-        items: [],
-        selectedConversationId: "",
-        hasMore: false,
-        scopeKey: "",
-      };
-      renderRuntimeConversationShell();
-      captureRuntimeReentrySnapshot("mailboxscope_changed");
-      debugReentrySnapshot("AFTER MAILBOX CHANGE");
-      debugRuntimePipeline("AFTER MAILBOX CHANGE");
-      refreshQueueInlineHistoryIfOpen();
-      if (!committedMailboxIds.length) {
+      if (!normalizedNextSelectedMailboxIds.length) {
+        const committedMailboxIds = workspaceSourceOfTruth.setSelectedMailboxIds([]);
         state.runtime.mailboxScopePinned = false;
+        workspaceSourceOfTruth.setSelectedThreadId("");
+        state.runtime.historyContextThreadId = "";
+        state.runtime.queueInlinePanel = {
+          ...state.runtime.queueInlinePanel,
+          open: false,
+          laneId: "",
+          feedKey: "",
+        };
         state.runtime.queueHistory = {
           ...state.runtime.queueHistory,
+          open: false,
           loading: false,
           loaded: true,
           error: "",
@@ -1361,16 +1351,24 @@
         }).catch((error) => {
           console.warn("CCO workspace bootstrap misslyckades efter tomt mailboxscope.", error);
         });
+        captureRuntimeReentrySnapshot("mailboxscope_changed");
+        debugReentrySnapshot("AFTER MAILBOX CHANGE");
+        debugRuntimePipeline("AFTER MAILBOX CHANGE");
+        refreshQueueInlineHistoryIfOpen();
         return committedMailboxIds;
       }
+      state.runtime.mailboxScopePinned = true;
+      clearRuntimeLiveRefreshTimer();
       loadLiveRuntime({
-        requestedMailboxIds: committedMailboxIds,
+        requestedMailboxIds: normalizedNextSelectedMailboxIds,
         preferredThreadId: "",
         resetHistoryOnChange: true,
+        preserveVisibleWorkspace: true,
+        commitMailboxScopeOnSuccess: true,
       }).catch((error) => {
         console.warn("CCO live runtime misslyckades efter mailboxbyte.", error);
       });
-      return committedMailboxIds;
+      return normalizedNextSelectedMailboxIds;
     }
 
     function scheduleRuntimeMailboxScopeSelectionCommit() {
@@ -2681,7 +2679,10 @@
       const runtimeMailboxIds = requestedMailboxIds.length
         ? requestedMailboxIds
         : getRequestedRuntimeMailboxIds();
-      const preserveStableWorkspace = shouldPreserveStableRuntimeWorkspace(runtimeMailboxIds);
+      const preserveStableWorkspace =
+        options.preserveVisibleWorkspace === true
+          ? hasStableRuntimeWorkspaceSurface()
+          : shouldPreserveStableRuntimeWorkspace(runtimeMailboxIds);
       const shouldHonorReentryRestore =
         preserveStableWorkspace !== true &&
         state.runtime.loaded !== true &&
@@ -2958,6 +2959,38 @@
         debugRuntimePipeline("AFTER LIVE LOAD (before restore)");
         debugReentrySnapshot("BEFORE RESTORE");
         if (!isCurrentRequest()) return;
+        const shouldCommitMailboxScopeOnSuccess =
+          options.commitMailboxScopeOnSuccess === true &&
+          !runtimeMailboxScopeMatches(
+            workspaceSourceOfTruth.getSelectedMailboxIds(),
+            runtimeMailboxIds
+          );
+        if (shouldCommitMailboxScopeOnSuccess) {
+          workspaceSourceOfTruth.setSelectedMailboxIds(runtimeMailboxIds);
+          state.runtime.mailboxScopePinned = runtimeMailboxIds.length > 0;
+          workspaceSourceOfTruth.setSelectedThreadId("");
+          state.runtime.historyContextThreadId = "";
+          state.runtime.queueInlinePanel = {
+            ...state.runtime.queueInlinePanel,
+            open: false,
+            laneId: "",
+            feedKey: "",
+          };
+          state.runtime.queueHistory = {
+            ...state.runtime.queueHistory,
+            open: false,
+            loading: false,
+            loaded: false,
+            error: "",
+            items: [],
+            selectedConversationId: "",
+            hasMore: false,
+            scopeKey: "",
+          };
+          captureRuntimeReentrySnapshot("mailboxscope_changed");
+          debugReentrySnapshot("AFTER MAILBOX CHANGE");
+          debugRuntimePipeline("AFTER MAILBOX CHANGE");
+        }
         state.runtime.loading = false;
         state.runtime.loaded = true;
         state.runtime.startupLocked = false;

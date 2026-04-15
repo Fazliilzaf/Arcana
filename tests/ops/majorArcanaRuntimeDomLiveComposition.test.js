@@ -383,6 +383,21 @@ test('mailboxscope-byte debounce:ar tomma mellanlägen så workspace inte nollst
     /mailboxMenuGrid\.addEventListener\("change",[\s\S]*scheduleRuntimeMailboxScopeSelectionCommit\(\);/,
     'Förväntade att mailboxmenyn använder den batchade scope-commiten i stället för att nollställa runtime-state direkt i change-handlern.'
   );
+  assert.match(
+    source,
+    /loadLiveRuntime\(\{\s*requestedMailboxIds:\s*normalizedNextSelectedMailboxIds,\s*preferredThreadId:\s*"",\s*resetHistoryOnChange:\s*true,\s*preserveVisibleWorkspace:\s*true,\s*commitMailboxScopeOnSuccess:\s*true,/,
+    'Förväntade att mailboxbyte håller den senaste stabila workspace-ytan synlig tills den nya mailboxstaten är redo.'
+  );
+  assert.match(
+    source,
+    /const preserveStableWorkspace =[\s\S]*options\.preserveVisibleWorkspace === true[\s\S]*hasStableRuntimeWorkspaceSurface\(\)/,
+    'Förväntade att loadLiveRuntime kan bevara en stabil workspace även när det nya mailboxscopet skiljer sig från det nuvarande.'
+  );
+  assert.match(
+    source,
+    /const shouldCommitMailboxScopeOnSuccess =[\s\S]*options\.commitMailboxScopeOnSuccess === true[\s\S]*workspaceSourceOfTruth\.setSelectedMailboxIds\(runtimeMailboxIds\)/,
+    'Förväntade att det nya mailboxscopet committas först när live-loaden faktiskt lyckas i stället för att rensa ytan direkt.'
+  );
 });
 
 test('loadLiveRuntime väntar in admin-token innan runtime-status hämtas', () => {
