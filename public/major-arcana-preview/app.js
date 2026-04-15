@@ -20226,6 +20226,7 @@
 
   function renderRuntimeConversationShell() {
     ensureRuntimeSelection();
+    syncFocusSectionUI(workspaceSourceOfTruth.getFocusSection());
     renderRuntimeQueue();
     renderQueueCategoryStripMode();
     renderTruthWorklistView();
@@ -20882,8 +20883,8 @@
     renderAutomationAutopilot();
   }
 
-  function applyFocusSection(section) {
-    const activeSection = workspaceSourceOfTruth.setFocusSection(section);
+  function syncFocusSectionUI(section) {
+    const activeSection = normalizeKey(section) || "conversation";
     focusTabButtons.forEach((button) => {
       const isActive = button.dataset.focusSection === activeSection;
       button.classList.toggle("is-active", isActive);
@@ -20896,6 +20897,12 @@
       panel.classList.toggle("is-active", isActive);
       panel.setAttribute("aria-hidden", isActive ? "false" : "true");
     });
+    return activeSection;
+  }
+
+  function applyFocusSection(section) {
+    const activeSection = workspaceSourceOfTruth.setFocusSection(section);
+    syncFocusSectionUI(activeSection);
     captureRuntimeReentrySnapshot("focus_section_change");
   }
 
