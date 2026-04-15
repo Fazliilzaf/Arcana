@@ -4203,9 +4203,9 @@
     const parts = [];
     const writeBlockedByMode = runtimeMode === "auth_required" || runtimeMode === "offline_history";
     const sendModeBlockedCopy =
-      runtimeMode === "auth_required" ? "Skicka: auth-låst" : "Skicka: spärrad i läsläge";
+      runtimeMode === "auth_required" ? "Skicka: auth-låst" : "Skicka: kräver aktiv tråd";
     const deleteModeBlockedCopy =
-      runtimeMode === "auth_required" ? "Radera: auth-låst" : "Radera: spärrad i läsläge";
+      runtimeMode === "auth_required" ? "Radera: auth-låst" : "Radera: kräver aktiv tråd";
     const requestedTokens = new Set(
       getMailboxIdentityTokens({
         id: mailboxId,
@@ -4240,7 +4240,7 @@
     if (runtimeMode === "auth_required") {
       parts.push("Läs: auth-låst");
     } else if (runtimeMode === "offline_history") {
-      parts.push("Läs: offline historik · läsläge");
+      parts.push("Läs: historik");
     } else {
       parts.push(capability?.readAvailable ? "Läs: livekälla" : "Läs: spärrad");
     }
@@ -5833,7 +5833,7 @@
       summaryParts.push(studioTruthState.waveLabel);
     }
     if (!isComposeMode && isOfflineHistoryContextThread(thread)) {
-      summaryParts.push("Läge: Offline historik");
+      summaryParts.push("Läge: Historik");
     }
     const signatureLabel = getStudioSignatureProfile(studioState.selectedSignatureId).label;
     if (signatureLabel) {
@@ -10258,7 +10258,7 @@
       studioIncomingBody.innerHTML =
         `<article class="studio-conversation-message studio-conversation-message--empty"><p class="studio-conversation-message-text">${escapeHtml(
           isOfflineHistoryReadOnlyMode()
-            ? "Välj en historikruta i vänsterkolumnen för att öppna kundens historik i läsläge här."
+            ? "Välj en historikruta i vänsterkolumnen för att öppna kundens historik här."
             : "Välj en live-tråd i arbetskön för att öppna konversationen i studion."
         )}</p></article>`;
       return;
@@ -11745,12 +11745,12 @@
       ...thread,
       offlineHistorySelection: true,
       offlineContextMode: "read_only",
-      offlineContextLabel: "Offline historik",
+      offlineContextLabel: "Historik",
       historyQueueItem: historyItem || null,
       raw: {
         ...(thread.raw && typeof thread.raw === "object" ? thread.raw : {}),
         offlineHistorySelection: true,
-        offlineContextLabel: "Offline historik",
+        offlineContextLabel: "Historik",
       },
     };
   }
@@ -15243,7 +15243,7 @@
           )
         );
         if (sharedMailboxes.length) {
-          reasons.push(`Samma mailboxspår: ${sharedMailboxes[0]}`);
+          reasons.push(`Samma historikspår: ${sharedMailboxes[0]}`);
           confidence += 8;
         }
 
@@ -21177,7 +21177,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra studioutkastet.", "error");
+      setStudioFeedback("Öppna en aktiv tråd i arbetslistan för att ändra studioutkastet.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21208,7 +21208,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att växla responsspår.", "error");
+      setStudioFeedback("Öppna en aktiv tråd i arbetslistan för att växla responsspår.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21238,7 +21238,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att ändra tonfilter.", "error");
+      setStudioFeedback("Öppna en aktiv tråd i arbetslistan för att ändra tonfilter.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21265,7 +21265,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Öppna live-tråden för att finjustera svaret.", "error");
+      setStudioFeedback("Öppna en aktiv tråd i arbetslistan för att finjustera svaret.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);
@@ -21308,7 +21308,7 @@
     const thread = getSelectedRuntimeThread();
     if (!thread) return;
     if (isOfflineHistoryContextThread(thread)) {
-      setStudioFeedback("Offline historik är läsläge. Verktygen låses upp när live-tråden är tillgänglig.", "error");
+      setStudioFeedback("Öppna en aktiv tråd i arbetslistan för att använda verktygen.", "error");
       return;
     }
     const studioState = ensureStudioState(thread);

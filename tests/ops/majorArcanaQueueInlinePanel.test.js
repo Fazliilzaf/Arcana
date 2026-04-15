@@ -404,10 +404,9 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
   assert.equal(queueTitle.textContent, 'Historik (0)');
   assert.equal(queueHistoryToggle.attributes['aria-expanded'], 'true');
   assert.equal(queueHistoryLoadMoreButton.hidden, true);
-  assert.match(queueHistoryMeta.textContent, /hela mailboxens strukturerade mejlspår/i);
-  assert.match(queueHistoryMeta.textContent, /valt mailboxscope/i);
+  assert.match(queueHistoryMeta.textContent, /Historik visas även när livekön är pausad\./i);
   assert.doesNotMatch(queueHistoryMeta.textContent, /äldre mejl|offline historikläge/i);
-  assert.match(queueHistoryList.innerHTML, /Inga mejl hittades i mailboxspåret/i);
+  assert.match(queueHistoryList.innerHTML, /Ingen historik hittades i valt mailboxscope ännu/i);
 });
 
 test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list nar ingen panel ar oppen', () => {
@@ -1194,7 +1193,7 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
 
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueTitle.textContent, 'Historik (1)');
-  assert.match(queueHistoryMeta.textContent, /hela mailboxens strukturerade mejlspår/i);
+  assert.match(queueHistoryMeta.textContent, /Historik visas även när livekön är pausad\./i);
   assert.doesNotMatch(queueHistoryMeta.textContent, /offline historikläge/i);
   assert.match(queueHistoryList.innerHTML, /Shahram/);
   assert.match(queueHistoryList.innerHTML, /Offline historiktrad/);
@@ -1324,7 +1323,7 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
 
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueTitle.textContent, 'Arbetslista (1)');
-  assert.match(queueHistoryMeta.textContent, /offline historikläge/i);
+  assert.match(queueHistoryMeta.textContent, /Historik visas medan livekön är pausad\./i);
   assert.match(queueHistoryList.innerHTML, /offline-thread-1/);
   assert.match(queueHistoryList.innerHTML, /Arbetskön ska visa historikbaserad fallback/);
   assert.doesNotMatch(queueHistoryList.innerHTML, /Servern kör offline-läge/i);
@@ -1422,7 +1421,7 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
         loading: false,
         error: 'Ingen lokal historik hittades i valt mailboxscope ännu. Livekön är fortsatt offline.',
         offlineWorkingSetMeta:
-          'Offline historikläge. Ingen lokal historik hittades i valt mailboxscope ännu.',
+          'Ingen lokal historik hittades i valt mailboxscope ännu.',
         activeLaneId: 'all',
         queueInlinePanel: {
           open: false,
@@ -1446,37 +1445,25 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
   assert.equal(queueTitle.textContent, 'Arbetslista (0)');
   assert.equal(
     queueHistoryMeta.textContent,
-    'Offline historikläge. Ingen lokal historik hittades i valt mailboxscope ännu.'
+    'Ingen lokal historik hittades i valt mailboxscope ännu.'
   );
   assert.match(queueHistoryList.innerHTML, /Ingen lokal historik hittades i valt mailboxscope ännu\./);
   assert.doesNotMatch(queueHistoryList.innerHTML, /Livekön kunde inte läsas just nu/i);
 });
 
-test('renderQueueHistorySection beskriver Historik som full mailboxyta och inte Alla som full mailboxvag', () => {
+test('renderQueueHistorySection håller Historik neutral och gör inte Alla eller Historik till särskilda specialytor', () => {
   const source = fs.readFileSync(RENDERERS_PATH, 'utf8');
-
-  assert.match(
-    source,
-    /Historik visar hela mailboxens strukturerade mejlspår för valt mailboxscope\./,
-    'Historik ska beskrivas som den fulla mailboxytan för valt mailboxscope.'
-  );
-
-  assert.match(
-    source,
-    /Arbetslistan visar det operativa urvalet\./,
-    'Historikens copy ska tydligt hålla isär mailboxspåret från arbetslistans operativa urval.'
-  );
-
-  assert.match(
-    source,
-    /arbetslistans Alla/,
-    'Om copy hänvisar till Alla ska det tydligt vara arbetslistans Alla, inte en dold full mailboxyta.'
-  );
 
   assert.doesNotMatch(
     source,
-    /återgå till Alla trådar för att se fler konversationer/i,
-    'Vi ska inte längre antyda att Alla är vägen till full mailboxbredd.'
+    /hela mailboxens strukturerade mejlspår|arbetslistans Alla|full mailboxyta/i,
+    'Historikcopy ska inte skriva om CCO-ytan till en ny produktmodell.'
+  );
+
+  assert.match(
+    source,
+    /Historik visas även när livekön är pausad\.|Ingen historik hittades i valt mailboxscope ännu\./,
+    'Historik ska beskrivas neutralt som historik i stället för som ett separat specialläge.'
   );
 });
 

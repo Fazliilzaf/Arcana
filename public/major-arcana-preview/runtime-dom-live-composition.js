@@ -2270,7 +2270,7 @@
       let historyEvents = [];
       let offlineWorkingSetSource = "history_store";
       let offlineWorkingSetMeta =
-        "Offline historikläge. Arbetskön bygger just nu på senast kända mailboxhistorik.";
+        "Historik visas medan livekön är pausad.";
       let resolvedOfflineMessage =
         offlineMessage ||
         "Livekön är offline. Visar senast kända historik i stället.";
@@ -2303,13 +2303,13 @@
           if (historyMessages.length) {
             offlineWorkingSetSource = "search_partial";
             offlineWorkingSetMeta =
-              "Offline working set bygger på lokal historik och kan vara ofullständig tills livekön är tillbaka.";
+              "Historik visas från lokalt underlag tills livekön är tillbaka.";
             resolvedOfflineMessage =
               "Livekön är offline. Arbetskön bygger på lokal historik i valt mailboxscope.";
           } else {
             offlineWorkingSetSource = "search_empty";
             offlineWorkingSetMeta =
-              "Offline historikläge. Ingen lokal historik hittades i valt mailboxscope ännu.";
+              "Ingen lokal historik hittades i valt mailboxscope ännu.";
             resolvedOfflineMessage =
               "Ingen lokal historik hittades i valt mailboxscope ännu. Livekön är fortsatt offline.";
           }
@@ -2321,7 +2321,7 @@
           );
           offlineWorkingSetSource = "search_empty";
           offlineWorkingSetMeta =
-            "Offline historikläge. Ingen lokal historik hittades i valt mailboxscope ännu.";
+            "Ingen lokal historik hittades i valt mailboxscope ännu.";
           resolvedOfflineMessage =
             historyErrorMessage ||
             "Ingen lokal historik hittades i valt mailboxscope ännu. Livekön är fortsatt offline.";
@@ -2356,7 +2356,7 @@
             ? getTruthPrimaryFocusMailboxIds({ mailboxIds: runtimeMailboxIds })
             : [],
         activeMailboxIds: [],
-        fallbackReason: "Offline historikläge. Fokusytan läser inte truth-driven focus i detta läge.",
+        fallbackReason: "Fokusytan läser inte truth-driven focus i det här läget.",
         readOnly: true,
         lastAppliedAt: new Date().toISOString(),
       };

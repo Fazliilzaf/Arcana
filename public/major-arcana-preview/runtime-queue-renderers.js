@@ -1944,21 +1944,21 @@
               : ownerFiltered
                 ? "Ägarfiltret gav inga aktiva trådar"
                 : runtimeMode === "offline_history"
-                  ? "Inget mailboxspår hittades i valt mailboxscope"
+                  ? "Ingen historik hittades i valt mailboxscope"
                   : "Mailboxfiltret gav inga aktiva trådar",
             preview: laneFiltered
-              ? "Byt kö i vänsterpanelen, återgå till arbetslistans Alla eller öppna Historik för hela mailboxspåret."
+              ? "Byt kö i vänsterpanelen eller återgå till Alla trådar för att se fler konversationer."
               : ownerFiltered
                 ? "Byt ägare eller återgå till Ägarvy för att se fler trådar."
                 : runtimeMode === "offline_history"
                   ? "Livekön är offline och det finns ännu ingen sparad historik att visa i arbetsytan."
                   : "Välj fler mailboxar eller vänta på nästa inkommande konversation.",
             mailboxLabel: "Arbetskö",
-            intentLabel: runtimeMode === "offline_history" ? "Offline historik" : "Tom kö",
+            intentLabel: runtimeMode === "offline_history" ? "Historik" : "Tom kö",
             statusLabel: runtimeMode === "offline_history" ? "Historik saknas" : "Ingen match",
             nextActionLabel: runtimeMode === "offline_history" ? "Byt mailboxscope" : "Justera urval",
             nextActionSummary: laneFiltered
-              ? "Återgå till arbetslistans Alla, byt kö eller öppna Historik för att hitta nästa relevanta konversation."
+              ? "Återgå till Alla trådar eller byt kö för att hitta nästa aktiva konversation."
               : ownerFiltered
                 ? "Byt ägarfilter eller återgå till Ägarvy för att läsa fler trådar."
                 : runtimeMode === "offline_history"
@@ -2236,9 +2236,7 @@
         }
 
         if (historyState.loading) {
-          setQueueHistoryMeta(
-            "Laddar hela mailboxens strukturerade mejlspår för valt mailboxscope…"
-          );
+          setQueueHistoryMeta("Laddar historik…", { showHead: false });
           syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
           syncQueueHistoryActionButton(deleteActionButton, {
             visible: false,
@@ -2247,15 +2245,14 @@
           });
           renderQueueHistoryList([]);
           if (queueHistoryList) {
-            queueHistoryList.innerHTML =
-              '<div class="queue-history-empty">Laddar mailboxspåret för valt mailboxscope…</div>';
+            queueHistoryList.innerHTML = '<div class="queue-history-empty">Laddar historik…</div>';
           }
           if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
           return;
         }
 
         if (historyState.error) {
-          setQueueHistoryMeta("Mailboxspåret kunde inte laddas just nu.");
+          setQueueHistoryMeta("Historiken kunde inte laddas just nu.", { showHead: false });
           syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
           syncQueueHistoryActionButton(deleteActionButton, {
             visible: false,
@@ -2273,14 +2270,14 @@
 
         setQueueHistoryMeta(
           runtimeMode === "offline_history" || state.runtime.live !== true
-            ? "Historik visar hela mailboxens strukturerade mejlspår från senast kända CCO-underlag för valt mailboxscope."
-            : "Historik visar hela mailboxens strukturerade mejlspår för valt mailboxscope. Arbetslistan visar det operativa urvalet."
+            ? "Historik visas även när livekön är pausad."
+            : ""
         );
 
         if (!asArray(historyState.items).length) {
           if (queueHistoryList) {
             queueHistoryList.innerHTML =
-              '<div class="queue-history-empty">Inga mejl hittades i mailboxspåret för valt mailboxscope ännu.</div>';
+              '<div class="queue-history-empty">Ingen historik hittades i valt mailboxscope ännu.</div>';
           }
           if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
           return;
@@ -2418,12 +2415,12 @@
               ownerLabel: "Arbetskö",
               subject: `${QUEUE_LANE_LABELS[laneId] || QUEUE_LANE_LABELS.all} har inga aktiva trådar`,
               preview:
-                "Byt kö i vänsterpanelen, återgå till arbetslistans Alla eller öppna Historik för hela mailboxspåret.",
+                "Byt kö i vänsterpanelen eller återgå till Alla trådar för att se fler konversationer.",
               mailboxLabel: "Arbetskö",
               statusLabel: "Ingen match",
               nextActionLabel: "Byt kö",
               nextActionSummary:
-                "Återgå till arbetslistans Alla, byt kö eller öppna Historik för att hitta nästa relevanta konversation.",
+                "Återgå till Alla trådar eller byt kö för att hitta nästa aktiva konversation.",
             }),
           ]);
         } else {
@@ -2447,9 +2444,9 @@
         setQueueHistoryMeta(
           runtimeMode === "offline_history"
             ? offlineWorkingSetMeta ||
-                "Offline historikläge. Arbetskön bygger just nu på senast kända mailboxhistorik."
+                "Historik visas medan livekön är pausad."
             : isOfflineHistoryMode
-              ? "Offline historikläge aktivt."
+              ? "Historik aktiv."
               : ""
         );
         if (!defaultThreads.length) {
@@ -2459,11 +2456,11 @@
               customerName: "Inga trådar i urvalet",
               ownerLabel:
                 runtimeMode === "offline_history"
-                  ? "Offline historik"
+                  ? "Historik"
                   : "Arbetskö",
               subject:
                 runtimeMode === "offline_history"
-                  ? "Inget mailboxspår hittades i valt mailboxscope"
+                  ? "Ingen historik hittades i valt mailboxscope"
                   : "Mailboxfiltret gav inga aktiva trådar",
               preview:
                 runtimeMode === "offline_history"
@@ -2650,12 +2647,12 @@
       if (runtimeMode === "offline_history") {
         return {
           label: normalizedFeed === "later" ? "Senare" : "Skickade",
-          title: "Offline historikläge",
+          title: "Historik",
           meta: "CCO historik",
-          copy: "Livekön är offline. Den här vyn visar bara sådant som kan härledas från sparad historik.",
+          copy: "Livekön är pausad. Historiken finns fortfarande tillgänglig i den här vyn.",
           scope: `${mailboxScopeCount} mailboxar`,
-          context: "Historikfallback",
-          hint: "Återgå till arbetskön eller invänta att livekopplingen kommer tillbaka.",
+          context: "Historik",
+          hint: "Välj en rad eller återgå till arbetskön för att fortsätta arbeta.",
         };
       }
       if (state.runtime.error && !state.runtime.live) {

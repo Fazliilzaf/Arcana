@@ -418,16 +418,16 @@ test('fokusrenderern får offline-historikhelpers och studion visar read-only co
 
   assert.ok(
     focusRendererCall.includes('\n      isOfflineHistoryContextThread,'),
-    'Fokusrenderern måste få isOfflineHistoryContextThread för att kunna markera offline läsläge.'
+    'Fokusrenderern måste få isOfflineHistoryContextThread för att kunna markera historikkontext utan att ändra ytan.'
   );
   assert.ok(
     focusRendererCall.includes('\n      isOfflineHistorySelectionActive,'),
-    'Fokusrenderern måste få isOfflineHistorySelectionActive för ärliga empty states i offline historik.'
+    'Fokusrenderern måste få isOfflineHistorySelectionActive för ärliga empty states i historikläget.'
   );
   assert.match(
     overlaySource,
-    /Offline historik är läsläge\. Svar, förhandsvisning, senare, klar, radera och anteckningar kräver live-tråd\./,
-    'Studion ska visa tydlig read-only copy när den öppnas från offline historik.'
+    /Välj en aktiv tråd i arbetslistan för att använda hela Svarstudio\./,
+    'Studion ska visa neutral blockertext när den öppnas från historikkontext.'
   );
 });
 

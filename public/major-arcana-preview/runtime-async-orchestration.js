@@ -552,7 +552,7 @@
       if (
         !isComposeMode &&
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att förhandsvisa eller svara.",
+          "Öppna en aktiv tråd i arbetslistan för att förhandsvisa eller svara.",
           "studio"
         )
       ) {
@@ -606,7 +606,7 @@
       if (
         !isComposeMode &&
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att spara utkast.",
+          "Öppna en aktiv tråd i arbetslistan för att spara utkast.",
           "studio"
         )
       ) {
@@ -647,7 +647,7 @@
       if (!thread || !studioState) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att parkera konversationen.",
+          "Öppna en aktiv tråd i arbetslistan för att parkera konversationen.",
           "studio"
         )
       ) {
@@ -662,7 +662,7 @@
       if (!thread || !studioState) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att markera konversationen som klar.",
+          "Öppna en aktiv tråd i arbetslistan för att markera konversationen som klar.",
           "studio"
         )
       ) {
@@ -700,7 +700,7 @@
       if (!thread || !studioState) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "Öppna en aktiv tråd i arbetslistan för att radera konversationen.",
           "studio"
         )
       ) {
@@ -728,7 +728,7 @@
       if (!thread || !state.runtime.deleteEnabled || asText(state.runtime.deletingThreadId)) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "Öppna en aktiv tråd i arbetslistan för att radera konversationen.",
           "focusStatus"
         )
       ) {
@@ -756,7 +756,7 @@
       if (!thread) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att markera konversationen som klar.",
+          "Öppna en aktiv tråd i arbetslistan för att markera konversationen som klar.",
           "focusStatus"
         )
       ) {
@@ -772,7 +772,7 @@
       if (!thread || state.runtime.historyDeleting) return;
       if (
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att radera konversationen.",
+          "Öppna en aktiv tråd i arbetslistan för att radera konversationen.",
           "focusHistory"
         )
       ) {
@@ -811,7 +811,7 @@
       if (
         !isComposeMode &&
         blockOfflineHistoryAction(
-          "Offline historik är läsläge. Öppna live-tråden för att skicka svar.",
+          "Öppna en aktiv tråd i arbetslistan för att skicka svar.",
           "studio"
         )
       ) {

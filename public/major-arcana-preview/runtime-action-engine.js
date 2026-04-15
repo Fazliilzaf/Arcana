@@ -70,7 +70,7 @@
         setFeedback(
           noteFeedback,
           "error",
-          "Offline historik är läsläge. Öppna live-tråden för att skapa anteckningar."
+          "Öppna en aktiv tråd i arbetslistan för att skapa anteckningar."
         );
         return Promise.resolve(false);
       }
@@ -89,7 +89,7 @@
         setFeedback(
           scheduleFeedback,
           "error",
-          "Offline historik är läsläge. Öppna live-tråden för att schemalägga uppföljning."
+          "Öppna en aktiv tråd i arbetslistan för att schemalägga uppföljning."
         );
         return Promise.resolve(false);
       }
