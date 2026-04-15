@@ -1112,6 +1112,30 @@
       }
     }
 
+    function restoreRuntimeFocusSectionIfNeeded({
+      restoredFocusSection = "",
+      restoredSelectedThreadId = "",
+      preferredThreadId = "",
+    } = {}) {
+      const normalizedRestoredFocusSection = normalizeKey(restoredFocusSection || "");
+      if (!normalizedRestoredFocusSection) return false;
+      const currentFocusSection = normalizeKey(workspaceSourceOfTruth.getFocusSection() || "");
+      const currentSelectedThreadId = asText(workspaceSourceOfTruth.getSelectedThreadId());
+      const expectedThreadId = asText(
+        restoredSelectedThreadId,
+        preferredThreadId || currentSelectedThreadId
+      );
+      if (
+        normalizedRestoredFocusSection === currentFocusSection ||
+        !runtimeConversationIdsMatch(currentSelectedThreadId, expectedThreadId)
+      ) {
+        return false;
+      }
+      workspaceSourceOfTruth.setFocusSection(normalizedRestoredFocusSection);
+      renderRuntimeConversationShell();
+      return true;
+    }
+
     function getRuntimeThreadHydrationMailboxIds(thread, fallbackMailboxIds = []) {
       const historyMailboxIds = asArray(thread?.historyMailboxOptions)
         .map((item) => canonicalizeRuntimeMailboxId(item?.id || item))
@@ -2836,6 +2860,19 @@
           mailboxIds: runtimeMailboxIds,
         });
         if (!isCurrentRequest()) return;
+        if (shouldHonorReentryRestore) {
+          restoreRuntimeFocusSectionIfNeeded({
+            restoredFocusSection: asText(
+              reentryOutcome?.savedSnapshot?.activeFocusSection ||
+                reentryOutcome?.restoredSnapshot?.activeFocusSection
+            ),
+            restoredSelectedThreadId: asText(
+              reentryOutcome?.savedSnapshot?.selectedThreadId ||
+                reentryOutcome?.restoredSnapshot?.selectedThreadId
+            ),
+            preferredThreadId,
+          });
+        }
         scheduleRuntimeLiveRefresh({
           requestedMailboxIds: runtimeMailboxIds,
           preferredThreadId,
