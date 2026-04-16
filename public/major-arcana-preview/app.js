@@ -2136,6 +2136,9 @@
       defaultSignatureProfile: "fazli",
       sendEnabled: false,
       deleteEnabled: false,
+      graphReadEnabled: false,
+      graphReadConnectorAvailable: false,
+      graphAllowlistMailboxCount: 0,
       lastSyncAt: "",
       mailboxDiagnostics: {
         lastLoadAt: "",

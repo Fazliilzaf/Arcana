@@ -881,6 +881,11 @@
       }
       state.runtime.sendEnabled = graph?.sendEnabled === true;
       state.runtime.deleteEnabled = graph?.deleteEnabled === true;
+      state.runtime.graphReadEnabled = graph?.readEnabled === true;
+      state.runtime.graphReadConnectorAvailable = graph?.readConnectorAvailable === true;
+      state.runtime.graphAllowlistMailboxCount = Number.isFinite(Number(graph?.allowlistMailboxCount))
+        ? Number(graph.allowlistMailboxCount)
+        : 0;
       state.runtime.mailboxCapabilities =
         typeof buildRuntimeMailboxCapabilities === "function"
           ? buildRuntimeMailboxCapabilities(graph)

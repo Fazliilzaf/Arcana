@@ -2717,7 +2717,19 @@
                 runtimeMode === "offline_history"
                   ? offlineEmptyMessage ||
                     "Livekön är offline och ingen historik hittades i valt mailboxscope ännu."
-                  : "Välj fler mailboxar eller vänta på nästa inkommande konversation.",
+                  : (() => {
+                      let live =
+                        "Välj fler mailboxar eller vänta på nästa inkommande konversation.";
+                      if (state.runtime?.graphReadEnabled === true) {
+                        live +=
+                          " Tom kö direkt efter testmail är ofta normalt — ge det en minut och ladda om.";
+                      }
+                      if (state.runtime?.graphReadEnabled === true && state.runtime?.graphReadConnectorAvailable === false) {
+                        live +=
+                          " Servern saknar aktiv Graph read-connector trots att read är påslaget — kontrollera miljövariabler.";
+                      }
+                      return live;
+                    })(),
               mailboxLabel: "Arbetskö",
               statusLabel:
                 runtimeMode === "offline_history" ? "Historik saknas" : "Ingen match",
