@@ -1871,11 +1871,14 @@
             legacyThreadCount: legacyThreads.length,
           });
           state.runtime.mailboxes = buildMailboxCatalog(
-            threads.map((thread) => ({
-              mailboxId: thread.mailboxAddress,
-              mailboxAddress: thread.mailboxAddress,
-              userPrincipalName: thread.mailboxAddress,
-            })),
+            threads.map((thread) => {
+              const mailboxAddress = asText(thread?.mailboxAddress);
+              return {
+                mailboxId: mailboxAddress,
+                mailboxAddress,
+                userPrincipalName: mailboxAddress,
+              };
+            }),
             {
               ...metadata,
               sourceMailboxIds: Array.from(
@@ -2082,11 +2085,14 @@
       });
       state.runtime.threads = threads;
       state.runtime.mailboxes = buildMailboxCatalog(
-        threads.map((thread) => ({
-          mailboxId: thread.mailboxAddress,
-          mailboxAddress: thread.mailboxAddress,
-          userPrincipalName: thread.mailboxAddress,
-        })),
+        threads.map((thread) => {
+          const mailboxAddress = asText(thread?.mailboxAddress);
+          return {
+            mailboxId: mailboxAddress,
+            mailboxAddress,
+            userPrincipalName: mailboxAddress,
+          };
+        }),
         {
           sourceMailboxIds: runtimeMailboxIds,
           mailboxCapabilities: state.runtime.mailboxCapabilities,
@@ -2607,11 +2613,14 @@
           legacyThreadCount: legacyThreads.length,
         });
         state.runtime.mailboxes = buildMailboxCatalog(
-          threads.map((thread) => ({
-            mailboxId: thread.mailboxAddress,
-            mailboxAddress: thread.mailboxAddress,
-            userPrincipalName: thread.mailboxAddress,
-          })),
+          threads.map((thread) => {
+            const mailboxAddress = asText(thread?.mailboxAddress);
+            return {
+              mailboxId: mailboxAddress,
+              mailboxAddress,
+              userPrincipalName: mailboxAddress,
+            };
+          }),
           {
             ...metadata,
             sourceMailboxIds: Array.from(
