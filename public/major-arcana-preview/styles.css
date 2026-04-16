@@ -16648,6 +16648,27 @@ button {
   -webkit-line-clamp: 2;
 }
 
+.thread-story-secondary-muted {
+  margin-top: 3px;
+  margin-bottom: 0;
+}
+
+.thread-story-secondary-muted .thread-story-context {
+  color: color-mix(in srgb, var(--copy-warm-body) 72%, white 28%);
+  font-size: 10.5px;
+  line-height: 13px;
+  font-weight: 500;
+}
+
+.queue-history-item-text-snippet {
+  margin-top: 4px;
+  color: var(--copy-warm-body);
+  font-size: 11.5px;
+  line-height: 15px;
+  font-weight: 500;
+  -webkit-line-clamp: 2;
+}
+
 .queue-history-item-text--operative {
   color: var(--copy-warm-body);
   font-size: 10.5px;

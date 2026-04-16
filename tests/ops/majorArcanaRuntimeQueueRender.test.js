@@ -1529,8 +1529,13 @@ test('buildQueueHistoryCardMarkup lyfter ämnet som huvudrubrik och visar avsän
   );
   assert.match(
     markup,
-    /thread-story-secondary[\s\S]*thread-story-lead">Sami Bonyadi<\/span>[\s\S]*thread-story-context"> · Kontaktformulär<\/span>/,
-    'Raden under huvudrubriken ska visa avsändaren och ärendekontexten i samma läsordning som de vanliga CCO-korten.'
+    /thread-story-secondary-muted[\s\S]*thread-story-context">Kontaktformulär<\/span>/,
+    'Kontaktformulär ska nu ligga i en mjukare sekundärrad under huvudrubriken.'
+  );
+  assert.match(
+    markup,
+    /queue-history-item-text-snippet">Hur kan vi hjälpa dig<\/p>/,
+    'Raden under Kontaktformulär ska bära kundens faktiska textsnutt, inte mailbox- eller systemtext.'
   );
   assert.match(
     markup,
@@ -1669,8 +1674,13 @@ test('renderQueueHistoryList återanvänder befintlig runtime-tråd för att ge 
   );
   assert.match(
     queueHistoryList.innerHTML,
-    /thread-story-lead">Sami Bonyadi<\/span>/,
-    'Historikkortet ska återanvända avsändarnamnet som sekundär rad, inte bara som en platt titel.'
+    /thread-story-secondary-muted[\s\S]*thread-story-context">Kontaktformulär<\/span>/,
+    'Historikkortet ska återanvända den mildare sekundärraden för ärendetypen, inte bära den som tung rubrik.'
+  );
+  assert.match(
+    queueHistoryList.innerHTML,
+    /queue-history-item-text-snippet">Hej, jag vill förstå prisbilden och boka konsultation\.<\/p>/,
+    'Historikkortet ska ge kundens faktiska text en egen läsrad under den mildare kontextraden.'
   );
   assert.match(
     queueHistoryList.innerHTML,

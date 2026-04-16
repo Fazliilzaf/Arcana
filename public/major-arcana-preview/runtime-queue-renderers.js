@@ -1429,37 +1429,53 @@
         asArray(item.signalItems).find((signal) => normalizeKey(signal?.role || signal?.tone) === "what")?.value
       );
       const hasExplicitWhatSignal = Boolean(whatSignalValue);
-      const secondaryContextFallback = stripRepeatedHistoryLead(asText(item.detail), [
+      const issueContextSource =
+        whatSignalValue || asText(item.intentLabel) || primaryHistoryTitle || counterpartyCopy;
+      const issueContextLabel = compactRuntimeCopy(issueContextSource, "", 40);
+      let secondaryContextFallback = stripRepeatedHistoryLead(asText(item.detail), [
         counterpartyCopy,
         rawHistoryTitle,
         primaryHistoryTitle,
+        issueContextLabel,
       ]);
-      const secondaryContextValue = compactRuntimeCopy(
-        asText(whatSignalValue, secondaryContextFallback),
-        "",
-        44
-      );
-      const showSecondaryContext =
-        Boolean(secondaryContextValue) &&
-        normalizeHistoryCompareValue(secondaryContextValue) !== normalizeHistoryCompareValue(counterpartyCopy) &&
-        (
-          hasExplicitWhatSignal ||
-          normalizeHistoryCompareValue(secondaryContextValue) !== normalizeHistoryCompareValue(primaryHistoryTitle)
+      if (counterpartyCopy) {
+        const escapedCounterparty = counterpartyCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        secondaryContextFallback = secondaryContextFallback.replace(
+          new RegExp(`^Från:\\s*${escapedCounterparty}\\s*`, "i"),
+          ""
         );
-      const secondaryLineMarkup =
-        counterpartyCopy || showSecondaryContext
-          ? `<p class="thread-story thread-story-inline thread-story-secondary">${
-              counterpartyCopy
-                ? `<span class="thread-story-lead">${escapeHtml(counterpartyCopy)}</span>`
-                : ""
-            }${
-              showSecondaryContext
-                ? `<span class="thread-story-context">${escapeHtml(
-                    counterpartyCopy ? ` · ${secondaryContextValue}` : secondaryContextValue
-                  )}</span>`
-                : ""
-            }</p>`
-          : "";
+      }
+      secondaryContextFallback = secondaryContextFallback.replace(/^Från:\s*/i, "").trim();
+      while (/^(?:E-post|Email|Epost|Telefon|Phone)\s*:\s*(?:\[[^\]]+\]|\S+)\s*/i.test(secondaryContextFallback)) {
+        secondaryContextFallback = secondaryContextFallback.replace(
+          /^(?:E-post|Email|Epost|Telefon|Phone)\s*:\s*(?:\[[^\]]+\]|\S+)\s*/i,
+          ""
+        ).trim();
+      }
+      secondaryContextFallback = secondaryContextFallback.replace(/^[,.;:-]+\s*/g, "").trim();
+      const snippetValue = compactRuntimeCopy(
+        asText(secondaryContextFallback),
+        "",
+        120
+      );
+      const showIssueContext = Boolean(issueContextLabel);
+      const showSnippet =
+        Boolean(snippetValue) &&
+        normalizeHistoryCompareValue(snippetValue) !==
+          normalizeHistoryCompareValue(issueContextLabel) &&
+        normalizeHistoryCompareValue(snippetValue) !==
+          normalizeHistoryCompareValue(primaryHistoryTitle);
+      const issueContextMarkup = showIssueContext
+        ? `<p class="thread-story thread-story-inline thread-story-secondary thread-story-secondary-muted">
+            <span class="thread-story-context">${escapeHtml(issueContextLabel)}</span>
+          </p>`
+        : "";
+      const snippetLineMarkup = showSnippet
+        ? `<p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(
+            snippetValue
+          )}</p>`
+        : "";
+      const secondaryLineMarkup = `${issueContextMarkup}${snippetLineMarkup}`;
       const intelligenceMarkup = historySignals.length
         ? `<div class="thread-intelligence-row queue-history-item-meta queue-history-item-meta--fullwidth">
             ${historySignals
@@ -1754,6 +1770,7 @@
         recordedAt: asText(thread.lastActivityAt),
         title: title || "Aktiv tråd",
         detail: resolvedDetail,
+        snippetText: cleanedPreview || rawDetail,
         laneId: primaryLaneId,
         signalItems:
           typeof buildQueueInlineLaneSignalItems === "function"
@@ -1763,6 +1780,7 @@
         mailboxAddress: asText(thread.mailboxAddress),
         mailboxProvenanceLabel: asText(thread.mailboxProvenanceLabel),
         mailboxProvenanceDetail: asText(thread.mailboxProvenanceDetail),
+        intentLabel: asText(thread.intentLabel),
         worklistSource: asText(thread.worklistSource || "legacy"),
         worklistSourceLabel: asText(thread.worklistSourceLabel),
         isUnread: thread?.unread === true || thread?.isUnread === true,
@@ -2220,7 +2238,7 @@
           ...item,
           counterpartyLabel: asText(runtimeHistoryItem.counterpartyLabel, item.counterpartyLabel),
           title: asText(item.title, runtimeHistoryItem.title),
-          detail: asText(runtimeHistoryItem.detail, item.detail),
+          detail: asText(runtimeHistoryItem.snippetText, runtimeHistoryItem.detail, item.detail),
           signalItems: asArray(runtimeHistoryItem.signalItems).length
             ? runtimeHistoryItem.signalItems
             : asArray(item.signalItems),
@@ -2232,6 +2250,7 @@
             runtimeHistoryItem.mailboxProvenanceDetail,
             item.mailboxProvenanceDetail
           ),
+          intentLabel: asText(runtimeHistoryItem.intentLabel, item.intentLabel),
           worklistSource: asText(runtimeHistoryItem.worklistSource, item.worklistSource),
           worklistSourceLabel: asText(
             runtimeHistoryItem.worklistSourceLabel,
