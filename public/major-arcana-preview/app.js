@@ -10899,6 +10899,7 @@
     handleWorkspaceDocumentClick,
     handleWorkspaceDocumentKeydown,
     initializeWorkspaceSurface,
+    loadLiveRuntime,
     requestRuntimeThreadHydration,
     selectOfflineHistoryConversation,
     selectRuntimeThread,
@@ -12317,6 +12318,36 @@
       quiet: true,
     }).catch((error) => {
       console.warn(`CCO workspace bootstrap misslyckades efter ${reason}.`, error);
+    });
+  }
+
+  function refreshConversationActionRuntimeProjection(
+    thread,
+    reason = "workspace mutation"
+  ) {
+    const selectedMailboxIds = getSelectedRuntimeMailboxScopeIds();
+    const requestedMailboxIds = selectedMailboxIds.length
+      ? selectedMailboxIds
+      : getRequestedRuntimeMailboxIds();
+    const preferredThreadId = asText(thread?.id || workspaceSourceOfTruth.getSelectedThreadId());
+    const shouldReloadLiveRuntime =
+      typeof loadLiveRuntime === "function" &&
+      state.runtime?.authRequired !== true &&
+      normalizeKey(getRuntimeMode()) !== "offline_history" &&
+      (state.runtime?.live === true || state.runtime?.loaded === true);
+    if (!shouldReloadLiveRuntime) {
+      return refreshWorkspaceBootstrapForSelectedThread(reason);
+    }
+    return loadLiveRuntime({
+      requestedMailboxIds,
+      preferredThreadId,
+      resetHistoryOnChange: true,
+    }).catch((error) => {
+      console.warn(
+        `CCO live runtime misslyckades efter ${reason}. Faller tillbaka till workspace bootstrap.`,
+        error
+      );
+      return refreshWorkspaceBootstrapForSelectedThread(reason);
     });
   }
 
@@ -20984,7 +21015,7 @@
     }
     setAuxStatus(laterStatus, `Tråden parkerades till ${label.toLowerCase()}.`, "success");
     if (refresh) {
-      await refreshWorkspaceBootstrapForSelectedThread("reply later");
+      await refreshConversationActionRuntimeProjection(thread, "reply later");
     }
     return true;
   }
@@ -21010,7 +21041,7 @@
       focusStatusLine.textContent = `Tråden markerades som klar: ${outcome}.`;
     }
     if (refresh) {
-      await refreshWorkspaceBootstrapForSelectedThread("mark handled");
+      await refreshConversationActionRuntimeProjection(thread, "mark handled");
     }
     return true;
   }
