@@ -425,11 +425,7 @@
   const queueHistoryShell = document.querySelector("[data-queue-history-shell]");
   const queueHistoryToggle = document.querySelector("[data-queue-history-toggle]");
   const queueHistoryPanel = document.querySelector("[data-queue-history-panel]");
-  const queueHistoryHead = document.querySelector(".queue-history-head");
   const queueHistoryList = document.querySelector("[data-queue-history-list]");
-  const queueHistoryMeta = document.querySelector("[data-queue-history-meta]");
-  const queueHistoryCompleteButton = document.querySelector("[data-queue-history-complete]");
-  const queueHistoryDeleteButton = document.querySelector("[data-queue-history-delete]");
   const queueHistoryCount = document.querySelector("[data-queue-history-count]");
   const queueHistoryLoadMoreButton = document.querySelector("[data-queue-history-load-more]");
   const queueQuickLaneStrip = document.querySelector(".queue-lane-quickstrip");
@@ -10695,12 +10691,8 @@
       queueContent,
       queueFeedCountNodes,
       queueHistoryCount,
-      queueHistoryHead,
-      queueHistoryCompleteButton,
-      queueHistoryDeleteButton,
       queueHistoryList,
       queueHistoryLoadMoreButton,
-      queueHistoryMeta,
       queueHistoryPanel,
       queueHistoryToggle,
       queueQuickLaneStrip,
@@ -10878,6 +10870,8 @@
     buildIntelReadoutHref,
     buildReauthUrl,
     getSelectedRuntimeThread,
+    getRuntimeLeftColumnState,
+    handleFocusHistoryDelete,
     isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
     handleRuntimeRestoreAction,
@@ -21675,25 +21669,6 @@
       syncMailboxAdminSignatureEditorFromFields();
     });
   });
-
-  if (queueHistoryCompleteButton) {
-    queueHistoryCompleteButton.addEventListener("click", async () => {
-      if (queueHistoryCompleteButton.disabled) return;
-      await handleRuntimeHandledAction();
-    });
-  }
-
-  if (queueHistoryDeleteButton) {
-    queueHistoryDeleteButton.addEventListener("click", async () => {
-      if (queueHistoryDeleteButton.disabled) return;
-      const leftColumnState = getRuntimeLeftColumnState();
-      if (leftColumnState.mode === "history") {
-        await handleFocusHistoryDelete();
-        return;
-      }
-      await handleRuntimeDeleteAction("major-arcana-queue-delete");
-    });
-  }
 
   if (truthWorklistLaunchButton) {
     truthWorklistLaunchButton.addEventListener("click", () => {

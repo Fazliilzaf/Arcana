@@ -306,26 +306,26 @@ test('arbetsytans tre huvudkolumner använder samma stabila panehojd och vänste
 
   assert.match(
     indexSource,
-    /data-queue-history-complete/,
-    'Scope-raden i vänsterarbetsytan ska ha en kompakt check-action bredvid informationscopy.'
+    /data-queue-actions/,
+    'Vänsterarbetsytan ska ha en scope-rad för snabbåtgärder (Alla + ikonstripp).'
   );
 
   assert.match(
     indexSource,
-    /data-queue-history-delete/,
-    'Scope-raden i vänsterarbetsytan ska ha en kompakt delete-action bredvid informationscopy.'
+    /data-queue-action-strip/,
+    'Scope-raden ska ha en tom stripp där check- och radera-ikoner renderas dynamiskt.'
   );
 
   assert.match(
     appSource,
-    /queueHistoryCompleteButton/,
-    'Appen ska koppla scope-radens check-action till den befintliga handled-logiken.'
+    /renderQueueLaneShortcutRows/,
+    'Appen ska fylla scope-strippen med handled- och delete-åtgärder via renderQueueLaneShortcutRows.'
   );
 
   assert.match(
     appSource,
-    /queueHistoryDeleteButton/,
-    'Appen ska koppla scope-radens delete-action till runtime-raderingslogiken.'
+    /handleRuntimeHandledAction/,
+    'Snabbåtgärder ska fortfarande nå handled-logiken via action-motorn.'
   );
 
   assert.match(

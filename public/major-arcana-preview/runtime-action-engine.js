@@ -5,6 +5,8 @@
     buildIntelReadoutHref,
     buildReauthUrl,
     getSelectedRuntimeThread,
+    getRuntimeLeftColumnState,
+    handleFocusHistoryDelete,
     isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
     handleRuntimeRestoreAction,
@@ -138,6 +140,16 @@
         const isQueueDeleteContext = Boolean(
           button.closest(".queue-action-row") || button.closest(".queue-scope-strip")
         );
+        if (
+          isQueueDeleteContext &&
+          typeof getRuntimeLeftColumnState === "function" &&
+          typeof handleFocusHistoryDelete === "function"
+        ) {
+          const leftColumnState = getRuntimeLeftColumnState();
+          if (leftColumnState && leftColumnState.mode === "history") {
+            return Promise.resolve(handleFocusHistoryDelete()).then(() => true);
+          }
+        }
         return Promise.resolve(
           handleRuntimeDeleteAction(
             isQueueDeleteContext

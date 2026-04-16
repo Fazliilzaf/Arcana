@@ -386,14 +386,8 @@ test('loading-fallbacken i vansterkon stanger av gamla bakgrundsrader', () => {
 
   assert.match(
     renderersSource,
-    /setQueueHistoryMeta\("Laddar live-trådar…",\s*\{\s*showHead:\s*false\s*\}\)/,
-    'Live-loadingfallbacken ska gora history-head dold sa den inte lagger sig bakom tomrutan.'
-  );
-
-  assert.match(
-    renderersSource,
-    /syncQueueHistoryActionButton\(completeActionButton,\s*\{\s*visible:\s*false,\s*disabled:\s*true\s*\}\);[\s\S]*syncQueueHistoryActionButton\(deleteActionButton,\s*\{[\s\S]*visible:\s*false,[\s\S]*disabled:\s*true,[\s\S]*action:\s*"delete"/,
-    'Live-loadingfallbacken ska nolla check- och delete-actions i queue-history-head.'
+    /useUnifiedQueueList && state\.runtime\.loading[\s\S]*renderQueueInlineLaneList\(buildUnifiedQueueLoadingItems\(\)\)/,
+    'Live-loadingfallbacken ska bygga skeletonkort direkt i listan utan separat informationshuvud ovanför.'
   );
 
   assert.match(

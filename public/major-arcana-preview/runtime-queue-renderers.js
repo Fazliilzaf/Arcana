@@ -27,12 +27,8 @@
       queueContent,
       queueFeedCountNodes = [],
       queueHistoryCount,
-      queueHistoryHead,
-      queueHistoryCompleteButton,
-      queueHistoryDeleteButton,
       queueHistoryList,
       queueHistoryLoadMoreButton,
-      queueHistoryMeta,
       queueHistoryPanel,
       queueHistoryToggle,
       queueQuickLaneStrip,
@@ -2296,23 +2292,6 @@
       if (typeof decorateStaticPills === "function") decorateStaticPills();
     }
 
-    function getQueueInlineLaneMeta(laneId, count) {
-      const normalizedLaneId = normalizeKey(laneId || "all");
-      const laneLabel = QUEUE_LANE_LABELS[normalizedLaneId] || QUEUE_LANE_LABELS.all;
-      if (normalizedLaneId === "all") {
-        return `Visar ${count} aktiva mejl i valt mailbox- och ägarscope.`;
-      }
-      return `Visar ${count} mejl i ${laneLabel.toLowerCase()} i samma vänsterarbetsyta.`;
-    }
-
-    function getQueueInlineFeedMeta(feedKey, count) {
-      const normalizedFeedKey = normalizeKey(feedKey || "");
-      if (normalizedFeedKey === "sent") {
-        return "";
-      }
-      return `Visar ${count} mejl i samma vänsterarbetsyta.`;
-    }
-
     function renderQueueHistorySection() {
       if (!queueHistoryPanel || !queueHistoryToggle) return;
       const buildUnifiedStateThread = ({
@@ -2349,33 +2328,6 @@
         tags: Array.from(new Set(["all", ...asArray(tags).filter(Boolean)])),
       });
       const useUnifiedQueueList = Boolean(queueHistoryList);
-      const setQueueHistoryMeta = (text = "", { showHead = Boolean(text) } = {}) => {
-        if (queueHistoryMeta) {
-          queueHistoryMeta.textContent = text;
-        }
-        if (queueHistoryHead) {
-          queueHistoryHead.hidden = !showHead;
-        }
-      };
-      const syncQueueHistoryActionButton = (
-        button,
-        { visible = false, disabled = true, label = "", action = "handled" } = {}
-      ) => {
-        if (typeof button === "undefined" || !button) return;
-        button.hidden = !visible;
-        button.disabled = disabled;
-        const safeLabel = asText(label);
-        const description =
-          action === "delete"
-            ? safeLabel
-              ? `Radera ${safeLabel}.`
-              : "Radera vald tråd."
-            : safeLabel
-              ? `Markera ${safeLabel} som klar. Tråden kommer tillbaka om kunden skriver igen.`
-              : "Markera vald tråd som klar. Tråden kommer tillbaka om kunden skriver igen.";
-        button.setAttribute("aria-label", description);
-        button.setAttribute("title", description);
-      };
       const historyState = state.runtime.queueHistory;
       const leftColumnState =
         typeof getRuntimeLeftColumnState === "function"
@@ -2406,45 +2358,11 @@
               return { mode: "default", open: false, feedKey: "", laneId: activeLaneId };
             })();
       const isHistoryOpen = leftColumnState.mode === "history";
-      const isOfflineHistoryMode = leftColumnState.mode === "offline_history";
       const inlineFeedKey = normalizeKey(leftColumnState.feedKey || "");
       const isFeedPanelOpen = leftColumnState.mode === "feed";
       const isLanePanelOpen = leftColumnState.mode === "lane";
       const runtimeMode = normalizeKey(state.runtime.mode || "");
-      const selectedThread =
-        typeof getSelectedRuntimeThread === "function" ? getSelectedRuntimeThread() : null;
-      const isOfflineHistoryThread = Boolean(
-        selectedThread &&
-          (selectedThread.offlineHistorySelection === true ||
-            selectedThread?.raw?.offlineHistorySelection === true)
-      );
-      const isDeletingThread =
-        Boolean(asText(state.runtime.deletingThreadId)) || state.runtime.historyDeleting === true;
-      const canMarkHandled =
-        runtimeMode !== "offline_history" &&
-        Boolean(selectedThread) &&
-        !isOfflineHistoryThread &&
-        !isHandledRuntimeThread(selectedThread);
-      const canDelete =
-        Boolean(selectedThread) &&
-        state.runtime.deleteEnabled === true &&
-        !isDeletingThread &&
-        !isOfflineHistoryThread;
-      const completeActionButton =
-        typeof queueHistoryCompleteButton === "undefined" ? null : queueHistoryCompleteButton;
-      const deleteActionButton =
-        typeof queueHistoryDeleteButton === "undefined" ? null : queueHistoryDeleteButton;
       const isOpen = useUnifiedQueueList || isHistoryOpen || isLanePanelOpen || isFeedPanelOpen;
-      const showHistoryCompleteAction =
-        isOpen &&
-        Boolean(selectedThread) &&
-        runtimeMode !== "offline_history" &&
-        !isOfflineHistoryThread;
-      const showHistoryDeleteAction =
-        isOpen &&
-        Boolean(selectedThread) &&
-        runtimeMode !== "offline_history" &&
-        !isOfflineHistoryThread;
       queueHistoryToggle.classList.toggle("is-active", isHistoryOpen);
       queueHistoryToggle.setAttribute("aria-expanded", String(isHistoryOpen));
       queueHistoryPanel.hidden = !isOpen;
@@ -2462,18 +2380,6 @@
         queueHistoryCount.textContent = String(visibleCount);
       }
 
-      syncQueueHistoryActionButton(completeActionButton, {
-        visible: showHistoryCompleteAction,
-        disabled: !canMarkHandled,
-        label: selectedThread?.customerName || selectedThread?.displaySubject || "",
-      });
-      syncQueueHistoryActionButton(deleteActionButton, {
-        visible: showHistoryDeleteAction,
-        disabled: !canDelete,
-        label: selectedThread?.customerName || selectedThread?.displaySubject || "",
-        action: "delete",
-      });
-
       if (!isOpen) return;
 
       if (isHistoryOpen) {
@@ -2485,13 +2391,6 @@
         }
 
         if (historyState.loading) {
-          setQueueHistoryMeta("Laddar äldre mejl…", { showHead: false });
-          syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
-          syncQueueHistoryActionButton(deleteActionButton, {
-            visible: false,
-            disabled: true,
-            action: "delete",
-          });
           renderQueueHistoryList([]);
           if (queueHistoryList) {
             queueHistoryList.innerHTML = '<div class="queue-history-empty">Laddar historik…</div>';
@@ -2501,13 +2400,6 @@
         }
 
         if (historyState.error) {
-          setQueueHistoryMeta("Historiken kunde inte laddas just nu.", { showHead: false });
-          syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
-          syncQueueHistoryActionButton(deleteActionButton, {
-            visible: false,
-            disabled: true,
-            action: "delete",
-          });
           if (queueHistoryList) {
             queueHistoryList.innerHTML = `<div class="queue-history-empty">${escapeHtml(
               historyState.error
@@ -2516,12 +2408,6 @@
           if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
           return;
         }
-
-        setQueueHistoryMeta(
-          runtimeMode === "offline_history" || state.runtime.live !== true
-            ? "Offline historikläge aktivt. Historik visas även när livekön är pausad."
-            : ""
-        );
 
         if (!asArray(historyState.items).length) {
           if (queueHistoryList) {
@@ -2548,13 +2434,6 @@
           if (queueTitle) {
             queueTitle.textContent = `Arbetslista (${loadingThreads.length})`;
           }
-          setQueueHistoryMeta("Synkar live-trådar…", { showHead: false });
-          syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
-          syncQueueHistoryActionButton(deleteActionButton, {
-            visible: false,
-            disabled: true,
-            action: "delete",
-          });
           renderQueueInlineLaneList(loadingThreads);
           if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
           return;
@@ -2562,13 +2441,6 @@
         if (queueTitle) {
           queueTitle.textContent = "Arbetslista (0)";
         }
-        setQueueHistoryMeta("Laddar live-trådar…", { showHead: false });
-        syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
-        syncQueueHistoryActionButton(deleteActionButton, {
-          visible: false,
-          disabled: true,
-          action: "delete",
-        });
         renderQueueInlineLaneList(buildUnifiedQueueLoadingItems());
         if (queueHistoryLoadMoreButton) queueHistoryLoadMoreButton.hidden = true;
         return;
@@ -2581,18 +2453,6 @@
         if (queueTitle) {
           queueTitle.textContent = "Arbetslista (0)";
         }
-        setQueueHistoryMeta(
-          runtimeMode === "auth_required"
-            ? "Livekön kräver inloggning."
-            : "Livekön kunde inte läsas just nu.",
-          { showHead: false }
-        );
-        syncQueueHistoryActionButton(completeActionButton, { visible: false, disabled: true });
-        syncQueueHistoryActionButton(deleteActionButton, {
-          visible: false,
-          disabled: true,
-          action: "delete",
-        });
         renderQueueInlineLaneList([
           buildUnifiedStateThread({
             id: "runtime-unified-error",
@@ -2623,10 +2483,6 @@
         if (queueTitle) {
           queueTitle.textContent = `${feedLabel} (${feedThreads.length})`;
         }
-        const queueInlineFeedMeta = getQueueInlineFeedMeta(inlineFeedKey, feedThreads.length);
-        setQueueHistoryMeta(queueInlineFeedMeta, {
-          showHead: inlineFeedKey === "sent" ? true : Boolean(queueInlineFeedMeta),
-        });
         if (!feedThreads.length) {
           renderQueueInlineLaneList([
             buildUnifiedStateThread({
@@ -2658,7 +2514,6 @@
         if (queueTitle) {
           queueTitle.textContent = `${QUEUE_LANE_LABELS[laneId] || QUEUE_LANE_LABELS.all} (${laneThreads.length})`;
         }
-        setQueueHistoryMeta(getQueueInlineLaneMeta(laneId, laneThreads.length));
         if (!laneThreads.length) {
           renderQueueInlineLaneList([
             buildUnifiedStateThread({
@@ -2687,19 +2542,10 @@
         }
         const activeLaneId = normalizeKey(state.runtime.activeLaneId || "all");
         const defaultThreads = getQueueLaneThreads(activeLaneId, getQueueScopedRuntimeThreads());
-        const offlineWorkingSetMeta = asText(state.runtime.offlineWorkingSetMeta);
         const offlineEmptyMessage = asText(state.runtime.error);
         if (queueTitle) {
           queueTitle.textContent = `Arbetslista (${defaultThreads.length})`;
         }
-        setQueueHistoryMeta(
-          runtimeMode === "offline_history"
-            ? offlineWorkingSetMeta ||
-                "Offline historikläge. Arbetskön bygger just nu på senast kända mailboxhistorik."
-            : isOfflineHistoryMode
-              ? "Offline historikläge aktivt."
-              : ""
-        );
         if (!defaultThreads.length) {
           renderQueueInlineLaneList([
             buildUnifiedStateThread({

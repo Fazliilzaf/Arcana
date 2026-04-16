@@ -162,7 +162,6 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -170,8 +169,6 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -208,10 +205,8 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -223,7 +218,6 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -251,10 +245,8 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -284,7 +276,6 @@ test('renderQueueHistorySection visar lane-panelen i samma inline-shell som hist
   assert.equal(queueContent.hidden, true);
   assert.equal(queuePrimaryLaneTag.hidden, true);
   assert.equal(queueTitle.textContent, 'Agera nu (2)');
-  assert.match(queueHistoryMeta.textContent, /2 mejl/i);
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="thread-1"/);
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="thread-2"/);
   assert.match(queueHistoryList.innerHTML, /queue-history-item-subject/);
@@ -299,7 +290,6 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -307,8 +297,6 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -324,10 +312,8 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -339,7 +325,6 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -367,10 +352,8 @@ test('renderQueueHistorySection behåller historik som eget läge', () => {
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -413,7 +396,6 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -421,8 +403,6 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -459,10 +439,8 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -474,7 +452,6 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -502,10 +479,8 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -537,7 +512,6 @@ test('renderQueueHistorySection visar vanlig arbetslista i queue-history-list na
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueContent.hidden, true);
   assert.equal(queueTitle.textContent, 'Arbetslista (2)');
-  assert.equal(queueHistoryMeta.textContent, '');
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="queue-1"/);
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="queue-2"/);
   assert.equal(queueHistoryLoadMoreButton.hidden, true);
@@ -551,7 +525,6 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const buildUnifiedQueueLoadingItemsSource = extractFunctionSource(source, 'buildUnifiedQueueLoadingItems');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -559,8 +532,6 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -577,10 +548,8 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -593,7 +562,6 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
      ${buildQueueInlineLaneHistoryItemSource}
      ${buildUnifiedQueueLoadingItemsSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -621,10 +589,8 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -655,7 +621,6 @@ test('renderQueueHistorySection visar loading i samma kortsystem som live-kön',
   renderQueueHistorySection();
 
   assert.equal(queueTitle.textContent, 'Arbetslista (0)');
-  assert.equal(queueHistoryMeta.textContent, 'Laddar live-trådar…');
   assert.equal(queueHistoryList.dataset.queueListMode, 'live');
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="runtime-loading-1"/);
   assert.match(queueHistoryList.innerHTML, /Synkar live-kö/);
@@ -668,7 +633,6 @@ test('renderQueueHistorySection visar live-tomlage i samma kortsystem som övrig
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -676,8 +640,6 @@ test('renderQueueHistorySection visar live-tomlage i samma kortsystem som övrig
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -694,10 +656,8 @@ test('renderQueueHistorySection visar live-tomlage i samma kortsystem som övrig
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -709,7 +669,6 @@ test('renderQueueHistorySection visar live-tomlage i samma kortsystem som övrig
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -737,10 +696,8 @@ test('renderQueueHistorySection visar live-tomlage i samma kortsystem som övrig
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -788,7 +745,6 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const buildUnifiedQueueLoadingItemsSource = extractFunctionSource(source, 'buildUnifiedQueueLoadingItems');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -796,8 +752,6 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -828,10 +782,8 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -844,7 +796,6 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
      ${buildQueueInlineLaneHistoryItemSource}
      ${buildUnifiedQueueLoadingItemsSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -872,10 +823,8 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -907,7 +856,6 @@ test('renderQueueHistorySection visar redan kända livekort under loading när k
   renderQueueHistorySection();
 
   assert.equal(queueTitle.textContent, 'Arbetslista (2)');
-  assert.equal(queueHistoryMeta.textContent, 'Synkar live-trådar…');
   assert.equal(queueHistoryList.dataset.queueListMode, 'live');
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="runtime-loading-thread-1"/);
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="runtime-loading-thread-2"/);
@@ -939,8 +887,6 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
-  const getQueueInlineFeedMetaSource = extractFunctionSource(source, 'getQueueInlineFeedMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const getMailFeedRuntimeThreadsSource = extractFunctionSource(source, 'getMailFeedRuntimeThreads');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
@@ -949,8 +895,6 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -984,10 +928,8 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -999,8 +941,6 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
-     ${getQueueInlineFeedMetaSource}
      ${renderQueueHistoryListSource}
      ${getMailFeedRuntimeThreadsSource}
      ${renderQueueHistorySectionSource}
@@ -1033,10 +973,8 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -1064,7 +1002,6 @@ test('renderQueueHistorySection visar skickade i samma inline-shell som historik
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueContent.hidden, true);
   assert.equal(queueTitle.textContent, 'Skickade (1)');
-  assert.equal(queueHistoryMeta.textContent, '');
   assert.match(queueHistoryList.innerHTML, /data-runtime-thread="sent-1"/);
 });
 
@@ -1074,7 +1011,6 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -1082,8 +1018,6 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -1112,10 +1046,8 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -1127,7 +1059,6 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -1155,10 +1086,8 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -1191,7 +1120,6 @@ test('renderQueueHistorySection prioriterar historik over live-fel nar historikp
 
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueTitle.textContent, 'Historik (1)');
-  assert.match(queueHistoryMeta.textContent, /offline historikläge/i);
   assert.match(queueHistoryList.innerHTML, /Shahram/);
   assert.match(queueHistoryList.innerHTML, /Offline historiktrad/);
   assert.doesNotMatch(queueHistoryList.innerHTML, /Servern kör offline-läge/i);
@@ -1203,7 +1131,6 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -1211,8 +1138,6 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -1240,10 +1165,8 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -1255,7 +1178,6 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -1283,10 +1205,8 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -1320,7 +1240,6 @@ test('renderQueueHistorySection visar offline fallback-arbetslista i defaultlage
 
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueTitle.textContent, 'Arbetslista (1)');
-  assert.match(queueHistoryMeta.textContent, /offline historikläge/i);
   assert.match(queueHistoryList.innerHTML, /offline-thread-1/);
   assert.match(queueHistoryList.innerHTML, /Arbetskön ska visa historikbaserad fallback/);
   assert.doesNotMatch(queueHistoryList.innerHTML, /Servern kör offline-läge/i);
@@ -1332,7 +1251,6 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -1340,8 +1258,6 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -1358,10 +1274,8 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -1373,7 +1287,6 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -1401,10 +1314,8 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
@@ -1440,28 +1351,8 @@ test('renderQueueHistorySection visar arlig offline-meta nar lokal historik sakn
 
   assert.equal(queueHistoryPanel.hidden, false);
   assert.equal(queueTitle.textContent, 'Arbetslista (0)');
-  assert.equal(
-    queueHistoryMeta.textContent,
-    'Offline historikläge. Ingen lokal historik hittades i valt mailboxscope ännu.'
-  );
   assert.match(queueHistoryList.innerHTML, /Ingen lokal historik hittades i valt mailboxscope ännu\./);
   assert.doesNotMatch(queueHistoryList.innerHTML, /Livekön kunde inte läsas just nu/i);
-});
-
-test('renderQueueHistorySection döljer scope-actions i offline_history', () => {
-  const source = fs.readFileSync(RENDERERS_PATH, 'utf8');
-
-  assert.match(
-    source,
-    /const showHistoryCompleteAction =[\s\S]*runtimeMode !== "offline_history"/,
-    'Historikhuvudets klar-action ska inte visas i offline_history eftersom tråden inte är live-handlingsbar där.'
-  );
-
-  assert.match(
-    source,
-    /const showHistoryDeleteAction =[\s\S]*runtimeMode !== "offline_history"/,
-    'Historikhuvudets delete-action ska inte visas i offline_history eftersom den tidigare skapade ett extra actionlager i fallback-läget.'
-  );
 });
 
 test('renderQueueHistorySection kan inte återvisa legacy queue-content när unified queue-list är aktiv', () => {
@@ -1470,7 +1361,6 @@ test('renderQueueHistorySection kan inte återvisa legacy queue-content när uni
   const buildQueueHistoryCardMarkupSource = extractFunctionSource(source, 'buildQueueHistoryCardMarkup');
   const buildQueueInlineLaneHistoryItemSource = extractFunctionSource(source, 'buildQueueInlineLaneHistoryItem');
   const renderQueueInlineLaneListSource = extractFunctionSource(source, 'renderQueueInlineLaneList');
-  const getQueueInlineLaneMetaSource = extractFunctionSource(source, 'getQueueInlineLaneMeta');
   const renderQueueHistoryListSource = extractFunctionSource(source, 'renderQueueHistoryList');
   const renderQueueHistorySectionSource = extractFunctionSource(source, 'renderQueueHistorySection');
 
@@ -1478,8 +1368,6 @@ test('renderQueueHistorySection kan inte återvisa legacy queue-content när uni
   const queueHistoryToggle = createElementStub();
   const queuePrimaryLaneTag = createElementStub();
   const queueContent = createElementStub();
-  const queueHistoryHead = createElementStub();
-  const queueHistoryMeta = createElementStub();
   const queueHistoryList = createElementStub();
   const queueHistoryLoadMoreButton = createElementStub();
   const queueTitle = createElementStub();
@@ -1507,10 +1395,8 @@ test('renderQueueHistorySection kan inte återvisa legacy queue-content när uni
     'normalizeKey',
     'queueContent',
     'queueHistoryCount',
-    'queueHistoryHead',
     'queueHistoryList',
     'queueHistoryLoadMoreButton',
-    'queueHistoryMeta',
     'queueHistoryPanel',
     'queueHistoryToggle',
     'queuePrimaryLaneTag',
@@ -1522,7 +1408,6 @@ test('renderQueueHistorySection kan inte återvisa legacy queue-content när uni
      ${buildQueueHistoryCardMarkupSource}
      ${buildQueueInlineLaneHistoryItemSource}
      ${renderQueueInlineLaneListSource}
-     ${getQueueInlineLaneMetaSource}
      ${renderQueueHistoryListSource}
      ${renderQueueHistorySectionSource}
      return renderQueueHistorySection;`
@@ -1550,10 +1435,8 @@ test('renderQueueHistorySection kan inte återvisa legacy queue-content när uni
     },
     queueContent,
     null,
-    queueHistoryHead,
     queueHistoryList,
     queueHistoryLoadMoreButton,
-    queueHistoryMeta,
     queueHistoryPanel,
     queueHistoryToggle,
     queuePrimaryLaneTag,
