@@ -725,6 +725,9 @@
 
     async function deleteRuntimeThread(thread, idempotencyScope = "major-arcana-delete") {
       if (!thread) return false;
+      const mailboxId = asText(thread.mailboxAddress, asText(thread?.raw?.mailboxId));
+      const messageId = asText(thread.raw?.messageId);
+      const conversationId = asText(thread.id);
       await apiRequest("/api/v1/cco/delete", {
         method: "POST",
         headers: {
@@ -732,17 +735,75 @@
         },
         body: {
           channel: "admin",
-          mailboxId: asText(thread.mailboxAddress),
-          messageId: asText(thread.raw?.messageId),
-          conversationId: thread.id,
+          mailboxId,
+          messageId,
+          conversationId,
           softDelete: true,
         },
       });
+      if (mailboxId && messageId && conversationId) {
+        state.runtime.pendingGraphRestore = {
+          mailboxId,
+          messageId,
+          conversationId,
+          label: asText(thread.displaySubject, asText(thread.subject, "Konversation")),
+        };
+      } else {
+        state.runtime.pendingGraphRestore = null;
+      }
       state.runtime.threads = state.runtime.threads.filter((item) => item.id !== thread.id);
       ensureRuntimeSelection();
       renderRuntimeConversationShell();
       await refreshWorkspaceBootstrapForSelectedThread("delete");
       return true;
+    }
+
+    async function handleRuntimeRestoreAction(idempotencyScope = "major-arcana-restore") {
+      const pending = state.runtime.pendingGraphRestore;
+      if (!pending?.mailboxId || !pending?.messageId || !pending?.conversationId) {
+        if (focusStatusLine) {
+          focusStatusLine.textContent = "Ingen nyligen raderad konversation finns att återställa.";
+        }
+        return;
+      }
+      if (!state.runtime.deleteEnabled) {
+        if (focusStatusLine) {
+          focusStatusLine.textContent = "Återställ via Graph är inte aktiverat i denna miljö.";
+        }
+        return;
+      }
+      state.runtime.restoringMail = true;
+      renderRuntimeConversationShell();
+      let restoreError = null;
+      try {
+        await apiRequest("/api/v1/cco/restore", {
+          method: "POST",
+          headers: {
+            "x-idempotency-key": createIdempotencyKey(idempotencyScope),
+          },
+          body: {
+            channel: "admin",
+            mailboxId: pending.mailboxId,
+            messageId: pending.messageId,
+            conversationId: pending.conversationId,
+            destinationFolderId: "inbox",
+          },
+        });
+        state.runtime.pendingGraphRestore = null;
+        await refreshWorkspaceBootstrapForSelectedThread("restore");
+        ensureRuntimeSelection();
+      } catch (error) {
+        restoreError = error;
+      } finally {
+        state.runtime.restoringMail = false;
+        renderRuntimeConversationShell();
+      }
+      if (restoreError && focusStatusLine) {
+        focusStatusLine.textContent = asText(
+          restoreError?.message,
+          "Kunde inte återställa meddelandet."
+        );
+      }
     }
 
     async function handleStudioDelete() {
@@ -1036,6 +1097,7 @@
     return Object.freeze({
       deleteRuntimeThread,
       handleFocusHistoryDelete,
+      handleRuntimeRestoreAction,
       handleRuntimeDeleteAction,
       handleRuntimeHandledAction,
       handleStudioDelete,

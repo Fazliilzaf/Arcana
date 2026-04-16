@@ -2129,6 +2129,8 @@
       },
       historyDeleting: false,
       deletingThreadId: "",
+      pendingGraphRestore: null,
+      restoringMail: false,
       preferredMailboxId: "kons@hairtpclinic.com",
       defaultSenderMailbox: "contact@hairtpclinic.com",
       defaultSignatureProfile: "fazli",
@@ -10758,6 +10760,7 @@
   const {
     deleteRuntimeThread,
     handleFocusHistoryDelete,
+    handleRuntimeRestoreAction,
     handleRuntimeDeleteAction,
     handleRuntimeHandledAction,
     handleStudioDelete,
@@ -10874,6 +10877,7 @@
     getSelectedRuntimeThread,
     isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
+    handleRuntimeRestoreAction,
     handleRuntimeHandledAction,
     laterStatus,
     loadBootstrap,
@@ -20257,7 +20261,21 @@
           : "Anteckningar";
     }
     renderRuntimeFocusSignals(selectedFocusThread, focusReadState);
-    renderQuickActionRows(focusActionRows, focusReadState.readOnly ? [] : FOCUS_ACTIONS);
+    const focusQuickActions = focusReadState.readOnly
+      ? []
+      : (() => {
+            const base = [...FOCUS_ACTIONS];
+            if (state.runtime.pendingGraphRestore && state.runtime.deleteEnabled) {
+              base.push({
+                label: "Återställ",
+                tone: "compose",
+                action: "restore",
+                icon: "undo",
+              });
+            }
+            return base;
+          })();
+    renderQuickActionRows(focusActionRows, focusQuickActions);
     renderRuntimeFocusConversation(selectedFocusThread, focusReadState);
     renderRuntimeCustomerPanel(selectedFocusThread, focusReadState);
     renderFocusHistorySection(selectedFocusThread, focusReadState);
@@ -20409,6 +20427,7 @@
         button.className = `quick-action-pill quick-action-pill--${item.tone}`;
         button.dataset.quickAction = item.action;
         const isDeleteAction = item.action === "delete";
+        const isRestoreAction = item.action === "restore";
         if (item.mode) {
           button.dataset.quickMode = item.mode;
         }
@@ -20421,11 +20440,23 @@
           button.disabled = deleteDisabled;
           button.setAttribute("aria-disabled", String(deleteDisabled));
         }
+        if (isRestoreAction) {
+          const restoreDisabled =
+            !state.runtime.pendingGraphRestore ||
+            !state.runtime.deleteEnabled ||
+            state.runtime.restoringMail === true;
+          button.disabled = restoreDisabled;
+          button.setAttribute("aria-disabled", String(restoreDisabled));
+        }
         const icon = createPillIcon(item.icon);
         if (icon) button.appendChild(icon);
         button.appendChild(
           document.createTextNode(
-            isDeleteAction && isDeletingThread ? "Raderar…" : item.label
+            isDeleteAction && isDeletingThread
+              ? "Raderar…"
+              : isRestoreAction && state.runtime.restoringMail
+                ? "Återställer…"
+                : item.label
           )
         );
         row.appendChild(button);

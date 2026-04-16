@@ -69,6 +69,8 @@
         '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 3.4 3.2 7.6l3.8 1.2 1.2 3.8L13 3.4Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.2" /><path d="M7 8.8 13 3.4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.2" /></svg>',
       trash:
         '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.3 3.8h5.4M6.2 3.8V2.9h3.6v.9M4.6 5.1l.5 6.6a1 1 0 0 0 1 .9h3.8a1 1 0 0 0 1-.9l.5-6.6M6.9 6.7v4.1M9.1 6.7v4.1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" /></svg>',
+      undo:
+        '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 7.2V4.5H1.5M4.2 4.5c1.4-2 3.8-3.2 6.4-3.2 4.2 0 7.6 3.4 7.6 7.6S14.8 16 10.6 16c-2.9 0-5.4-1.6-6.7-4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.3" /></svg>',
     },
     QUEUE_ACTIONS: [
       { label: "Studio", tone: "studio", action: "studio", mode: "reply", icon: "sparkle" },

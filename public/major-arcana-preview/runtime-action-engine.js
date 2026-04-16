@@ -7,6 +7,7 @@
     getSelectedRuntimeThread,
     isOfflineHistoryContextThread,
     handleRuntimeDeleteAction,
+    handleRuntimeRestoreAction,
     handleRuntimeHandledAction,
     laterStatus,
     loadBootstrap,
@@ -144,6 +145,12 @@
               : "major-arcana-focus-delete"
           )
         ).then(() => true);
+      }
+
+      if (action === "restore") {
+        return Promise.resolve(handleRuntimeRestoreAction("major-arcana-focus-restore")).then(
+          () => true
+        );
       }
 
       if (action === "handled") {
