@@ -78,6 +78,10 @@
 
     let runtimeAuthRecoveryTimer = 0;
     let runtimeLiveRefreshTimer = 0;
+    let adminTokenBridgeBound = false;
+    let adminTokenBridgeFocusTimer = 0;
+
+    const ADMIN_TOKEN_STORAGE_KEY = "ARCANA_ADMIN_TOKEN";
 
     const {
       CCO_DEFAULT_REPLY_SENDER,
@@ -3808,7 +3812,46 @@
       return false;
     }
 
+    function maybeReloadLiveAfterAdminTokenBridge() {
+      const token = normalizeText(typeof getAdminToken === "function" ? getAdminToken() : "");
+      if (!token || token === "__preview_local__") return;
+      if (state.runtime?.loading === true) return;
+      if (state.runtime?.live === true && state.runtime?.authRequired !== true) return;
+      loadLiveRuntime({
+        resetHistoryOnChange: false,
+      }).catch((error) => {
+        console.warn("CCO live runtime misslyckades efter synkad admin-token.", error);
+      });
+    }
+
+    function scheduleAdminTokenBridgeFocusCheck() {
+      if (adminTokenBridgeFocusTimer) {
+        windowObject.clearTimeout(adminTokenBridgeFocusTimer);
+      }
+      adminTokenBridgeFocusTimer = windowObject.setTimeout(() => {
+        adminTokenBridgeFocusTimer = 0;
+        maybeReloadLiveAfterAdminTokenBridge();
+      }, 200);
+    }
+
+    function bindAdminTokenBridge() {
+      if (adminTokenBridgeBound) return;
+      adminTokenBridgeBound = true;
+      windowObject.addEventListener("storage", (event) => {
+        if (event.key !== ADMIN_TOKEN_STORAGE_KEY) return;
+        if (!normalizeText(event.newValue || "")) return;
+        maybeReloadLiveAfterAdminTokenBridge();
+      });
+      windowObject.addEventListener("focus", scheduleAdminTokenBridgeFocusCheck);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          scheduleAdminTokenBridgeFocusCheck();
+        }
+      });
+    }
+
     function initializeWorkspaceSurface() {
+      bindAdminTokenBridge();
       bindWorkspaceInteractions();
       DEFAULT_WORKSPACE.left =
         Math.round(readPxVariable("--workspace-left-width")) || DEFAULT_WORKSPACE.left;

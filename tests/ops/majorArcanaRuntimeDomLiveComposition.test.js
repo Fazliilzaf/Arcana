@@ -326,6 +326,26 @@ test('runtime-dom-live-composition bär vidare customerIdentity genom live-threa
   );
 });
 
+test('initializeWorkspaceSurface kopplar admin-token-brygga för andra flikar', () => {
+  const source = fs.readFileSync(COMPOSITION_PATH, 'utf8');
+
+  assert.match(
+    source,
+    /function bindAdminTokenBridge\(/,
+    'Förväntade en explicit brygga när ARCANA_ADMIN_TOKEN skrivs i en annan flik (admin).'
+  );
+  assert.match(
+    source,
+    /addEventListener\("storage"/,
+    'Token-bryggan ska lyssna på storage så preview inte fastnar i auth-läge efter admin-login.'
+  );
+  assert.match(
+    source,
+    /function initializeWorkspaceSurface\(\) \{[\s\S]*bindAdminTokenBridge\(\);/,
+    'Arbetsytan ska aktivera token-bryggan innan övriga interaktioner.'
+  );
+});
+
 test('loadLiveRuntime canonicaliserar mailboxscope och skyddar mot stale live-loads', () => {
   const source = fs.readFileSync(COMPOSITION_PATH, 'utf8');
 
