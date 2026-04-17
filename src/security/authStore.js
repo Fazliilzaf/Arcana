@@ -525,7 +525,7 @@ async function createAuthStore({
       }
     }
 
-    if (!auditAppendOnly && auditMaxEntries > 0 && state.auditEvents.length > auditMaxEntries) {
+    if (auditMaxEntries > 0 && state.auditEvents.length > auditMaxEntries) {
       state.auditEvents = state.auditEvents.slice(-auditMaxEntries);
       changed = true;
     }

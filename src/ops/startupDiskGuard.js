@@ -142,6 +142,22 @@ function buildStateFileGuards(config = {}) {
       fallback: { version: 1, createdAt: ts, updatedAt: ts, mailboxes: {}, messages: [] },
     },
     {
+      scope: 'cco_mailbox_truth_store',
+      filePath: config.ccoMailboxTruthStorePath,
+      maxBytes: 150 * MB,
+      fallback: {
+        version: 1,
+        createdAt: ts,
+        updatedAt: ts,
+        accounts: {},
+        folders: {},
+        messages: {},
+        conversations: {},
+        syncCheckpoints: {},
+        syncRuns: [],
+      },
+    },
+    {
       scope: 'cco_note_store',
       filePath: config.ccoNoteStorePath,
       maxBytes: toPositiveInt(config.startupCcoNoteStoreMaxBytes, 12 * MB),
