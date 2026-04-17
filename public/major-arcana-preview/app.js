@@ -6723,9 +6723,9 @@
     const mailboxLabel = titleCaseMailbox(
       asText(row.mailboxAddress || row.mailboxId || row.userPrincipalName || "kons@hairtpclinic.com")
     );
-    const canonicalThreadMessages = asArray(threadDocument?.messages).filter(
-      (message) => message && typeof message === "object"
-    );
+    const canonicalThreadMessages = asArray(threadDocument?.messages)
+      .filter((message) => message && typeof message === "object")
+      .sort(compareRuntimeMessagesDesc);
     const feedEntriesByMessageId = new Map(
       asArray(feedEntries)
         .map((entry) => [asText(entry?.messageId), entry])
@@ -6787,7 +6787,7 @@
         mailDocument: matchedMailDocument,
       };
     });
-    const entries = canonicalEntries.length
+    const entries = (canonicalEntries.length
       ? canonicalEntries
       : feedEntries.length
       ? feedEntries
@@ -6825,7 +6825,9 @@
               .map((value) => sanitizePreviewText(value))
               .find((value) => value && !isRuntimePlaceholderLine(value)),
           },
-        ];
+        ])
+      .slice()
+      .sort(compareRuntimeMessagesDesc);
     const customerName = getRuntimeCustomerNameFromFeedEntries(entries, rowCustomerName);
     return entries.slice(0, 8).map((entry, index) => {
       const mailThreadMessage = getMailThreadMessage(entry);
@@ -9047,7 +9049,7 @@
     const messages = buildPreviewMessages(row, feedEntries, threadDocument);
     const resolvedThreadDocument =
       threadDocument && typeof threadDocument === "object"
-        ? threadDocument
+        ? normalizeThreadDocumentMessageOrder(threadDocument)
         : buildClientThreadDocumentFromPreviewMessages(messages, {
             conversationId: asText(row?.conversationId),
             customerEmail,
@@ -9656,7 +9658,7 @@
       feedEntries: buildHistoryFeedEntries(messages),
       threadDocument:
         historyPayload?.threadDocument && typeof historyPayload.threadDocument === "object"
-          ? historyPayload.threadDocument
+          ? normalizeThreadDocumentMessageOrder(historyPayload.threadDocument)
           : derivedThreadDocument,
       historyEvents: buildHistoryRuntimeEvents(events, {
         conversationId: historyBackedRow.conversationId || conversationId,
@@ -12509,6 +12511,54 @@
   function compareHistoryEventsDesc(left, right) {
     return Date.parse(String(right?.recordedAt || right?.timestamp || "")) -
       Date.parse(String(left?.recordedAt || left?.timestamp || ""));
+  }
+
+  function getRuntimeMessageSortIso(message = {}) {
+    const candidates = [
+      asText(message?.sentAt),
+      asText(message?.recordedAt),
+      asText(message?.timestamp),
+      asText(message?.createdAt),
+      asText(message?.updatedAt),
+      asText(message?.mailThreadMessage?.sentAt),
+      asText(message?.mailThreadMessage?.recordedAt),
+      asText(message?.mailThreadMessage?.timestamp),
+      asText(message?.mailDocument?.sentAt),
+      asText(message?.mailDocument?.receivedAt),
+      asText(message?.mailDocument?.createdAt),
+      asText(message?.mailDocument?.updatedAt),
+    ];
+    for (const candidate of candidates) {
+      const iso = toIso(candidate);
+      if (iso) return iso;
+    }
+    return "";
+  }
+
+  function compareRuntimeMessagesDesc(left, right) {
+    const rightIso = getRuntimeMessageSortIso(right);
+    const leftIso = getRuntimeMessageSortIso(left);
+    if (rightIso && leftIso && rightIso !== leftIso) {
+      return rightIso.localeCompare(leftIso);
+    }
+    if (rightIso && !leftIso) return -1;
+    if (!rightIso && leftIso) return 1;
+    const rightId = asText(right?.messageId || right?.id);
+    const leftId = asText(left?.messageId || left?.id);
+    const idCompare = rightId.localeCompare(leftId);
+    if (idCompare !== 0) return idCompare;
+    return asText(right?.subject || "").localeCompare(asText(left?.subject || ""));
+  }
+
+  function normalizeThreadDocumentMessageOrder(threadDocument = null) {
+    if (!threadDocument || typeof threadDocument !== "object") return threadDocument;
+    return {
+      ...threadDocument,
+      messages: asArray(threadDocument.messages)
+        .filter((message) => message && typeof message === "object")
+        .slice()
+        .sort(compareRuntimeMessagesDesc),
+    };
   }
 
   function dedupeHistoryEvents(events) {
