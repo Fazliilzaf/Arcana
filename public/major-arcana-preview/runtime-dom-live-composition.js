@@ -2027,10 +2027,14 @@
           });
           renderRuntimeConversationShell();
         } catch (historyLoadError) {
+          if (typeof onApplied === "function") {
+            onApplied();
+          }
           console.warn(
             "CCO kunde inte ladda tunn mailboxhistorik i bakgrunden efter initial live-load.",
             historyLoadError
           );
+          renderRuntimeConversationShell();
         }
       }, 0);
     }
@@ -2550,6 +2554,7 @@
       clearRuntimeAuthRecoveryTimer();
       const isBackgroundRefresh = options.isBackgroundRefresh === true;
       if (isBackgroundRefresh) {
+        state.runtime.pendingFullRefresh = true;
         state.runtime.isBackgroundRefresh = true;
         state.runtime.backgroundRefreshSelectedThreadId = asText(
           workspaceSourceOfTruth.getSelectedThreadId()
@@ -2564,6 +2569,9 @@
         const adminToken = await waitForRuntimeAuthToken();
         if (!isCurrentRequest()) return;
         if (!adminToken) {
+          if (isBackgroundRefresh) {
+            state.runtime.pendingFullRefresh = false;
+          }
           state.runtime.loading = false;
           state.runtime.loaded = false;
           state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
@@ -2629,6 +2637,9 @@
         applyRuntimeGraphStatus(status?.graph || {});
         if (status?.graph?.readEnabled !== true) {
           clearRuntimeLiveRefreshTimer();
+          if (isBackgroundRefresh) {
+            state.runtime.pendingFullRefresh = false;
+          }
           await loadOfflineHistoryRuntime({
             runtimeMailboxIds,
             preferredThreadId,
@@ -2868,6 +2879,7 @@
           truthPrimaryPayload,
           isCurrentRequest,
           onApplied: () => {
+            state.runtime.pendingFullRefresh = false;
             stableFocusThread = null;
           },
         });
@@ -2887,6 +2899,9 @@
         if (!isCurrentRequest()) return;
         const message = error instanceof Error ? error.message : String(error);
         const statusCode = Number(error?.statusCode || error?.status || 0);
+        if (isBackgroundRefresh) {
+          state.runtime.pendingFullRefresh = false;
+        }
         state.runtime.loading = false;
         state.runtime.loaded = false;
         state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
@@ -2916,6 +2931,9 @@
         }
         renderRuntimeConversationShell();
       } finally {
+        if (isBackgroundRefresh && !isCurrentRequest()) {
+          state.runtime.pendingFullRefresh = false;
+        }
         if (isBackgroundRefresh) {
           state.runtime.isBackgroundRefresh = false;
           state.runtime.backgroundRefreshSelectedThreadId = "";

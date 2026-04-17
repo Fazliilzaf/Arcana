@@ -2089,6 +2089,7 @@
       hasReachedSteadyState: false,
       hasRemovedRuntimeLoading: false,
       authRecoveryArmed: false,
+      pendingFullRefresh: false,
       isBackgroundRefresh: false,
       backgroundRefreshSelectedThreadId: "",
       mode: "",
@@ -20426,6 +20427,9 @@
   }
 
   function renderRuntimeConversationShell() {
+    if (state.runtime?.pendingFullRefresh === true) {
+      return;
+    }
     ensureRuntimeSelection();
     renderRuntimeQueue();
     renderQueueCategoryStripMode();
