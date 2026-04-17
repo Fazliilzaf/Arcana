@@ -13434,6 +13434,8 @@
     if (normalized === "needs_reply") return "Needs reply";
     if (normalized === "act_now") return "Act now";
     if (normalized === "comparable") return "Jämförbara";
+    if (normalized === "today") return "Idag";
+    if (normalized === "tomorrow") return "Imorgon";
     return "Alla";
   }
 
@@ -13515,10 +13517,13 @@
     const sortMode = normalizeText(viewState?.localSort || "latest") || "latest";
     const filteredRows = rows.filter((item) => {
       const mailboxId = normalizeMailboxId(item?.mailbox?.mailboxId || "");
+      const dueBucket = asArray(item?.dueBucket);
       if (filterMode === "unread") return item?.state?.hasUnreadInbound === true;
       if (filterMode === "needs_reply") return item?.state?.needsReply === true;
       if (filterMode === "act_now") return normalizeText(item?.lane || "") === "act-now";
       if (filterMode === "comparable") return comparableMailboxIds.has(mailboxId);
+      if (filterMode === "today") return dueBucket.includes("today");
+      if (filterMode === "tomorrow") return dueBucket.includes("tomorrow");
       return true;
     });
 
@@ -13570,6 +13575,8 @@
       comparable: rows.filter((item) =>
         comparableMailboxIds.has(normalizeMailboxId(item?.mailbox?.mailboxId || ""))
       ).length,
+      today: rows.filter((item) => asArray(item?.dueBucket).includes("today")).length,
+      tomorrow: rows.filter((item) => asArray(item?.dueBucket).includes("tomorrow")).length,
     };
     const filterMode = normalizeText(viewState?.localFilter || "all") || "all";
     const sortMode = normalizeText(viewState?.localSort || "latest") || "latest";
@@ -13579,6 +13586,8 @@
       { id: "unread", label: "Unread" },
       { id: "needs_reply", label: "Needs reply" },
       { id: "act_now", label: "Act now" },
+      { id: "today", label: "Idag" },
+      { id: "tomorrow", label: "Imorgon" },
       { id: "comparable", label: "Jämförbara" },
     ];
     const sorts = [

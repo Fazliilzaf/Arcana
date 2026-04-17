@@ -158,6 +158,57 @@ function toIso(value) {
   return date.toISOString();
 }
 
+/** Gregorian YYYY-MM-DD + 1 day (for calendar math independent of machine local TZ). */
+function addOneCalendarDayYmd(ymd) {
+  const raw = normalizeText(ymd || '');
+  const parts = raw.split('-').map((p) => parseInt(String(p).trim(), 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return '';
+  const [y, m, d] = parts;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * Maps an instant to whether its calendar date in `timezone` is today or tomorrow (in that zone).
+ * @returns {'today'|'tomorrow'|null}
+ */
+function getCalendarDayBucket(isoString, timezone = 'Europe/Stockholm') {
+  const raw = normalizeText(isoString || '');
+  if (!raw) return null;
+  const instant = new Date(raw);
+  if (Number.isNaN(instant.getTime())) return null;
+  const safeTz = normalizeText(timezone) || 'Europe/Stockholm';
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: safeTz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const targetYmd = fmt.format(instant);
+  const todayYmd = fmt.format(new Date());
+  const tomorrowYmd = addOneCalendarDayYmd(todayYmd);
+  if (targetYmd === todayYmd) return 'today';
+  if (tomorrowYmd && targetYmd === tomorrowYmd) return 'tomorrow';
+  return null;
+}
+
+function buildConsumerDueBucket(row = {}) {
+  const tz = 'Europe/Stockholm';
+  const buckets = [];
+  if (getCalendarDayBucket(row.lastInboundAt, tz) === 'today') {
+    buckets.push('today');
+  }
+  const followUpIso = normalizeText(row.operatorState?.followUpDueAt || '');
+  if (followUpIso && getCalendarDayBucket(followUpIso, tz) === 'tomorrow') {
+    buckets.push('tomorrow');
+  }
+  return buckets;
+}
+
 function normalizeMailboxId(value = '') {
   return normalizeText(value).toLowerCase();
 }
@@ -909,6 +960,16 @@ function createCcoMailboxTruthWorklistReadModel({
       rollupRows: buildCustomerRollupRows(readModel.rows),
       conversationStateStore,
     });
+    const todayCount = rollupRows.filter(
+      (row) => getCalendarDayBucket(row.lastInboundAt, 'Europe/Stockholm') === 'today'
+    ).length;
+    const tomorrowCount = rollupRows.filter((row) => {
+      const followUpIso = normalizeText(row.operatorState?.followUpDueAt || '');
+      return (
+        followUpIso &&
+        getCalendarDayBucket(followUpIso, 'Europe/Stockholm') === 'tomorrow'
+      );
+    }).length;
     return {
       generatedAt: new Date().toISOString(),
       source: 'mailbox_truth_worklist_consumer',
@@ -931,6 +992,11 @@ function createCcoMailboxTruthWorklistReadModel({
           rollupRows.length > 0
             ? Math.round((countSafeIdentityRows(rollupRows) / rollupRows.length) * 1000) / 10
             : 0,
+        laneCounts: {
+          ...(readModel.summary?.laneCounts || {}),
+          todayCount,
+          tomorrowCount,
+        },
       },
       rows: rollupRows.map((row) => ({
         id: row.conversationKey,
@@ -938,6 +1004,7 @@ function createCcoMailboxTruthWorklistReadModel({
         placementIndex: row.placementIndex,
         subject: row.subject,
         preview: row.latestPreview,
+        dueBucket: buildConsumerDueBucket(row),
         conversation: {
           key: row.conversationKey,
           conversationId: row.conversationId,
