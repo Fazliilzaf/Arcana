@@ -2400,6 +2400,7 @@ function createScheduler({
 
   async function runCcoTruthDeltaSync({ tenantId }) {
     if (!config.graphReadEnabled) {
+      logger?.log?.('[scheduler] cco_truth_delta_sync skipped: graph_read_disabled');
       return {
         tenantId,
         skipped: true,
@@ -2410,6 +2411,7 @@ function createScheduler({
       !graphReadConnector ||
       typeof graphReadConnector.fetchMailboxTruthFolderDeltaPage !== 'function'
     ) {
+      logger?.log?.('[scheduler] cco_truth_delta_sync skipped: graph_read_unavailable');
       return {
         tenantId,
         skipped: true,
@@ -2418,6 +2420,7 @@ function createScheduler({
     }
     const mailboxIds = resolveCcoHistoryMailboxIds(config);
     if (mailboxIds.length === 0) {
+      logger?.log?.('[scheduler] cco_truth_delta_sync skipped: mailbox_ids_missing');
       return {
         tenantId,
         skipped: true,
@@ -2426,6 +2429,7 @@ function createScheduler({
     }
     const truthPath = normalizeText(config.ccoMailboxTruthStorePath);
     if (!truthPath) {
+      logger?.log?.('[scheduler] cco_truth_delta_sync skipped: truth_store_path_missing');
       return {
         tenantId,
         skipped: true,
@@ -2439,6 +2443,9 @@ function createScheduler({
         filePath: truthPath,
       });
     } catch (error) {
+      logger?.log?.(
+        `[scheduler] cco_truth_delta_sync skipped: truth_store_open_failed (${sanitizeError(error)})`
+      );
       return {
         tenantId,
         skipped: true,
@@ -2457,6 +2464,9 @@ function createScheduler({
         mailboxIds,
         folderTypes: ['inbox', 'sent', 'drafts', 'deleted'],
       });
+      logger?.log?.(
+        `[scheduler] cco_truth_delta_sync ok runId=${result?.runId || ''} mailboxes=${mailboxIds.length} elapsedMs=${result?.elapsedMs ?? ''}`
+      );
       return {
         tenantId,
         skipped: false,
