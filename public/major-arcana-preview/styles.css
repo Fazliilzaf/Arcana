@@ -222,6 +222,10 @@ body {
   background: var(--page-gradient);
 }
 
+body.is-runtime-loading .preview-canvas {
+  opacity: 0;
+}
+
 body:not(.is-preview-ready) .focus-tabs,
 body:not(.is-preview-ready) .focus-signals,
 body:not(.is-preview-ready) .focus-badge-row,

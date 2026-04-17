@@ -2086,6 +2086,8 @@
     runtime: {
       loading: false,
       loaded: false,
+      hasReachedSteadyState: false,
+      hasRemovedRuntimeLoading: false,
       mode: "",
       live: false,
       authRequired: false,
@@ -4099,8 +4101,19 @@
     const visualState = deriveRuntimeVisualState();
     state.runtime.visualState = visualState;
 
-    if (state.runtime.hasReachedSteadyState !== true && visualState === "ready") {
+    if (
+      state.runtime.hasReachedSteadyState !== true &&
+      (visualState === "ready" || visualState === "offline_history")
+    ) {
       state.runtime.hasReachedSteadyState = true;
+    }
+
+    if (
+      state.runtime.hasRemovedRuntimeLoading !== true &&
+      (visualState === "ready" || visualState === "offline_history")
+    ) {
+      document.body.classList.remove("is-runtime-loading");
+      state.runtime.hasRemovedRuntimeLoading = true;
     }
 
     RUNTIME_VISUAL_STATES.forEach((candidate) => {
@@ -20392,8 +20405,6 @@
       (state.runtime.hasReachedSteadyState === true && runtimeVisualState === "syncing");
     if (isPreviewReady) {
       document.body.classList.add("is-preview-ready");
-    } else {
-      document.body.classList.remove("is-preview-ready");
     }
   }
 
