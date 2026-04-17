@@ -2289,20 +2289,26 @@
     });
   }
   const TRUTH_WORKLIST_VIEW_STORAGE_KEY = "cco.truthWorklistView.hidden";
+  const truthPrimaryWorklistDisableStorageKey = asText(
+    WORKLIST_TRUTH_PRIMARY?.disableStorageKey
+  ).trim();
   const TRUTH_PRIMARY_WORKLIST_DISABLE_STORAGE_KEY =
-    typeof WORKLIST_TRUTH_PRIMARY?.disableStorageKey === "string" &&
-    WORKLIST_TRUTH_PRIMARY.disableStorageKey.trim()
-      ? WORKLIST_TRUTH_PRIMARY.disableStorageKey.trim()
+    truthPrimaryWorklistDisableStorageKey
+      ? truthPrimaryWorklistDisableStorageKey
       : "cco.truthPrimaryWorklist.disabled";
+  const truthPrimaryFocusDisableStorageKey = asText(
+    FOCUS_TRUTH_PRIMARY?.disableStorageKey
+  ).trim();
   const TRUTH_PRIMARY_FOCUS_DISABLE_STORAGE_KEY =
-    typeof FOCUS_TRUTH_PRIMARY?.disableStorageKey === "string" &&
-    FOCUS_TRUTH_PRIMARY.disableStorageKey.trim()
-      ? FOCUS_TRUTH_PRIMARY.disableStorageKey.trim()
+    truthPrimaryFocusDisableStorageKey
+      ? truthPrimaryFocusDisableStorageKey
       : "cco.truthPrimaryFocus.disabled";
+  const truthPrimaryStudioDisableStorageKey = asText(
+    STUDIO_TRUTH_PRIMARY?.disableStorageKey
+  ).trim();
   const TRUTH_PRIMARY_STUDIO_DISABLE_STORAGE_KEY =
-    typeof STUDIO_TRUTH_PRIMARY?.disableStorageKey === "string" &&
-    STUDIO_TRUTH_PRIMARY.disableStorageKey.trim()
-      ? STUDIO_TRUTH_PRIMARY.disableStorageKey.trim()
+    truthPrimaryStudioDisableStorageKey
+      ? truthPrimaryStudioDisableStorageKey
       : "cco.truthPrimaryStudio.disabled";
 
   const STUDIO_SIGNATURE_PROFILES = Object.freeze([
