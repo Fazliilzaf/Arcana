@@ -28,6 +28,8 @@ const { resolveAdaptiveFocusState } = require('../intelligence/adaptiveFocusCont
 const { evaluateRecovery } = require('../intelligence/recoveryEngine');
 const { evaluateStrategicInsights } = require('../intelligence/strategicInsightsEngine');
 const { runClientoBackfill } = require('../../scripts/run-cliento-backfill');
+const { createMicrosoftGraphMailboxTruthDelta } = require('../infra/microsoftGraphMailboxTruthDelta');
+const { createCcoMailboxTruthStore } = require('./ccoMailboxTruthStore');
 
 function nowIso() {
   return new Date().toISOString();
@@ -2396,6 +2398,76 @@ function createScheduler({
     };
   }
 
+  async function runCcoTruthDeltaSync({ tenantId }) {
+    if (!config.graphReadEnabled) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'graph_read_disabled',
+      };
+    }
+    if (
+      !graphReadConnector ||
+      typeof graphReadConnector.fetchMailboxTruthFolderDeltaPage !== 'function'
+    ) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'graph_read_unavailable',
+      };
+    }
+    const mailboxIds = resolveCcoHistoryMailboxIds(config);
+    if (mailboxIds.length === 0) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'mailbox_ids_missing',
+      };
+    }
+    const truthPath = normalizeText(config.ccoMailboxTruthStorePath);
+    if (!truthPath) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'truth_store_path_missing',
+      };
+    }
+
+    let truthStore;
+    try {
+      truthStore = await createCcoMailboxTruthStore({
+        filePath: truthPath,
+      });
+    } catch (error) {
+      return {
+        tenantId,
+        skipped: true,
+        reason: 'truth_store_open_failed',
+        error: sanitizeError(error),
+      };
+    }
+
+    const delta = createMicrosoftGraphMailboxTruthDelta({
+      connectorFactory: () => graphReadConnector,
+      store: truthStore,
+    });
+
+    try {
+      const result = await delta.runDeltaSync({
+        mailboxIds,
+        folderTypes: ['inbox', 'sent', 'drafts', 'deleted'],
+      });
+      return {
+        tenantId,
+        skipped: false,
+        ...result,
+      };
+    } catch (error) {
+      logger?.error?.('[scheduler] cco_truth_delta_sync failed', sanitizeError(error));
+      throw error;
+    }
+  }
+
   const jobDefinitions = [
     {
       id: 'cco_weekly_brief',
@@ -2420,6 +2492,14 @@ function createScheduler({
       name: 'CCO kons history sync',
       intervalMs: toHoursMs(config.schedulerCcoHistorySyncIntervalHours, 6),
       run: runCcoHistorySync,
+    },
+    {
+      id: 'cco_truth_delta_sync',
+      name: 'CCO mailbox truth delta sync',
+      intervalMs: config.graphReadEnabled
+        ? toMinutesMs(config.schedulerCcoTruthDeltaIntervalMinutes, 5)
+        : 0,
+      run: runCcoTruthDeltaSync,
     },
     {
       id: 'cco_cliento_backfill',

@@ -454,6 +454,7 @@ const config = {
   reportRetentionMaxAgeDays: asInt(process.env.ARCANA_REPORT_RETENTION_MAX_AGE_DAYS, 45),
 
   schedulerEnabled: asBool(process.env.ARCANA_SCHEDULER_ENABLED, true),
+  graphReadEnabled: asBool(process.env.ARCANA_GRAPH_READ_ENABLED, false),
   schedulerReportWindowDays: asInt(process.env.ARCANA_SCHEDULER_REPORT_WINDOW_DAYS, 14),
   schedulerCcoWeeklyBriefIntervalHours: asInt(
     process.env.ARCANA_SCHEDULER_CCO_WEEKLY_BRIEF_INTERVAL_HOURS,
@@ -477,6 +478,10 @@ const config = {
   schedulerCcoHistorySyncIntervalHours: asInt(
     process.env.ARCANA_SCHEDULER_CCO_HISTORY_SYNC_INTERVAL_HOURS,
     6
+  ),
+  schedulerCcoTruthDeltaIntervalMinutes: asInt(
+    process.env.ARCANA_SCHEDULER_CCO_TRUTH_DELTA_INTERVAL_MINUTES,
+    5
   ),
   schedulerCcoHistoryMailboxId: asNonEmptyString(
     process.env.ARCANA_SCHEDULER_CCO_HISTORY_MAILBOX_ID,
