@@ -977,6 +977,35 @@
       );
     }
 
+    function getRuntimeThreadSortTimestamp(thread = {}) {
+      const newestMessage = asArray(thread?.messages)[0] || {};
+      const candidates = [
+        asText(thread?.lastActivityAt),
+        asText(newestMessage?.recordedAt),
+        asText(newestMessage?.sentAt),
+        asText(thread?.raw?.lastInboundAt),
+        asText(thread?.raw?.lastOutboundAt),
+        asText(thread?.raw?.updatedAt),
+      ];
+      for (const candidate of candidates) {
+        const parsed = Date.parse(candidate);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      return 0;
+    }
+
+    function sortRuntimeThreadsDeterministic(threads = []) {
+      return asArray(threads)
+        .slice()
+        .sort((left, right) => {
+          const timestampDiff =
+            getRuntimeThreadSortTimestamp(right) -
+            getRuntimeThreadSortTimestamp(left);
+          if (timestampDiff !== 0) return timestampDiff;
+          return asText(left?.id).localeCompare(asText(right?.id));
+        });
+    }
+
     function scheduleRuntimeAuthRecovery({ requestedMailboxIds = [] } = {}) {
       clearRuntimeAuthRecoveryTimer();
       if (state.runtime?.authRequired !== true) return;
@@ -1900,18 +1929,18 @@
           );
           if (!isCurrentRequest()) return;
 
-          const legacyThreads = carryRuntimeCustomerIdentity(
+          const legacyThreads = sortRuntimeThreadsDeterministic(carryRuntimeCustomerIdentity(
             buildLiveThreads(liveData, {
             historyMessages: historyPayload?.messages,
             historyEvents: historyPayload?.events,
             })
-          );
-          const threads = carryRuntimeCustomerIdentity(
+          ));
+          const threads = sortRuntimeThreadsDeterministic(carryRuntimeCustomerIdentity(
             buildLiveThreads(mergedWorklistData, {
             historyMessages: historyPayload?.messages,
             historyEvents: historyPayload?.events,
             })
-          );
+          ));
 
           recordRuntimeThreadAssignment("thin_history_refresh", {
             stage: "before_apply",
@@ -2085,7 +2114,7 @@
         }
       }
 
-      const threads = carryRuntimeCustomerIdentity(
+      const threads = sortRuntimeThreadsDeterministic(carryRuntimeCustomerIdentity(
         buildLiveThreads(
           {
             conversationWorklist: [],
@@ -2097,7 +2126,7 @@
             historyEvents,
           }
         )
-      );
+      ));
       state.runtime.truthPrimaryLegacyThreads = [];
       state.runtime.truthPrimaryCutover = {
         enabled: false,
@@ -2619,24 +2648,24 @@
           }
         }
 
-        const legacyThreads = carryRuntimeCustomerIdentity(
+        const legacyThreads = sortRuntimeThreadsDeterministic(carryRuntimeCustomerIdentity(
           buildLiveThreads(liveData, {
             historyMessages: [],
             historyEvents: [],
           })
-        );
+        ));
         const mergedWorklistData =
           typeof mergeTruthPrimaryWorklistData === "function"
             ? mergeTruthPrimaryWorklistData(liveData, truthPrimaryPayload, {
                 truthPrimaryMailboxIds: activeTruthPrimaryMailboxIds,
               })
             : liveData;
-        const threads = carryRuntimeCustomerIdentity(
+        const threads = sortRuntimeThreadsDeterministic(carryRuntimeCustomerIdentity(
           buildLiveThreads(mergedWorklistData, {
             historyMessages: [],
             historyEvents: [],
           })
-        );
+        ));
         const activeFocusTruthMailboxIds = configuredFocusTruthMailboxIds.filter((mailboxId) =>
           activeTruthPrimaryMailboxIds.includes(mailboxId)
         );
