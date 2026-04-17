@@ -71,6 +71,43 @@ async function readJson(filePath, fallbackValue) {
   }
 }
 
+function isJsonSyntaxError(error) {
+  return error instanceof SyntaxError || String(error?.name || '') === 'SyntaxError';
+}
+
+async function nextCorruptBackupPath(filePath) {
+  const basePath = `${filePath}.corrupt.bak`;
+  try {
+    await fs.access(basePath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return basePath;
+    throw error;
+  }
+  return `${filePath}.${Date.now()}.corrupt.bak`;
+}
+
+async function recoverCorruptJsonFile(filePath, fallbackValue, scopeLabel = 'json_store') {
+  const dir = path.dirname(filePath);
+  await fs.mkdir(dir, { recursive: true });
+  const backupPath = await nextCorruptBackupPath(filePath);
+  await fs.rename(filePath, backupPath);
+  await writeJsonAtomic(filePath, fallbackValue);
+  console.warn(
+    `[${scopeLabel}] korrupt JSON upptäcktes och återställdes automatiskt`,
+    JSON.stringify({ filePath, backupPath })
+  );
+  return cloneJson(fallbackValue);
+}
+
+async function readJsonWithRecovery(filePath, fallbackValue, scopeLabel = 'json_store') {
+  try {
+    return await readJson(filePath, fallbackValue);
+  } catch (error) {
+    if (!isJsonSyntaxError(error)) throw error;
+    return recoverCorruptJsonFile(filePath, fallbackValue, scopeLabel);
+  }
+}
+
 async function writeJsonAtomic(filePath, data) {
   const dir = path.dirname(filePath);
   await fs.mkdir(dir, { recursive: true });
@@ -249,7 +286,11 @@ async function createCcoMailboxTruthStore({
   const resolvedPath = path.resolve(String(filePath || '').trim());
   if (!resolvedPath) throw new Error('ccoMailboxTruthStore filePath saknas.');
   const keepRuns = Math.max(10, Math.min(2000, Number(maxSyncRuns) || 200));
-  const state = await readJson(resolvedPath, createEmptyState());
+  const state = await readJsonWithRecovery(
+    resolvedPath,
+    createEmptyState(),
+    'cco_mailbox_truth_store'
+  );
   if (!state.version) state.version = 1;
   if (!state.createdAt) state.createdAt = nowIso();
   if (!state.accounts || typeof state.accounts !== 'object' || Array.isArray(state.accounts)) {

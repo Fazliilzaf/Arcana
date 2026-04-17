@@ -160,7 +160,7 @@ test('worklist consumer projection applies reply_later and handled overrides fro
 
     const baseline = model.buildConsumerModel({ mailboxIds: [] });
     assert.equal(baseline.rows.length, 1);
-    assert.equal(baseline.rows[0].lane, 'all');
+    assert.equal(baseline.rows[0].lane, 'act-now');
 
     await conversationStateStore.writeConversationState({
       tenantId: 'tenant-a',
