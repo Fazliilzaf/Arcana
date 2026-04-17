@@ -2089,6 +2089,8 @@
       hasReachedSteadyState: false,
       hasRemovedRuntimeLoading: false,
       authRecoveryArmed: false,
+      isBackgroundRefresh: false,
+      backgroundRefreshSelectedThreadId: "",
       mode: "",
       live: false,
       authRequired: false,
@@ -20433,44 +20435,58 @@
     renderQueueHistorySection();
     renderMailFeeds();
     renderThreadContextRows();
+    const backgroundRefreshSelectedThreadId = asText(
+      state.runtime?.backgroundRefreshSelectedThreadId
+    );
+    const shouldSkipFocusRefresh =
+      state.runtime?.isBackgroundRefresh === true &&
+      Boolean(backgroundRefreshSelectedThreadId) &&
+      runtimeConversationIdsMatch(
+        backgroundRefreshSelectedThreadId,
+        workspaceSourceOfTruth.getSelectedThreadId()
+      );
     const selectedThread = getSelectedRuntimeThread();
     const selectedFocusThread = getSelectedRuntimeFocusThread();
-    syncSelectedCustomerIdentityForThread(selectedFocusThread || selectedThread);
-    const focusReadState = getRuntimeFocusReadState(selectedFocusThread);
-    const focusNotesHeading = document.querySelector(".focus-notes-head h3");
-    if (focusNotesHeading) {
-      focusNotesHeading.textContent = selectedFocusThread
-        ? `Anteckningar för ${selectedFocusThread.customerName}`
-        : state.runtime.authRequired
-          ? "Anteckningar kräver inloggning"
-          : "Anteckningar";
+    if (!shouldSkipFocusRefresh) {
+      syncSelectedCustomerIdentityForThread(selectedFocusThread || selectedThread);
+      const focusReadState = getRuntimeFocusReadState(selectedFocusThread);
+      const focusNotesHeading = document.querySelector(".focus-notes-head h3");
+      if (focusNotesHeading) {
+        focusNotesHeading.textContent = selectedFocusThread
+          ? `Anteckningar för ${selectedFocusThread.customerName}`
+          : state.runtime.authRequired
+            ? "Anteckningar kräver inloggning"
+            : "Anteckningar";
+      }
+      renderRuntimeFocusSignals(selectedFocusThread, focusReadState);
+      const focusQuickActions = focusReadState.readOnly
+        ? []
+        : (() => {
+              const base = [...FOCUS_ACTIONS];
+              if (state.runtime.pendingGraphRestore && state.runtime.deleteEnabled) {
+                base.push({
+                  label: "Återställ",
+                  tone: "compose",
+                  action: "restore",
+                  icon: "undo",
+                });
+              }
+              return base;
+            })();
+      renderQuickActionRows(focusActionRows, focusQuickActions);
+      renderRuntimeFocusConversation(selectedFocusThread, focusReadState);
+      renderRuntimeCustomerPanel(selectedFocusThread, focusReadState);
+      renderFocusHistorySection(selectedFocusThread, focusReadState);
+      renderFocusNotesSection();
+      renderQuickActionRows(intelActionRows, INTEL_ACTIONS);
+      renderRuntimeIntel(selectedFocusThread, focusReadState);
     }
-    renderRuntimeFocusSignals(selectedFocusThread, focusReadState);
-    const focusQuickActions = focusReadState.readOnly
-      ? []
-      : (() => {
-            const base = [...FOCUS_ACTIONS];
-            if (state.runtime.pendingGraphRestore && state.runtime.deleteEnabled) {
-              base.push({
-                label: "Återställ",
-                tone: "compose",
-                action: "restore",
-                icon: "undo",
-              });
-            }
-            return base;
-          })();
-    renderQuickActionRows(focusActionRows, focusQuickActions);
-    renderRuntimeFocusConversation(selectedFocusThread, focusReadState);
-    renderRuntimeCustomerPanel(selectedFocusThread, focusReadState);
-    renderFocusHistorySection(selectedFocusThread, focusReadState);
-    renderFocusNotesSection();
-    renderQuickActionRows(intelActionRows, INTEL_ACTIONS);
-    renderRuntimeIntel(selectedFocusThread, focusReadState);
     renderStudioShell();
     renderWorkspaceRuntimeContext();
     renderAnalyticsRuntime();
-    renderRuntimeIntel(selectedFocusThread, focusReadState);
+    if (!shouldSkipFocusRefresh) {
+      renderRuntimeIntel(selectedFocusThread, getRuntimeFocusReadState(selectedFocusThread));
+    }
     const runtimeVisualState = syncRuntimeVisualStateMachine();
     const isPreviewReady =
       runtimeVisualState === "ready" ||

@@ -1092,6 +1092,7 @@
             requestedMailboxIds: mailboxIds,
             preferredThreadId: preferredThreadId || getRuntimeReentryThreadId(),
             resetHistoryOnChange: false,
+            isBackgroundRefresh: true,
           });
         } catch (error) {
           console.warn("CCO live runtime kunde inte uppdateras i bakgrunden.", error);
@@ -2515,6 +2516,13 @@
       const runtimeRequestSequence = ++liveRuntimeRequestSequence;
       const isCurrentRequest = () => runtimeRequestSequence === liveRuntimeRequestSequence;
       clearRuntimeAuthRecoveryTimer();
+      const isBackgroundRefresh = options.isBackgroundRefresh === true;
+      if (isBackgroundRefresh) {
+        state.runtime.isBackgroundRefresh = true;
+        state.runtime.backgroundRefreshSelectedThreadId = asText(
+          workspaceSourceOfTruth.getSelectedThreadId()
+        );
+      }
 
       if (state.runtime?.authRequired === true && options.allowAuthRecovery !== true) {
         return;
@@ -2875,6 +2883,11 @@
           });
         }
         renderRuntimeConversationShell();
+      } finally {
+        if (isBackgroundRefresh) {
+          state.runtime.isBackgroundRefresh = false;
+          state.runtime.backgroundRefreshSelectedThreadId = "";
+        }
       }
     }
 
