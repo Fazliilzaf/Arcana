@@ -2740,6 +2740,11 @@ function toIdempotencyKey(req) {
   );
 }
 
+/** CCO conversation actions (/cco/handled, /cco/reply-later): header only, no body fallback. */
+function toCcoConversationActionIdempotencyKeyHeader(req) {
+  return normalizeText(req.get('x-idempotency-key')) || null;
+}
+
 function toRunInputBody(rawBody = {}) {
   const payload = asObject(rawBody);
   if (payload.input && typeof payload.input === 'object') {
@@ -5982,6 +5987,13 @@ function toCcoSendHandler({
 function toCcoHandledHandler({ executor }) {
   return async (req, res) => {
     try {
+      const idempotencyKey = toCcoConversationActionIdempotencyKeyHeader(req);
+      if (!idempotencyKey) {
+        return res.status(400).json({
+          error: 'Header x-idempotency-key krävs.',
+          code: 'CCO_IDEMPOTENCY_HEADER_REQUIRED',
+        });
+      }
       const actor = toActor(req);
       const payload = asObject(req.body);
       const input = asObject(
@@ -5993,7 +6005,7 @@ function toCcoHandledHandler({ executor }) {
         channel: toChannel(req),
         input,
         correlationId: toCorrelationId(req),
-        idempotencyKey: toIdempotencyKey(req),
+        idempotencyKey,
         requestMetadata: toRequestMetadata(req),
       });
       return res.json(result);
@@ -6009,6 +6021,13 @@ function toCcoHandledHandler({ executor }) {
 function toCcoReplyLaterHandler({ executor }) {
   return async (req, res) => {
     try {
+      const idempotencyKey = toCcoConversationActionIdempotencyKeyHeader(req);
+      if (!idempotencyKey) {
+        return res.status(400).json({
+          error: 'Header x-idempotency-key krävs.',
+          code: 'CCO_IDEMPOTENCY_HEADER_REQUIRED',
+        });
+      }
       const actor = toActor(req);
       const payload = asObject(req.body);
       const input = asObject(
@@ -6020,7 +6039,7 @@ function toCcoReplyLaterHandler({ executor }) {
         channel: toChannel(req),
         input,
         correlationId: toCorrelationId(req),
-        idempotencyKey: toIdempotencyKey(req),
+        idempotencyKey,
         requestMetadata: toRequestMetadata(req),
       });
       return res.json(result);

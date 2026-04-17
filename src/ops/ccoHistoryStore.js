@@ -1188,13 +1188,16 @@ async function createCcoHistoryStore({
   async function recordAction({
     tenantId,
     conversationId,
+    canonicalConversationKey = null,
     mailboxId = null,
     customerEmail = null,
+    messageId = null,
     actionType,
     actionLabel = null,
     subject = null,
     recordedAt = null,
     actorUserId = null,
+    actorEmail = null,
     source = 'cco_usage_event',
     selectedMode = null,
     recommendedMode = null,
@@ -1210,17 +1213,21 @@ async function createCcoHistoryStore({
     nextActionSummary = null,
     followUpDueAt = null,
     intent = null,
+    version = null,
   } = {}) {
     const normalizedAction = normalizeHistoryAction({
       tenantId,
       conversationId,
+      canonicalConversationKey,
       mailboxId,
       customerEmail,
+      messageId,
       actionType,
       actionLabel,
       subject,
       recordedAt,
       actorUserId,
+      actorEmail,
       source,
       selectedMode,
       recommendedMode,
@@ -1236,6 +1243,7 @@ async function createCcoHistoryStore({
       nextActionSummary,
       followUpDueAt,
       intent,
+      version,
     });
     if (!normalizedAction) {
       throw new Error('tenantId, conversationId och actionType krävs för historikåtgärd.');

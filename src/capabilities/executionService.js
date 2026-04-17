@@ -917,25 +917,6 @@ function createCapabilityExecutor({
         canonicalConversationKey: target.canonicalConversationKey,
         idempotencyKey: normalizedIdempotencyKey,
       });
-      await writeAuditSafely({
-        tenantId: normalizedTenantId,
-        actorUserId: normalizedActor.id,
-        action: failedAuditAction,
-        outcome: 'failure',
-        targetType: 'cco_conversation',
-        targetId: conversationId,
-        metadata: {
-          correlationId: normalizedCorrelationId,
-          mailboxId,
-          conversationId,
-          messageId,
-          canonicalConversationKey: target.canonicalConversationKey,
-          stage: 'state_write',
-          errorCode: normalizeText(error?.code) || 'CCO_ACTION_STATE_WRITE_FAILED',
-          errorMessage: normalizeText(error?.message) || 'Conversation state write misslyckades.',
-          requestMetadata,
-        },
-      });
       throw makeCapabilityError(
         'CCO_ACTION_STATE_WRITE_FAILED',
         normalizeText(error?.message) || 'Conversation state write misslyckades.'
