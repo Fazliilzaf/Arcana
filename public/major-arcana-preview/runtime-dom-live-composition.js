@@ -2576,6 +2576,7 @@
       const isCurrentRequest = () => runtimeRequestSequence === liveRuntimeRequestSequence;
       clearRuntimeAuthRecoveryTimer();
       const isBackgroundRefresh = options.isBackgroundRefresh === true;
+      const shouldApplyPhaseA = !isBackgroundRefresh;
       if (isBackgroundRefresh) {
         state.runtime.pendingFullRefresh = true;
         state.runtime.isBackgroundRefresh = true;
@@ -2622,8 +2623,10 @@
         }
 
         state.runtime.loading = true;
-        state.runtime.truthPrimaryLegacyThreads = [];
-        state.runtime.liveHydratedThreadIds = [];
+        if (shouldApplyPhaseA) {
+          state.runtime.truthPrimaryLegacyThreads = [];
+          state.runtime.liveHydratedThreadIds = [];
+        }
         resetRuntimeOpenFlowDiagnostics({
           requestSequence: runtimeRequestSequence,
           reason: "live_runtime_load",
@@ -2653,7 +2656,9 @@
           phase: "loading",
           requestedMailboxIds: runtimeMailboxIds,
         });
-        renderRuntimeConversationShell();
+        if (shouldApplyPhaseA) {
+          renderRuntimeConversationShell();
+        }
 
         const status = await apiRequest("/api/v1/cco/runtime/status");
         if (!isCurrentRequest()) return;
@@ -2813,16 +2818,18 @@
           threadCount: threads.length,
           legacyThreadCount: legacyThreads.length,
         });
-        state.runtime.truthPrimaryLegacyThreads = legacyThreads;
-        state.runtime.threads = threads;
-        if (stableFocusThread) {
-          const stableFocusThreadIndex = state.runtime.threads.findIndex((thread) =>
-            runtimeConversationIdsMatch(thread?.id, selectedThreadId)
-          );
-          if (stableFocusThreadIndex >= 0) {
-            const patchedThreads = [...state.runtime.threads];
-            patchedThreads[stableFocusThreadIndex] = stableFocusThread;
-            state.runtime.threads = patchedThreads;
+        if (shouldApplyPhaseA) {
+          state.runtime.truthPrimaryLegacyThreads = legacyThreads;
+          state.runtime.threads = threads;
+          if (stableFocusThread) {
+            const stableFocusThreadIndex = state.runtime.threads.findIndex((thread) =>
+              runtimeConversationIdsMatch(thread?.id, selectedThreadId)
+            );
+            if (stableFocusThreadIndex >= 0) {
+              const patchedThreads = [...state.runtime.threads];
+              patchedThreads[stableFocusThreadIndex] = stableFocusThread;
+              state.runtime.threads = patchedThreads;
+            }
           }
         }
         recordRuntimeThreadAssignment("live_load", {
@@ -2831,27 +2838,29 @@
           threadCount: threads.length,
           legacyThreadCount: legacyThreads.length,
         });
-        state.runtime.mailboxes = buildMailboxCatalog(
-          threads.map((thread) => {
-            const mailboxAddress = asText(thread?.mailboxAddress);
-            return {
-              mailboxId: mailboxAddress,
-              mailboxAddress,
-              userPrincipalName: mailboxAddress,
-            };
-          }),
-          {
-            ...metadata,
-            sourceMailboxIds: Array.from(
-              new Set([
-                ...runtimeMailboxIds,
-                ...asArray(status?.graph?.allowlistMailboxIds),
-                ...asArray(metadata?.sourceMailboxIds),
-              ])
-            ),
-            mailboxCapabilities: state.runtime.mailboxCapabilities,
-          }
-        );
+        if (shouldApplyPhaseA) {
+          state.runtime.mailboxes = buildMailboxCatalog(
+            threads.map((thread) => {
+              const mailboxAddress = asText(thread?.mailboxAddress);
+              return {
+                mailboxId: mailboxAddress,
+                mailboxAddress,
+                userPrincipalName: mailboxAddress,
+              };
+            }),
+            {
+              ...metadata,
+              sourceMailboxIds: Array.from(
+                new Set([
+                  ...runtimeMailboxIds,
+                  ...asArray(status?.graph?.allowlistMailboxIds),
+                  ...asArray(metadata?.sourceMailboxIds),
+                ])
+              ),
+              mailboxCapabilities: state.runtime.mailboxCapabilities,
+            }
+          );
+        }
         state.runtime.defaultSenderMailbox = asText(
           metadata?.ccoDefaultSenderMailbox,
           state.runtime.defaultSenderMailbox
@@ -2886,18 +2895,20 @@
           replyOnly: true,
           lastAppliedAt: new Date().toISOString(),
         };
-        state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
-          phase: "live",
-          requestedMailboxIds: runtimeMailboxIds,
-          liveData,
-          mergedWorklistData,
-          threads,
-          legacyThreads,
-          historyPayload: null,
-          truthPrimaryPayload,
-          configuredTruthPrimaryMailboxIds,
-          activeTruthPrimaryMailboxIds,
-        });
+        if (shouldApplyPhaseA) {
+          state.runtime.mailboxDiagnostics = buildRuntimeMailboxLoadDiagnostics({
+            phase: "live",
+            requestedMailboxIds: runtimeMailboxIds,
+            liveData,
+            mergedWorklistData,
+            threads,
+            legacyThreads,
+            historyPayload: null,
+            truthPrimaryPayload,
+            configuredTruthPrimaryMailboxIds,
+            activeTruthPrimaryMailboxIds,
+          });
+        }
         debugRuntimePipeline("AFTER LIVE LOAD (before restore)");
         debugReentrySnapshot("BEFORE RESTORE");
         if (!isCurrentRequest()) return;
