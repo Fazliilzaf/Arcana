@@ -15852,11 +15852,11 @@ button {
 
 
 /* =============================================================================
-   Kö-kort — thread cards in .queue-history-list (rebuilt)
-   Shell: vit yta, 8px radius, tunn kant, lätt skugga, padding 12px 16px
-   Rad 1: avatar 32 + namn + preview | tid/status
-   Rad 2: mailbox + status + action (intelligence chips, ikoner synliga)
-   Rad 3: mailboxspår med | prefix
+   Kö-kort — queue list thread cards (reference)
+   Kort: vit, 4px vänster rosa kant, lätt skugga, 8px hörn, generös padding
+   Rad 1: 28px avatar (ljusgrå), namn + preview en rad, tid + ägare höger
+   Rad 2: separator, text-chips utan box (mailbox grå, what lila, why rosa, next grön)
+   Rad 3: | MAILBOXSPÅR (lila caps) + detalj grå
    ============================================================================= */
 
 .queue-history-list > .thread-card {
@@ -15865,19 +15865,20 @@ button {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: clamp(6px, 1.2vw, 10px);
+  gap: 10px;
   align-items: stretch;
   width: 100%;
   min-width: 0;
   min-height: 0;
   margin: 0;
-  padding: 12px 16px;
+  padding: 14px 20px 16px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(218, 210, 202, 0.98);
+  border: 1px solid rgba(224, 216, 210, 0.92);
+  border-left: 4px solid rgba(232, 152, 168, 0.95);
   background: #fff;
   box-shadow:
-    0 1px 2px rgba(45, 38, 32, 0.06),
-    0 4px 14px rgba(45, 38, 32, 0.05);
+    0 1px 3px rgba(45, 38, 32, 0.07),
+    0 6px 18px rgba(45, 38, 32, 0.06);
   overflow: hidden;
   transition:
     border-color 160ms ease,
@@ -15893,10 +15894,11 @@ button {
 .queue-history-list > .thread-card.thread-card-cross-mailbox,
 .queue-history-list > .thread-card.thread-card-cross-mailbox.thread-card-selected {
   min-height: 0;
-  padding: 12px 16px;
+  padding: 14px 20px 16px 14px;
   border-radius: 8px;
   background: #fff;
-  border-color: rgba(218, 210, 202, 0.98);
+  border: 1px solid rgba(224, 216, 210, 0.92);
+  border-left: 4px solid rgba(232, 152, 168, 0.95);
 }
 
 .queue-history-list > .thread-card + .thread-card {
@@ -15904,30 +15906,31 @@ button {
 }
 
 .queue-history-list > .thread-card:not(.thread-card-selected):hover {
-  border-color: rgba(200, 190, 180, 0.98);
+  border-color: rgba(214, 206, 200, 0.98);
+  border-left-color: rgba(228, 145, 162, 0.98);
   box-shadow:
-    0 1px 3px rgba(45, 38, 32, 0.08),
-    0 8px 22px rgba(45, 38, 32, 0.07);
+    0 2px 4px rgba(45, 38, 32, 0.09),
+    0 10px 24px rgba(45, 38, 32, 0.07);
 }
 
 .queue-history-list > .thread-card-selected {
   min-height: 0 !important;
-  padding: 12px 16px !important;
+  padding: 14px 20px 16px 14px !important;
   border-radius: 8px !important;
-  border: 1px solid rgba(188, 175, 162, 0.92) !important;
+  border: 1px solid rgba(208, 198, 190, 0.95) !important;
+  border-left: 4px solid rgba(220, 130, 150, 0.95) !important;
   background: #fff !important;
   box-shadow:
-    0 2px 4px rgba(45, 38, 32, 0.08),
-    0 10px 26px rgba(45, 38, 32, 0.09) !important;
-  gap: clamp(6px, 1.2vw, 10px) !important;
+    0 2px 5px rgba(45, 38, 32, 0.08),
+    0 8px 22px rgba(45, 38, 32, 0.09) !important;
 }
 
 /* Rad 1 */
 .queue-history-list > .thread-card .thread-card-head {
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: clamp(8px, 2vw, 12px);
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
   width: 100%;
   overflow: hidden;
@@ -15939,8 +15942,6 @@ button {
 }
 
 .queue-history-list > .thread-card.thread-card-cross-mailbox .thread-card-head {
-  display: flex;
-  flex-wrap: nowrap;
   padding: 0;
   border: 0;
   background: transparent !important;
@@ -15950,8 +15951,8 @@ button {
 .queue-history-list > .thread-card .thread-card-identity {
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: clamp(8px, 2vw, 12px);
+  align-items: flex-start;
+  gap: 10px;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -15959,12 +15960,13 @@ button {
 
 .queue-history-list > .thread-card .avatar {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid rgba(228, 222, 216, 0.95);
-  box-shadow: 0 1px 2px rgba(45, 38, 32, 0.07);
+  background: rgba(236, 232, 228, 0.98);
+  border: 1px solid rgba(228, 222, 216, 0.88);
+  box-shadow: none;
 }
 
 .queue-history-list > .thread-card .thread-card-head-copy {
@@ -15972,7 +15974,7 @@ button {
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
-  gap: clamp(6px, 1.5vw, 10px);
+  gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -15991,7 +15993,7 @@ button {
   gap: 6px;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(52%, 22rem);
+  max-width: min(46%, 20rem);
   overflow: hidden;
 }
 
@@ -16016,10 +16018,10 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(12px, 3.2vw, 14px);
-  line-height: 1.25;
+  font-size: 13px;
+  line-height: 1.3;
   font-weight: 700;
-  color: rgba(26, 22, 20, 0.98);
+  color: rgba(42, 36, 32, 0.98);
 }
 
 .queue-history-list > .thread-card .thread-subject-context {
@@ -16028,10 +16030,10 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(11px, 2.9vw, 13px);
-  line-height: 1.25;
-  font-weight: 600;
-  color: rgba(108, 98, 90, 0.9);
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 500;
+  color: rgba(110, 100, 92, 0.88);
 }
 
 .queue-history-list > .thread-card .thread-unread-indicator {
@@ -16048,20 +16050,20 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
-  font-size: clamp(11px, 2.9vw, 13px);
-  line-height: 1.3;
-  font-weight: 500;
-  color: rgba(102, 94, 86, 0.92);
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 400;
+  color: rgba(118, 110, 102, 0.95);
 }
 
 .queue-history-list > .thread-card[data-row-family="booking_system_mail"] .thread-story,
 .queue-history-list > .thread-card[data-row-family="notification/system_notice"] .thread-story {
-  color: rgba(88, 80, 74, 0.94);
+  color: rgba(100, 92, 86, 0.94);
 }
 
 .queue-history-list > .thread-card .thread-story-placeholder {
-  color: rgba(118, 110, 102, 0.82);
-  font-weight: 560;
+  color: rgba(130, 122, 114, 0.82);
+  font-weight: 500;
 }
 
 .queue-history-list > .thread-card .thread-card-stamp {
@@ -16069,12 +16071,13 @@ button {
   flex-direction: column;
   flex-wrap: nowrap;
   align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-start;
   flex: 0 0 auto;
   min-width: 0;
-  max-width: min(38%, 10rem);
+  max-width: min(34%, 9rem);
   overflow: hidden;
   gap: 2px;
+  padding-top: 1px;
 }
 
 .queue-history-list > .thread-card .thread-card-stamp-top {
@@ -16095,15 +16098,15 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
-  font-size: clamp(10px, 2.6vw, 12px);
+  font-size: 11px;
   line-height: 1.25;
-  font-weight: 600;
-  color: rgba(68, 62, 56, 0.92);
+  font-weight: 500;
+  color: rgba(130, 122, 116, 0.92);
 }
 
 .queue-history-list > .thread-card .thread-owner {
-  font-weight: 560;
-  color: rgba(96, 88, 82, 0.88);
+  font-weight: 500;
+  color: rgba(130, 122, 116, 0.88);
 }
 
 /* Rad 2 + 3 */
@@ -16112,12 +16115,13 @@ button {
   display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
-  gap: clamp(4px, 1vw, 8px);
+  gap: 8px;
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0;
+  padding: 10px 0 0;
   border: 0;
+  border-top: 1px solid rgba(230, 224, 218, 0.95);
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -16126,7 +16130,7 @@ button {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: clamp(4px, 1.2vw, 8px);
+  gap: 10px;
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -16136,37 +16140,30 @@ button {
   flex-wrap: nowrap;
 }
 
+.queue-history-list > .thread-card .thread-intelligence-item-head,
+.queue-history-list > .thread-card .thread-intelligence-item-icon {
+  display: none;
+}
+
 .queue-history-list > .thread-card .thread-intelligence-item,
 .queue-history-list > .thread-card button.thread-intelligence-item {
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 5px;
+  gap: 0;
   flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   margin: 0;
-  padding: 3px 7px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: 0;
   border: 0;
-  background: rgba(246, 244, 242, 0.96);
+  background: transparent !important;
   font: inherit;
   text-align: left;
   cursor: inherit;
-}
-
-.queue-history-list > .thread-card .thread-intelligence-item-head {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  min-width: 0;
-}
-
-.queue-history-list > .thread-card .thread-intelligence-item-icon,
-.queue-history-list > .thread-card .thread-intelligence-item-icon .pill-icon,
-.queue-history-list > .thread-card .thread-intelligence-item-icon svg {
-  flex-shrink: 0;
+  box-shadow: none;
 }
 
 .queue-history-list > .thread-card .thread-intelligence-item-value {
@@ -16175,13 +16172,29 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(9px, 2.5vw, 11px);
-  line-height: 1.25;
-  font-weight: 640;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.queue-history-list > .thread-card .thread-intelligence-item--mailbox .thread-intelligence-item-value {
+  color: rgba(72, 66, 60, 0.92);
+}
+
+.queue-history-list > .thread-card .thread-intelligence-item--what .thread-intelligence-item-value {
+  color: #5a58b0;
 }
 
 .queue-history-list > .thread-card .thread-intelligence-item--why .thread-intelligence-item-value {
-  color: inherit;
+  color: #b8567a;
+}
+
+.queue-history-list > .thread-card .thread-intelligence-item--next .thread-intelligence-item-value {
+  color: #2f8f56;
+}
+
+.queue-history-list > .thread-card .thread-intelligence-item--source .thread-intelligence-item-value {
+  color: #6b5a9a;
 }
 
 .queue-history-list > .thread-card .intel-card-provenance,
@@ -16195,6 +16208,7 @@ button {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  border: 0;
 }
 
 .queue-history-list > .thread-card .thread-card-provenance {
@@ -16203,23 +16217,24 @@ button {
 
 .queue-history-list > .thread-card .intel-card-provenance-label {
   flex: 0 0 auto;
-  color: rgba(124, 118, 112, 0.78);
-  font-size: clamp(8px, 2.2vw, 10px);
-  line-height: 1.2;
+  color: #7a6bab;
+  font-size: 9px;
+  line-height: 1.25;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .queue-history-list > .thread-card .intel-card-provenance-label::before {
   content: "|";
   display: inline;
+  margin-right: 5px;
+  color: #8b7ec4;
+  opacity: 0.95;
   width: auto;
   height: auto;
-  margin-right: 5px;
   border-radius: 0;
   background: none;
-  opacity: 0.55;
   font-weight: 700;
 }
 
@@ -16230,33 +16245,12 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(9px, 2.5vw, 11px);
-  line-height: 1.3;
-  font-weight: 600;
-  color: rgba(102, 96, 90, 0.88);
+  font-size: 10.5px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: rgba(118, 110, 104, 0.9);
 }
 
-/* Chip-ytor per ton */
-.queue-history-list > .thread-card .thread-intelligence-item--mailbox {
-  background: rgba(238, 234, 230, 0.98);
-  color: #5a4a42;
-}
-.queue-history-list > .thread-card .thread-intelligence-item--what {
-  background: rgba(232, 240, 255, 0.95);
-  color: var(--accent-indigo);
-}
-.queue-history-list > .thread-card .thread-intelligence-item--why {
-  background: rgba(255, 232, 244, 0.92);
-  color: var(--accent-magenta);
-}
-.queue-history-list > .thread-card .thread-intelligence-item--next {
-  background: rgba(232, 248, 238, 0.95);
-  color: var(--accent-green);
-}
-.queue-history-list > .thread-card .thread-intelligence-item--source {
-  background: rgba(240, 238, 252, 0.95);
-  color: #5a5680;
-}
 
 
 .queue-history-item:not(.thread-card) {
