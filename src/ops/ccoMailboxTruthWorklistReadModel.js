@@ -1,5 +1,7 @@
 const {
   extractEmail,
+  humanizeCounterpartyEmail,
+  resolveCounterpartyDisplayName,
   resolveCounterpartyIdentity,
 } = require('./ccoCounterpartyTruth');
 
@@ -274,9 +276,75 @@ function deriveLatestSortIso(message = {}) {
   );
 }
 
+function buildMailboxIdentityEmailSet(message = {}, mailboxId = '') {
+  const safeMessage = asObject(message);
+  return new Set(
+    [
+      mailboxId,
+      safeMessage.mailboxId,
+      safeMessage.mailboxAddress,
+      safeMessage.userPrincipalName,
+    ]
+      .map((item) => extractEmail(item))
+      .filter(Boolean)
+  );
+}
+
+/**
+ * For Sent/outbound, prefer a recipient that is not the clinic mailbox (Graph may thread
+ * outbound separately; replyTo is not always the customer, so To/Cc come first).
+ */
+function resolveOutboundCounterpartyForWorklist(message = {}, mailboxId = '') {
+  const safeMessage = asObject(message);
+  const identitySet = buildMailboxIdentityEmailSet(safeMessage, mailboxId);
+  const orderedRecipientFields = [
+    ...asArray(safeMessage.toRecipients),
+    ...asArray(safeMessage.ccRecipients),
+    ...asArray(safeMessage.replyToRecipients),
+    ...asArray(safeMessage.bccRecipients),
+  ];
+  for (const item of orderedRecipientFields) {
+    const obj = asObject(item);
+    const email = extractEmail(obj.address || item);
+    if (!email || identitySet.has(email)) continue;
+    const rawName = normalizeText(obj.name);
+    const displayName = resolveCounterpartyDisplayName(rawName, email);
+    return {
+      email,
+      name: displayName,
+      rawName: rawName || null,
+      fallbackLabel: displayName || email,
+    };
+  }
+  for (const raw of asArray(safeMessage.recipients)) {
+    const email = extractEmail(typeof raw === 'string' ? raw : asObject(raw).address || raw);
+    if (!email || identitySet.has(email)) continue;
+    const displayName = humanizeCounterpartyEmail(email);
+    return {
+      email,
+      name: displayName || email,
+      rawName: null,
+      fallbackLabel: displayName || email,
+    };
+  }
+  return null;
+}
+
 function deriveCounterparty(message = {}, mailboxId = '') {
   const safeMessage = asObject(message);
   const direction = normalizeDirection(safeMessage.direction, safeMessage.folderType);
+  const folderType = normalizeText(safeMessage.folderType).toLowerCase();
+  if (direction === 'outbound' || folderType === 'sent') {
+    const outbound = resolveOutboundCounterpartyForWorklist(safeMessage, mailboxId);
+    if (outbound) {
+      return {
+        email: outbound.email,
+        name: outbound.name,
+        rawName: outbound.rawName,
+        fallbackLabel: outbound.fallbackLabel,
+      };
+    }
+  }
   const counterparty = resolveCounterpartyIdentity(safeMessage, {
     mailboxId,
     direction,
@@ -330,13 +398,25 @@ function getWorklistMergeIdentityKey(row = {}) {
     },
   ].filter((candidate) => candidate.value);
   const chosen = candidates[0] || null;
-  return chosen
-    ? {
-        key: `${chosen.type}:${chosen.value}`,
-        type: chosen.type,
-        value: chosen.value,
-      }
-    : null;
+  if (chosen) {
+    return {
+      key: `${chosen.type}:${chosen.value}`,
+      type: chosen.type,
+      value: chosen.value,
+    };
+  }
+  const emailFallback =
+    extractEmail(row.customerEmail) ||
+    extractEmail(row.customer?.email) ||
+    extractEmail(identity.customerEmail);
+  if (emailFallback) {
+    return {
+      key: `customerEmail:${emailFallback}`,
+      type: 'customerEmail',
+      value: emailFallback,
+    };
+  }
+  return null;
 }
 
 function hasWorklistHardMergeConflict(left = {}, right = {}) {
@@ -450,6 +530,10 @@ function buildWorklistRollupRow(rows = []) {
   };
   const customerIdentity = normalizeIdentityCarrier(primaryRow).customerIdentity;
   const mergedCount = safeRows.length;
+  const publicConversationKey =
+    rollupIdentity.type === 'customerEmail' && mergedCount === 1
+      ? normalizeText(primaryRow?.conversationKey || primaryRow?.id || '') || rollupIdentity.key
+      : rollupIdentity.key;
   const hasUnreadInbound = safeRows.some((row) => row?.hasUnreadInbound === true);
   const needsReply = safeRows.some((row) => row?.needsReply === true);
   const unreadCount = safeRows.filter((row) => row?.hasUnreadInbound === true).length;
@@ -486,7 +570,7 @@ function buildWorklistRollupRow(rows = []) {
   const provenanceLabel = uniqueMailboxLabels.length > 1 ? `${uniqueMailboxLabels.length} mailboxar` : '';
   return {
     ...primaryRow,
-    conversationKey: rollupIdentity.key,
+    conversationKey: publicConversationKey,
     conversationId: primaryRow?.conversationId || uniqueConversationIds[0] || null,
     mailboxConversationId: primaryRow?.mailboxConversationId || uniqueConversationIds[0] || null,
     subject,
