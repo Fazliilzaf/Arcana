@@ -471,6 +471,34 @@ function compareWorklistRollupRows(left = {}, right = {}) {
   );
 }
 
+function buildQueueInlineContext(row = {}) {
+  const rollup = asObject(row.rollup);
+  if (rollup.enabled === true && Number(rollup.mailboxCount || 0) > 1) {
+    return 'Samma kund har skrivit från flera mailboxar';
+  }
+  if (normalizeActionState(row?.operatorState?.actionState) === 'reply_later') {
+    return 'Vantar pa uppfoljning enligt operatorsplan';
+  }
+  if (row?.needsReply === true) {
+    return 'Behover svar i aktiv dialog';
+  }
+  return '';
+}
+
+function buildQueueExplanatoryLine(row = {}) {
+  const rollup = asObject(row.rollup);
+  if (rollup.enabled === true && Number(rollup.mailboxCount || 0) > 1) {
+    return 'Historiken halls ihop, men varje meddelande visar sin mailboxproveniens.';
+  }
+  if (normalizeActionState(row?.operatorState?.actionState) === 'reply_later') {
+    return 'Traden ligger i reply-later och visar nasta planerade uppfoljningssteg.';
+  }
+  if (row?.needsReply === true) {
+    return 'Senaste inkommande meddelande vantar pa operativ uppfoljning.';
+  }
+  return '';
+}
+
 function buildWorklistRollupRow(rows = []) {
   const safeRows = asArray(rows).filter((row) => row && typeof row === 'object');
   const primaryRow = [...safeRows].sort(compareWorklistRollupRows)[0] || null;
@@ -1082,7 +1110,10 @@ function createCcoMailboxTruthWorklistReadModel({
           tomorrowCount,
         },
       },
-      rows: rollupRows.map((row) => ({
+      rows: rollupRows.map((row) => {
+        const inlineContext = buildQueueInlineContext(row);
+        const explanatoryLine = buildQueueExplanatoryLine(row);
+        return {
         id: row.conversationKey,
         lane: row.lane || 'all',
         placementIndex: row.placementIndex,
@@ -1109,6 +1140,13 @@ function createCcoMailboxTruthWorklistReadModel({
         mergeReviewDecisionsByPairId: row.mergeReviewDecisionsByPairId,
         identityProvenance: row.identityProvenance,
         rollup: row.rollup,
+        queueInlineContext: inlineContext || null,
+        queueExplanatoryLine: explanatoryLine || null,
+        presentation: {
+          primaryLabel: row.customerName || row.customerEmail || null,
+          inlineContext: inlineContext || null,
+          explanatoryLine: explanatoryLine || null,
+        },
         timing: {
           latestMessageAt: row.latestMessageAt,
           lastInboundAt: row.lastInboundAt,
@@ -1131,7 +1169,8 @@ function createCcoMailboxTruthWorklistReadModel({
               ? 'cco_conversation_state_store'
               : null,
         },
-      })),
+      };
+      }),
     };
   }
 
