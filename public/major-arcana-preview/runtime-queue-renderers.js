@@ -427,8 +427,7 @@
       const foundationSource =
         asText(foundationState?.source) ||
         (foundationMode === "foundation" ? "mail_foundation" : "legacy_preview_fallback");
-      const modelQueuePreview = compactRuntimeCopy(asText(thread.queuePreviewText), "", 104);
-      const previewFallbackCandidates = [
+      const previewCandidates = [
         ...collectThreadMessagePreviewCandidates(preferredFoundationMessage),
         ...collectThreadMessagePreviewCandidates(thread.mailThreadMessage),
         thread.mailDocument?.previewText,
@@ -461,20 +460,14 @@
         latestCustomerMessage?.body,
         latestCustomerMessage?.bodyPreview,
       ];
-      let previewCopy = modelQueuePreview;
-      if (
-        !previewCopy ||
-        previewLooksGeneric(modelQueuePreview, modelQueuePreview)
-      ) {
-        previewCopy = "";
-        for (const candidate of previewFallbackCandidates) {
-          const candidateRaw = asText(candidate).replace(/\s+/g, " ").trim();
-          if (!candidateRaw) continue;
-          const candidatePreview = sanitizeMailPreview(candidateRaw);
-          if (previewLooksGeneric(candidateRaw, candidatePreview)) continue;
-          previewCopy = candidatePreview;
-          break;
-        }
+      let previewCopy = "";
+      for (const candidate of previewCandidates) {
+        const candidateRaw = asText(candidate).replace(/\s+/g, " ").trim();
+        if (!candidateRaw) continue;
+        const candidatePreview = sanitizeMailPreview(candidateRaw);
+        if (previewLooksGeneric(candidateRaw, candidatePreview)) continue;
+        previewCopy = candidatePreview;
+        break;
       }
       const hasUnread = thread.unread === true || thread.isUnread === true;
       const unreadIndicatorMarkup = hasUnread
@@ -1431,10 +1424,28 @@
       const whatSignalValue = asText(
         asArray(item.signalItems).find((signal) => normalizeKey(signal?.role || signal?.tone) === "what")?.value
       );
+      const inlineContextHint = asText(
+        item.inlineContext ||
+          item.queueInlineContext ||
+          item.presentation?.inlineContext
+      );
       const hasExplicitWhatSignal = Boolean(whatSignalValue);
       const issueContextSource =
-        whatSignalValue || asText(item.intentLabel) || primaryHistoryTitle || counterpartyCopy;
+        inlineContextHint ||
+        whatSignalValue ||
+        asText(item.intentLabel) ||
+        primaryHistoryTitle ||
+        counterpartyCopy;
       const issueContextLabel = compactRuntimeCopy(issueContextSource, "", 40);
+      const explanatoryLineHint = compactRuntimeCopy(
+        asText(
+          item.explanatoryLine ||
+            item.queueExplanatoryLine ||
+            item.presentation?.explanatoryLine
+        ),
+        "",
+        132
+      );
       let secondaryContextFallback = stripRepeatedHistoryLead(asText(item.detail), [
         counterpartyCopy,
         rawHistoryTitle,
@@ -1456,11 +1467,13 @@
         ).trim();
       }
       secondaryContextFallback = secondaryContextFallback.replace(/^[,.;:-]+\s*/g, "").trim();
-      const snippetValue = compactRuntimeCopy(
-        asText(secondaryContextFallback),
-        "",
-        120
-      );
+      const snippetValue = explanatoryLineHint
+        ? explanatoryLineHint
+        : compactRuntimeCopy(
+            asText(secondaryContextFallback),
+            "",
+            120
+          );
       const showIssueContext = Boolean(issueContextLabel);
       const showSnippet =
         Boolean(snippetValue) &&
@@ -1519,6 +1532,14 @@
           ? `<div class="thread-support-stack${isSelected ? " thread-support-stack-selected" : ""}">${intelligenceMarkup}${provenanceMarkup}</div>`
           : "";
 
+      const showTitleContext =
+        Boolean(primaryHistoryTitle) &&
+        normalizeHistoryCompareValue(primaryHistoryTitle) !==
+          normalizeHistoryCompareValue(counterpartyCopy);
+      const subjectContextSpan = showTitleContext
+        ? `<span class="thread-subject-context">${escapeHtml(primaryHistoryTitle)}</span>`
+        : "";
+
       return `<article class="thread-card queue-history-item${selectedClass}${
         isSelected ? " thread-card-selected" : ""
       }${laneClass}${operationalClass}${unreadClass}${loadingClass}"${runtimeThreadAttribute}${worklistSourceAttribute}${worklistSourceLabelAttribute}${historyConversationAttribute}${selectedState}>
@@ -1529,10 +1550,11 @@
               <div class="thread-heading thread-heading-merged">
                 ${freshnessMarkup}
                 <p class="thread-subject">
-                  <span class="thread-subject-primary">${escapeHtml(primaryHistoryTitle)}</span>
+                  <span class="thread-subject-primary">${escapeHtml(counterpartyCopy)}</span>
+                  ${subjectContextSpan}
                 </p>
               </div>
-              ${secondaryLineMarkup}
+              <div class="thread-card-head-secondary">${secondaryLineMarkup}</div>
             </div>
           </div>
           <div class="thread-card-stamp">
@@ -1766,13 +1788,35 @@
               ? cleanedPreview
               : "Ingen förhandsvisning tillgänglig."
             : "";
+      const inlineContextHint = compactRuntimeCopy(
+        asText(
+          thread.queueInlineContext ||
+            thread.presentation?.inlineContext ||
+            thread.rollup?.presentation?.inlineContext
+        ),
+        "",
+        72
+      );
+      const explanatoryLineHint = compactRuntimeCopy(
+        asText(
+          thread.queueExplanatoryLine ||
+            thread.presentation?.explanatoryLine ||
+            thread.rollup?.presentation?.explanatoryLine
+        ),
+        "",
+        132
+      );
+      const resolvedTitle = inlineContextHint || title || "Aktiv tråd";
+      const finalDetail = explanatoryLineHint || resolvedDetail;
       return {
         initials: getQueueHistoryItemInitials(thread.customerName),
         counterpartyLabel,
         time: asText(thread.lastActivityLabel),
         recordedAt: asText(thread.lastActivityAt),
-        title: title || "Aktiv tråd",
-        detail: resolvedDetail,
+        title: resolvedTitle,
+        detail: finalDetail,
+        inlineContext: inlineContextHint,
+        explanatoryLine: explanatoryLineHint,
         snippetText: cleanedPreview || rawDetail,
         laneId: primaryLaneId,
         signalItems:
