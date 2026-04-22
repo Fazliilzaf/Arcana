@@ -1490,6 +1490,23 @@
             snippetValue
           )}</p>`
         : "";
+      const explicitExplanatoryLine = compactRuntimeCopy(
+        asText(
+          item.explanatoryLine ||
+            item.queueExplanatoryLine ||
+            item.presentation?.explanatoryLine ||
+            (Number(item.rollup?.mailboxCount || 0) > 1
+              ? "Historiken hålls ihop, men varje meddelande visar sin mailboxproveniens."
+              : "")
+        ),
+        "",
+        160
+      );
+      const explanatoryLineMarkup = explicitExplanatoryLine
+        ? `<div class="thread-card-head-secondary"><p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(
+            explicitExplanatoryLine
+          )}</p></div>`
+        : "";
       const secondaryLineMarkup = `${issueContextMarkup}${snippetLineMarkup}`;
       const intelligenceMarkup = historySignals.length
         ? `<div class="thread-intelligence-row queue-history-item-meta queue-history-item-meta--fullwidth">
@@ -1553,13 +1570,14 @@
           <div class="thread-card-identity">
             <img class="avatar" src="${avatarSrc}" alt="${escapeHtml(counterpartyCopy)}" />
             <div class="thread-card-head-copy">
-              <div class="thread-heading thread-heading-merged">
+              <div class="thread-heading-merged-full">
                 ${freshnessMarkup}
                 <p class="thread-subject">
                   <span class="thread-subject-primary">${escapeHtml(counterpartyCopy)}</span>
                   ${subjectContextSpan}
                 </p>
               </div>
+              ${explanatoryLineMarkup}
               <div class="thread-card-head-secondary">${secondaryLineMarkup}</div>
             </div>
           </div>
@@ -1848,6 +1866,7 @@
         mailboxProvenanceDetail: asText(
           thread.mailboxProvenanceDetail || thread?.rollup?.provenanceDetail
         ),
+        rollup: thread?.rollup || null,
         intentLabel: asText(thread.intentLabel),
         worklistSource: asText(thread.worklistSource || "legacy"),
         worklistSourceLabel: asText(thread.worklistSourceLabel),
