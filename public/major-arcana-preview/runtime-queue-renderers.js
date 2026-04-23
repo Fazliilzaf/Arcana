@@ -1144,6 +1144,14 @@
     }
 
     function buildQueueHistoryCardMarkup(item, options = {}) {
+      const HISTORIK_STRINGS = {
+        unknownSender: "Okänd avsändare",
+        history: "Historik",
+        defaultCategory: "Kons",
+        multiMailboxSubtitle: "Samma kund har skrivit från flera mailboxar",
+        mailboxTrailLabel: "MAILBOXSPÅR",
+        mailboxTrailMore: "+{count} till",
+      };
       const resolveMailboxMeta =
         typeof getQueueHistoryMailboxMeta === "function"
           ? getQueueHistoryMailboxMeta
@@ -1219,6 +1227,66 @@
       const selectedState = isSelected
         ? ' aria-current="true" data-history-selected="true"'
         : ' aria-current="false"';
+      const parseMailboxTrailFromDetail = (detail = "") => {
+        // TODO(backend): expose mailboxTrail: string[] from worklist/history payload.
+        // Text parsing is a temporary fallback and may split incorrectly if names contain separators.
+        return asText(detail)
+          .split(/[·,]/g)
+          .map((part) => asText(part).trim())
+          .filter(Boolean);
+      };
+      const normalizeHistoryCardModel = (source = {}) => {
+        const defaultName = HISTORIK_STRINGS.unknownSender;
+        const customerName = asText(source.counterpartyLabel || defaultName, defaultName);
+        const deriveHistoryInitials = (label = "") => {
+          const normalizedLabel = asText(label)
+            .trim()
+            .replace(/\s+/g, " ");
+          if (!normalizedLabel) return "?";
+          const parts = normalizedLabel
+            .split(" ")
+            .map((part) => asText(part).trim())
+            .filter(Boolean);
+          if (!parts.length) return "?";
+          if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+          return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+        };
+        const mailboxTrailFromPayload = asArray(source.mailboxTrail)
+          .map((entry) => asText(entry).trim())
+          .filter(Boolean);
+        const mailboxTrailFromRollup = asArray(source.rollup?.underlyingMailboxIds)
+          .map((entry) => asText(entry).trim())
+          .filter(Boolean);
+        const mailboxTrailFromDetail = parseMailboxTrailFromDetail(
+          source.mailboxProvenanceDetail || source.rollup?.provenanceDetail || ""
+        );
+        const mailboxTrail = mailboxTrailFromPayload.length
+          ? mailboxTrailFromPayload
+          : mailboxTrailFromRollup.length
+            ? mailboxTrailFromRollup
+            : mailboxTrailFromDetail;
+        const normalizedLaneId = normalizeKey(source.laneId || "");
+        const highRiskSignal = asArray(source.signalItems).some((signal = {}) => {
+          const role = normalizeKey(signal.role || signal.tone || "");
+          const value = normalizeKey(signal.value || "");
+          return role === "why" && (value.includes("hög risk") || value.includes("risk"));
+        });
+        const status =
+          normalizedLaneId === "act-now" || highRiskSignal
+            ? "urgent"
+            : normalizedLaneId === "history" || !asText(source.ownerLabel)
+              ? "waiting"
+              : "active";
+        return {
+          customerName,
+          customerInitials: asText(source.initials || deriveHistoryInitials(customerName), "?"),
+          mailboxTrail,
+          subtitle:
+            mailboxTrail.length > 1 ? HISTORIK_STRINGS.multiMailboxSubtitle : "",
+          status,
+        };
+      };
+      const normalizedHistoryModel = normalizeHistoryCardModel(item);
       const subjectMarkup = asText(item.title)
         ? `<p class="subject queue-history-item-subject">${escapeHtml(item.title)}</p>`
         : "";
@@ -1346,7 +1414,7 @@
       </article>`;
       }
 
-      const counterpartyCopy = asText(item.counterpartyLabel || "Okänd avsändare");
+      const counterpartyCopy = normalizedHistoryModel.customerName;
       const normalizeHistoryCompareValue = (value = "") =>
         asText(value)
           .trim()
@@ -1380,20 +1448,7 @@
         rawHistoryTitle || "Historikrad",
         72
       );
-      const deriveHistoryInitials = (label = "") => {
-        const normalizedLabel = asText(label)
-          .trim()
-          .replace(/\s+/g, " ");
-        if (!normalizedLabel) return "?";
-        const parts = normalizedLabel
-          .split(" ")
-          .map((part) => asText(part).trim())
-          .filter(Boolean);
-        if (!parts.length) return "?";
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
-      };
-      const avatarText = asText(item.initials || deriveHistoryInitials(counterpartyCopy), "?");
+      const avatarText = normalizedHistoryModel.customerInitials;
       const avatarSrc =
         typeof buildAvatarDataUri === "function" ? buildAvatarDataUri(avatarText) : "";
       const stampLabel = asText(
@@ -1402,7 +1457,7 @@
           worklistSourceLabel ||
           item.mailboxProvenanceLabel ||
           item.mailboxLabel ||
-          "Historik"
+          HISTORIK_STRINGS.history
       );
       const historySignals = [];
       const pushHistorySignal = (role, value, iconKey = "", marker = "") => {
