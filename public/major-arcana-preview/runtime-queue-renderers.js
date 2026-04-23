@@ -1388,12 +1388,22 @@
         item.isUnread === true
           ? '<span class="queue-history-item-freshness" aria-label="Nytt oläst mejl"><span class="queue-history-item-freshness-dot"></span></span>'
           : "";
-      const buildHistorySignalIconMarkup = (iconKey) => {
-        if (typeof createPillIcon !== "function") return "";
-        const iconNode = createPillIcon(iconKey);
-        if (!iconNode) return "";
-        if (typeof iconNode === "string") return iconNode;
-        if (typeof iconNode.outerHTML === "string") return iconNode.outerHTML;
+      const buildInlineHistoryIconMarkup = (iconType = "") => {
+        if (iconType === "mail") {
+          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-10 5L2 7"></path></svg>';
+        }
+        if (iconType === "users") {
+          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+        }
+        if (iconType === "alert") {
+          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+        }
+        if (iconType === "chevron-right") {
+          return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        }
+        if (iconType === "inbox") {
+          return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>';
+        }
         return "";
       };
 
@@ -1601,26 +1611,49 @@
           )}</p></div>`
         : "";
       const secondaryLineMarkup = `${issueContextMarkup}${snippetLineMarkup}`;
-      const intelligenceMarkup = historySignals.length
-        ? `<div class="thread-intelligence-row queue-history-item-meta queue-history-item-meta--fullwidth">
-            ${historySignals
-              .map((signal) => {
-                const historyIconMarkup = buildHistorySignalIconMarkup(signal.iconKey);
-                return `<span class="thread-intelligence-item thread-intelligence-item--${escapeHtml(
-                  signal.role
-                )}"${
-                  signal.marker
-                    ? ` data-history-pill-class="${escapeHtml(signal.marker)}"`
-                    : ""
-                }${signal.iconKey ? ` data-pill-icon="${escapeHtml(signal.iconKey)}"` : ""}>
-                  <span class="thread-intelligence-item-head">${
-                    historyIconMarkup
-                      ? `<span class="thread-intelligence-item-icon">${historyIconMarkup}</span>`
-                      : ""
-                  }</span>
-                  <span class="thread-intelligence-item-value">${escapeHtml(signal.value)}</span>
-                </span>`;
-              })
+      const relationshipChipValue =
+        normalizedHistoryModel.mailboxTrail.length > 1
+          ? HISTORIK_STRINGS.multiMailboxSubtitle
+          : "";
+      const priorityChipValue = asText(
+        historySignals.find((signal) => signal.role === "why")?.value || item.intentLabel
+      );
+      const actionChipValue = asText(
+        historySignals.find((signal) => signal.role === "next")?.value || item.nextActionLabel
+      );
+      const footerChips = [
+        {
+          key: "category",
+          value: asText(item.mailboxLabel, HISTORIK_STRINGS.defaultCategory),
+          icon: "mail",
+          toneClass: "chip-gray",
+        },
+        {
+          key: "relationship",
+          value: relationshipChipValue,
+          icon: "users",
+          toneClass: "chip-blue",
+        },
+        {
+          key: "priority",
+          value: priorityChipValue,
+          icon: "alert",
+          toneClass: "chip-pink",
+        },
+        {
+          key: "action",
+          value: actionChipValue,
+          icon: "chevron-right",
+          toneClass: "chip-green",
+        },
+      ].filter((chip) => asText(chip.value));
+      const intelligenceMarkup = footerChips.length
+        ? `<div class="thread-intelligence-row queue-history-item-meta queue-history-item-meta--fullwidth card-footer">
+            ${footerChips
+              .map((chip) => `<span class="thread-intelligence-item chip ${chip.toneClass}" data-history-chip="${chip.key}">
+                  ${buildInlineHistoryIconMarkup(chip.icon)}
+                  <span class="thread-intelligence-item-value">${escapeHtml(chip.value)}</span>
+                </span>`)
               .join("")}
           </div>`
         : "";
