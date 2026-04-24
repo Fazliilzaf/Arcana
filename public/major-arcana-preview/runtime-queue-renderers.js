@@ -994,17 +994,6 @@
           ? `<div class="row-2 history-card-row-2">${escapeHtml(content.previewLine)}</div>`
           : "";
 
-      const explanatoryLineMarkup = asText(unifiedModel.explanatoryLine)
-        ? `<div class="queue-card-snippet"><p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(
-            unifiedModel.explanatoryLine
-          )}</p></div>`
-        : "";
-      const secondarySnippet = asText(unifiedModel.secondarySnippet);
-      const secondaryInner = secondarySnippet
-        ? `<p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(secondarySnippet)}</p>`
-        : "";
-      const headSecondaryClosing = `<div class="queue-card-snippet">${secondaryInner}</div>`;
-
       const selectedClass = isSelected ? " is-selected" : "";
       const selectedArticleClass = isSelected ? " thread-card-selected" : "";
       const selectedState = isSelected
@@ -1052,25 +1041,21 @@
           <div class="avatar-wrap history-avatar-wrap">
             <span class="avatar queue-history-avatar history-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
             <span class="status-dot ${escapeHtml(statusDot)}" aria-hidden="true"></span>
-            <div class="card-body">
-              <div class="row-1 history-card-row-1">
-                <p class="history-card-name">
-                  <span class="name">${escapeHtml(counterpartyCopy)}</span>
-                  ${subtitleMarkup}
-                </p>
-              </div>
-              ${previewMarkup}
-            </div>
           </div>
-          <div class="meta history-card-meta">
-            <div class="meta-date"><time datetime="${escapeHtml(
-              unifiedModel.recordedAt || ""
-            )}">${escapeHtml(unifiedModel.time || "")}</time></div>
-            <span class="meta-status">${escapeHtml(stampLabel)}</span>
+          <div class="card-body">
+            <div class="row-1 history-card-row-1">
+              <span class="name">${escapeHtml(counterpartyCopy)}</span>
+              ${subtitleMarkup}
+              <div class="meta history-card-meta">
+                <div class="meta-date"><time datetime="${escapeHtml(
+                  unifiedModel.recordedAt || ""
+                )}">${escapeHtml(unifiedModel.time || "")}</time></div>
+                <span class="meta-status">${escapeHtml(stampLabel)}</span>
+              </div>
+            </div>
+            ${previewMarkup}
           </div>
         </div>
-        ${explanatoryLineMarkup}
-        ${headSecondaryClosing}
         ${supportMarkup}
       </article>`;
     }
