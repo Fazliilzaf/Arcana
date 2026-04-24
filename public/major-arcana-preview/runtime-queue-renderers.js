@@ -220,561 +220,16 @@
       ];
     }
 
-    function buildRuntimeThreadCardPresentation(thread, selected) {
-      const tags = asArray(thread.tags);
-      const normalizeCardValue = (value) => String(value || "").trim().toLowerCase();
-      const escapeRegExp = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const buildThreadSignalIconMarkup = (iconKey) => {
-        if (typeof createPillIcon !== "function") return "";
-        const iconNode = createPillIcon(iconKey);
-        if (!iconNode) return "";
-        if (typeof iconNode === "string") return iconNode;
-        if (typeof iconNode.outerHTML === "string") return iconNode.outerHTML;
-        return "";
-      };
-      const normalizedCustomerName = String(thread.customerName || "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9]+/g, "_")
-        .replace(/^_+|_+$/g, "");
-      const genericCustomerName = [
-        "okand_avsandare",
-        "okand_kund",
-        "unknown",
-        "unknown_customer",
-        "unknown_sender",
-      ].includes(normalizedCustomerName);
-      const subjectFallback =
-        !genericCustomerName && thread.customerName
-          ? `Konversation med ${thread.customerName}`
-          : thread.mailboxLabel
-            ? `Nytt inkommande mejl i ${thread.mailboxLabel}`
-            : "Nytt inkommande mejl";
-      const selectedClass = selected ? " thread-card-selected" : "";
-      const crossMailboxEvidenceMode = thread.crossMailboxProvenanceEvidence === true;
-      const priorityClass = tags.includes("act-now")
-        ? " thread-card-act-now"
-        : tags.includes("high-risk")
-          ? " thread-card-high-risk"
-          : "";
-      const nextStepCopy = compactRuntimeCopy(thread.nextActionSummary || thread.systemHint, "", 110);
-      const rawSubjectText = asText(thread.displaySubject || thread.subject).trim();
-      const subjectCopy = compactRuntimeCopy(
-        rawSubjectText,
-        subjectFallback,
-        92
-      );
-      const customerCopy = compactRuntimeCopy(thread.customerName, "Okänd avsändare", 42);
-      const duplicatedSenderPrefixPattern = customerCopy
-        ? new RegExp(`^${escapeRegExp(customerCopy).replace(/\s+/g, "\\s+")}[\\s:|,\\-–—]*`, "i")
-        : null;
-      const subjectContextRaw = rawSubjectText
-        ? rawSubjectText.replace(duplicatedSenderPrefixPattern || /^$/, "").trim()
-        : "";
-      const subjectContextCopy =
-        subjectContextRaw &&
-        normalizeCardValue(subjectContextRaw) !== normalizeCardValue(customerCopy)
-          ? compactRuntimeCopy(subjectContextRaw, "", 54)
-          : "";
-      const stripRepeatedLead = (value = "", leads = []) => {
-        let cleaned = asText(value).replace(/\s+/g, " ").trim();
-        asArray(leads)
-          .map((lead) => asText(lead).replace(/\s+/g, " ").trim())
-          .filter(Boolean)
-          .forEach((lead) => {
-            const leadPattern = new RegExp(`^${escapeRegExp(lead)}(?:\\s*[-:|,–—]\\s*|\\s+)`, "i");
-            cleaned = cleaned.replace(leadPattern, "").trim();
-          });
-        return cleaned;
-      };
-      const extractPreviewTextFromHtml = (value = "") =>
-        asText(value)
-          .replace(/<br\s*\/?>/gi, "\n")
-          .replace(/<\/p>/gi, "\n")
-          .replace(/<\/div>/gi, "\n")
-          .replace(/<\/li>/gi, "\n")
-          .replace(/<li\b[^>]*>/gi, "• ")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/&nbsp;/gi, " ")
-          .replace(/&amp;/gi, "&")
-          .replace(/&lt;/gi, "<")
-          .replace(/&gt;/gi, ">")
-          .replace(/&quot;/gi, '"')
-          .replace(/&#39;|&apos;/gi, "'")
-          .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
-            const parsed = Number.parseInt(code, 16);
-            return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
-          })
-          .replace(/&#([0-9]+);/g, (_, code) => {
-            const parsed = Number.parseInt(code, 10);
-            return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
-          })
-          .replace(/\s+/g, " ")
-          .trim();
-      const sanitizeMailPreview = (value = "") => {
-        let cleaned = stripRepeatedLead(extractPreviewTextFromHtml(value), [
-          customerCopy,
-          rawSubjectText,
-          subjectCopy,
-        ]);
-        if (customerCopy) {
-          cleaned = cleaned.replace(
-            new RegExp(`^Från:\\s*${escapeRegExp(customerCopy)}\\s*`, "i"),
-            ""
-          );
-        }
-        cleaned = cleaned.replace(/^Från:\s*/i, "").trim();
-        while (/^(?:E-post|Email|Epost|Telefon|Phone)\s*:\s*(?:\[[^\]]+\]|\S+)\s*/i.test(cleaned)) {
-          cleaned = cleaned.replace(
-            /^(?:E-post|Email|Epost|Telefon|Phone)\s*:\s*(?:\[[^\]]+\]|\S+)\s*/i,
-            ""
-          ).trim();
-        }
-        cleaned = cleaned
-          .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
-          .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
-          .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
-          .replace(/^Get more done with apps like Word\.?\s*/i, "")
-          .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
-          .replace(/^Read more about why this is important\.?\s*/i, "")
-          .replace(/^hur kan vi hjälpa dig med\s+/i, "Vill ha hjälp med ")
-          .replace(/^hur kan jag få hjälp med\s+/i, "Vill ha hjälp med ")
-          .replace(/^kan ni hjälpa mig med\s+/i, "Vill ha hjälp med ")
-          .replace(/^hur kan vi hjälpa dig\??\s*/i, "")
-          .replace(/^hur kan jag få hjälp\??\s*/i, "")
-          .replace(/^kan ni hjälpa mig\??\s*/i, "")
-          .replace(/^(?:hej|hello|hi)\b[,!:\-\s]*/i, "")
-          .replace(/^[\s_—–-]{6,}/, "")
-          .replace(/^\s*[–—-]\s*/, "")
-          .trim();
-        return compactRuntimeCopy(cleaned, "", 104);
-      };
-      const fallbackSnippet = "Ingen senaste kundsignal ännu.";
-      const placeholderPreviewCopies = [
-        fallbackSnippet,
-        "Ingen förhandsvisning tillgänglig.",
-        "Ingen förhandsvisning tillgänglig",
-        "Ingen ytterligare information tillgänglig.",
-        "Ingen ytterligare information tillgänglig",
-      ].map((value) => normalizeCardValue(value));
-      const previewLooksGeneric = (rawValue = "", cleanedValue = "") => {
-        const normalizedRawPreview = normalizeCardValue(rawValue);
-        const normalizedPreviewCopy = normalizeCardValue(cleanedValue);
-        const previewLooksOperationalStatus =
-          normalizedRawPreview.includes(normalizeCardValue("Unread inbound")) ||
-          normalizedRawPreview.includes(normalizeCardValue("needs reply")) ||
-          normalizedRawPreview.includes(normalizeCardValue("mailbox truth i wave"));
-        const previewLooksProviderNoise =
-          /^\s*du\s+f[åa]r\s+inte\s+ofta\s+e-post/i.test(cleanedValue) ||
-          /^\s*you\s+don['’]t\s+often\s+get\s+email/i.test(cleanedValue) ||
-          /^\s*power up your productivity with microsoft 365/i.test(cleanedValue) ||
-          /^\s*get more done with apps like word/i.test(cleanedValue) ||
-          /^\s*l[aä]s om varf[oö]r det h[aä]r [aä]r viktigt/i.test(cleanedValue);
-        return (
-          !normalizedPreviewCopy ||
-          previewLooksOperationalStatus ||
-          previewLooksProviderNoise ||
-          placeholderPreviewCopies.includes(normalizedRawPreview) ||
-          placeholderPreviewCopies.includes(normalizedPreviewCopy) ||
-          normalizedPreviewCopy === normalizeCardValue(subjectCopy) ||
-          normalizedPreviewCopy === normalizeCardValue(subjectContextCopy) ||
-          normalizedPreviewCopy === normalizeCardValue(customerCopy)
-        );
-      };
-      const previewMessages = asArray(thread.messages);
-      const collectThreadMessagePreviewCandidates = (message = null) => {
-        if (!message || typeof message !== "object") return [];
-        return [
-          message?.presentation?.previewText,
-          message?.presentation?.conversationText,
-          message?.primaryBody?.text,
-        ].filter((candidate) => asText(candidate).trim());
-      };
-      const foundationThreadMessages =
-        asArray(thread.threadDocument?.messages).length > 0
-          ? asArray(thread.threadDocument?.messages)
-          : asArray(thread.raw?.threadDocument?.messages);
-      const preferredFoundationMessage =
-        foundationThreadMessages.find((message) => {
-          return (
-            normalizeKey(message?.role) === "customer" &&
-            collectThreadMessagePreviewCandidates(message).length > 0
-          );
-        }) ||
-        foundationThreadMessages.find(
-          (message) => collectThreadMessagePreviewCandidates(message).length > 0
-        ) ||
-        null;
-      const latestCustomerMessage =
-        previewMessages.find((entry) => normalizeKey(entry?.role) === "customer") ||
-        previewMessages[0] ||
-        null;
-      const foundationState =
-        thread.foundationState && typeof thread.foundationState === "object"
-          ? thread.foundationState
-          : null;
-      const foundationMode =
-        foundationState ||
-        preferredFoundationMessage ||
-        thread.mailThreadMessage ||
-        thread.mailDocument ||
-        thread.raw?.mailThreadMessage ||
-        thread.raw?.mailDocument
-          ? "foundation"
-          : "legacy_fallback";
-      const foundationSource =
-        asText(foundationState?.source) ||
-        (foundationMode === "foundation" ? "mail_foundation" : "legacy_preview_fallback");
-      const previewCandidates = [
-        ...collectThreadMessagePreviewCandidates(preferredFoundationMessage),
-        ...collectThreadMessagePreviewCandidates(thread.mailThreadMessage),
-        thread.mailDocument?.previewText,
-        thread.mailDocument?.primaryBodyText,
-        ...collectThreadMessagePreviewCandidates(thread.raw?.mailThreadMessage),
-        thread.raw?.mailDocument?.previewText,
-        thread.raw?.mailDocument?.primaryBodyText,
-        thread.preview,
-        thread.systemPreview,
-        thread.raw?.latestInboundPreview,
-        thread.raw?.preview,
-        thread.raw?.systemPreview,
-        thread.raw?.latestPreview,
-        thread.raw?.bodyPreview,
-        thread.raw?.detail,
-        thread.raw?.summary,
-        thread.raw?.latestMessage?.preview,
-        thread.raw?.latestMessage?.bodyPreview,
-        thread.raw?.latestMessage?.bodyHtml,
-        thread.raw?.latestMessage?.body,
-        thread.raw?.latestMessage?.detail,
-        thread.raw?.latestMessage?.summary,
-        thread.raw?.conversation?.preview,
-        thread.raw?.conversation?.bodyPreview,
-        thread.raw?.conversation?.bodyHtml,
-        thread.raw?.conversation?.detail,
-        thread.raw?.conversation?.summary,
-        thread.raw?.bodyHtml,
-        thread.raw?.customerSummary?.lastCaseSummary,
-        latestCustomerMessage?.body,
-        latestCustomerMessage?.bodyPreview,
-      ];
-      let previewCopy = "";
-      for (const candidate of previewCandidates) {
-        const candidateRaw = asText(candidate).replace(/\s+/g, " ").trim();
-        if (!candidateRaw) continue;
-        const candidatePreview = sanitizeMailPreview(candidateRaw);
-        if (previewLooksGeneric(candidateRaw, candidatePreview)) continue;
-        previewCopy = candidatePreview;
-        break;
-      }
-      const hasUnread = thread.unread === true || thread.isUnread === true;
-      const unreadIndicatorMarkup = hasUnread
-        ? crossMailboxEvidenceMode
-          ? ""
-          : '<span class="thread-unread-indicator" aria-label="Oläst mejl"></span>'
-        : "";
-      const signalLaneId = normalizeKey(thread.primaryLaneId || "");
-      const mailboxSignalValue = compactRuntimeCopy(
-        asText(thread.mailboxLabel || thread.mailboxAddress || thread.mailboxesLabel),
-        "",
-        20
-      );
-      const whatSignalValue = compactRuntimeCopy(
-        asText(getQueueInlineLaneSignalWhat(thread, signalLaneId) || subjectContextCopy),
-        "",
-        18
-      );
-      const whySignalValue = compactRuntimeCopy(
-        asText(getQueueInlineLaneSignalWhy(thread, signalLaneId)),
-        "",
-        18
-      );
-      const nextSignalValue = compactRuntimeCopy(
-        asText(getQueueInlineLaneSignalNext(thread, signalLaneId) || nextStepCopy),
-        "",
-        18
-      );
-      const smartNextDetail = buildThreadSmartSummary(thread);
-      const parseTrailDetailLive = (detail = "") =>
-        asText(detail)
-          .split(/[·,]/g)
-          .map((part) => asText(part).trim())
-          .filter(Boolean);
-      const mailboxTrailFromPayload = asArray(thread.mailboxTrail)
-        .map((entry) => asText(entry).trim())
-        .filter(Boolean);
-      const mailboxTrailFromRollup = asArray(thread.rollup?.underlyingMailboxIds)
-        .map((entry) => asText(entry).trim())
-        .filter(Boolean);
-      const mailboxTrailFromDetail = parseTrailDetailLive(thread.mailboxProvenanceDetail || "");
-      const mailboxTrail = mailboxTrailFromPayload.length
-        ? mailboxTrailFromPayload
-        : mailboxTrailFromRollup.length
-          ? mailboxTrailFromRollup
-          : mailboxTrailFromDetail;
-      const deriveLiveInitials = (label = "") => {
-        const normalizedLabel = asText(label).trim().replace(/\s+/g, " ");
-        if (!normalizedLabel) return "?";
-        const parts = normalizedLabel
-          .split(" ")
-          .map((part) => asText(part).trim())
-          .filter(Boolean);
-        if (!parts.length) return "?";
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
-      };
-      const avatarInitials = asText(thread.initials) || deriveLiveInitials(customerCopy);
-      const resolvedNextChipValue =
-        (tags.includes("act-now") ||
-          tags.includes("high-risk") ||
-          signalLaneId === "act_now") &&
-        smartNextDetail
-          ? smartNextDetail
-          : nextSignalValue;
-      const rowFamily = normalizeCardValue(
-        thread.rowFamily || thread.raw?.rowFamily || "human_mail"
-      );
-      const isCompactSystemRow =
-        rowFamily === "booking_system_mail" || rowFamily === "notification/system_notice";
-      const displaySubjectContextCopy = isCompactSystemRow ? "" : subjectContextCopy;
-      const displayStoryCopy = (() => {
-        if (!isCompactSystemRow) return previewCopy;
-        const compactSystemContextCopy = compactRuntimeCopy(
-          subjectContextRaw || subjectCopy,
-          "",
-          rowFamily === "booking_system_mail" ? 76 : 72
-        );
-        return compactRuntimeCopy(
-          previewCopy || compactSystemContextCopy,
-          compactSystemContextCopy,
-          rowFamily === "booking_system_mail" ? 88 : 80
-        );
-      })();
-      const intelligenceItems = [
-        { key: "Mailbox", value: mailboxSignalValue, tone: "mailbox", icon: "mail", role: "mailbox" },
-        {
-          key: "Gäller",
-          value: whatSignalValue,
-          tone: "what",
-          icon: "layers",
-          role: "what",
-        },
-        {
-          key: "Nu",
-          value: whySignalValue,
-          tone: "why",
-          icon: "clock",
-          role: "why",
-        },
-        {
-          key: "Nästa",
-          value: resolvedNextChipValue,
-          tone: "next",
-          icon: "bolt",
-          role: "next",
-        },
-      ].filter((item) => item.value);
-      const intelligenceMarkup = intelligenceItems.length
-        ? `<div class="thread-intelligence-row">
-             ${intelligenceItems
-               .map((item) => {
-                 const iconMarkup = buildThreadSignalIconMarkup(item.icon);
-                 const isNextAction = normalizeKey(item.role) === "next";
-                 const tagName = isNextAction ? "button" : "span";
-                 const actionAttributes = isNextAction
-                   ? ` type="button" data-runtime-studio-open data-runtime-studio-thread-id="${escapeHtml(
-                       thread.id
-                     )}" aria-controls="studio-shell" aria-label="Öppna svarsstudion för ${escapeHtml(
-                       thread.customerName || "vald tråd"
-                     )}"`
-                   : "";
-                 return `<${tagName} class="thread-intelligence-item thread-intelligence-item--${escapeHtml(
-                   item.tone
-                 )}"${actionAttributes}>
-                   <span class="thread-intelligence-item-head">
-                     ${
-                       iconMarkup
-                         ? `<span class="thread-intelligence-item-icon">${iconMarkup}</span>`
-                         : ""
-                     }
-                   </span>
-                   <span class="thread-intelligence-item-value">${escapeHtml(item.value)}</span>
-                 </${tagName}>`;
-               })
-               .join("")}
-           </div>`
-        : "";
-      const storyMarkup = displayStoryCopy
-        ? `<p class="thread-story thread-story-inline">${escapeHtml(displayStoryCopy)}</p>`
-        : "";
-      const supportMarkup = intelligenceMarkup
-        ? `<div class="thread-support-stack${
-            selected ? " thread-support-stack-selected" : ""
-          }">
-            ${intelligenceMarkup}
-            ${
-              asText(thread.mailboxProvenanceLabel)
-                ? (() => {
-                    const provenanceDetail = asText(thread.mailboxProvenanceDetail);
-                    const provenanceCopy = crossMailboxEvidenceMode
-                      ? provenanceDetail
-                      : `${thread.mailboxProvenanceLabel}${
-                          provenanceDetail ? ` · ${provenanceDetail}` : ""
-                        }`;
-                    return provenanceCopy
-                      ? `<div class="intel-card-provenance thread-card-provenance">
-                    <span class="intel-card-provenance-label intel-card-provenance-derived">Mailboxspår</span>
-                    <p class="intel-card-provenance-detail">${escapeHtml(provenanceCopy)}</p>
-                  </div>`
-                      : "";
-                  })()
-                : ""
-            }
-          </div>`
-        : "";
-      const crossMailboxClass = crossMailboxEvidenceMode ? " thread-card-cross-mailbox" : "";
-      return {
-        intelligenceMarkup,
-        storyMarkup,
-        supportMarkup,
-        selectedClass,
-        crossMailboxClass,
-        priorityClass,
-        crossMailboxEvidenceMode,
-        customerCopy,
-        displaySubjectContextCopy,
-        displayStoryCopy,
-        unreadIndicatorMarkup,
-        rowFamily,
-        foundationMode,
-        foundationSource,
-        thread,
-        selected,
-        mailboxTrail,
-        avatarInitials,
-        signalLaneId,
-        mailboxSignalValue,
-        whatSignalValue,
-        whySignalValue,
-        nextSignalValue: resolvedNextChipValue,
-        tags,
-      };
-    }
-
     function buildThreadCardMarkup(thread, index, selected) {
-      const p = buildRuntimeThreadCardPresentation(thread, selected);
-      const relationshipChipValue =
-        p.mailboxTrail.length > 1 ? "Samma kund har skrivit från flera mailboxar" : "";
-      const footerChips = [
-        {
-          key: "category",
-          value: asText(p.mailboxSignalValue, "Kons"),
-          icon: "mail",
-          toneClass: "chip-gray",
-        },
-        {
-          key: "relationship",
-          value: relationshipChipValue,
-          icon: "users",
-          toneClass: "chip-blue",
-        },
-        {
-          key: "priority",
-          value: asText(p.whySignalValue),
-          icon: "alert",
-          toneClass: "chip-pink",
-        },
-        {
-          key: "action",
-          value: asText(p.nextSignalValue),
-          icon: "chevron-right",
-          toneClass: "chip-green",
-          interactive: "studio-open",
-          runtimeThreadId: p.thread.id,
-          studioAriaLabel: `Öppna svarsstudion för ${asText(p.thread.customerName || "vald tråd")}`,
-        },
-      ].filter((chip) => asText(chip.value));
-      const extraArticleClasses = `${p.crossMailboxClass}${p.priorityClass} thread-card-live`.trim();
-      const articleDataAttributes = ` data-row-family="${escapeHtml(p.rowFamily)}" data-foundation-mode="${escapeHtml(p.foundationMode)}" data-foundation-source="${escapeHtml(p.foundationSource)}"`;
-      const worklistSourceKey =
-        typeof normalizeKey === "function"
-          ? normalizeKey(p.thread.worklistSource || "legacy") || "legacy"
-          : asText(p.thread.worklistSource || "legacy")
-              .trim()
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "_") || "legacy";
-      const unifiedModel = {
-        counterpartyLabel: p.customerCopy,
-        customerInitials: p.avatarInitials,
-        mailboxTrail: p.mailboxTrail,
-        laneId: p.thread.primaryLaneId,
-        ownerLabel: p.thread.displayOwnerLabel || p.thread.ownerLabel,
-        tags: p.tags,
-        signalItems: asArray(p.thread.signalItems),
-        previewLine: p.displayStoryCopy,
-        footerChips,
-        hasOperationalSignals: false,
-        isUnread: p.thread.unread === true || p.thread.isUnread === true,
-        time: p.thread.lastActivityLabel,
-        recordedAt: p.thread.lastActivityAt,
-        stampLabel: asText(
-          p.thread.displayOwnerLabel || p.thread.ownerLabel || "Ej tilldelad"
-        ),
-        extraArticleClasses,
-        worklistSource: worklistSourceKey,
-      };
-      const unifiedOptions = {
-        runtimeThreadId: p.thread.id,
-        conversationId: p.thread.id,
-        selectedConversationId: asText(state.runtime.selectedThreadId),
-        worklistSource: worklistSourceKey,
-        articleDataAttributes,
-        skipNormalizeCardContent: false,
-      };
-      return buildUnifiedCardMarkup(unifiedModel, unifiedOptions);
-    }
-
-    /**
-     * @deprecated Use buildUnifiedCardMarkup instead.
-     * Kept temporarily during migration. Delete after 2026-05-01
-     * if no regression found.
-     */
-    function buildThreadCardMarkup_legacy(thread, index, selected) {
-      const p = buildRuntimeThreadCardPresentation(thread, selected);
-      return `<article class="thread-card thread-card-live${p.crossMailboxClass}${p.selectedClass}${p.priorityClass}" data-runtime-thread="${escapeHtml(p.thread.id)}" data-worklist-source="${escapeHtml(p.thread.worklistSource || "legacy")}" data-row-family="${escapeHtml(p.rowFamily)}" data-foundation-mode="${escapeHtml(p.foundationMode)}" data-foundation-source="${escapeHtml(p.foundationSource)}">
-        <div class="thread-card-head">
-          <div class="thread-card-identity">
-            <img class="avatar" src="${p.thread.avatar}" alt="${escapeHtml(p.thread.customerName)}" />
-            <div class="thread-card-head-copy">
-              <div class="thread-heading thread-heading-merged">
-                ${p.unreadIndicatorMarkup}
-                <p class="thread-subject">
-                  <span class="thread-subject-primary">${escapeHtml(p.customerCopy)}</span>
-                  ${
-                    p.displaySubjectContextCopy
-                      ? `<span class="thread-subject-context">${escapeHtml(
-                          p.displaySubjectContextCopy
-                        )}</span>`
-                      : ""
-                  }
-                </p>
-              </div>
-              ${p.storyMarkup}
-            </div>
-          </div>
-          <div class="thread-card-stamp">
-            <div class="thread-card-stamp-top">
-              <time datetime="${escapeHtml(p.thread.lastActivityAt || "")}">${escapeHtml(
-                p.thread.lastActivityLabel
-              )}</time>
-            </div>
-            <span class="thread-owner">${escapeHtml(p.thread.displayOwnerLabel || p.thread.ownerLabel || "Ej tilldelad")}</span>
-          </div>
-        </div>
-        ${p.supportMarkup}
-      </article>`;
+      const runtimeThreadId = asText(thread?.id || thread?.conversationId || "");
+      const item = buildQueueInlineLaneHistoryItem(thread);
+      const selectedConversationId = asText(
+        typeof state === "object" && state.runtime ? state.runtime.selectedThreadId : ""
+      );
+      return buildQueueHistoryCardMarkup(item, {
+        runtimeThreadId,
+        selectedConversationId,
+      });
     }
 
     function buildThreadSmartSummary(thread = {}) {
@@ -1472,7 +927,7 @@
 
       const footerChips = content.footerChips;
       const intelligenceMarkup = footerChips.length
-        ? `<div class="thread-intelligence-row queue-history-item-meta queue-history-item-meta--fullwidth card-footer">
+        ? `<div class="card-footer">
             ${footerChips
               .map((chip) => {
                 const toneClass = escapeHtml(chip.toneClass || "chip-gray");
@@ -1482,14 +937,14 @@
                   const aria = escapeHtml(
                     chip.studioAriaLabel || "Öppna svarsstudion"
                   );
-                  return `<button class="thread-intelligence-item chip ${toneClass}" data-history-chip="${chipKey}" type="button" data-runtime-studio-open data-runtime-studio-thread-id="${tid}" aria-controls="studio-shell" aria-label="${aria}">
+                  return `<button class="chip ${toneClass}" data-history-chip="${chipKey}" type="button" data-runtime-studio-open data-runtime-studio-thread-id="${tid}" aria-controls="studio-shell" aria-label="${aria}">
                   ${buildUnifiedCardIconMarkup(chip.icon)}
-                  <span class="thread-intelligence-item-value">${escapeHtml(chip.value)}</span>
+                  <span class="chip-label">${escapeHtml(chip.value)}</span>
                 </button>`;
                 }
-                return `<span class="thread-intelligence-item chip ${toneClass}" data-history-chip="${chipKey}">
+                return `<span class="chip ${toneClass}" data-history-chip="${chipKey}">
                   ${buildUnifiedCardIconMarkup(chip.icon)}
-                  <span class="thread-intelligence-item-value">${escapeHtml(chip.value)}</span>
+                  <span class="chip-label">${escapeHtml(chip.value)}</span>
                 </span>`;
               })
               .join("")}
@@ -1500,16 +955,14 @@
       const visibleMailboxTrailItems = showTrail ? trail.slice(0, 3) : [];
       const mailboxTrailOverflowCount = showTrail ? Math.max(0, trail.length - visibleMailboxTrailItems.length) : 0;
       const mailboxTrailMarkup = showTrail
-        ? `<div class="intel-card-provenance thread-card-provenance mailbox-trail">
+        ? `<div class="mailbox-trail">
             <span class="trail-bar" aria-hidden="true"></span>
             ${buildUnifiedCardIconMarkup("inbox")}
-            <span class="intel-card-provenance-label intel-card-provenance-derived trail-label" data-history-pill-class="queue-history-pill--provenance">${escapeHtml(
-              UNIFIED_CARD_COPY.mailboxTrailLabel
-            )}</span>
+            <span class="trail-label">${escapeHtml(UNIFIED_CARD_COPY.mailboxTrailLabel)}</span>
             ${visibleMailboxTrailItems
               .map(
                 (entry, index) =>
-                  `${index > 0 ? '<span class="trail-separator" aria-hidden="true">·</span>' : ""}<span class="intel-card-provenance-detail trail-item">${escapeHtml(entry)}</span>`
+                  `${index > 0 ? '<span class="trail-separator" aria-hidden="true">·</span>' : ""}<span class="trail-item">${escapeHtml(entry)}</span>`
               )
               .join("")}
             ${
@@ -1530,14 +983,11 @@
         typeof runtimeConversationIdsMatch === "function" &&
         runtimeConversationIdsMatch(conversationId, selectedConversationId);
 
-      const supportMarkup =
-        intelligenceMarkup || mailboxTrailMarkup
-          ? `<div class="thread-support-stack${isSelected ? " thread-support-stack-selected" : ""}">${intelligenceMarkup}${mailboxTrailMarkup}</div>`
-          : "";
+      const supportMarkup = `${intelligenceMarkup}${mailboxTrailMarkup}`;
 
       const subtitleMarkup =
         content.subtitle && !content.tightMode
-          ? `<span class="thread-subject-context history-card-subtitle">${escapeHtml(content.subtitle)}</span>`
+          ? `<span class="subtitle history-card-subtitle">${escapeHtml(content.subtitle)}</span>`
           : "";
       const previewMarkup =
         content.previewLine && !content.tightMode
@@ -1545,7 +995,7 @@
           : "";
 
       const explanatoryLineMarkup = asText(unifiedModel.explanatoryLine)
-        ? `<div class="thread-card-head-secondary"><p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(
+        ? `<div class="queue-card-snippet"><p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(
             unifiedModel.explanatoryLine
           )}</p></div>`
         : "";
@@ -1553,7 +1003,7 @@
       const secondaryInner = secondarySnippet
         ? `<p class="queue-history-item-text queue-history-item-text-snippet">${escapeHtml(secondarySnippet)}</p>`
         : "";
-      const headSecondaryClosing = `<div class="thread-card-head-secondary">${secondaryInner}</div>`;
+      const headSecondaryClosing = `<div class="queue-card-snippet">${secondaryInner}</div>`;
 
       const selectedClass = isSelected ? " is-selected" : "";
       const selectedArticleClass = isSelected ? " thread-card-selected" : "";
@@ -1598,25 +1048,25 @@
       const extraArticleClasses = asText(unifiedModel.extraArticleClasses).trim();
       const articleDataAttributes = asText(options.articleDataAttributes);
       return `<article class="thread-card queue-history-item unified-queue-card${extraArticleClasses ? ` ${extraArticleClasses}` : ""}${selectedClass}${selectedArticleClass}${laneClass}${operationalClass}${unreadClass}${loadingClass}"${runtimeThreadAttribute}${worklistSourceAttribute}${worklistSourceLabelAttribute}${historyConversationAttribute}${articleDataAttributes}${selectedState}>
-        <div class="thread-card-head card-top">
-          <div class="thread-card-identity history-avatar-wrap">
+        <div class="card-top">
+          <div class="avatar-wrap history-avatar-wrap">
             <span class="avatar queue-history-avatar history-avatar" aria-hidden="true">${escapeHtml(avatarText)}</span>
             <span class="status-dot ${escapeHtml(statusDot)}" aria-hidden="true"></span>
-            <div class="thread-card-head-copy card-body">
+            <div class="card-body">
               <div class="row-1 history-card-row-1">
-                <p class="thread-subject history-card-name">
-                  <span class="thread-subject-primary">${escapeHtml(counterpartyCopy)}</span>
+                <p class="history-card-name">
+                  <span class="name">${escapeHtml(counterpartyCopy)}</span>
                   ${subtitleMarkup}
                 </p>
               </div>
               ${previewMarkup}
             </div>
           </div>
-          <div class="thread-card-stamp history-card-meta">
-            <div class="thread-card-stamp-top"><time datetime="${escapeHtml(
+          <div class="meta history-card-meta">
+            <div class="meta-date"><time datetime="${escapeHtml(
               unifiedModel.recordedAt || ""
             )}">${escapeHtml(unifiedModel.time || "")}</time></div>
-            <span class="thread-owner">${escapeHtml(stampLabel)}</span>
+            <span class="meta-status">${escapeHtml(stampLabel)}</span>
           </div>
         </div>
         ${explanatoryLineMarkup}
@@ -1691,14 +1141,9 @@
               }
               return { icon: "mail", toneClass: "queue-filter-chip--slate" };
             };
-      const resolveQueueMeta =
-        typeof getQueueHistoryQueueMeta === "function"
-          ? getQueueHistoryQueueMeta
-          : () => ({ icon: "layers", toneClass: "queue-filter-chip--slate" });
       const runtimeThreadId = asText(options.runtimeThreadId);
       const conversationId = asText(item.conversationId || runtimeThreadId);
       const selectedConversationId = asText(options.selectedConversationId);
-      const useThreadCardClass = options.useThreadCardClass !== false;
       const worklistSource =
         typeof normalizeKey === "function"
           ? normalizeKey(item.worklistSource || "legacy") || "legacy"
@@ -1709,35 +1154,8 @@
       const worklistSourceLabel = asText(
         item.worklistSourceLabel || (worklistSource === "truth_primary" ? "Truth primary" : "")
       );
-      const isSelected =
-        Boolean(conversationId) &&
-        typeof runtimeConversationIdsMatch === "function" &&
-        runtimeConversationIdsMatch(conversationId, selectedConversationId);
-      const runtimeThreadAttribute = runtimeThreadId
-        ? ` data-runtime-thread="${escapeHtml(runtimeThreadId)}"`
-        : "";
-      const worklistSourceAttribute = ` data-worklist-source="${escapeHtml(worklistSource)}"`;
-      const worklistSourceLabelAttribute = worklistSourceLabel
-        ? ` data-worklist-source-label="${escapeHtml(worklistSourceLabel)}"`
-        : "";
-      const historyConversationAttribute = conversationId
-        ? ` data-history-conversation="${escapeHtml(conversationId)}"`
-        : "";
-      const selectedClass = isSelected ? " is-selected" : "";
-      const laneId =
-        typeof normalizeKey === "function"
-          ? normalizeKey(item.laneId || "")
-          : asText(item.laneId || "")
-              .trim()
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, "_");
-      const laneClass = laneId ? ` queue-history-item--lane-${laneId.replace(/_/g, "-")}` : "";
       const signalItems = asArray(item.signalItems);
       const hasOperationalSignals = signalItems.length > 0;
-      const operationalClass = hasOperationalSignals ? " has-operational-signals" : "";
-      const selectedState = isSelected
-        ? ' aria-current="true" data-history-selected="true"'
-        : ' aria-current="false"';
       const parseMailboxTrailFromDetail = (detail = "") => {
         // TODO(backend): expose mailboxTrail: string[] from worklist/history payload.
         // Text parsing is a temporary fallback and may split incorrectly if names contain separators.
@@ -1798,124 +1216,8 @@
         };
       };
       const normalizedHistoryModel = normalizeHistoryCardModel(item);
-      const subjectMarkup = asText(item.title)
-        ? `<p class="subject queue-history-item-subject">${escapeHtml(item.title)}</p>`
-        : "";
-      const operationalChipMarkup = hasOperationalSignals
-        ? signalItems
-            .map(
-              (signal) => {
-                const signalRole = normalizeKey(signal.role || signal.tone || "neutral");
-                const signalLabel = `${asText(signal.key)}: ${asText(signal.value)}`;
-                const toneClass =
-                  signalRole === "next"
-                    ? laneId === "act-now"
-                      ? "queue-filter-chip--rose"
-                      : laneId === "review"
-                        ? "queue-filter-chip--urgent"
-                        : laneId === "medical"
-                          ? "queue-filter-chip--magenta"
-                          : laneId === "bookable"
-                            ? "queue-filter-chip--cyan"
-                            : laneId === "later"
-                              ? "queue-filter-chip--indigo"
-                              : "queue-filter-chip--violet"
-                    : signalRole === "why"
-                      ? laneId === "act-now"
-                        ? "queue-filter-chip--rose"
-                        : laneId === "review"
-                          ? "queue-filter-chip--urgent"
-                          : laneId === "medical"
-                            ? "queue-filter-chip--magenta"
-                            : laneId === "bookable"
-                              ? "queue-filter-chip--cyan"
-                              : laneId === "later"
-                                ? "queue-filter-chip--indigo"
-                                : "queue-filter-chip--violet"
-                      : "queue-filter-chip--slate";
-                const iconKey = resolveSignalIcon(signalRole);
-                return `<span class="queue-filter-chip queue-history-operational-pill queue-history-operational-pill--${escapeHtml(
-                  signalRole
-                )} ${toneClass}" data-signal-role="${escapeHtml(
-                  signalRole
-                )}" data-pill-icon="${escapeHtml(iconKey)}" title="${escapeHtml(
-                  signalLabel
-                )}" aria-label="${escapeHtml(signalLabel)}"><span>${escapeHtml(signal.value)}</span></span>`;
-              }
-            )
-            .join("")
-        : "";
-      const detailMarkup = asText(item.detail)
-        ? `<p class="preview-text queue-history-item-text${
-            hasOperationalSignals ? " queue-history-item-text--operative" : ""
-          }">${escapeHtml(item.detail)}</p>`
-        : "";
       const mailboxMeta = resolveMailboxMeta(item);
-      const sourcePill =
-        worklistSource === "truth_primary" && worklistSourceLabel
-          ? `<span class="queue-history-pill queue-history-pill--source queue-filter-chip--violet" data-pill-icon="layers"><span class="queue-history-pill-label">${escapeHtml(
-              worklistSourceLabel
-            )}</span></span>`
-          : "";
-      const mailboxPill = asText(item.mailboxLabel)
-        ? `<span class="queue-history-pill queue-history-pill--mailbox ${escapeHtml(
-            mailboxMeta.toneClass
-          )}" data-pill-icon="${escapeHtml(mailboxMeta.icon)}"><span class="queue-history-pill-label">${escapeHtml(
-            item.mailboxLabel
-          )}</span></span>`
-        : "";
-      const mailboxProvenancePill = asText(item.mailboxProvenanceLabel)
-        ? `<span class="queue-history-pill queue-history-pill--provenance queue-filter-chip--green" data-pill-icon="layers" title="${escapeHtml(
-            item.mailboxProvenanceDetail || ""
-          )}"><span class="queue-history-pill-label">${escapeHtml(
-            item.mailboxProvenanceLabel
-          )}</span></span>`
-        : "";
-      const showDirectionPill = !runtimeThreadId;
       const directionMeta = resolveDirectionMeta(item.direction);
-      const directionPill = showDirectionPill && asText(item.direction)
-        ? `<span class="queue-history-pill queue-history-pill--direction ${escapeHtml(
-            directionMeta.toneClass
-          )}" data-pill-icon="${escapeHtml(directionMeta.icon)}"><span class="queue-history-pill-label">${escapeHtml(
-            item.direction
-          )}</span></span>`
-        : "";
-      const queueMeta = resolveQueueMeta();
-      const queuePill = asText(item.queueLabel)
-        ? `<span class="queue-history-pill queue-history-pill--queue ${escapeHtml(
-            queueMeta.toneClass
-          )}" data-pill-icon="${escapeHtml(queueMeta.icon)}"><span class="queue-history-pill-label">${escapeHtml(
-            item.queueLabel
-          )}</span></span>`
-        : "";
-      const metaMarkup =
-        sourcePill || operationalChipMarkup || mailboxPill || mailboxProvenancePill || directionPill || queuePill
-        ? `<div class="queue-history-item-meta queue-history-item-meta--fullwidth">${sourcePill}${mailboxPill}${mailboxProvenancePill}${operationalChipMarkup}${directionPill}${queuePill}</div>`
-        : "";
-
-      const unreadClass = item.isUnread === true ? " queue-history-item--unread" : "";
-      const loadingClass = item.loading === true ? " is-loading" : "";
-      const freshnessMarkup =
-        item.isUnread === true
-          ? '<span class="queue-history-item-freshness" aria-label="Nytt oläst mejl"><span class="queue-history-item-freshness-dot"></span></span>'
-          : "";
-
-      if (!useThreadCardClass) {
-        return `<article class="queue-history-item${selectedClass}${laneClass}${operationalClass}${unreadClass}${loadingClass}"${runtimeThreadAttribute}${worklistSourceAttribute}${worklistSourceLabelAttribute}${historyConversationAttribute}${selectedState}>
-        <span class="avatar queue-history-avatar">${escapeHtml(item.initials || "?")}</span>
-        <div class="thread-main queue-history-body">
-          <div class="thread-meta queue-history-item-head">
-            <div class="thread-heading queue-history-item-heading">
-              <h3>${escapeHtml(item.counterpartyLabel || "Okänd avsändare")}</h3>
-            </div>
-            <div class="queue-history-item-time-group">${freshnessMarkup}<time class="queue-history-item-time" datetime="${escapeHtml(item.recordedAt || "")}">${escapeHtml(item.time || "")}</time></div>
-          </div>
-          ${subjectMarkup}
-          ${detailMarkup}
-        </div>
-        ${metaMarkup}
-      </article>`;
-      }
 
       const counterpartyCopy = normalizedHistoryModel.customerName;
       const normalizeHistoryCompareValue = (value = "") =>
@@ -2397,9 +1699,33 @@
           : "";
       const resolvedTitle = inlineContextHint || title || "Aktiv tråd";
       const finalDetail = explanatoryLineHint || defaultRollupExplanatoryLine || resolvedDetail;
+      const parseInlineMailboxTrail = (detail = "") =>
+        asText(detail)
+          .split(/[·,]/g)
+          .map((part) => asText(part).trim())
+          .filter(Boolean);
+      const mailboxTrailFromPayload = asArray(thread.mailboxTrail)
+        .map((entry) => asText(entry).trim())
+        .filter(Boolean);
+      const mailboxTrailFromRollup = asArray(thread?.rollup?.underlyingMailboxIds)
+        .map((entry) => asText(entry).trim())
+        .filter(Boolean);
+      const mailboxTrailFromDetail = parseInlineMailboxTrail(
+        thread.mailboxProvenanceDetail || thread?.rollup?.provenanceDetail || ""
+      );
+      const mailboxTrail = mailboxTrailFromPayload.length
+        ? mailboxTrailFromPayload
+        : mailboxTrailFromRollup.length
+          ? mailboxTrailFromRollup
+          : mailboxTrailFromDetail;
       return {
         initials: getQueueHistoryItemInitials(thread.customerName),
         counterpartyLabel,
+        conversationId: asText(thread?.conversationId || thread?.id || ""),
+        ownerLabel: asText(thread.displayOwnerLabel || thread.ownerLabel || ""),
+        tags: asArray(thread.tags),
+        nextActionLabel: asText(thread.nextActionLabel),
+        mailboxTrail,
         time: asText(thread.lastActivityLabel),
         recordedAt: asText(thread.lastActivityAt),
         title: resolvedTitle,
@@ -2927,7 +2253,6 @@
                 buildQueueHistoryCardMarkup(buildQueueInlineLaneHistoryItem(thread), {
                   runtimeThreadId: thread.id,
                   selectedConversationId: state.runtime.selectedThreadId,
-                  useThreadCardClass: false,
                 })
             : null;
       queueHistoryList.innerHTML = asArray(threads)
