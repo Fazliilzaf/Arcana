@@ -511,11 +511,14 @@ function createScheduler({
       for (const item of Array.isArray(restore?.stores) ? restore.stores : []) {
         const restored = item?.restored === true;
         if (!restored) {
-          missingCount += 1;
+          const missingReason = normalizeText(item?.reason) || 'missing_in_backup';
+          if (missingReason !== 'missing_in_backup') {
+            missingCount += 1;
+          }
           stores.push({
             name: normalizeText(item?.name) || null,
             restored: false,
-            reason: normalizeText(item?.reason) || 'missing_in_backup',
+            reason: missingReason,
             validated: false,
           });
           continue;

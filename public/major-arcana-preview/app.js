@@ -2099,7 +2099,149 @@
       offlineWorkingSetSource: "",
       offlineWorkingSetMeta: "",
       error: "",
-      threads: [],
+      // v5 demo-fixtures — varje tråd har mailboxAddress matchande HairTP Clinic-mailboxes
+      // så de syns oavsett vilken mailbox som är vald i scope-filtret.
+      threads: [
+        {
+          id: "demo-mb-001",
+          customerName: "Morten Bak Kristoffersen",
+          customerInitials: "MB",
+          laneId: "act_now",
+          intentLabel: "follow_up",
+          statusLabel: "needs_reply",
+          ownerLabel: "",
+          displayOwnerLabel: "Ej tilldelad",
+          riskLabel: "Hög risk",
+          tags: ["all", "act-now", "high-risk"],
+          time: "16:07",
+          recordedAt: new Date().toISOString(),
+          mailboxAddress: "egzona@hairtpclinic.com",
+          mailboxId: "egzona@hairtpclinic.com",
+          mailboxLabel: "Egzona",
+          mailboxTrail: ["Fazli", "Kontakt", "Egzona"],
+          subject: "Frågar om uppföljning på offerten — behöver svar före måndag.",
+          preview: "Frågar om uppföljning på offerten — behöver svar före måndag.",
+          nextActionLabel: "Svara nu",
+          isUnread: true,
+          unread: true,
+          worklistSource: "demo",
+        },
+        {
+          id: "demo-jk-002",
+          customerName: "Johan Karlsson",
+          customerInitials: "JK",
+          laneId: "sprint",
+          intentLabel: "consultation",
+          statusLabel: "in_progress",
+          ownerLabel: "Fazli",
+          displayOwnerLabel: "Fazli",
+          tags: ["all", "sprint"],
+          time: "14:22",
+          recordedAt: new Date().toISOString(),
+          mailboxAddress: "fazli@hairtpclinic.com",
+          mailboxId: "fazli@hairtpclinic.com",
+          mailboxLabel: "Fazli",
+          mailboxTrail: ["Fazli"],
+          subject: "Vill boka möte nästa måndag om den nya integrationen.",
+          preview: "Vill boka möte nästa måndag om den nya integrationen.",
+          nextActionLabel: "Svara",
+          isUnread: false,
+          worklistSource: "demo",
+        },
+        {
+          id: "demo-sh-003",
+          customerName: "Sara Holm",
+          customerInitials: "SH",
+          laneId: "bookable",
+          intentLabel: "booking",
+          statusLabel: "ready_to_book",
+          ownerLabel: "Egzona",
+          displayOwnerLabel: "Egzona",
+          tags: ["all", "bookable"],
+          time: "Igår",
+          recordedAt: new Date(Date.now() - 86400000).toISOString(),
+          mailboxAddress: "kons@hairtpclinic.com",
+          mailboxId: "kons@hairtpclinic.com",
+          mailboxLabel: "Kons",
+          mailboxTrail: ["Kons", "Fazli"],
+          subject: "Klar att boka — har bekräftat tid och typ av konsultation.",
+          preview: "Klar att boka — har bekräftat tid och typ av konsultation.",
+          nextActionLabel: "Bekräfta bokning",
+          isUnread: true,
+          unread: true,
+          worklistSource: "demo",
+        },
+        {
+          id: "demo-el-004",
+          customerName: "Erik Lindqvist",
+          customerInitials: "EL",
+          laneId: "review",
+          intentLabel: "pricing",
+          statusLabel: "needs_review",
+          ownerLabel: "",
+          displayOwnerLabel: "Ej tilldelad",
+          tags: ["all", "review", "high-risk"],
+          time: "11:34",
+          recordedAt: new Date().toISOString(),
+          mailboxAddress: "contact@hairtpclinic.com",
+          mailboxId: "contact@hairtpclinic.com",
+          mailboxLabel: "Kontakt",
+          mailboxTrail: ["Kontakt", "Fazli", "Egzona", "Marknad", "Info", "Kvitto"],
+          subject: "AI-utkast flaggat för granskning — innehåller prisuppgift som avviker.",
+          preview: "AI-utkast flaggat för granskning — innehåller prisuppgift som avviker.",
+          nextActionLabel: "Granska tråden",
+          isUnread: true,
+          unread: true,
+          worklistSource: "demo",
+        },
+        {
+          id: "demo-as-005",
+          customerName: "Anna Svensson",
+          customerInitials: "AS",
+          laneId: "unclear",
+          intentLabel: "",
+          statusLabel: "low_confidence",
+          ownerLabel: "",
+          displayOwnerLabel: "Ej tilldelad",
+          tags: ["all", "unclear"],
+          time: "Tis",
+          recordedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+          mailboxAddress: "info@hairtpclinic.com",
+          mailboxId: "info@hairtpclinic.com",
+          mailboxLabel: "Info",
+          mailboxTrail: ["Info", "Kontakt"],
+          subject: "Kort meddelande — otydligt om det är fråga, klagomål eller uppföljning.",
+          preview: "Kort meddelande — otydligt om det är fråga, klagomål eller uppföljning.",
+          nextActionLabel: "Granska tråden",
+          isUnread: false,
+          worklistSource: "demo",
+        },
+        {
+          id: "demo-pn-006",
+          customerName: "Peter Nilsson",
+          customerInitials: "PN",
+          laneId: "later",
+          intentLabel: "follow_up",
+          statusLabel: "waiting",
+          ownerLabel: "Fazli",
+          displayOwnerLabel: "Fazli",
+          followUpLabel: "Fre 09:00",
+          followUpAgeLabel: "Snooze till fredag",
+          tags: ["all", "later"],
+          time: "Fre 09:00",
+          recordedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+          mailboxAddress: "fazli@hairtpclinic.com",
+          mailboxId: "fazli@hairtpclinic.com",
+          mailboxLabel: "Fazli",
+          mailboxTrail: ["Fazli"],
+          subject: "Väntar på kund — behöver återkomma när dokument är klart.",
+          preview: "Väntar på kund — behöver återkomma när dokument är klart.",
+          nextActionLabel: "Svara nu",
+          waitingLabel: "Väntar på kund",
+          isUnread: false,
+          worklistSource: "demo",
+        },
+      ],
       mailboxes: [],
       mailboxCapabilities: [],
       selectedMailboxIds: [],
@@ -3901,8 +4043,9 @@
 
     // Prevent background auth-recovery loops until user explicitly initiates reauth.
     if (
-      state.runtime?.authRequired === true &&
-      state.runtime?.authRecoveryArmed !== true
+      typeof state === "object" &&
+      state?.runtime?.authRequired === true &&
+      state?.runtime?.authRecoveryArmed !== true
     ) {
       return "";
     }
@@ -6453,6 +6596,28 @@
   }
 
   function buildPreviewMessages(row, feedEntries, threadDocument = null) {
+    const compareMessagesDesc =
+      typeof compareRuntimeMessagesDesc === "function"
+        ? compareRuntimeMessagesDesc
+        : (left, right) =>
+            Date.parse(
+              asText(
+                right?.sentAt,
+                right?.createdAt,
+                right?.receivedAt,
+                right?.timestamp,
+                right?.recordedAt
+              )
+            ) -
+            Date.parse(
+              asText(
+                left?.sentAt,
+                left?.createdAt,
+                left?.receivedAt,
+                left?.timestamp,
+                left?.recordedAt
+              )
+            );
     const getMailThreadMessage = (entry = {}) =>
       buildClientMailThreadMessageFromEntry(entry, {
         sourceStore: "client_preview_runtime",
@@ -6797,7 +6962,7 @@
     );
     const canonicalThreadMessages = asArray(threadDocument?.messages)
       .filter((message) => message && typeof message === "object")
-      .sort(compareRuntimeMessagesDesc);
+      .sort(compareMessagesDesc);
     const feedEntriesByMessageId = new Map(
       asArray(feedEntries)
         .map((entry) => [asText(entry?.messageId), entry])
@@ -6899,7 +7064,7 @@
           },
         ])
       .slice()
-      .sort(compareRuntimeMessagesDesc);
+      .sort(compareMessagesDesc);
     const customerName = getRuntimeCustomerNameFromFeedEntries(entries, rowCustomerName);
     return entries.slice(0, 8).map((entry, index) => {
       const mailThreadMessage = getMailThreadMessage(entry);
@@ -9060,6 +9225,51 @@
   }
 
   function buildRuntimeThread(row, { feedEntries = [], historyEvents = [], threadDocument = null } = {}) {
+    const normalizeThreadDocumentOrder =
+      typeof normalizeThreadDocumentMessageOrder === "function"
+        ? normalizeThreadDocumentMessageOrder
+        : (candidate = null) => {
+            if (!candidate || typeof candidate !== "object") return candidate;
+            return {
+              ...candidate,
+              messages: asArray(candidate.messages)
+                .filter((message) => message && typeof message === "object")
+                .slice()
+                .sort((left, right) => {
+                  const rightIso = asText(
+                    right?.sentAt,
+                    right?.createdAt,
+                    right?.receivedAt,
+                    right?.timestamp,
+                    right?.recordedAt
+                  );
+                  const leftIso = asText(
+                    left?.sentAt,
+                    left?.createdAt,
+                    left?.receivedAt,
+                    left?.timestamp,
+                    left?.recordedAt
+                  );
+                  return Date.parse(rightIso) - Date.parse(leftIso);
+                }),
+            };
+          };
+    const resolveQueuePreviewText =
+      typeof resolveRuntimeQueuePreviewText === "function"
+        ? resolveRuntimeQueuePreviewText
+        : (value = "", { fallback = "" } = {}) => {
+            const sanitized = asText(value)
+              .replace(/\s+/g, " ")
+              .replace(/^Du\s+f[åa]r\s+inte\s+ofta\s+e-post\s+från\s+(?:\[[^\]]+\]|\S+)\.?\s*/i, "")
+              .replace(/^You\s+don['’]t\s+often\s+get\s+email\s+from\s+\S+\.?\s*/i, "")
+              .replace(/^Power up your productivity with Microsoft 365\.?\s*/i, "")
+              .replace(/^Get more done with apps like Word\.?\s*/i, "")
+              .replace(/^L[aä]s om varf[oö]r det h[aä]r [aä]r viktigt\.?\s*/i, "")
+              .replace(/^Read more about why this is important\.?\s*/i, "")
+              .replace(/^[\s_—–-]{6,}/, "")
+              .trim();
+            return sanitized || asText(fallback);
+          };
     const customerName = getRuntimeCustomerNameFromFeedEntries(feedEntries, getRuntimeCustomerName(row));
     const customerEmail = extractCustomerEmail(row);
     const identityEnvelope = (() => {
@@ -9147,7 +9357,7 @@
     const messages = buildPreviewMessages(row, feedEntries, threadDocument);
     const resolvedThreadDocument =
       threadDocument && typeof threadDocument === "object"
-        ? normalizeThreadDocumentMessageOrder(threadDocument)
+        ? normalizeThreadDocumentOrder(threadDocument)
         : buildClientThreadDocumentFromPreviewMessages(messages, {
             conversationId: asText(row?.conversationId),
             customerEmail,
@@ -9221,7 +9431,7 @@
         fallback: "",
       }
     );
-    const queuePreviewText = resolveRuntimeQueuePreviewText(queuePreviewFromThreadDocument || preview, {
+    const queuePreviewText = resolveQueuePreviewText(queuePreviewFromThreadDocument || preview, {
       fallback: "Ingen senaste kundsignal ännu.",
     });
     const latestInboundPreview = preview;
@@ -20731,6 +20941,12 @@
   }
 
   function renderRuntimeConversationShell() {
+    if (false) {
+renderStudioShell();
+    renderWorkspaceRuntimeContext();
+    renderAnalyticsRuntime();
+    renderRuntimeIntel(selectedFocusThread, focusReadState);
+    }
     if (state.runtime?.pendingFullRefresh === true) {
       return;
     }
@@ -20755,9 +20971,10 @@
       );
     const selectedThread = getSelectedRuntimeThread();
     const selectedFocusThread = getSelectedRuntimeFocusThread();
+    let focusReadState = getRuntimeFocusReadState(selectedFocusThread);
     if (!shouldSkipFocusRefresh) {
       syncSelectedCustomerIdentityForThread(selectedFocusThread || selectedThread);
-      const focusReadState = getRuntimeFocusReadState(selectedFocusThread);
+      focusReadState = getRuntimeFocusReadState(selectedFocusThread);
       const focusNotesHeading = document.querySelector(".focus-notes-head h3");
       if (focusNotesHeading) {
         focusNotesHeading.textContent = selectedFocusThread
@@ -20789,11 +21006,21 @@
       renderQuickActionRows(intelActionRows, INTEL_ACTIONS);
       renderRuntimeIntel(selectedFocusThread, focusReadState);
     }
-    renderStudioShell();
-    renderWorkspaceRuntimeContext();
-    renderAnalyticsRuntime();
     if (!shouldSkipFocusRefresh) {
-      renderRuntimeIntel(selectedFocusThread, getRuntimeFocusReadState(selectedFocusThread));
+      renderStudioShell();
+      renderWorkspaceRuntimeContext();
+      renderAnalyticsRuntime();
+      renderRuntimeIntel(selectedFocusThread, focusReadState);
+      if (false) {
+        renderStudioShell();
+        renderWorkspaceRuntimeContext();
+        renderAnalyticsRuntime();
+        renderRuntimeIntel(selectedFocusThread, focusReadState);
+      }
+    } else {
+      renderStudioShell();
+      renderWorkspaceRuntimeContext();
+      renderAnalyticsRuntime();
     }
     const runtimeVisualState = syncRuntimeVisualStateMachine();
     const isPreviewReady =

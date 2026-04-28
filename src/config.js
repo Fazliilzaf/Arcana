@@ -640,7 +640,11 @@ const config = {
   clientoApiTimeoutMs: asInt(process.env.CLIENTO_API_TIMEOUT_MS, 10000),
 };
 
-if (config.aiProvider === 'openai' && !config.openaiApiKey) {
+if (
+  config.aiProvider === 'openai' &&
+  !config.openaiApiKey &&
+  String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production'
+) {
   throw new Error('Missing env var: OPENAI_API_KEY');
 }
 

@@ -410,8 +410,9 @@ function getWorklistMergeIdentityKey(row = {}) {
     extractEmail(row.customer?.email) ||
     extractEmail(identity.customerEmail);
   if (emailFallback) {
+    const mailboxScope = normalizeMailboxId(row.ownershipMailbox || row.mailboxId || '');
     return {
-      key: `customerEmail:${emailFallback}`,
+      key: mailboxScope ? `customerEmail:${emailFallback}:${mailboxScope}` : `customerEmail:${emailFallback}`,
       type: 'customerEmail',
       value: emailFallback,
     };
