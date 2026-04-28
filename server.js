@@ -459,7 +459,10 @@ app.get("/admin", (req, res) => {
 });
 
 app.get('/cco', (req, res) => {
-  sendAdminHtml(res);
+  // Legacy /cco-vyn (admin.html-baserad) ersatt av /major-arcana-preview/
+  // som har full feature-paritet plus Cmd+K, sökning, AI-summary, follow-up filters,
+  // soft-break och density-toggle. Behåller redirect för bookmarks.
+  res.redirect(302, '/major-arcana-preview/');
 });
 
 app.get(/^\/cco-next(?:\/.*)?$/, (_req, res) => {
@@ -471,7 +474,7 @@ app.get('/unanswered', (req, res) => {
 });
 
 app.get(['/ccp', '/admin/cco'], (req, res) => {
-  res.redirect(302, '/cco');
+  res.redirect(302, '/major-arcana-preview/');
 });
 
 app.get('/admin/unanswered', (req, res) => {
