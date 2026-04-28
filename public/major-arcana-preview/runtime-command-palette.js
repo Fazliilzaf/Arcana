@@ -216,6 +216,32 @@
         action: () => clickByAriaLabel('Global'),
       },
 
+      // Fokus / avbrott
+      {
+        id: 'soft-break-open',
+        label: 'Hantera avbrott (pausa/byt/avsluta fokus)',
+        hint: 'P',
+        group: 'Fokus',
+        keywords: 'soft break pause replace end fokus avbrott pausa byt avsluta',
+        action: () => {
+          const sb = (typeof window !== 'undefined') && window.MajorArcanaPreviewSoftBreak;
+          if (sb && typeof sb.openModal === 'function') sb.openModal();
+        },
+      },
+
+      // Densitet
+      {
+        id: 'density-toggle',
+        label: 'Växla densitet (regular/kompakt)',
+        hint: 'UI',
+        group: 'Inställningar',
+        keywords: 'density densitet kompakt compact regular zoom layout',
+        action: () => {
+          const dt = (typeof window !== 'undefined') && window.MajorArcanaPreviewDensityToggle;
+          if (dt && typeof dt.toggleDensity === 'function') dt.toggleDensity();
+        },
+      },
+
       // AI
       {
         id: 'ai-thread-summary',
@@ -290,6 +316,17 @@
       try {
         const viewCommands = savedViews.getViewCommands() || [];
         for (const cmd of viewCommands) {
+          if (cmd && typeof cmd.action === 'function') base.push(cmd);
+        }
+      } catch (_e) { /* tyst */ }
+    }
+
+    // Lägg till uppföljnings-filter som dynamiska kommandon
+    const followup = (typeof window !== 'undefined') && window.MajorArcanaPreviewFollowupFilters;
+    if (followup && typeof followup.getFilterCommands === 'function') {
+      try {
+        const filterCommands = followup.getFilterCommands() || [];
+        for (const cmd of filterCommands) {
           if (cmd && typeof cmd.action === 'function') base.push(cmd);
         }
       } catch (_e) { /* tyst */ }

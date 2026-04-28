@@ -223,6 +223,8 @@ html[data-theme="dark"] .cco-shortcuts-key {
       { label: 'Nytt mejl', key: 'N' },
       { label: 'Senare (snooze)', key: 'S' },
       { label: 'Radera', key: 'D' },
+      { section: 'Fokus / avbrott' },
+      { label: 'Hantera avbrott (pausa/byt/avsluta)', key: 'P' },
       { section: 'Sökning & paletter' },
       { label: 'Kommandopalett', key: '⌘K' },
       { label: 'Sök överallt', key: '⌘/' },

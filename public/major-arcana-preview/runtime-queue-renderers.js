@@ -2091,6 +2091,13 @@
 
       const extraArticleClasses = asText(unifiedModel.extraArticleClasses).trim();
       const articleDataAttributes = asText(options.articleDataAttributes);
+      // Exponera tags som DOM-attribut för follow-up-filter och saved-views.
+      const runtimeTagsList = (Array.isArray(unifiedModel.tags) ? unifiedModel.tags : [])
+        .map((t) => String(t || '').trim())
+        .filter(Boolean);
+      const runtimeTagsAttribute = runtimeTagsList.length
+        ? ` data-runtime-tags="${escapeHtml(runtimeTagsList.join(','))}"`
+        : '';
 
       // ====== v5 LAYOUT ======
       // Compute What/Why/Next via existing signal-functions. unifiedModel has the
@@ -2186,7 +2193,7 @@
 
       const v5DataLane = ` data-lane="${escapeHtml(v5Lane)}"`;
 
-      return `<article class="thread-card queue-history-item unified-queue-card${extraArticleClasses ? ` ${extraArticleClasses}` : ""}${selectedClass}${selectedArticleClass}${laneClass}${operationalClass}${unreadClass}${loadingClass}"${v5DataLane}${runtimeThreadAttribute}${worklistSourceAttribute}${worklistSourceLabelAttribute}${historyConversationAttribute}${articleDataAttributes}${selectedState}>
+      return `<article class="thread-card queue-history-item unified-queue-card${extraArticleClasses ? ` ${extraArticleClasses}` : ""}${selectedClass}${selectedArticleClass}${laneClass}${operationalClass}${unreadClass}${loadingClass}"${v5DataLane}${runtimeThreadAttribute}${worklistSourceAttribute}${worklistSourceLabelAttribute}${historyConversationAttribute}${runtimeTagsAttribute}${articleDataAttributes}${selectedState}>
         <div class="priority-bar" aria-hidden="true"></div>
         <div class="card-strip">
           <span class="lane-badge" data-lane="${escapeHtml(v5Lane)}">${v5Icon}${escapeHtml(v5Label)}</span>
