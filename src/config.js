@@ -139,6 +139,14 @@ const stateRoot = resolveDirectoryPath(
 const brand = asNonEmptyString(process.env.ARCANA_BRAND, 'hair-tp-clinic');
 const brandByHost = asJsonObject(process.env.ARCANA_BRAND_BY_HOST, null);
 
+// S3: Multi-tenant default-mailbox alias. Default-värde överrids via env:
+//   • CCO_DEFAULT_MAILBOX (eller ARCANA_DEFAULT_MAILBOX)
+// defaultTenantId definieras nedan i config-objektet med samma alias-stöd.
+const defaultMailbox = asNonEmptyString(
+  process.env.CCO_DEFAULT_MAILBOX || process.env.ARCANA_DEFAULT_MAILBOX,
+  asNonEmptyString(process.env.ARCANA_SCHEDULER_CCO_HISTORY_MAILBOX_ID, 'kons@hairtpclinic.com')
+);
+
 const config = {
   port,
   publicBaseUrl,
@@ -146,6 +154,7 @@ const config = {
   ccoNextRedirectHosts,
   brand,
   brandByHost,
+  defaultMailbox,
   publicClinicIdAliases: asJsonObject(process.env.ARCANA_PUBLIC_CLINIC_ALIASES, null),
   nodeEnv,
   isProduction,
@@ -419,7 +428,12 @@ const config = {
     process.env.ARCANA_PUBLIC_CHAT_PROMPT_INJECTION_MESSAGE,
     'Jag kan inte hjälpa till med den typen av instruktion. Kontakta kliniken direkt för fortsatt hjälp.'
   ),
-  defaultTenantId: asNonEmptyString(process.env.ARCANA_DEFAULT_TENANT, brand),
+  defaultTenantId: asNonEmptyString(
+    process.env.CCO_DEFAULT_TENANT_ID ||
+      process.env.ARCANA_DEFAULT_TENANT_ID ||
+      process.env.ARCANA_DEFAULT_TENANT,
+    brand
+  ),
   bootstrapOwnerEmail: asNonEmptyString(process.env.ARCANA_OWNER_EMAIL),
   bootstrapOwnerPassword: asNonEmptyString(process.env.ARCANA_OWNER_PASSWORD),
   bootstrapOwnerResetPassword: asBool(process.env.ARCANA_BOOTSTRAP_RESET_OWNER_PASSWORD, false),

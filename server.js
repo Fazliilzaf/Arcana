@@ -258,6 +258,53 @@ app.use((req, res, next) => {
   return next();
 });
 
+// S4: Säkerhets-headers (CSP, X-Content-Type-Options, X-Frame-Options,
+// Referrer-Policy, Permissions-Policy, HSTS för HTTPS).
+// Strikt CSP eftersom 0 inline-scripts finns i major-arcana-preview/index.html.
+app.use((req, res, next) => {
+  const path = String(req.path || '').trim().toLowerCase();
+  const isApi = path.startsWith('/api/');
+  const isStream = path.endsWith('/runtime/stream');
+
+  // CSP — endast för HTML-svar, inte för JSON-API eller SSE-streams
+  if (!isApi && !isStream) {
+    const cspDirectives = [
+      "default-src 'self'",
+      // 'unsafe-inline' för style behövs för existing CSS-injection från modulerna
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "script-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https:",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+      "media-src 'self'",
+      "manifest-src 'self'",
+      "worker-src 'self' blob:",
+    ].join('; ');
+    res.setHeader('Content-Security-Policy', cspDirectives);
+  }
+
+  // Generella säkerhets-headers (alla svar)
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=()'
+  );
+  // HSTS — endast för HTTPS-anslutningar (Render serverar HTTPS i prod)
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    );
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   const path = String(req.path || '').trim().toLowerCase();
   const disableCachePaths = new Set([
