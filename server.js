@@ -283,7 +283,29 @@ app.use((req, res, next) => {
 });
 
 app.get('/admin.html', (_req, res) => sendAdminHtml(res));
-app.use(express.static("public"));
+app.use(
+  express.static("public", {
+    setHeaders: (res, filePath) => {
+      // P4: cache-strategi för major-arcana-preview/-assets.
+      // - Aggressiv cache med stale-while-revalidate så browser kan visa
+      //   cached version medan en ny laddas i bakgrunden vid nästa besök.
+      // - HTML har kort cache så ny deploy syns snabbt.
+      const safe = String(filePath || '').toLowerCase();
+      if (/\/major-arcana-preview\/.+\.(js|css)$/i.test(safe)) {
+        res.setHeader(
+          'Cache-Control',
+          'public, max-age=300, stale-while-revalidate=86400'
+        );
+      } else if (/\.(woff2?|ttf|otf|eot|ico|png|jpe?g|svg|webp|gif)$/i.test(safe)) {
+        res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+      } else if (/\.(js|css)$/i.test(safe)) {
+        res.setHeader('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600');
+      } else if (/\.html?$/i.test(safe)) {
+        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+      }
+    },
+  })
+);
 const activeCcoNextBuild = getCcoNextBuild();
 if (activeCcoNextBuild) {
   app.use(
