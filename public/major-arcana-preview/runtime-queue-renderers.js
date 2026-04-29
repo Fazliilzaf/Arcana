@@ -832,29 +832,10 @@
             useThreadCardClass: true,
           }
         );
-        if (asText(unifiedMarkup).includes("card-footer")) return unifiedMarkup;
-        const fallbackTrailItems = mailboxTrail.length ? mailboxTrail.slice(0, 3) : ["Fazli", "Contact", "Egzona"];
-        const fallbackFooter = `<div class="card-footer">
-            <span class="chip chip-gray">${buildUnifiedCardIconMarkup("mail")}<span class="chip-label">Kons</span></span>
-            <span class="chip chip-blue">${buildUnifiedCardIconMarkup("users")}<span class="chip-label">Samma kund har sk...</span></span>
-            <span class="chip chip-pink">${buildUnifiedCardIconMarkup("alert")}<span class="chip-label">Behöver uppmärksa...</span></span>
-            <span class="chip chip-green">${buildUnifiedCardIconMarkup("chevron-right")}<span class="chip-label">Fortsätt från samma</span></span>
-          </div>`;
-        const fallbackTrail =
-          fallbackTrailItems.length > 1
-            ? `<div class="mailbox-trail">
-                <span class="trail-bar" aria-hidden="true"></span>
-                ${buildUnifiedCardIconMarkup("inbox")}
-                <span class="trail-label">MAILBOXSPÅR</span>
-                ${fallbackTrailItems
-                  .map(
-                    (entry, index) =>
-                      `${index > 0 ? '<span class="trail-separator" aria-hidden="true">·</span>' : ""}<span class="trail-item">${escapeHtml(entry)}</span>`
-                  )
-                  .join("")}
-              </div>`
-            : "";
-        return asText(unifiedMarkup).replace("</article>", `${fallbackFooter}${fallbackTrail}</article>`);
+        // v5: alltid returnera unifiedMarkup direkt (innehåller card-footer + mailbox-stack
+        // i sin egen v5-struktur). Ta bort gammal v3-fallback som injekterade chip-footer
+        // + mailbox-trail efter v5-markupen och förstörde grid-area-layouten.
+        return unifiedMarkup;
       }
       {
         const safeName = escapeHtml(asText(historyItem.customerName, "Okänd avsändare"));
