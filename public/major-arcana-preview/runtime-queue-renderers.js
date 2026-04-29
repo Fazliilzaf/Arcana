@@ -2177,7 +2177,10 @@
       // v5: använd inline-styles på varje sektion + grid-style på artikeln så ingen
       // CSS-override kan vända ordningen (footer-strip-body-buggen). Browser-defaults
       // för grid + explicit grid-row på children ger garanterad strip→body→footer.
-      const articleStyle = "display:grid;grid-template-columns:12px 1fr;grid-template-rows:auto auto auto;grid-template-areas:\"rail strip\" \"rail body\" \"rail footer\";position:relative;height:auto;min-height:0;max-height:none;padding:0;overflow:visible;";
+      // OBS: använd single-quotes ('rail strip') i grid-template-areas-värdet
+      // eftersom hela style="..."-attributet redan är inom double-quotes i HTML.
+      // Med double-quotes inuti bryter \" ut ur attributet och styling ignoreras.
+      const articleStyle = "display:grid;grid-template-columns:12px 1fr;grid-template-rows:auto auto auto;grid-template-areas:'rail strip' 'rail body' 'rail footer';position:relative;height:auto;min-height:0;max-height:none;padding:0;overflow:visible;";
       const railStyle = "grid-area:rail;grid-row:1/4;grid-column:1;width:5px;height:100%;align-self:stretch;border-radius:14px 0 0 14px;";
       const stripStyle = "grid-area:strip;grid-row:1;grid-column:2;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 4px;";
       const bodyStyle = "grid-area:body;grid-row:2;grid-column:2;display:grid;grid-template-columns:42px 1fr;align-items:flex-start;gap:14px;padding:6px 16px 12px;";
