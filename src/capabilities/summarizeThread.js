@@ -19,6 +19,7 @@
 
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const { BaseCapability } = require('./baseCapability');
+const { buildGuardrailReport } = require('../risk/aiGuardrails');
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -345,6 +346,7 @@ class SummarizeThreadCapability extends BaseCapability {
           'newMessagesSinceLastVisit',
           'source',
           'generatedAt',
+          'guardrails',
         ],
         properties: {
           conversationId: { type: 'string', maxLength: 1024 },
@@ -359,6 +361,32 @@ class SummarizeThreadCapability extends BaseCapability {
           newMessagesSinceLastVisit: { type: 'integer', minimum: 0, maximum: 1000 },
           source: { type: 'string', enum: ['heuristic', 'openai', 'hybrid'] },
           generatedAt: { type: 'string', minLength: 1, maxLength: 64 },
+          guardrails: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['verified', 'severity', 'shortLabel', 'violationCount'],
+            properties: {
+              verified: { type: 'boolean' },
+              severity: { type: 'string', enum: ['none', 'low', 'high', 'critical'] },
+              shortLabel: { type: 'string', maxLength: 64 },
+              violationCount: { type: 'integer', minimum: 0, maximum: 100 },
+              violations: {
+                type: 'array',
+                maxItems: 20,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['type', 'value', 'severity', 'message'],
+                  properties: {
+                    type: { type: 'string', maxLength: 40 },
+                    value: { type: 'string', maxLength: 200 },
+                    severity: { type: 'string', enum: ['low', 'high', 'critical'] },
+                    message: { type: 'string', maxLength: 280 },
+                  },
+                },
+              },
+            },
+          },
         },
       },
       metadata: {
@@ -424,6 +452,27 @@ class SummarizeThreadCapability extends BaseCapability {
       }
     }
 
+    // Hallucinationsskydd (Fas 2): kontrollera att outputen inte introducerar
+    // fakta som inte finns i source-meddelandena.
+    const sourceTexts = asArray(messages)
+      .map((m) => normalizeText(m?.body || m?.bodyPreview || m?.text))
+      .filter(Boolean);
+    const outputText = [
+      headline,
+      ...asArray(bullets),
+      heuristic.whatChangedSinceLastVisit,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const guardrails = buildGuardrailReport({ outputText, sourceTexts });
+    if (!guardrails.verified) {
+      warnings.push(
+        `Hallucinationsskydd: ${guardrails.violationCount} möjlig${
+          guardrails.violationCount === 1 ? '' : 'a'
+        } ej-verifierade fakta upptäckta (${guardrails.severity}).`
+      );
+    }
+
     return {
       data: {
         conversationId,
@@ -433,6 +482,7 @@ class SummarizeThreadCapability extends BaseCapability {
         newMessagesSinceLastVisit: heuristic.newMessagesSinceLastVisit,
         source,
         generatedAt: new Date().toISOString(),
+        guardrails,
       },
       metadata: {
         capability: SummarizeThreadCapability.name,

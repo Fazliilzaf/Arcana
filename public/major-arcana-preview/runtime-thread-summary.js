@@ -236,6 +236,60 @@
 .cco-tsum-warnings {
   margin: 12px 0 0; font-size: 11px; color: rgba(180, 100, 40, 0.85);
 }
+.cco-tsum-guardrail {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; margin-bottom: 12px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.cco-tsum-guardrail.is-verified {
+  background: rgba(40, 130, 90, 0.12);
+  color: #1f6e4a;
+}
+.cco-tsum-guardrail.is-unverified {
+  background: rgba(180, 100, 40, 0.14);
+  color: #8a4a14;
+}
+.cco-tsum-guardrail.is-sev-critical {
+  background: rgba(180, 50, 50, 0.14);
+  color: #a82828;
+}
+.cco-tsum-guardrail-icon { font-size: 13px; }
+.cco-tsum-guardrail-count {
+  font-size: 10px; font-weight: 500; opacity: 0.75;
+  margin-left: 2px;
+}
+.cco-tsum-violations {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  background: rgba(180, 100, 40, 0.08);
+  border-left: 3px solid rgba(180, 100, 40, 0.35);
+  border-radius: 6px;
+  font-size: 12px; color: #5d4a3c;
+}
+.cco-tsum-violations strong { color: #8a4a14; display: block; margin-bottom: 6px; }
+.cco-tsum-violations ul { margin: 0; padding-left: 18px; }
+.cco-tsum-violations li { margin-bottom: 3px; line-height: 1.4; }
+.cco-tsum-violations code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+  font-size: 10px; padding: 1px 5px;
+  background: rgba(80, 60, 40, 0.10); border-radius: 4px;
+  color: #5d4a3c;
+}
+.cco-tsum-violations em { color: rgba(80, 60, 40, 0.7); font-style: normal; font-size: 11px; }
+[data-cco-theme="dark"] .cco-tsum-violations,
+.is-dark .cco-tsum-violations,
+html[data-theme="dark"] .cco-tsum-violations {
+  background: rgba(180, 100, 40, 0.10);
+  color: #ddd1c2;
+}
+[data-cco-theme="dark"] .cco-tsum-violations code,
+.is-dark .cco-tsum-violations code,
+html[data-theme="dark"] .cco-tsum-violations code {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ddd1c2;
+}
 [data-cco-theme="dark"] .cco-tsum-dialog,
 .is-dark .cco-tsum-dialog,
 html[data-theme="dark"] .cco-tsum-dialog {
@@ -340,7 +394,25 @@ html[data-theme="dark"] .cco-tsum-since {
     const whatChanged = data.whatChangedSinceLastVisit || '';
     const newCount = Number(data.newMessagesSinceLastVisit || 0);
 
+    const guardrails = data.guardrails || null;
     let html = '';
+    // Guardrail-badge överst (Verifierad / Ej verifierad)
+    if (guardrails && typeof guardrails === 'object') {
+      const klass = guardrails.verified ? 'is-verified' : 'is-unverified';
+      const sevClass = guardrails.severity ? ` is-sev-${guardrails.severity}` : '';
+      const violationDetail =
+        !guardrails.verified && Array.isArray(guardrails.violations) && guardrails.violations.length
+          ? guardrails.violations
+              .slice(0, 4)
+              .map((v) => `${v.type}: ${v.value}`)
+              .join(' · ')
+          : '';
+      html += `<div class="cco-tsum-guardrail ${klass}${sevClass}" title="${escapeHtml(violationDetail)}">
+        <span class="cco-tsum-guardrail-icon">${guardrails.verified ? '✓' : '⚠'}</span>
+        <span class="cco-tsum-guardrail-label">${escapeHtml(guardrails.shortLabel || (guardrails.verified ? 'Verifierad' : 'Ej verifierad'))}</span>
+        ${!guardrails.verified ? `<span class="cco-tsum-guardrail-count">${guardrails.violationCount} ${guardrails.violationCount === 1 ? 'fakta' : 'fakta'}</span>` : ''}
+      </div>`;
+    }
     if (headline) html += `<p class="cco-tsum-headline">${escapeHtml(headline)}</p>`;
     if (bullets.length > 0) {
       html += '<ul class="cco-tsum-bullets">';
@@ -354,6 +426,14 @@ html[data-theme="dark"] .cco-tsum-since {
         <strong>Sedan senast:</strong> ${escapeHtml(whatChanged)}
         ${newCount > 0 ? ` (${newCount} ny${newCount === 1 ? 'tt' : 'a'})` : ''}
       </div>`;
+    }
+    if (guardrails && !guardrails.verified && Array.isArray(guardrails.violations) && guardrails.violations.length > 0) {
+      html += '<div class="cco-tsum-violations">';
+      html += '<strong>Möjliga ej-verifierade fakta:</strong><ul>';
+      for (const v of guardrails.violations.slice(0, 6)) {
+        html += `<li><code>${escapeHtml(v.type)}</code>: ${escapeHtml(v.value)} <em>— ${escapeHtml(v.message || '')}</em></li>`;
+      }
+      html += '</ul></div>';
     }
     if (warnings.length > 0) {
       html += `<div class="cco-tsum-warnings">⚠ ${escapeHtml(warnings.join(' · '))}</div>`;
