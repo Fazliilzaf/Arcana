@@ -3,11 +3,17 @@
    1) 2 bg-toner   2) topp-highlight   3) inset bottenskugga
    4) 3 yttre skuggor   5) ljus border som smälter in
    ============================================================ */
-/* v5: tvinga full vertikal layout — överskriv ALLA kollideringar från äldre regler */
+/* v5: explicit GRID-AREA layout låser varje sektion i rätt position */
 .thread-card.unified-queue-card[data-lane],
 .queue-history-list[data-queue-list-mode="live"] > .thread-card.unified-queue-card[data-lane],
 .queue-history-list[data-queue-list-mode="history"] > .thread-card.unified-queue-card[data-lane] {
-  display: block !important;
+  display: grid !important;
+  grid-template-columns: 12px 1fr !important;
+  grid-template-rows: auto auto auto !important;
+  grid-template-areas:
+    "rail strip"
+    "rail body"
+    "rail footer" !important;
   position: relative !important;
   min-height: 0 !important;
   max-height: none !important;
@@ -15,56 +21,54 @@
   padding: 0 !important;
   margin-bottom: 14px !important;
   overflow: visible !important;
-  grid-template-rows: none !important;
-  grid-template-columns: none !important;
-  flex-direction: column !important;
+  flex-direction: unset !important;
+  align-items: unset !important;
+  justify-content: unset !important;
 }
-/* Inom v5-kortet: alla direkta children som BLOCK (inte flex/grid items) */
 .thread-card.unified-queue-card[data-lane] > .priority-bar {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
+  grid-area: rail !important;
   width: 5px !important;
   height: 100% !important;
-  z-index: 1 !important;
   border-radius: 14px 0 0 14px !important;
-}
-.thread-card.unified-queue-card[data-lane] > .card-strip,
-.thread-card.unified-queue-card[data-lane] > .card-body,
-.thread-card.unified-queue-card[data-lane] > .card-footer {
+  align-self: stretch !important;
   position: relative !important;
-  width: auto !important;
-  margin-left: 12px !important; /* skapa plats för priority-bar */
-  display: flex !important;
 }
 .thread-card.unified-queue-card[data-lane] > .card-strip {
+  grid-area: strip !important;
+  display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-between !important;
+  gap: 10px !important;
   padding: 12px 16px 4px !important;
-  margin-left: 12px !important;
 }
 .thread-card.unified-queue-card[data-lane] > .card-body {
-  flex-direction: row !important;
+  grid-area: body !important;
+  display: grid !important;
+  grid-template-columns: 42px 1fr !important;
+  grid-template-rows: auto !important;
   align-items: flex-start !important;
   gap: 14px !important;
-  padding: 6px 16px 14px !important;
-  margin-left: 12px !important;
+  padding: 6px 16px 12px !important;
 }
 .thread-card.unified-queue-card[data-lane] .card-body .avatar-wrap {
-  flex: 0 0 42px !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
   position: relative !important;
 }
 .thread-card.unified-queue-card[data-lane] .card-body .card-content {
-  flex: 1 1 auto !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
   min-width: 0 !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
 }
 .thread-card.unified-queue-card[data-lane] .card-body .card-content .name-row {
   display: flex !important;
   align-items: baseline !important;
   gap: 10px !important;
-  margin-bottom: 4px !important;
+  margin: 0 !important;
 }
 .thread-card.unified-queue-card[data-lane] .card-body .card-content .signal-what {
   display: -webkit-box !important;
@@ -75,13 +79,15 @@
   color: #16161a !important;
   font-weight: 600 !important;
   overflow: hidden !important;
+  margin: 0 !important;
 }
 .thread-card.unified-queue-card[data-lane] > .card-footer {
+  grid-area: footer !important;
+  display: flex !important;
   flex-wrap: wrap !important;
   align-items: center !important;
   gap: 14px !important;
   padding: 10px 16px 12px !important;
-  margin-left: 12px !important;
   border-top: 1px solid rgba(215, 130, 90, 0.16) !important;
   background: linear-gradient(180deg, rgba(215, 130, 90, 0.05) 0%, rgba(215, 130, 90, 0.03) 100%) !important;
 }
