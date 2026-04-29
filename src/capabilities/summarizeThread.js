@@ -21,6 +21,8 @@ const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const { BaseCapability } = require('./baseCapability');
 const { buildGuardrailReport } = require('../risk/aiGuardrails');
 const { detectConversationLanguage, getLanguageLabel } = require('../risk/languageDetect');
+const { detectConversationSentiment, getSentimentLabel } = require('../risk/sentimentDetect');
+const { runDeterministicIntent } = require('../intelligence/intentClassifier');
 
 function normalizeText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -349,6 +351,8 @@ class SummarizeThreadCapability extends BaseCapability {
           'generatedAt',
           'guardrails',
           'detectedLanguage',
+          'sentiment',
+          'intent',
         ],
         properties: {
           conversationId: { type: 'string', maxLength: 1024 },
@@ -376,6 +380,28 @@ class SummarizeThreadCapability extends BaseCapability {
                 type: 'object',
                 additionalProperties: { type: 'integer', minimum: 0, maximum: 1000 },
               },
+            },
+          },
+          sentiment: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['code', 'label', 'icon', 'tone', 'confidence'],
+            properties: {
+              code: { type: 'string', maxLength: 16 },
+              label: { type: 'string', maxLength: 32 },
+              icon: { type: 'string', maxLength: 8 },
+              tone: { type: 'string', maxLength: 16 },
+              confidence: { type: 'number', minimum: 0, maximum: 1 },
+            },
+          },
+          intent: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['code', 'label', 'confidence'],
+            properties: {
+              code: { type: 'string', maxLength: 32 },
+              label: { type: 'string', maxLength: 60 },
+              confidence: { type: 'number', minimum: 0, maximum: 1 },
             },
           },
           guardrails: {
@@ -469,6 +495,56 @@ class SummarizeThreadCapability extends BaseCapability {
       }
     }
 
+    // Sentiment + intent (Fas 5): analysera senaste kund-meddelandet för
+    // emotionell ton + avsiktsklassificering.
+    const sentimentResult = detectConversationSentiment(messages, {
+      customerDirection: 'inbound',
+    });
+    const sentimentLabel = getSentimentLabel(sentimentResult.currentSentiment);
+    const sentiment = {
+      code: sentimentResult.currentSentiment,
+      label: sentimentLabel.label,
+      icon: sentimentLabel.icon,
+      tone: sentimentLabel.tone,
+      confidence: Number.isFinite(sentimentResult.currentConfidence)
+        ? Math.round(sentimentResult.currentConfidence * 100) / 100
+        : 0,
+    };
+
+    // Hitta senaste kund-meddelande för intent-klassificering
+    const inboundMessages = asArray(messages).filter(
+      (m) => normalizeText(m?.direction).toLowerCase() !== 'outbound'
+    );
+    const latestInboundText = inboundMessages.length
+      ? normalizeText(
+          inboundMessages[inboundMessages.length - 1]?.body ||
+            inboundMessages[inboundMessages.length - 1]?.bodyPreview ||
+            inboundMessages[inboundMessages.length - 1]?.text
+        )
+      : '';
+    // Använd deterministic intent (snabb regex/keyword-baserad) — passar
+    // för per-tråd-detektion utan att blockera på OpenAI-anrop.
+    const intentInputText = [subject, latestInboundText].filter(Boolean).join(' — ');
+    const intentResult = intentInputText
+      ? runDeterministicIntent(intentInputText)
+      : null;
+    const intentLabelMap = {
+      booking_request: 'Bokningsförfrågan',
+      pricing_question: 'Pris-fråga',
+      anxiety_pre_op: 'Orolig inför behandling',
+      complaint: 'Klagomål',
+      cancellation: 'Avbokning',
+      follow_up: 'Uppföljning',
+      unclear: 'Oklart',
+    };
+    const intent = {
+      code: intentResult?.intent || 'unclear',
+      label: intentLabelMap[intentResult?.intent] || 'Oklart',
+      confidence: Number.isFinite(intentResult?.confidence)
+        ? Math.round(intentResult.confidence * 100) / 100
+        : 0,
+    };
+
     // Multi-language detection (Fas 3): identifiera vilket språk kunden skriver på
     // så att studio kan föreslå svar på samma språk.
     const conversationLanguage = detectConversationLanguage(messages, {
@@ -517,6 +593,8 @@ class SummarizeThreadCapability extends BaseCapability {
         generatedAt: new Date().toISOString(),
         guardrails,
         detectedLanguage,
+        sentiment,
+        intent,
       },
       metadata: {
         capability: SummarizeThreadCapability.name,

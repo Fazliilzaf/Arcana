@@ -236,6 +236,33 @@
 .cco-tsum-warnings {
   margin: 12px 0 0; font-size: 11px; color: rgba(180, 100, 40, 0.85);
 }
+.cco-tsum-badges {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.cco-tsum-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 500;
+  background: rgba(80, 60, 40, 0.06);
+  color: #5d4a3c;
+}
+.cco-tsum-badge-icon { font-size: 13px; }
+.cco-tsum-badge.is-tone-green { background: rgba(40, 130, 90, 0.14); color: #1f6e4a; }
+.cco-tsum-badge.is-tone-red { background: rgba(180, 50, 50, 0.14); color: #a82828; }
+.cco-tsum-badge.is-tone-amber { background: rgba(180, 130, 40, 0.14); color: #8a6014; }
+.cco-tsum-badge.is-tone-gray { background: rgba(80, 60, 40, 0.08); color: rgba(80, 60, 40, 0.85); }
+.cco-tsum-badge-intent {
+  background: rgba(80, 100, 180, 0.10);
+  color: #3a4a8a;
+}
+[data-cco-theme="dark"] .cco-tsum-badge,
+.is-dark .cco-tsum-badge,
+html[data-theme="dark"] .cco-tsum-badge {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3ece2;
+}
 .cco-tsum-language {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 10px; margin-bottom: 8px; margin-right: 6px;
@@ -413,7 +440,27 @@ html[data-theme="dark"] .cco-tsum-since {
 
     const guardrails = data.guardrails || null;
     const detectedLanguage = data.detectedLanguage || null;
+    const sentiment = data.sentiment || null;
+    const intent = data.intent || null;
     let html = '';
+    // Sentiment + intent badges (Fas 5)
+    if (sentiment || intent) {
+      html += '<div class="cco-tsum-badges">';
+      if (sentiment && sentiment.code && sentiment.code !== 'unknown') {
+        const tone = sentiment.tone || 'gray';
+        html += `<div class="cco-tsum-badge cco-tsum-badge-sentiment is-tone-${escapeHtml(tone)}" title="Konfidens ${Math.round((sentiment.confidence || 0) * 100)}%">
+          <span class="cco-tsum-badge-icon">${escapeHtml(sentiment.icon || '')}</span>
+          <span class="cco-tsum-badge-label">Stämning: ${escapeHtml(sentiment.label || '')}</span>
+        </div>`;
+      }
+      if (intent && intent.code && intent.code !== 'unclear') {
+        html += `<div class="cco-tsum-badge cco-tsum-badge-intent" title="Konfidens ${Math.round((intent.confidence || 0) * 100)}%">
+          <span class="cco-tsum-badge-icon">🎯</span>
+          <span class="cco-tsum-badge-label">Intent: ${escapeHtml(intent.label || '')}</span>
+        </div>`;
+      }
+      html += '</div>';
+    }
     // Språk-badge (Fas 3): visa detekterat språk + flagga
     if (detectedLanguage && detectedLanguage.primary && detectedLanguage.primary !== 'unknown') {
       const conf = Math.round((detectedLanguage.confidence || 0) * 100);
