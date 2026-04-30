@@ -192,15 +192,152 @@ html .cco-svw-item:focus-visible {
   }
 
   function auditAria() {
-    // Basic ARIA-audit på interaktiva element som saknar labels
+    // A2: Full ARIA + keyboard-nav audit
     const issues = [];
-    document.querySelectorAll('button:not([aria-label])').forEach((btn) => {
+
+    // 1. Interaktiva element utan tillgängligt namn
+    document.querySelectorAll('button, [role="button"]').forEach((btn) => {
+      const ariaLabel = btn.getAttribute('aria-label');
+      const ariaLabelledBy = btn.getAttribute('aria-labelledby');
+      const title = btn.getAttribute('title');
       const txt = (btn.textContent || '').trim();
-      if (!txt) {
-        issues.push({ el: btn, issue: 'button utan aria-label eller text' });
+      if (!ariaLabel && !ariaLabelledBy && !title && !txt) {
+        issues.push({ el: btn, severity: 'error', issue: 'button saknar tillgängligt namn (aria-label, aria-labelledby, title eller text)' });
       }
     });
+
+    // 2. Form-inputs utan label
+    document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea').forEach((inp) => {
+      const id = inp.getAttribute('id');
+      const ariaLabel = inp.getAttribute('aria-label');
+      const ariaLabelledBy = inp.getAttribute('aria-labelledby');
+      const placeholder = inp.getAttribute('placeholder');
+      const hasLabelFor = id && document.querySelector(`label[for="${CSS.escape(id)}"]`);
+      const wrapped = inp.closest('label');
+      if (!ariaLabel && !ariaLabelledBy && !hasLabelFor && !wrapped && !placeholder) {
+        issues.push({ el: inp, severity: 'error', issue: 'form-input saknar label / aria-label' });
+      }
+    });
+
+    // 3. Bilder utan alt
+    document.querySelectorAll('img:not([alt])').forEach((img) => {
+      issues.push({ el: img, severity: 'warning', issue: 'img saknar alt-attribut (använd alt="" för dekorativa)' });
+    });
+
+    // 4. Klickbara <div>/<span> utan role/tabindex
+    document.querySelectorAll('div[onclick], span[onclick]').forEach((el) => {
+      if (!el.getAttribute('role') || !el.hasAttribute('tabindex')) {
+        issues.push({ el, severity: 'error', issue: 'klickbart element utan role + tabindex (otillgängligt via tangentbord)' });
+      }
+    });
+
+    // 5. Modaler utan rätt ARIA-attribut
+    document.querySelectorAll('.cco-cmdk, .cco-svw-dialog, .cco-usearch, .cco-tsum-dialog, .cco-sbreak-dialog, .cco-shortcuts, .cco-tadmin, .cco-help, .cco-2fa, .cco-wizard').forEach((dlg) => {
+      if (!dlg.getAttribute('role')) {
+        issues.push({ el: dlg, severity: 'warning', issue: 'modal saknar role="dialog"' });
+      }
+      if (!dlg.getAttribute('aria-modal')) {
+        issues.push({ el: dlg, severity: 'warning', issue: 'modal saknar aria-modal="true"' });
+      }
+      if (!dlg.getAttribute('aria-label') && !dlg.getAttribute('aria-labelledby')) {
+        issues.push({ el: dlg, severity: 'warning', issue: 'modal saknar aria-label / aria-labelledby' });
+      }
+    });
+
+    // 6. Headings hierarchy — får inte hoppa nivåer
+    const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+    let prevLevel = 0;
+    for (const h of headings) {
+      const level = Number(h.tagName.charAt(1));
+      if (prevLevel > 0 && level > prevLevel + 1) {
+        issues.push({ el: h, severity: 'warning', issue: `heading hoppar från h${prevLevel} till h${level}` });
+      }
+      prevLevel = level;
+    }
+
+    // 7. Buttons som borde vara länkar (target="_blank" eller href-liknande data)
+    document.querySelectorAll('button[data-href], button[data-url]').forEach((btn) => {
+      issues.push({ el: btn, severity: 'info', issue: 'button med data-href/data-url — överväg <a> istället' });
+    });
+
     return issues;
+  }
+
+  function autoLabelInteractive() {
+    // A2: Säkerställ att vanliga ikoner har aria-label
+    const labels = {
+      '[data-action="close"]': 'Stäng',
+      '[data-action="back"]': 'Tillbaka',
+      '[data-action="next"]': 'Nästa',
+      '[data-action="prev"]': 'Föregående',
+      '[data-action="reload"]': 'Ladda om',
+      '[data-action="settings"]': 'Inställningar',
+      '[data-action="search"]': 'Sök',
+      '[data-action="menu"]': 'Meny',
+      '[data-action="help"]': 'Hjälp',
+      '[data-cco-locale-toggle]': 'Byt språk',
+      '[data-cco-density-toggle]': 'Växla täthet',
+      '[data-cco-reduced-motion]': 'Växla reducerad rörelse',
+      '[data-cco-high-contrast]': 'Växla hög kontrast',
+    };
+    let added = 0;
+    for (const [selector, label] of Object.entries(labels)) {
+      document.querySelectorAll(selector).forEach((el) => {
+        if (!el.hasAttribute('aria-label') && !el.hasAttribute('aria-labelledby')) {
+          const txt = (el.textContent || '').trim();
+          if (!txt) {
+            el.setAttribute('aria-label', label);
+            added += 1;
+          }
+        }
+      });
+    }
+    return added;
+  }
+
+  function ensureModalAria() {
+    // A2: Säkerställ role/aria-modal på alla kända modaler
+    const dialogs = [
+      '.cco-cmdk',
+      '.cco-svw-dialog',
+      '.cco-usearch',
+      '.cco-tsum-dialog',
+      '.cco-sbreak-dialog',
+      '.cco-shortcuts',
+      '.cco-tadmin',
+      '.cco-help',
+      '.cco-2fa',
+      '.cco-wizard',
+    ];
+    let fixed = 0;
+    document.querySelectorAll(dialogs.join(', ')).forEach((dlg) => {
+      if (!dlg.getAttribute('role')) {
+        dlg.setAttribute('role', 'dialog');
+        fixed += 1;
+      }
+      if (!dlg.getAttribute('aria-modal')) {
+        dlg.setAttribute('aria-modal', 'true');
+        fixed += 1;
+      }
+    });
+    return fixed;
+  }
+
+  function setupKeyboardEscapeForModals() {
+    // A2: Säkerställ att Escape stänger modaler även om enskilda moduler missat det
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const openDialog = document.querySelector(
+        '.cco-cmdk[aria-hidden="false"], .cco-usearch[aria-hidden="false"], .cco-svw-dialog[aria-hidden="false"], .cco-tsum-dialog[aria-hidden="false"], .cco-sbreak-dialog[aria-hidden="false"], .cco-shortcuts[aria-hidden="false"], .cco-tadmin[aria-hidden="false"], .cco-help[aria-hidden="false"], .cco-2fa[aria-hidden="false"], .cco-wizard[aria-hidden="false"]'
+      );
+      if (!openDialog) return;
+      const closeBtn = openDialog.querySelector('[data-action="close"], .cco-close, [aria-label="Stäng"], [aria-label="Close"]');
+      if (closeBtn) {
+        closeBtn.click();
+      } else {
+        openDialog.setAttribute('aria-hidden', 'true');
+      }
+    }, true);
   }
 
   function mount() {
@@ -208,15 +345,26 @@ html .cco-svw-item:focus-visible {
     // Apply persisted prefs
     applyPref(STORAGE_MOTION, 'data-cco-reduced-motion', readPref(STORAGE_MOTION));
     applyPref(STORAGE_CONTRAST, 'data-cco-high-contrast', readPref(STORAGE_CONTRAST));
-    // Inject skip-link + main-landmark
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    // Setup global Escape-handler för modaler
+    setupKeyboardEscapeForModals();
+    const runOnReady = () => {
       injectSkipLink();
       ensureMainLandmark();
+      autoLabelInteractive();
+      ensureModalAria();
+      // Re-run auto-labeling när nya moduler renderar in
+      const observer = new MutationObserver(() => {
+        autoLabelInteractive();
+        ensureModalAria();
+      });
+      try {
+        observer.observe(document.body, { childList: true, subtree: true });
+      } catch (_e) {}
+    };
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      runOnReady();
     } else {
-      document.addEventListener('DOMContentLoaded', () => {
-        injectSkipLink();
-        ensureMainLandmark();
-      }, { once: true });
+      document.addEventListener('DOMContentLoaded', runOnReady, { once: true });
     }
   }
 
@@ -230,6 +378,8 @@ html .cco-svw-item:focus-visible {
       getReducedMotion: () => readPref(STORAGE_MOTION),
       getHighContrast: () => readPref(STORAGE_CONTRAST),
       auditAria,
+      autoLabelInteractive,
+      ensureModalAria,
     });
 
     if (document.readyState === 'loading') {
