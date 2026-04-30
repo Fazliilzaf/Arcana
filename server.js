@@ -803,6 +803,23 @@ process.once('SIGTERM', () => {
   app.use('/api/v1/orchestrator', orchestratorRateLimiter);
   app.use('/api/public', publicClinicRateLimiter);
 
+  // SF3: Multi-layer rate-limit på sensitive endpoints (GDPR + 2FA + Tenant-mgmt)
+  const { createMultiLayerRateLimit } = require('./src/security/multiLayerRateLimit');
+  const sensitiveLimiter = createMultiLayerRateLimit({
+    store: rateLimitStore,
+    name: 'sensitive',
+    layers: {
+      ip: { points: 50, durationSec: 60 },
+      user: { points: 30, durationSec: 60 },
+      tenant: { points: 200, durationSec: 60 },
+    },
+  });
+  app.use('/api/v1/capabilities/GdprExportCustomer', sensitiveLimiter);
+  app.use('/api/v1/capabilities/GdprAnonymizeCustomer', sensitiveLimiter);
+  app.use('/api/v1/capabilities/TenantCreate', sensitiveLimiter);
+  app.use('/api/v1/capabilities/TenantDisable', sensitiveLimiter);
+  app.use('/api/v1/auth/2fa', sensitiveLimiter);
+
   const templateStore = await createTemplateStore({
     filePath: config.templateStorePath,
     maxEvaluations: config.templateEvalMaxEntries,
