@@ -8606,6 +8606,7 @@ function createCapabilitiesRouter({
   ccoHistoryStore = null,
   ccoMailboxTruthStore = null,
   ccoCustomerStore = null,
+  runtimeMetricsStore = null,
   templateStore = null,
   scheduler = null,
   graphReadConnector = null,
@@ -8735,6 +8736,7 @@ function createCapabilitiesRouter({
     ccoMailboxTruthStore,
     ccoCustomerStore,
     ccoConversationStateStore,
+    runtimeMetricsStore,
     buildVersion: process.env.npm_package_version || 'dev',
   });
 

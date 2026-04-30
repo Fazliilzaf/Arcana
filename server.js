@@ -1232,6 +1232,7 @@ process.once('SIGTERM', () => {
       ccoHistoryStore,
       ccoMailboxTruthStore,
       ccoCustomerStore,
+      runtimeMetricsStore,
       scheduler,
       graphReadConnector,
     })

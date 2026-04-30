@@ -137,21 +137,156 @@ class GdprExportCustomerCapability extends BaseCapability {
     const includeAuditTrail = input.includeAuditTrail !== false;
 
     const warnings = [];
-    const sections = { profile: {} };
-
-    // Stub-implementering: i framtid hämta riktigt data från stores.
-    // För nu returnera struktur så frontend kan renderas.
-    sections.profile = {
-      customerId,
-      tenantId,
-      note: 'Stub: full data-hämtning från stores implementeras när alla store-API:er är klara',
-    };
+    const sections = { profile: {}, notes: [] };
     if (includeThreads) sections.threads = [];
     if (includeAuditTrail) sections.auditTrail = [];
-    sections.notes = [];
 
     if (!customerId) {
       warnings.push('customerId saknas — exporten är tom.');
+      return {
+        data: {
+          customerId,
+          tenantId,
+          exportedAt: new Date().toISOString(),
+          sections,
+          summary: { threadCount: 0, noteCount: 0, auditCount: 0 },
+        },
+        metadata: {
+          capability: GdprExportCustomerCapability.name,
+          version: GdprExportCustomerCapability.version,
+          channel: normalizeText(safeContext.channel) || 'admin',
+          tenantId,
+          requestId: normalizeText(safeContext.requestId) || '',
+          correlationId: normalizeText(safeContext.correlationId) || '',
+        },
+        warnings,
+      };
+    }
+
+    // SF5: hämta riktigt data från stores (graceful fallback om de saknas)
+    const ccoCustomerStore = safeContext.ccoCustomerStore;
+    const ccoHistoryStore = safeContext.ccoHistoryStore;
+    const authStore = safeContext.authStore;
+
+    // 1. PROFILE — från ccoCustomerStore
+    if (ccoCustomerStore && typeof ccoCustomerStore.peekTenantCustomerState === 'function') {
+      try {
+        const customerState = await ccoCustomerStore.peekTenantCustomerState({ tenantId });
+        const directory = (customerState && customerState.directory) || {};
+        const details = (customerState && customerState.details) || {};
+        const primaryEmailByKey = (customerState && customerState.primaryEmailByKey) || {};
+        // Försök hitta kund — customerId kan vara key eller email
+        let resolvedKey = null;
+        const lcId = customerId.toLowerCase();
+        for (const key of Object.keys(directory)) {
+          if (String(key).toLowerCase() === lcId) {
+            resolvedKey = key;
+            break;
+          }
+          const primary = String(primaryEmailByKey[key] || '').toLowerCase();
+          if (primary && primary === lcId) {
+            resolvedKey = key;
+            break;
+          }
+          const emails = Array.isArray(details[key]?.emails) ? details[key].emails : [];
+          if (emails.some((e) => String(e).toLowerCase() === lcId)) {
+            resolvedKey = key;
+            break;
+          }
+        }
+        if (resolvedKey) {
+          sections.profile = {
+            customerId,
+            tenantId,
+            customerKey: resolvedKey,
+            name: directory[resolvedKey]?.name || null,
+            primaryEmail: primaryEmailByKey[resolvedKey] || null,
+            emails: Array.isArray(details[resolvedKey]?.emails) ? details[resolvedKey].emails : [],
+            phone: details[resolvedKey]?.phone || null,
+            mailboxes: Array.isArray(details[resolvedKey]?.mailboxes) ? details[resolvedKey].mailboxes : [],
+          };
+        } else {
+          sections.profile = { customerId, tenantId, found: false };
+          warnings.push('Kunden hittades inte i customer-store.');
+        }
+      } catch (err) {
+        warnings.push(`Profile-hämtning misslyckades: ${err.message || 'okänt'}`);
+        sections.profile = { customerId, tenantId, error: true };
+      }
+    } else {
+      warnings.push('ccoCustomerStore saknas — profil ej hämtad.');
+      sections.profile = { customerId, tenantId };
+    }
+
+    // 2. THREADS — fetch via history-store outcomes/actions per email
+    if (includeThreads && ccoHistoryStore) {
+      try {
+        const customerEmail = sections.profile?.primaryEmail || customerId;
+        const conversationMap = new Map();
+        if (typeof ccoHistoryStore.listCustomerOutcomes === 'function') {
+          const outcomes = await ccoHistoryStore.listCustomerOutcomes({ tenantId, customerEmail });
+          for (const o of outcomes || []) {
+            const cid = String(o?.conversationId || '');
+            if (!cid) continue;
+            if (!conversationMap.has(cid)) {
+              conversationMap.set(cid, { conversationId: cid, outcomes: [], actions: [] });
+            }
+            conversationMap.get(cid).outcomes.push({
+              outcomeCode: o.outcomeCode || null,
+              recordedAt: o.recordedAt || null,
+              direction: o.direction || null,
+            });
+          }
+        }
+        if (typeof ccoHistoryStore.listCustomerActions === 'function') {
+          const actions = await ccoHistoryStore.listCustomerActions({ tenantId, customerEmail });
+          for (const a of actions || []) {
+            const cid = String(a?.conversationId || '');
+            if (!cid) continue;
+            if (!conversationMap.has(cid)) {
+              conversationMap.set(cid, { conversationId: cid, outcomes: [], actions: [] });
+            }
+            conversationMap.get(cid).actions.push({
+              actionType: a.actionType || null,
+              recordedAt: a.recordedAt || null,
+            });
+          }
+        }
+        sections.threads = Array.from(conversationMap.values()).slice(0, 1000);
+      } catch (err) {
+        warnings.push(`Thread-hämtning misslyckades: ${err.message || 'okänt'}`);
+      }
+    } else if (includeThreads) {
+      warnings.push('ccoHistoryStore saknas — trådar ej hämtade.');
+    }
+
+    // 3. AUDIT TRAIL — från authStore (filtrera client-side på targetId/customerId)
+    if (includeAuditTrail && authStore && typeof authStore.listAuditEvents === 'function') {
+      try {
+        const events = await authStore.listAuditEvents({ tenantId, limit: 500 });
+        const lcId = customerId.toLowerCase();
+        const lcEmail = String(sections.profile?.primaryEmail || '').toLowerCase();
+        const filtered = (Array.isArray(events) ? events : []).filter((ev) => {
+          const target = String(ev?.targetId || '').toLowerCase();
+          if (target && (target === lcId || (lcEmail && target === lcEmail))) return true;
+          // Inkludera även events med customerId i metadata
+          const meta = ev?.metadata || {};
+          const metaCustomer = String(meta.customerId || meta.customer_id || meta.customerEmail || '').toLowerCase();
+          return metaCustomer && (metaCustomer === lcId || (lcEmail && metaCustomer === lcEmail));
+        });
+        sections.auditTrail = filtered.slice(0, 500).map((ev) => ({
+          timestamp: ev.ts || ev.timestamp || ev.createdAt || null,
+          action: ev.action || null,
+          outcome: ev.outcome || null,
+          actorUserId: ev.actorUserId || null,
+          targetType: ev.targetType || null,
+          targetId: ev.targetId || null,
+        }));
+      } catch (err) {
+        warnings.push(`Audit-hämtning misslyckades: ${err.message || 'okänt'}`);
+      }
+    } else if (includeAuditTrail) {
+      warnings.push('authStore.listAuditEvents saknas — audit-trail ej hämtad.');
     }
 
     return {

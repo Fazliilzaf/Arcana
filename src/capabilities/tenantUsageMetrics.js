@@ -11,9 +11,8 @@
  *
  * Foundation för MT8 billing — kvota mot plan-tier.
  *
- * Stub-implementation som returnerar 0:or där metrics-pipelinen ännu inte
- * exponerar tenant-specifika räkningar. Framtida iteration läser från
- * runtimeMetricsStore som finns i src/observability/.
+ * Läser från runtimeMetricsStore.getTenantUsage() (implementerad i SF2).
+ * Om store eller metoden saknas returneras 0:or med warning.
  */
 
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
@@ -117,8 +116,10 @@ class TenantUsageMetricsCapability extends BaseCapability {
       } catch (error) {
         warnings.push(`Kunde inte hämta usage-metrics: ${error.message || 'okänt'}`);
       }
+    } else if (!runtimeMetricsStore) {
+      warnings.push('runtimeMetricsStore ej injicerad i kontext — returnerar 0:or.');
     } else {
-      warnings.push('runtimeMetricsStore.getTenantUsage saknas — returnerar 0:or (stub).');
+      warnings.push('runtimeMetricsStore.getTenantUsage saknas — returnerar 0:or.');
     }
 
     return {

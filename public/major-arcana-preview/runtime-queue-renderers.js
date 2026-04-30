@@ -2333,9 +2333,12 @@
       const selectedState = isSelected
         ? ' aria-current="true" data-history-selected="true"'
         : ' aria-current="false"';
-      const parseMailboxTrailFromDetail = (detail = "") => {
-        // TODO(backend): expose mailboxTrail: string[] from worklist/history payload.
-        // Text parsing is a temporary fallback and may split incorrectly if names contain separators.
+      const parseMailboxTrailFromDetail = (detail = "", source = null) => {
+        // Föredrar mailboxTrail: string[] direkt från payload om backend exponerar det.
+        // Annars fallback: dela detail-strängen på · / komma.
+        if (source && Array.isArray(source.mailboxTrail) && source.mailboxTrail.length) {
+          return source.mailboxTrail.map((part) => asText(part).trim()).filter(Boolean);
+        }
         return asText(detail)
           .split(/[·,]/g)
           .map((part) => asText(part).trim())
@@ -2364,7 +2367,8 @@
           .map((entry) => asText(entry).trim())
           .filter(Boolean);
         const mailboxTrailFromDetail = parseMailboxTrailFromDetail(
-          source.mailboxProvenanceDetail || source.rollup?.provenanceDetail || ""
+          source.mailboxProvenanceDetail || source.rollup?.provenanceDetail || "",
+          source
         );
         const mailboxTrail = mailboxTrailFromPayload.length
           ? mailboxTrailFromPayload
