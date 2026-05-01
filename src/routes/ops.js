@@ -20,6 +20,7 @@ const {
   applyChannelSignature,
 } = require('../templates/variables');
 const { evaluateTemplateRisk } = require('../risk/templateRisk');
+const { buildDigest } = require('../ops/dailyDigest');
 
 function parseLimit(value, fallback = 20) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -1951,6 +1952,46 @@ function createOpsRouter({
       }
     }
   );
+
+  // OI3: Daily digest preview — bygger HTML-email från KPI-payload som
+  // klienten redan hämtat. Tar `{ kpis, locale }` i bodyn, returnerar
+  // antingen JSON {subject, html, text} eller direkt HTML när
+  // `?format=html` skickas.
+  router.post('/ops/digest/preview', requireAuth, requireRole(ROLE_OWNER, ROLE_STAFF), async (req, res) => {
+    try {
+      const body = req.body && typeof req.body === 'object' ? req.body : {};
+      const kpis = body.kpis && typeof body.kpis === 'object' ? body.kpis : {};
+      const locale = typeof body.locale === 'string' ? body.locale : 'sv';
+      const tenantId = req.auth?.tenantId || kpis?.data?.tenantId || '';
+      let tenantBrand = body.tenantBrand && typeof body.tenantBrand === 'object' ? body.tenantBrand : null;
+      if (!tenantBrand && tenantConfigStore && typeof tenantConfigStore.getTenantConfig === 'function') {
+        try {
+          const cfg = await tenantConfigStore.getTenantConfig(tenantId);
+          tenantBrand = cfg?.brand || null;
+        } catch (_e) {}
+      }
+      const digest = buildDigest({ tenantBrand: tenantBrand || {}, kpis, locale });
+      try {
+        await authStore.addAuditEvent({
+          tenantId,
+          actorUserId: req.auth?.userId,
+          action: 'ops.digest.preview',
+          outcome: 'success',
+          targetType: 'ops',
+          targetId: 'daily_digest',
+          metadata: { locale, hasAlerts: Array.isArray(kpis?.data?.alerts) && kpis.data.alerts.length > 0 },
+        });
+      } catch (_e) {}
+      if (String(req.query?.format || '').toLowerCase() === 'html') {
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(digest.html);
+      }
+      return res.json({ ok: true, digest });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Kunde inte bygga digest.' });
+    }
+  });
 
   return router;
 }
