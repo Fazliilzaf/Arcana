@@ -27,6 +27,10 @@ const {
   findCrossMailboxCustomers,
   summarizeAggregation,
 } = require('../ops/crossMailboxAggregator');
+const {
+  getBootstrapStatus,
+  isEnabled: isBootstrapEnabled,
+} = require('../ops/bootstrapRunner');
 
 function parseLimit(value, fallback = 20) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
@@ -1960,6 +1964,25 @@ function createOpsRouter({
         }
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte återställa backup.' });
+      }
+    }
+  );
+
+  // DI9: Auto-bootstrap status. Read-only.
+  router.get(
+    '/ops/bootstrap/status',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      try {
+        return res.json({
+          ok: true,
+          enabled: isBootstrapEnabled(),
+          ...getBootstrapStatus(),
+        });
+      } catch (error) {
+        console.error('[ops/bootstrap/status]', error);
+        return res.status(500).json({ error: 'Kunde inte hämta bootstrap-status.' });
       }
     }
   );

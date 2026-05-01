@@ -40,3 +40,13 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+      - key: ARCANA_BOOTSTRAP_MAILBOX_BACKFILL
+        value: "true"
+      - key: ARCANA_BOOTSTRAP_MAILBOX_LOOKBACK_DAYS
+        value: "90"
+      - key: ARCANA_BOOTSTRAP_PREFERRED_MAILBOX
+        value: contact@hairtpclinic.com
+      - key: ARCANA_BOOTSTRAP_TENANT_ID
+        value: hair-tp-clinic
+      - key: ARCANA_BOOTSTRAP_DELAY_MS
+        value: "5000"

@@ -406,6 +406,10 @@ const { createCcoHistoryStore } = require('./src/ops/ccoHistoryStore');
 const { createCcoMailboxTruthStore } = require('./src/ops/ccoMailboxTruthStore');
 const { createMessageIntelligenceStore } = require('./src/ops/messageIntelligenceStore');
 const { createCustomerPreferenceStore } = require('./src/ops/customerPreferenceStore');
+const {
+  scheduleBootstrap: scheduleMailboxBootstrap,
+  isEnabled: isMailboxBootstrapEnabled,
+} = require('./src/ops/bootstrapRunner');
 const { createCcoConversationStateStore } = require('./src/ops/ccoConversationStateStore');
 const { createCcoNoteStore } = require('./src/ops/ccoNoteStore');
 const { createCcoFollowUpStore } = require('./src/ops/ccoFollowUpStore');
@@ -1323,6 +1327,23 @@ process.once('SIGTERM', () => {
     );
   } else {
     console.log('[scheduler] inaktiv (ARCANA_SCHEDULER_ENABLED=false)');
+  }
+
+  // DI9: auto-bootstrap mailbox-backfill om ARCANA_BOOTSTRAP_MAILBOX_BACKFILL=true.
+  // Fire-and-forget — server.listen blockas inte. Status syns på
+  // /api/v1/ops/bootstrap/status.
+  if (isMailboxBootstrapEnabled()) {
+    console.log('[bootstrap] schemalägger mailbox-backfill efter startup …');
+    scheduleMailboxBootstrap({
+      tenantId:
+        process.env.ARCANA_BOOTSTRAP_TENANT_ID ||
+        process.env.ARCANA_DEFAULT_TENANT ||
+        'hair-tp-clinic',
+      graphReadConnector,
+      ccoMailboxTruthStore,
+      messageIntelligenceStore,
+      customerPreferenceStore,
+    });
   }
 })().catch((error) => {
   runtimeState.ready = false;
