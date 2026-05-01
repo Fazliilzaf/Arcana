@@ -109,6 +109,34 @@
       'help.faq.title': 'Vanliga frågor',
       'help.shortcuts.title': 'Snabbgenvägar',
       'help.contact.title': 'Behöver du mer hjälp?',
+
+      // Nav + huvud-UI (I5)
+      'nav.conversations': 'Konversationer',
+      'nav.customers': 'Kunder',
+      'nav.automation': 'Automatisering',
+      'nav.analytics': 'Analys',
+      'nav.more': 'Mer',
+      'nav.newMail': 'Nytt mejl',
+      'nav.sprint': 'Sprint',
+      'header.title': 'CCO',
+      'header.refresh': 'Uppdatera',
+      'header.signOut': 'Logga ut',
+      'header.changeClinic': 'Byt klinik',
+      'header.languagePicker': 'Språk',
+
+      // Empty states
+      'empty.inbox.title': 'Allt klart!',
+      'empty.inbox.message': 'Inga öppna trådar i kön just nu.',
+      'empty.search.title': 'Inga träffar',
+      'empty.search.message': 'Försök med en annan sökterm.',
+      'empty.firstRun.title': 'Välkommen!',
+      'empty.firstRun.message': 'Inga mail har lästs in ännu. Synkroniseringen är på gång.',
+
+      // Toast titlar
+      'toast.success.saved': 'Sparat',
+      'toast.error.failed': 'Något gick fel',
+      'toast.info.processing': 'Bearbetar…',
+      'toast.warning.attention': 'Obs',
     },
 
     en: {
@@ -147,6 +175,16 @@
       'feedback.registered': 'Feedback recorded — improves future drafts.',
       'help.faq.title': 'FAQ', 'help.shortcuts.title': 'Shortcuts',
       'help.contact.title': 'Need more help?',
+      'nav.conversations': 'Conversations', 'nav.customers': 'Customers',
+      'nav.automation': 'Automation', 'nav.analytics': 'Analytics', 'nav.more': 'More',
+      'nav.newMail': 'New mail', 'nav.sprint': 'Sprint',
+      'header.title': 'CCO', 'header.refresh': 'Refresh', 'header.signOut': 'Sign out',
+      'header.changeClinic': 'Switch clinic', 'header.languagePicker': 'Language',
+      'empty.inbox.title': 'All clear!', 'empty.inbox.message': 'No open threads in the queue.',
+      'empty.search.title': 'No results', 'empty.search.message': 'Try a different search term.',
+      'empty.firstRun.title': 'Welcome!', 'empty.firstRun.message': 'No mail loaded yet. Sync in progress.',
+      'toast.success.saved': 'Saved', 'toast.error.failed': 'Something went wrong',
+      'toast.info.processing': 'Processing…', 'toast.warning.attention': 'Heads up',
     },
 
     de: {
@@ -185,6 +223,16 @@
       'feedback.registered': 'Feedback gespeichert — verbessert zukünftige Entwürfe.',
       'help.faq.title': 'Häufige Fragen', 'help.shortcuts.title': 'Tastenkürzel',
       'help.contact.title': 'Brauchst du mehr Hilfe?',
+      'nav.conversations': 'Konversationen', 'nav.customers': 'Kunden',
+      'nav.automation': 'Automatisierung', 'nav.analytics': 'Analyse', 'nav.more': 'Mehr',
+      'nav.newMail': 'Neue Mail', 'nav.sprint': 'Sprint',
+      'header.title': 'CCO', 'header.refresh': 'Aktualisieren', 'header.signOut': 'Abmelden',
+      'header.changeClinic': 'Klinik wechseln', 'header.languagePicker': 'Sprache',
+      'empty.inbox.title': 'Alles erledigt!', 'empty.inbox.message': 'Keine offenen Threads in der Warteschlange.',
+      'empty.search.title': 'Keine Treffer', 'empty.search.message': 'Versuche einen anderen Suchbegriff.',
+      'empty.firstRun.title': 'Willkommen!', 'empty.firstRun.message': 'Noch keine Mails geladen. Synchronisierung läuft.',
+      'toast.success.saved': 'Gespeichert', 'toast.error.failed': 'Etwas ist schiefgelaufen',
+      'toast.info.processing': 'Verarbeite…', 'toast.warning.attention': 'Achtung',
     },
 
     dk: {
@@ -223,6 +271,16 @@
       'feedback.registered': 'Feedback registreret — forbedrer fremtidige udkast.',
       'help.faq.title': 'Ofte stillede spørgsmål', 'help.shortcuts.title': 'Genveje',
       'help.contact.title': 'Brug for mere hjælp?',
+      'nav.conversations': 'Konversationer', 'nav.customers': 'Kunder',
+      'nav.automation': 'Automatisering', 'nav.analytics': 'Analyse', 'nav.more': 'Mere',
+      'nav.newMail': 'Ny mail', 'nav.sprint': 'Sprint',
+      'header.title': 'CCO', 'header.refresh': 'Opdater', 'header.signOut': 'Log ud',
+      'header.changeClinic': 'Skift klinik', 'header.languagePicker': 'Sprog',
+      'empty.inbox.title': 'Alt klar!', 'empty.inbox.message': 'Ingen åbne tråde i køen lige nu.',
+      'empty.search.title': 'Ingen resultater', 'empty.search.message': 'Prøv en anden søgeterm.',
+      'empty.firstRun.title': 'Velkommen!', 'empty.firstRun.message': 'Ingen mails indlæst endnu. Synkronisering i gang.',
+      'toast.success.saved': 'Gemt', 'toast.error.failed': 'Noget gik galt',
+      'toast.info.processing': 'Behandler…', 'toast.warning.attention': 'Bemærk',
     },
   };
 
@@ -329,9 +387,97 @@
     }
   }
 
+  // I4: DOM auto-translate.
+  // Mark element with data-i18n="key" → text content blir översatt.
+  // Mark med data-i18n-attr-placeholder="key" → attributet placeholder översätts.
+  // Mark med data-i18n-attr-aria-label="key" → aria-label översätts. Etc.
+  function translateElement(el) {
+    if (!el || !el.getAttribute) return;
+    const textKey = el.getAttribute('data-i18n');
+    if (textKey) {
+      const value = t(textKey);
+      // Bevara children om de har egen i18n; annars sätt text
+      if (el.children.length === 0) {
+        el.textContent = value;
+      } else {
+        // Hitta första text-noden och uppdatera den
+        let textNode = null;
+        for (const node of el.childNodes) {
+          if (node.nodeType === 3 && node.textContent.trim()) {
+            textNode = node;
+            break;
+          }
+        }
+        if (textNode) textNode.textContent = value;
+        else el.insertBefore(document.createTextNode(value), el.firstChild);
+      }
+    }
+    // Attribut-översättningar via data-i18n-attr-*
+    for (const attr of Array.from(el.attributes || [])) {
+      if (attr.name.startsWith('data-i18n-attr-')) {
+        const targetAttr = attr.name.replace('data-i18n-attr-', '');
+        const key = attr.value;
+        if (targetAttr && key) el.setAttribute(targetAttr, t(key));
+      }
+    }
+  }
+
+  function translateDom(root = document) {
+    if (!root || !root.querySelectorAll) return 0;
+    let count = 0;
+    const all = root.querySelectorAll('[data-i18n], [data-i18n-attr-placeholder], [data-i18n-attr-aria-label], [data-i18n-attr-title], [data-i18n-attr-alt]');
+    for (const el of all) {
+      translateElement(el);
+      count += 1;
+    }
+    return count;
+  }
+
+  function setupMutationObserver() {
+    if (typeof MutationObserver === 'undefined') return;
+    if (window.__cco_i18n_observer) return;
+    const observer = new MutationObserver((mutations) => {
+      const seen = new Set();
+      for (const m of mutations) {
+        if (m.type === 'childList') {
+          for (const node of m.addedNodes) {
+            if (node.nodeType === 1 && !seen.has(node)) {
+              seen.add(node);
+              translateElement(node);
+              if (typeof node.querySelectorAll === 'function') {
+                for (const child of node.querySelectorAll('[data-i18n], [data-i18n-attr-placeholder], [data-i18n-attr-aria-label], [data-i18n-attr-title], [data-i18n-attr-alt]')) {
+                  translateElement(child);
+                }
+              }
+            }
+          }
+        } else if (m.type === 'attributes' && m.attributeName && m.attributeName.startsWith('data-i18n')) {
+          translateElement(m.target);
+        }
+      }
+    });
+    try {
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['data-i18n'],
+      });
+      window.__cco_i18n_observer = observer;
+    } catch (_e) {}
+  }
+
   function mount() {
     document.documentElement.setAttribute('lang', currentLocale === 'dk' ? 'da' : currentLocale);
     document.documentElement.setAttribute('data-cco-locale', currentLocale);
+    // Initial pass över befintlig DOM
+    if (document.body) translateDom(document);
+    else document.addEventListener('DOMContentLoaded', () => translateDom(document), { once: true });
+    setupMutationObserver();
+    // Re-translate vid locale-change
+    onLocaleChange(() => {
+      try { translateDom(document); } catch (_e) {}
+    });
   }
 
   if (typeof window !== 'undefined') {
@@ -345,6 +491,8 @@
       formatNumber,
       formatCurrency,
       onLocaleChange,
+      translateDom,
+      translateElement,
       _notifyListeners,
       SUPPORTED,
     });
