@@ -10,6 +10,7 @@ const { GdprExportCustomerCapability, GdprAnonymizeCustomerCapability } = requir
 const { TenantListCapability, TenantCreateCapability, TenantDisableCapability } = require('./tenantLifecycle');
 const { TenantUsageMetricsCapability } = require('./tenantUsageMetrics');
 const { CcoOperationalKpisCapability } = require('./ccoOperationalKpis');
+const { CcoCustomerBookingsCapability } = require('./ccoCustomerBookings');
 const { ROLE_OWNER, ROLE_STAFF } = require('../security/roles');
 const { COO_AGENT_NAME } = require('../agents/cooDailyBriefAgent');
 const { CCO_AGENT_NAME } = require('../agents/ccoInboxAgent');
@@ -33,6 +34,7 @@ const CAPABILITY_DEFINITIONS = Object.freeze([
   assertCapabilityClass(TenantDisableCapability),
   assertCapabilityClass(TenantUsageMetricsCapability),
   assertCapabilityClass(CcoOperationalKpisCapability),
+  assertCapabilityClass(CcoCustomerBookingsCapability),
 ]);
 
 const CAPABILITY_MAP = new Map(

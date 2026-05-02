@@ -26,6 +26,7 @@ const {
   runDailyDigestForAllTenants,
 } = require('../ops/dailyDigestRunner');
 const { runEnrichment } = require('../ops/messageEnrichmentRunner');
+const { seedFromMailboxTruth: seedClientoMockBookings } = require('../ops/clientoMockSeeder');
 const {
   aggregateByCustomer,
   findCrossMailboxCustomers,
@@ -242,6 +243,7 @@ function createOpsRouter({
   ccoHistoryStore = null,
   graphSendConnector = null,
   runtimeMetricsStore = null,
+  clientoBookingStore = null,
   requireAuth,
   requireRole,
 }) {
@@ -1971,6 +1973,103 @@ function createOpsRouter({
         }
         console.error(error);
         return res.status(500).json({ error: 'Kunde inte återställa backup.' });
+      }
+    }
+  );
+
+  // CL4: Cliento bookings — list + summary + import + mock-seed.
+  router.get(
+    '/ops/cliento/bookings/summary',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!clientoBookingStore) {
+        return res.status(503).json({ error: 'clientoBookingStore saknas.' });
+      }
+      try {
+        return res.json({ ok: true, summary: clientoBookingStore.summarize({ tenantId: req.auth?.tenantId }) });
+      } catch (error) {
+        console.error('[ops/cliento/summary]', error);
+        return res.status(500).json({ error: 'Kunde inte hämta summary.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/cliento/import-bookings',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!clientoBookingStore) {
+        return res.status(503).json({ error: 'clientoBookingStore saknas.' });
+      }
+      try {
+        const tenantId = req.auth?.tenantId;
+        if (!tenantId) return res.status(400).json({ error: 'tenantId saknas.' });
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const bookings = Array.isArray(body.bookings) ? body.bookings : [];
+        if (bookings.length === 0) {
+          return res.status(400).json({ error: 'bookings[] saknas i body.' });
+        }
+        const result = await clientoBookingStore.importBatch({
+          tenantId,
+          bookings,
+          source: body.source || 'manual',
+        });
+        try {
+          await authStore.addAuditEvent({
+            tenantId,
+            actorUserId: req.auth?.userId,
+            action: 'ops.cliento.import',
+            outcome: 'success',
+            targetType: 'cliento_bookings',
+            targetId: 'batch_import',
+            metadata: { ...result, source: body.source || 'manual' },
+          });
+        } catch (_e) {}
+        return res.json({ ok: true, ...result });
+      } catch (error) {
+        console.error('[ops/cliento/import-bookings]', error);
+        return res.status(500).json({ error: 'Kunde inte importera bokningar.' });
+      }
+    }
+  );
+
+  router.post(
+    '/ops/cliento/mock-seed',
+    requireAuth,
+    requireRole(ROLE_OWNER, ROLE_STAFF),
+    async (req, res) => {
+      if (!clientoBookingStore || !ccoMailboxTruthStore) {
+        return res
+          .status(503)
+          .json({ error: 'clientoBookingStore eller ccoMailboxTruthStore saknas.' });
+      }
+      try {
+        const tenantId = req.auth?.tenantId;
+        if (!tenantId) return res.status(400).json({ error: 'tenantId saknas.' });
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const result = await seedClientoMockBookings({
+          tenantId,
+          ccoMailboxTruthStore,
+          clientoBookingStore,
+          maxCustomers: Number(body.maxCustomers) || 200,
+        });
+        try {
+          await authStore.addAuditEvent({
+            tenantId,
+            actorUserId: req.auth?.userId,
+            action: 'ops.cliento.mock_seed',
+            outcome: 'success',
+            targetType: 'cliento_bookings',
+            targetId: 'mock_seed',
+            metadata: result,
+          });
+        } catch (_e) {}
+        return res.json({ ok: true, ...result });
+      } catch (error) {
+        console.error('[ops/cliento/mock-seed]', error);
+        return res.status(500).json({ error: error?.message || 'Kunde inte seeda mockdata.' });
       }
     }
   );

@@ -407,6 +407,7 @@ const { createCcoHistoryStore } = require('./src/ops/ccoHistoryStore');
 const { createCcoMailboxTruthStore } = require('./src/ops/ccoMailboxTruthStore');
 const { createMessageIntelligenceStore } = require('./src/ops/messageIntelligenceStore');
 const { createCustomerPreferenceStore } = require('./src/ops/customerPreferenceStore');
+const { createClientoBookingStore } = require('./src/ops/clientoBookingStore');
 const {
   scheduleBootstrap: scheduleMailboxBootstrap,
   isEnabled: isMailboxBootstrapEnabled,
@@ -851,6 +852,11 @@ process.once('SIGTERM', () => {
       config.customerPreferenceStorePath ||
       (config.dataDir ? `${config.dataDir}/cco/customer-preferences.json` : './data/cco/customer-preferences.json'),
   });
+  const clientoBookingStore = await createClientoBookingStore({
+    filePath:
+      config.clientoBookingStorePath ||
+      (config.dataDir ? `${config.dataDir}/cco/cliento-bookings.json` : './data/cco/cliento-bookings.json'),
+  });
   const ccoConversationStateStore = await createCcoConversationStateStore({
     filePath: config.ccoConversationStateStorePath,
   });
@@ -1276,6 +1282,7 @@ process.once('SIGTERM', () => {
       ccoMailboxTruthStore,
       ccoCustomerStore,
       runtimeMetricsStore,
+      clientoBookingStore,
       scheduler,
       graphReadConnector,
     })
@@ -1340,6 +1347,7 @@ process.once('SIGTERM', () => {
       ccoHistoryStore,
       graphSendConnector,
       runtimeMetricsStore,
+      clientoBookingStore,
       requireAuth: auth.requireAuth,
       requireRole: auth.requireRole,
     })
