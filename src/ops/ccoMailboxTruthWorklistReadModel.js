@@ -593,8 +593,28 @@ function buildWorklistRollupRow(rows = []) {
         : 'all';
   const subject = normalizeText(primaryRow?.subject) || '(utan ämne)';
   const preview = normalizeText(primaryRow?.latestPreview || '');
-  const customerName = normalizeText(primaryRow?.customerName || '');
-  const customerEmail = normalizeText(primaryRow?.customerEmail || '');
+  // FIX4: utökad fallback-kedja för customerName så vi inte faller till
+  // "Okänd avsändare" när Graph har namnet i ett annat fält
+  const customerName =
+    normalizeText(primaryRow?.customerName) ||
+    normalizeText(primaryRow?.fromName) ||
+    normalizeText(primaryRow?.senderName) ||
+    normalizeText(primaryRow?.from?.name) ||
+    normalizeText(primaryRow?.from?.emailAddress?.name) ||
+    normalizeText(primaryRow?.sender?.name) ||
+    normalizeText(primaryRow?.sender?.emailAddress?.name) ||
+    normalizeText(primaryRow?.counterpartyLabel) ||
+    normalizeText(primaryRow?.identity?.customerName) ||
+    '';
+  const customerEmail =
+    normalizeText(primaryRow?.customerEmail) ||
+    normalizeText(primaryRow?.senderEmail) ||
+    normalizeText(primaryRow?.fromEmail) ||
+    normalizeText(primaryRow?.from?.address) ||
+    normalizeText(primaryRow?.from?.emailAddress?.address) ||
+    '';
+  // Sista fallback: använd användarnamn-delen av email (före @) som customerName
+  const customerNameWithFallback = customerName || (customerEmail ? customerEmail.split('@')[0] : '');
   const provenanceDetail = uniqueMailboxLabels.join(' · ');
   const provenanceLabel = uniqueMailboxLabels.length > 1 ? `${uniqueMailboxLabels.length} mailboxar` : '';
   return {
@@ -613,7 +633,7 @@ function buildWorklistRollupRow(rows = []) {
     lane,
     messageCount: safeRows.reduce((sum, row) => sum + Number(row?.messageCount || 0), 0),
     customerEmail: customerEmail || null,
-    customerName: customerName || null,
+    customerName: customerNameWithFallback || null,
     customerIdentity,
     hardConflictSignals: normalizeIdentityCarrier(primaryRow).hardConflictSignals,
     mergeReviewDecisionsByPairId: normalizeIdentityCarrier(primaryRow).mergeReviewDecisionsByPairId,

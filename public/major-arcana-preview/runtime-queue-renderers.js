@@ -3657,23 +3657,31 @@
         } catch (e) {
           if (typeof console !== "undefined") console.warn("buildQueueHistoryCardMarkup failed", e);
         }
-        // Sista fallback: enkelt synligt kort så ingen rad blir tom (bättre att se råa
-        // titlar än ingenting alls)
+        // Sista fallback: matchar förväntad CSS-struktur (.thread-card-head + .thread-story)
+        // så griden inte kollapsar och överlappar grannarna.
         const id = String(thread?.id || "").replace(/[^a-z0-9_-]/gi, "");
-        const customer = String(thread?.customerName || thread?.displaySubject || "Tråd").slice(0, 80);
-        const subject = String(thread?.displaySubject || thread?.subject || "(utan ämne)").slice(0, 120);
+        const customer = (thread?.customerName ||
+          thread?.fromName ||
+          thread?.from?.name ||
+          thread?.from?.emailAddress?.name ||
+          (thread?.customerEmail || thread?.from?.address || thread?.from?.emailAddress?.address || "")?.split('@')[0] ||
+          "Okänd avsändare").toString().slice(0, 80);
+        const subject = String(
+          thread?.displaySubject || thread?.subject || "(utan ämne)"
+        ).slice(0, 120);
         const preview = String(thread?.preview || thread?.systemPreview || "").slice(0, 200);
+        const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
         return (
-          '<article class="thread-card queue-history-item unified-queue-card" data-runtime-thread="' +
-          id +
-          '" tabindex="0">' +
-          '<div class="card-content"><strong>' +
-          customer +
-          "</strong><br><span>" +
-          subject +
-          "</span><br><small>" +
-          preview +
-          "</small></div></article>"
+          '<article class="thread-card queue-history-item unified-queue-card" ' +
+          'data-runtime-thread="' + id + '" tabindex="0" ' +
+          'style="position:relative;display:block;min-height:64px;padding:12px 14px;margin:0">' +
+          '<div class="thread-card-head" style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+          '<strong style="font-size:14px;color:#2b251f">' + escape(customer) + '</strong>' +
+          '<span style="font-size:12px;color:#8a8174">' + escape(subject) + '</span>' +
+          '</div>' +
+          '<div class="thread-story" style="font-size:12px;color:#5d544a;overflow:hidden;text-overflow:ellipsis">' +
+          escape(preview) +
+          '</div></article>'
         );
       }
       queueHistoryList.innerHTML = asArray(threads)
