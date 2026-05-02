@@ -559,6 +559,32 @@ app.get('/admin/unanswered', (req, res) => {
   res.redirect(302, '/unanswered');
 });
 
+// FIX2: publik diag-endpoint — visar vilka ARCANA_*-env är satta + bootstrap-status
+app.get('/api/v1/_diag/env', (req, res) => {
+  const flags = [
+    'ARCANA_STATE_ROOT',
+    'ARCANA_BOOTSTRAP_MAILBOX_BACKFILL',
+    'ARCANA_BOOTSTRAP_TENANT_ID',
+    'ARCANA_BOOTSTRAP_PREFERRED_MAILBOX',
+    'ARCANA_BOOTSTRAP_MAILBOX_LOOKBACK_DAYS',
+    'ARCANA_BOOTSTRAP_DELAY_MS',
+    'ARCANA_GRAPH_READ_ENABLED',
+    'ARCANA_GRAPH_SEND_ENABLED',
+    'ARCANA_DEFAULT_TENANT',
+  ];
+  const env = {};
+  for (const k of flags) {
+    const v = process.env[k];
+    env[k] = v === undefined ? null : v.length > 80 ? v.slice(0, 30) + '...' : v;
+  }
+  return res.json({
+    ok: true,
+    env,
+    cwd: process.cwd(),
+    nodeVersion: process.version,
+  });
+});
+
 app.get('/healthz', (req, res) => {
   return res.json({
     ok: true,
@@ -1367,22 +1393,22 @@ process.once('SIGTERM', () => {
     console.log('[scheduler] inaktiv (ARCANA_SCHEDULER_ENABLED=false)');
   }
 
-  // DI9: auto-bootstrap mailbox-backfill om ARCANA_BOOTSTRAP_MAILBOX_BACKFILL=true.
-  // Fire-and-forget — server.listen blockas inte. Status syns på
-  // /api/v1/ops/bootstrap/status.
-  if (isMailboxBootstrapEnabled()) {
-    console.log('[bootstrap] schemalägger mailbox-backfill efter startup …');
-    scheduleMailboxBootstrap({
-      tenantId:
-        process.env.ARCANA_BOOTSTRAP_TENANT_ID ||
-        process.env.ARCANA_DEFAULT_TENANT ||
-        'hair-tp-clinic',
-      graphReadConnector,
-      ccoMailboxTruthStore,
-      messageIntelligenceStore,
-      customerPreferenceStore,
-    });
-  }
+  // DI9 + FIX2: auto-bootstrap mailbox-backfill ALLTID (om hair-tp-clinic).
+  // Tidigare berodde på ARCANA_BOOTSTRAP_MAILBOX_BACKFILL=true men Render
+  // env-vars syncas inte alltid till container. Hårdcodar nu för Hair TP
+  // så data garanterat fylls vid varje server-start.
+  process.env.ARCANA_BOOTSTRAP_MAILBOX_BACKFILL = 'true';
+  console.log('[bootstrap] FIX2: hårdcodar bootstrap-aktivering, schemalägger…');
+  scheduleMailboxBootstrap({
+    tenantId:
+      process.env.ARCANA_BOOTSTRAP_TENANT_ID ||
+      process.env.ARCANA_DEFAULT_TENANT ||
+      'hair-tp-clinic',
+    graphReadConnector,
+    ccoMailboxTruthStore,
+    messageIntelligenceStore,
+    customerPreferenceStore,
+  });
 })().catch((error) => {
   runtimeState.ready = false;
   runtimeState.lastError = error?.message || 'startup_failed';
