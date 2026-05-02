@@ -915,11 +915,10 @@ function createCcoMailboxTruthWorklistReadModel({
         entry.customerEmail = counterparty.email || null;
         entry.customerName = counterparty.name || null;
       }
-      // FIX6: hård fallback — om deriveCounterparty inte hittade något,
-      // testa alla legacy-fält (senderEmail/senderName/counterpartyEmail/from.address).
-      // Trädet av Graph-ingestion har skiftat över tid och vissa rader saknar
-      // strukturerat from-objekt men har platt sender*-fält.
-      if (!entry.customerEmail) {
+      // FIX6: hård fallback (UNCONDITIONAL) — kör ALLTID denna även om customerEmail
+      // är satt, eftersom customerName kan vara null även när email finns.
+      // Testa alla legacy-fält (senderEmail/senderName/counterpartyEmail/from.address).
+      if (!entry.customerName || !entry.customerEmail) {
         const flatEmail =
           normalizeText(message?.senderEmail) ||
           normalizeText(message?.counterpartyEmail) ||
@@ -935,11 +934,15 @@ function createCcoMailboxTruthWorklistReadModel({
           normalizeText(message?.from?.emailAddress?.name) ||
           normalizeText(message?.sender?.emailAddress?.name) ||
           '';
-        if (flatEmail) {
+        if (!entry.customerEmail && flatEmail) {
           entry.customerEmail = flatEmail.toLowerCase();
         }
-        if (!entry.customerName) {
-          entry.customerName = flatName || null;
+        if (!entry.customerName && flatName) {
+          entry.customerName = flatName;
+        }
+        // Sista utvägen: om vi har email men ingen name, humanize email.
+        if (!entry.customerName && entry.customerEmail) {
+          entry.customerName = humanizeCounterpartyEmail(entry.customerEmail) || null;
         }
       }
       if (!entry.customerIdentity) {

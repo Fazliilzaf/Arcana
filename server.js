@@ -585,6 +585,18 @@ app.get('/api/v1/_diag/env', (req, res) => {
   });
 });
 
+// Commit-sha endpoint — så vi kan verifiera vilken version som är deployad
+app.get('/api/v1/_diag/version', (req, res) => {
+  return res.json({
+    ok: true,
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || 'unknown',
+    branch: process.env.RENDER_GIT_BRANCH || 'unknown',
+    deployedAt: process.env.RENDER_DEPLOY_AT || null,
+    serverStartedAt: runtimeState.startedAt,
+    fixes: ['FIX3', 'FIX4', 'FIX5', 'FIX6', 'FIX7', 'FIX8'],
+  });
+});
+
 app.get('/healthz', (req, res) => {
   return res.json({
     ok: true,
