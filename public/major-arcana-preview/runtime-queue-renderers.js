@@ -3631,23 +3631,54 @@
       if (queueHistoryList.dataset) {
         queueHistoryList.dataset.queueListMode = "live";
       }
-      const renderLiveThreadCard =
-        typeof buildThreadCardMarkup === "function"
-          ? (thread, index, selected) => buildThreadCardMarkup(thread, index, selected)
-          : typeof buildQueueHistoryCardMarkup === "function" &&
-              typeof buildQueueInlineLaneHistoryItem === "function"
-            ? (thread, index, selected) =>
-                buildQueueHistoryCardMarkup(buildQueueInlineLaneHistoryItem(thread), {
-                  runtimeThreadId: thread.id,
-                  selectedConversationId: state.runtime.selectedThreadId,
-                  useThreadCardClass: true,
-                })
-            : null;
+      // FIX3: explicit fallback chain. Trippel-ternär hade tom-sträng-fallback
+      // som producerade tomma rader när någon av build-funktionerna saknades.
+      function renderLiveThreadCard(thread, index, selected) {
+        try {
+          if (typeof buildThreadCardMarkup === "function") {
+            const html = buildThreadCardMarkup(thread, index, selected);
+            if (html) return html;
+          }
+        } catch (e) {
+          if (typeof console !== "undefined") console.warn("buildThreadCardMarkup failed", e);
+        }
+        try {
+          if (
+            typeof buildQueueHistoryCardMarkup === "function" &&
+            typeof buildQueueInlineLaneHistoryItem === "function"
+          ) {
+            const html = buildQueueHistoryCardMarkup(buildQueueInlineLaneHistoryItem(thread), {
+              runtimeThreadId: thread.id,
+              selectedConversationId: state.runtime.selectedThreadId,
+              useThreadCardClass: true,
+            });
+            if (html) return html;
+          }
+        } catch (e) {
+          if (typeof console !== "undefined") console.warn("buildQueueHistoryCardMarkup failed", e);
+        }
+        // Sista fallback: enkelt synligt kort så ingen rad blir tom (bättre att se råa
+        // titlar än ingenting alls)
+        const id = String(thread?.id || "").replace(/[^a-z0-9_-]/gi, "");
+        const customer = String(thread?.customerName || thread?.displaySubject || "Tråd").slice(0, 80);
+        const subject = String(thread?.displaySubject || thread?.subject || "(utan ämne)").slice(0, 120);
+        const preview = String(thread?.preview || thread?.systemPreview || "").slice(0, 200);
+        return (
+          '<article class="thread-card queue-history-item unified-queue-card" data-runtime-thread="' +
+          id +
+          '" tabindex="0">' +
+          '<div class="card-content"><strong>' +
+          customer +
+          "</strong><br><span>" +
+          subject +
+          "</span><br><small>" +
+          preview +
+          "</small></div></article>"
+        );
+      }
       queueHistoryList.innerHTML = asArray(threads)
         .map((thread, index) =>
-          renderLiveThreadCard
-            ? renderLiveThreadCard(thread, index, thread.id === state.runtime.selectedThreadId)
-            : ""
+          renderLiveThreadCard(thread, index, thread.id === state.runtime.selectedThreadId)
         )
         .join("");
       enforceUnifiedCardV3Sections(queueHistoryList);
