@@ -117,6 +117,8 @@ function toSummarizeInputMessage(m) {
 function createCcoConversationRouter({
   ccoMailboxTruthStore,
   requireAuth,
+  openai = null,
+  openaiModel = '',
 } = {}) {
   const router = express.Router();
   const authMiddleware =
@@ -218,6 +220,10 @@ function createCcoConversationRouter({
         const result = await capability.execute({
           channel: 'admin',
           tenantId: normalizeText(req.tenantId) || 'cco',
+          // OpenAI passas in om servern har en konfigurerad client; annars
+          // faller capabilityn tillbaka på heuristiken automatiskt.
+          openai: openai || null,
+          openaiModel: normalizeText(openaiModel) || '',
           input: {
             conversationId: key,
             customerName,

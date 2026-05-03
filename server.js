@@ -1220,12 +1220,14 @@ process.once('SIGTERM', () => {
     heartbeatIntervalMs: 30000,
   }));
 
-  // CCO Conversation messages — full tråd-historik på begäran
+  // CCO Conversation messages — full tråd-historik + AI-summary på begäran
   app.use(
     '/api/v1',
     createCcoConversationRouter({
       ccoMailboxTruthStore,
       requireAuth: auth.requireAuth,
+      openai,
+      openaiModel: config.openaiModel,
     })
   );
 
