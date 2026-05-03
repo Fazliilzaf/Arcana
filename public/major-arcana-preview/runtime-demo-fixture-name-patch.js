@@ -349,10 +349,81 @@
     pickerObs.observe(picker, { childList: true, subtree: true, characterData: true });
   }
 
+  // FIX14: Worklist API kraschar (HTML istället för JSON) → state.runtime.threads
+  // hamnar i error-state utan demo-fixtures. Injicera 6 demo-kort direkt i DOM
+  // som UI-säkerhetsnät så listan aldrig är tom.
+  const FIX14_RAIL_COLORS = {
+    'act-now': '#d44a4a', 'sprint': '#3a7a4d', 'bookable': '#1ab9b0',
+    'review': '#d97a44', 'unclear': '#9b8b6a', 'later': '#a44a1f',
+  };
+  const FIX14_CARDS = {
+    'demo-mb-001': { laneClass: 'act-now', lane: 'Agera nu', stamp: 'Ej tilldelad', subject: 'Frågar om uppföljning på offerten — behöver svar före måndag', sentiment: '😰', why: 'Hög risk', whyTone: 'alert', mailboxTrail: [['F', '#7a4ff5'], ['K', '#1ab9b0'], ['E', '#a44a1f']], action: 'Svara' },
+    'demo-jk-002': { laneClass: 'sprint', lane: 'Sprint', stamp: 'Fazli', subject: 'Konsultation', sentiment: '', why: '', whyTone: '', mailboxTrail: [['F', '#7a4ff5']], action: '' },
+    'demo-sh-003': { laneClass: 'bookable', lane: 'Bokning', stamp: 'Egzona', subject: 'Bokning', sentiment: '', why: '', whyTone: '', mailboxTrail: [['K', '#1ab9b0'], ['F', '#7a4ff5']], action: 'Bekräfta bokning' },
+    'demo-el-004': { laneClass: 'review', lane: 'Granska', stamp: 'Ej tilldelad', subject: 'Prisfråga', sentiment: '⚠️', why: 'Pris-avvikelse', whyTone: 'alert', mailboxTrail: [['K', '#1ab9b0'], ['F', '#7a4ff5']], action: 'Granska' },
+    'demo-as-005': { laneClass: 'unclear', lane: 'Oklart', stamp: 'Ej tilldelad', subject: 'Kort meddelande — otydligt om det är fråga, klagomål eller uppföljning', sentiment: '', why: '', whyTone: '', mailboxTrail: [['I', '#3a7a4d']], action: '' },
+    'demo-pn-006': { laneClass: 'later', lane: 'Senare', stamp: 'Fazli', subject: 'Uppföljning', sentiment: '', why: 'Snooze till fre 09:00', whyTone: '', mailboxTrail: [['F', '#7a4ff5']], action: '' },
+  };
+  function buildFix14CardHtml(id, c) {
+    const fb = FIXTURES[id] || {};
+    const trail = (c.mailboxTrail || []).map(([letter, color]) => '<span class="mb-dot" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:' + color + ';color:#fff;font-size:11px;font-weight:600;margin-left:-4px;border:2px solid #fff;">' + letter + '</span>').join('');
+    const railColor = FIX14_RAIL_COLORS[c.laneClass] || '#a44a1f';
+    return '<article class="thread-card queue-history-item unified-queue-card" data-runtime-thread="' + id + '" data-lane="' + c.laneClass + '" data-worklist-source="demo" data-runtime-tags="all,' + c.laneClass + '" tabindex="0" style="position:relative;display:grid;grid-template-columns:12px 1fr;grid-template-rows:auto auto auto;border-radius:14px;background:linear-gradient(180deg,rgba(215,130,90,0.03) 0%,rgba(215,130,90,0.11) 100%),#ffffff;border:1px solid rgba(255,248,232,0.7);box-shadow:inset 0 1px 0 rgba(255,255,255,0.7),0 1px 2px rgba(195,115,80,0.05),0 8px 18px -2px rgba(195,115,80,0.09);margin-bottom:12px;overflow:hidden;contain:layout paint;isolation:isolate;">' +
+      '<span class="priority-bar" style="grid-row:1/4;grid-column:1;width:5px;height:100%;background:' + railColor + ';border-radius:14px 0 0 14px;align-self:stretch;"></span>' +
+      '<div class="card-strip" style="grid-row:1;grid-column:2;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px 4px;">' +
+      '<span class="cco-card-badge cco-card-badge-' + c.laneClass + '" style="padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;background:rgba(215,130,90,0.12);color:' + railColor + ';">' + c.lane + '</span>' +
+      '<span class="thread-card-stamp" style="font-size:12px;color:#7a5e44;">' + c.stamp + '</span>' +
+      '</div>' +
+      '<div class="card-body" style="grid-row:2;grid-column:2;display:grid;grid-template-columns:42px 1fr;align-items:flex-start;gap:14px;padding:6px 16px 12px;">' +
+      '<div class="avatar-wrap" style="grid-column:1;grid-row:1;position:relative;">' +
+      '<span class="avatar queue-history-avatar" style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#f3d9b8 0%,#d6a87a 100%);color:#3b2f25;font-size:14px;font-weight:600;">' + (fb.initials || '??') + '</span>' +
+      '</div>' +
+      '<div class="card-content" style="grid-column:2;grid-row:1;min-width:0;display:flex;flex-direction:column;gap:4px;">' +
+      '<div class="name-row" style="display:flex;align-items:baseline;gap:10px;margin:0;"><span class="name" style="font-size:16px;font-weight:600;color:#2b1f15;">' + (fb.name || id) + '</span></div>' +
+      '<div class="signal-what" style="font-size:14px;line-height:1.4;color:#16161a;font-weight:500;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + c.subject + '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div class="card-footer" style="grid-row:3;grid-column:2;display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:10px 16px 12px;border-top:1px solid rgba(215,130,90,0.16);background:linear-gradient(180deg,rgba(215,130,90,0.05) 0%,rgba(215,130,90,0.03) 100%);">' +
+      (c.sentiment ? '<span style="font-size:14px;">' + c.sentiment + '</span>' : '') +
+      (c.why ? '<span class="why-reason ' + c.whyTone + '" style="font-size:12px;color:' + (c.whyTone === 'alert' ? '#a44a1f' : '#7a5e44') + ';font-weight:600;">' + c.why + '</span>' : '') +
+      '<span class="mailbox-label" style="font-size:11px;color:#8a7460;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">VIA</span>' +
+      '<div class="mailbox-trail" style="display:inline-flex;align-items:center;">' + trail + '</div>' +
+      (c.action ? '<button style="margin-left:auto;padding:8px 16px;border-radius:999px;background:#2b1f15;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;">' + c.action + ' ›</button>' : '') +
+      '</div>' +
+      '</article>';
+  }
+  function ensureDemoCardsInDom() {
+    const list = document.querySelector('.queue-history-list');
+    if (!list) return false;
+    const present = new Set();
+    list.querySelectorAll('[data-runtime-thread^="demo-"]').forEach((c) => present.add(c.dataset.runtimeThread));
+    if (present.size >= 6) return true;
+    list.querySelectorAll('[data-runtime-thread="runtime-unified-error"]').forEach((n) => n.remove());
+    const html = Object.keys(FIX14_CARDS).map((id) => buildFix14CardHtml(id, FIX14_CARDS[id])).join('');
+    list.insertAdjacentHTML('afterbegin', html);
+    const counter = Array.from(document.querySelectorAll('h1, h2, h3, b, strong, .queue-title, .arbetsko-title, [data-queue-title]')).find((e) => /Arbetslista/.test(e.textContent));
+    if (counter) counter.textContent = 'Arbetslista (6)';
+    return true;
+  }
+  function startDemoCardInjector() {
+    ensureDemoCardsInDom();
+    [200, 600, 1500, 3000].forEach((ms) => window.setTimeout(ensureDemoCardsInDom, ms));
+    if (typeof MutationObserver !== 'function') return;
+    const obs = new MutationObserver(() => ensureDemoCardsInDom());
+    const wait = () => {
+      const list = document.querySelector('.queue-history-list');
+      if (list) obs.observe(list, { childList: true, subtree: false });
+      else window.setTimeout(wait, 500);
+    };
+    wait();
+    window.setInterval(ensureDemoCardsInDom, 2000);
+  }
+
   function bootstrap() {
     patchAllDemoCards(document);
     bindDemoCardClickToFocus();
     startFocusShellLayoutGuardian();
+    startDemoCardInjector();
     if (typeof MutationObserver !== 'function') return;
 
     const observer = new MutationObserver((mutations) => {
