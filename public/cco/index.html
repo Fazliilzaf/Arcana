@@ -711,16 +711,16 @@ button { cursor: pointer; }
 .lane-later { --lane-color: var(--purple); --lane-bg: rgba(139, 92, 246, 0.12); --avatar-grad: linear-gradient(135deg,#8b5cf6,#a78bfa); --avatar-glow: rgba(139,92,246,0.28); }
 
 .thread-actions {
-  padding: 8px 24px 12px;
+  padding: 4px 24px 12px;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-  display: flex; gap: 4px; flex-wrap: nowrap; align-items: center;
+  display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
   background: var(--surface);
   position: relative;
 }
 .action {
-  height: 28px; padding: 0 11px; border-radius: 7px;
+  height: 28px; padding: 0 10px; border-radius: 7px;
   background: transparent;
-  font-size: 12px; font-weight: 600; color: var(--text-2);
+  font-size: 11.5px; font-weight: 600; color: var(--text-2);
   display: inline-flex; align-items: center; gap: 5px;
   transition: all 0.15s var(--ease);
   flex-shrink: 0;
@@ -733,31 +733,9 @@ button { cursor: pointer; }
   height: 30px; padding: 0 13px;
 }
 .action.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(108, 92, 231, 0.30); }
-.action.danger:hover { color: var(--red); }
+.action.danger:hover { color: var(--red); background: rgba(239, 68, 88, 0.08); }
 .action.icon-only { padding: 0; width: 28px; justify-content: center; }
 .action.icon-only svg { width: 13px; height: 13px; }
-
-/* More-menu (kebab) for less-used actions */
-.action-more-wrap { position: relative; margin-left: auto; }
-.action-more-menu {
-  display: none;
-  position: absolute; top: calc(100% + 4px); right: 0;
-  min-width: 180px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-          backdrop-filter: blur(20px) saturate(180%);
-  border: 0.5px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 11px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
-  padding: 4px;
-  z-index: 20;
-}
-.action-more-menu.open { display: block; animation: menuIn 0.15s var(--ease); }
-.action-more-menu .action {
-  width: 100%; justify-content: flex-start; height: 30px; padding: 0 10px;
-}
-.action-more-menu .action svg { color: var(--text-3); }
-.action-more-menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
 
 /* Messages — flat, no boxed cards */
 .thread-body {
@@ -817,28 +795,20 @@ button { cursor: pointer; }
   padding-left: 42px;
 }
 
-/* ===== AI summary block ===== */
+/* ===== AI summary block (visible by default if content exists) ===== */
 .ai-summary {
-  margin: 0 28px;
-  padding: 0;
+  margin: 10px 24px 0;
+  padding: 10px 14px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(108, 92, 231, 0.05) 0%, rgba(236, 72, 153, 0.04) 50%, rgba(6, 214, 160, 0.03) 100%);
-  border: 1px solid rgba(108, 92, 231, 0.18);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+          backdrop-filter: blur(10px) saturate(160%);
+  border: 0.5px solid color-mix(in srgb, var(--accent) 18%, transparent);
   position: relative;
   overflow: hidden;
-  max-height: 0;
-  border-color: transparent;
-  background: transparent;
-  transition: max-height 0.25s var(--ease), padding 0.2s var(--ease), margin 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+  transition: padding 0.2s var(--ease), margin 0.2s var(--ease);
 }
-.ai-summary.show {
-  margin: 14px 28px 0;
-  padding: 14px 16px;
-  max-height: 360px;
-  background: linear-gradient(135deg, rgba(108, 92, 231, 0.05) 0%, rgba(236, 72, 153, 0.04) 50%, rgba(6, 214, 160, 0.03) 100%);
-  border-color: rgba(108, 92, 231, 0.18);
-}
-.ai-summary.show::before {
+.ai-summary::before {
   content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1.5px;
   background: var(--ai-grad);
   background-size: 200% 100%;
@@ -2214,18 +2184,12 @@ button { cursor: pointer; }
       ` : ''}
       <div class="thread-actions">
         <button class="action primary" data-focus-composer>${ico('i-reply')} Svara nu</button>
+        <button class="action">${ico('i-mail-plus')} Nytt mejl</button>
+        <button class="action">${ico('i-clock')} Senare</button>
         <button class="action">${ico('i-check')} Klar</button>
-        <div class="action-more-wrap">
-          <button class="action icon-only" id="action-more-trigger" title="Fler åtgärder">${ico('i-more')}</button>
-          <div class="action-more-menu" id="action-more-menu">
-            <button class="action">${ico('i-mail-plus')} Nytt mejl</button>
-            <button class="action">${ico('i-clock')} Senare</button>
-            <button class="action">${ico('i-calendar')} Schemalägg</button>
-            <button class="action" data-history-open>${ico('i-history-overlay')} Historik</button>
-            <div class="sep"></div>
-            <button class="action danger">${ico('i-trash')} Radera</button>
-          </div>
-        </div>
+        <button class="action">${ico('i-calendar')} Schemalägg</button>
+        <button class="action" data-history-open>${ico('i-history-overlay')} Historik</button>
+        <button class="action danger icon-only" style="margin-left:auto;" title="Radera">${ico('i-trash')}</button>
       </div>
       <div class="thread-body">
         <div class="messages">${messages}</div>
@@ -2855,13 +2819,14 @@ button { cursor: pointer; }
       if (tnav && !tnav.disabled) { jumpThread(tnav.dataset.threadNav); return; }
       // History drawer
       if (ev.target.closest('[data-history-open], [data-open-history]')) { openHistory(); return; }
-      // AI-pill toggle in thread-head — opens/closes the AI-summary block
+      // AI-pill in thread-head — scrolls/expands AI-summary details
       const aiPill = ev.target.closest('[data-toggle-ai]');
       if (aiPill) {
         const sum = document.getElementById('ai-summary');
         if (sum) {
-          const isOpen = sum.classList.toggle('show');
-          aiPill.classList.toggle('active', isOpen);
+          sum.classList.toggle('expanded');
+          aiPill.classList.toggle('active', sum.classList.contains('expanded'));
+          if (sum.classList.contains('expanded')) sum.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         return;
       }
@@ -2885,17 +2850,6 @@ button { cursor: pointer; }
       if (ev.target.closest('[data-focus-composer]')) { focusComposer(); return; }
       // Send composer
       if (ev.target.closest('#send-btn')) { sendComposer(); return; }
-      // Action-more (kebab) menu trigger
-      const moreTrig = ev.target.closest('#action-more-trigger');
-      if (moreTrig) {
-        ev.stopPropagation();
-        document.getElementById('action-more-menu')?.classList.toggle('open');
-        return;
-      }
-      // Click outside more-menu closes it
-      if (!ev.target.closest('.action-more-wrap')) {
-        document.getElementById('action-more-menu')?.classList.remove('open');
-      }
       // Sort menu trigger
       const sortTrig = ev.target.closest('#sort-trigger');
       if (sortTrig) { ev.stopPropagation(); toggleSortMenu(); return; }
