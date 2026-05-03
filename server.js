@@ -386,6 +386,7 @@ const { createTenantConfigRouter } = require('./src/routes/tenantConfig');
 const { createTenantsRouter } = require('./src/routes/tenants');
 const { createDashboardRouter } = require('./src/routes/dashboard');
 const { createCcoRuntimeStreamRouter } = require('./src/routes/ccoRuntimeStream');
+const { createCcoConversationRouter } = require('./src/routes/ccoConversation');
 const { createRiskRouter } = require('./src/routes/risk');
 const { createIncidentsRouter } = require('./src/routes/incidents');
 const { createOrchestratorRouter } = require('./src/routes/orchestrator');
@@ -1218,6 +1219,15 @@ process.once('SIGTERM', () => {
     pollIntervalMs: 10000,
     heartbeatIntervalMs: 30000,
   }));
+
+  // CCO Conversation messages — full tråd-historik på begäran
+  app.use(
+    '/api/v1',
+    createCcoConversationRouter({
+      ccoMailboxTruthStore,
+      requireAuth: auth.requireAuth,
+    })
+  );
 
   app.use(
     '/api/v1',

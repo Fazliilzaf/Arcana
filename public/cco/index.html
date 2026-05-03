@@ -826,6 +826,10 @@ button { cursor: pointer; }
       $('#ctx-panel').innerHTML = '';
       return;
     }
+    // Live-mode: lazy-load full conversation history if not already cached on this thread
+    if (state.live && !t.conversationLoaded) {
+      loadConversationMessages(t);
+    }
     root.className = `thread lane-${t.lane}`;
     const messages = t.conversation.map(m=>`
       <article class="msg ${m.dir}">
@@ -986,6 +990,43 @@ button { cursor: pointer; }
       riskLevel: hoursSinceInbound>24?'Hög':'Låg',
       owner: ownershipMailbox.split('@')[0]||'—',
     };
+  }
+
+  async function loadConversationMessages(thread) {
+    if (!thread || thread.conversationLoading) return;
+    thread.conversationLoading = true;
+    try {
+      const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+      if (!tok || !thread.id) return;
+      const r = await fetch(`/api/v1/cco/runtime/conversation/${encodeURIComponent(thread.id)}/messages`, {
+        headers:{ Authorization:'Bearer '+tok }
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.ok || !Array.isArray(j.messages)) return;
+      const fmtRel = (iso)=>{
+        if (!iso) return '';
+        const d = new Date(iso); if (isNaN(d.getTime())) return '';
+        const now = new Date();
+        const sameDay = d.toDateString() === now.toDateString();
+        const yesterday = new Date(now.getTime()-86400000);
+        const t = d.toLocaleTimeString('sv',{hour:'2-digit',minute:'2-digit'});
+        if (sameDay) return `Idag · ${t}`;
+        if (d.toDateString() === yesterday.toDateString()) return `Igår · ${t}`;
+        return `${d.toLocaleDateString('sv',{day:'numeric',month:'short'})} · ${t}`;
+      };
+      thread.conversation = j.messages.map(m=>({
+        from: m.from || '(okänd)',
+        dir: m.dir === 'outbound' ? 'outbound' : (m.dir === 'draft' ? 'draft' : 'inbound'),
+        time: fmtRel(m.time),
+        initials: m.initials || '?',
+        body: m.body || ''
+      }));
+      thread.conversationLoaded = true;
+      // Re-render only if this is still the selected thread
+      if (state.selectedId === thread.id) renderThread();
+    } catch (_e) { /* swallow */ }
+    finally { thread.conversationLoading = false; }
   }
 
   async function init() { bind(); await tryLoadLive(); renderAll(); }
