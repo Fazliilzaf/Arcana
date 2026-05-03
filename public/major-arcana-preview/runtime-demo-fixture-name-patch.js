@@ -313,9 +313,46 @@
     }, true);
   }
 
+  // FIX13: Höger panel försvinner när 4+ mailboxar valts. Layout-koden flyttar
+  // focus-shell till en ny rad istället för höger kolumn. Tvinga kontinuerligt.
+  function startFocusShellLayoutGuardian() {
+    let lastApplyAt = 0;
+    function apply() {
+      const now = Date.now();
+      if (now - lastApplyAt < 100) return; // throttle
+      lastApplyAt = now;
+      ensureFocusShellInRightColumn();
+    }
+    // Initial + flera försök efter laddning (DOM är klar i etapper)
+    apply();
+    [50, 200, 600, 1500, 3000].forEach((ms) => window.setTimeout(apply, ms));
+
+    if (typeof MutationObserver !== 'function') return;
+    const ws = document.querySelector('.preview-workspace');
+    if (!ws) {
+      // Vänta tills workspace finns
+      const waiter = new MutationObserver(() => {
+        if (document.querySelector('.preview-workspace')) {
+          waiter.disconnect();
+          startFocusShellLayoutGuardian();
+        }
+      });
+      waiter.observe(document.body, { childList: true, subtree: true });
+      return;
+    }
+    const obs = new MutationObserver(apply);
+    obs.observe(ws, { childList: true, attributes: true, attributeFilter: ['style', 'class'], subtree: false });
+
+    // Lyssna också på mailbox-pickerns förändringar (när användaren väljer fler)
+    const picker = document.querySelector('.queue-mailbox-toggle, [data-mailbox-picker]') || document.body;
+    const pickerObs = new MutationObserver(() => window.setTimeout(apply, 50));
+    pickerObs.observe(picker, { childList: true, subtree: true, characterData: true });
+  }
+
   function bootstrap() {
     patchAllDemoCards(document);
     bindDemoCardClickToFocus();
+    startFocusShellLayoutGuardian();
     if (typeof MutationObserver !== 'function') return;
 
     const observer = new MutationObserver((mutations) => {
