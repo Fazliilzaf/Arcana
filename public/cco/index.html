@@ -943,20 +943,48 @@ button { cursor: pointer; }
     const laneRaw = String(row.lane||'').toLowerCase().replace(/_/g,'-');
     const lane = ['act-now','sprint','bookable','review','unclear','later','medical'].includes(laneRaw)?laneRaw:'unclear';
     const laneIconMap = {'act-now':'i-bolt','sprint':'i-trend','bookable':'i-calendar','review':'i-eye','unclear':'i-question','later':'i-pause'};
-    const who = row.customerName || row.customerEmail?.split('@')[0] || 'Okänd';
+    const laneLabelMap = {'act-now':'Agera nu','sprint':'Sprint','bookable':'Bokning','review':'Granska','unclear':'Oklart','later':'Senare','medical':'Medicinskt'};
+    // API uses nested objects: customer.{name,email}, mailbox.{mailboxAddress,ownershipMailbox}, timing.{lastInboundAt,hoursSinceInbound}, state.{hasUnreadInbound}
+    const customer = row.customer || {};
+    const mailbox  = row.mailbox  || {};
+    const timing   = row.timing   || {};
+    const stateObj = row.state    || {};
+    const customerEmail = customer.email || row.customerEmail || '';
+    const customerName  = customer.name  || row.customerName  || '';
+    const lastInboundAt = timing.lastInboundAt || row.lastInboundAt || '';
+    const hasUnreadInbound = stateObj.hasUnreadInbound === true || row.hasUnreadInbound === true;
+    const hoursSinceInbound = Number(timing.hoursSinceInbound ?? row.hoursSinceInbound ?? 0);
+    const mailboxAddress = mailbox.mailboxAddress || row.mailboxAddress || '';
+    const ownershipMailbox = mailbox.ownershipMailbox || row.ownershipMailbox || '';
+    const conversationKey = row.id || row.conversationKey || row.conversation?.key || row.conversation?.mailboxConversationId;
+    const who = customerName || customerEmail.split('@')[0] || 'Okänd';
     const initials = who.split(/\s+/).filter(Boolean).slice(0,2).map(p=>p[0]).join('').toUpperCase()||'?';
+    // Format time as "HH:MM" if today, "Igår", or "DD MMM" otherwise
+    const fmtTime = (iso) => {
+      if (!iso) return '';
+      const d = new Date(iso); if (isNaN(d.getTime())) return '';
+      const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      const yesterday = new Date(now.getTime()-86400000);
+      if (sameDay) return d.toLocaleTimeString('sv',{hour:'2-digit',minute:'2-digit'});
+      if (d.toDateString() === yesterday.toDateString()) return 'Igår';
+      return d.toLocaleDateString('sv',{day:'numeric',month:'short'});
+    };
     return {
-      id: row.conversationKey||row.mailboxConversationId,
+      id: conversationKey,
       lane, laneIcon: laneIconMap[lane]||'i-circle-dot',
-      laneLabel: lane==='act-now'?'Agera nu':lane[0].toUpperCase()+lane.slice(1),
-      unread: row.hasUnreadInbound===true, who, email: row.customerEmail||'', initials,
-      mailbox: row.mailboxAddress?.split('@')[0]||'Inkorg', mailboxTrail:[],
-      subject: row.subject||'(utan ämne)', preview: row.latestPreview||'',
-      time: row.lastInboundAt?new Date(row.lastInboundAt).toLocaleString('sv',{hour:'2-digit',minute:'2-digit'}):'',
-      tags:[], conversation:[{from:who,dir:'inbound',time:row.lastInboundAt||'',initials,body:row.latestPreview||''}],
-      timeline:[], risk:'', nextStep: row.hasUnreadInbound?'Svara nu':'Granska tråden',
-      lifecycle: row.hasUnreadInbound?'Olast':'Aktiv', followUp:'—',
-      riskLevel: row.hoursSinceInbound>24?'Hög':'Låg', owner: row.ownershipMailbox?.split('@')[0]||'—',
+      laneLabel: laneLabelMap[lane] || (lane[0].toUpperCase()+lane.slice(1)),
+      unread: hasUnreadInbound, who, email: customerEmail, initials,
+      mailbox: mailboxAddress.split('@')[0]||'Inkorg', mailboxTrail:[],
+      subject: row.subject||'(utan ämne)', preview: row.preview || row.latestPreview || '',
+      time: fmtTime(lastInboundAt),
+      tags:[],
+      conversation:[{from:who,dir:'inbound',time:lastInboundAt,initials,body: row.preview || row.latestPreview || ''}],
+      timeline:[], risk:'',
+      nextStep: hasUnreadInbound?'Svara nu':'Granska tråden',
+      lifecycle: hasUnreadInbound?'Olast':'Aktiv', followUp:'—',
+      riskLevel: hoursSinceInbound>24?'Hög':'Låg',
+      owner: ownershipMailbox.split('@')[0]||'—',
     };
   }
 
