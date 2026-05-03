@@ -359,11 +359,12 @@ button { cursor: pointer; }
   background: var(--bg);
   position: sticky; top: 0; z-index: 5;
 }
-.inbox-title-row { display: flex; align-items: baseline; gap: 8px; }
+.inbox-title-row { display: flex; align-items: center; gap: 8px; }
 .inbox-title-row h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.4px; line-height: 1; }
-.inbox-title-row .num { color: var(--text-3); font-weight: 500; font-size: 11px; letter-spacing: 0; }
+.inbox-title-row .num { color: var(--text-3); font-weight: 500; font-size: 11px; letter-spacing: 0; margin-right: auto; }
 
-.inbox-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.inbox-tabs { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.inbox-header { position: relative; }
 .tab {
   padding: 3px 9px; border-radius: 999px;
   font-size: 11px; font-weight: 600;
@@ -376,7 +377,146 @@ button { cursor: pointer; }
 .tab .num { opacity: 0.6; font-weight: 500; }
 .tab.active .num { opacity: 0.75; }
 
-.inbox-rows { flex: 1; overflow-y: auto; padding: 4px 6px 10px; }
+.inbox-rows { flex: 1; overflow-y: auto; padding: 4px 6px 10px; position: relative; }
+
+/* ===== Inbox header — live-pip + sort-trigger ===== */
+.inbox-toolbar { display: flex; align-items: center; gap: 8px; }
+.live-pip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--green);
+  background: rgba(26, 168, 108, 0.10);
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px solid rgba(26, 168, 108, 0.20);
+  transition: all 0.2s var(--ease);
+}
+.live-pip .pip-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px rgba(26, 168, 108, 0.18), 0 0 6px var(--green);
+  animation: pipPulse 2s ease-in-out infinite;
+}
+.live-pip.flash { animation: pipFlash 1.6s ease-in-out; background: rgba(26, 168, 108, 0.20); }
+@keyframes pipPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.4); opacity: 0.6; } }
+@keyframes pipFlash { 0% { box-shadow: 0 0 0 6px rgba(26,168,108,0.20); } 100% { box-shadow: 0 0 0 0 rgba(26,168,108,0); } }
+
+.sort-trigger {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  padding: 4px 8px; border-radius: 7px;
+  background: var(--bg-soft);
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+  margin-left: auto;
+}
+.sort-trigger:hover { background: var(--surface); color: var(--text); }
+.sort-trigger svg { width: 11px; height: 11px; }
+.sort-trigger .label { letter-spacing: -0.01em; }
+
+.sort-menu {
+  position: absolute; top: 100%; right: 8px;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  padding: 4px;
+  min-width: 200px;
+  z-index: 50;
+  display: none;
+}
+.sort-menu.open { display: block; animation: menuIn 0.15s var(--ease); }
+@keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.sort-menu .item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 9px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+  cursor: pointer; width: 100%; text-align: left;
+  transition: background 0.1s;
+}
+.sort-menu .item:hover { background: var(--bg-soft); color: var(--text); }
+.sort-menu .item.active { background: var(--accent-soft); color: var(--accent-2); font-weight: 600; }
+.sort-menu .item svg { width: 13px; height: 13px; opacity: 0.7; }
+.sort-menu .item .check { margin-left: auto; opacity: 0; }
+.sort-menu .item.active .check { opacity: 1; color: var(--accent); }
+.sort-menu .item.ai-item { background: linear-gradient(135deg, rgba(108,92,231,0.06), rgba(236,72,153,0.04)); }
+.sort-menu .item.ai-item .ai-badge {
+  margin-left: auto;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px;
+  background: var(--accent-grad); color: #fff;
+  padding: 1px 5px; border-radius: 4px;
+}
+.sort-menu .item.ai-item.active .check { display: none; }
+
+/* ===== Hover quick-actions on row ===== */
+.row .quick-actions {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: flex; gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease);
+}
+.row:hover .quick-actions { opacity: 1; pointer-events: auto; }
+.row .quick-actions button {
+  width: 26px; height: 26px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-2);
+  transition: all 0.1s var(--ease);
+}
+.row .quick-actions button:hover { background: var(--bg-soft); color: var(--text); }
+.row .quick-actions button.danger:hover { color: var(--red); background: rgba(239, 68, 88, 0.08); }
+.row .quick-actions button.success:hover { color: var(--green); background: rgba(26, 168, 108, 0.08); }
+.row .quick-actions button.primary:hover { color: var(--accent); background: var(--accent-soft); }
+.row .quick-actions svg { width: 13px; height: 13px; }
+
+.row { position: relative; }
+.row.row-selected-multi { background: var(--accent-soft) !important; }
+.row.row-selected-multi::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--accent-grad); border-radius: 0 3px 3px 0;
+}
+
+/* ===== Bulk-bar (bottom of inbox-list when multi-selected) ===== */
+.bulk-bar {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 8px 12px;
+  display: none;
+  align-items: center; gap: 6px;
+  box-shadow: 0 -4px 14px -4px rgba(20, 18, 32, 0.08);
+  animation: bulkIn 0.25s var(--bounce);
+}
+.bulk-bar.show { display: flex; }
+@keyframes bulkIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.bulk-bar .count-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-grad); color: #fff;
+  font-size: 11px; font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+.bulk-bar .bulk-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 9px; border-radius: 7px;
+  font-size: 11.5px; font-weight: 600; color: var(--text-2);
+  background: transparent;
+  transition: all 0.15s var(--ease);
+}
+.bulk-bar .bulk-btn:hover { background: var(--bg-soft); color: var(--text); }
+.bulk-bar .bulk-btn svg { width: 12px; height: 12px; }
+.bulk-bar .bulk-btn.danger:hover { color: var(--red); background: rgba(239, 68, 88, 0.08); }
+.bulk-bar .bulk-clear {
+  margin-left: auto;
+  font-size: 11px; color: var(--text-3); font-weight: 600;
+  padding: 4px 8px; border-radius: 6px;
+  cursor: pointer;
+}
+.bulk-bar .bulk-clear:hover { color: var(--text); background: var(--bg-soft); }
 .row {
   display: grid;
   grid-template-columns: 32px 1fr;
@@ -723,6 +863,8 @@ button { cursor: pointer; }
     <symbol id="i-circle-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1" fill="currentColor"/></symbol>
     <symbol id="i-question" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
     <symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></symbol>
+    <symbol id="i-sort" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M6 12h12M10 18h4"/></symbol>
+    <symbol id="i-snooze" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M5 3 2 6M22 6l-3-3M9 13h6l-6 5h6"/></symbol>
   </defs>
 </svg>
 
@@ -812,10 +954,35 @@ button { cursor: pointer; }
         <div class="inbox-title-row">
           <h1>Inkorg</h1>
           <span class="num" id="title-num">6 trådar idag</span>
+          <span class="live-pip" id="live-pip" title="Realtidsstatus">
+            <span class="pip-dot"></span>
+            Live
+          </span>
         </div>
-        <div class="inbox-tabs" id="inbox-tabs"></div>
+        <div class="inbox-toolbar">
+          <div class="inbox-tabs" id="inbox-tabs"></div>
+          <button class="sort-trigger" id="sort-trigger">
+            <svg><use href="#i-sort"/></svg>
+            <span class="label" id="sort-label">Nyaste</span>
+            <svg><use href="#i-arrow-down"/></svg>
+          </button>
+        </div>
+        <div class="sort-menu" id="sort-menu">
+          <button class="item active" data-sort="newest"><svg><use href="#i-clock"/></svg>Nyaste först<span class="check"><svg><use href="#i-check"/></svg></span></button>
+          <button class="item" data-sort="oldest"><svg><use href="#i-history"/></svg>Äldsta först<span class="check"><svg><use href="#i-check"/></svg></span></button>
+          <button class="item" data-sort="risk"><svg><use href="#i-flame"/></svg>Hög risk först<span class="check"><svg><use href="#i-check"/></svg></span></button>
+          <button class="item ai-item" data-sort="ai"><svg><use href="#i-sparkles"/></svg>AI-prioritet<span class="ai-badge">AI</span></button>
+        </div>
       </div>
       <div class="inbox-rows" id="inbox-rows"></div>
+      <div class="bulk-bar" id="bulk-bar">
+        <span class="count-badge" id="bulk-count"><svg width="11" height="11"><use href="#i-check"/></svg><span id="bulk-num">0</span> valda</span>
+        <button class="bulk-btn success" data-bulk="done"><svg><use href="#i-check"/></svg>Markera klar</button>
+        <button class="bulk-btn" data-bulk="snooze"><svg><use href="#i-clock"/></svg>Snooza</button>
+        <button class="bulk-btn" data-bulk="assign"><svg><use href="#i-users"/></svg>Tilldela</button>
+        <button class="bulk-btn danger" data-bulk="delete"><svg><use href="#i-trash"/></svg>Radera</button>
+        <button class="bulk-clear" id="bulk-clear">Avbryt</button>
+      </div>
     </section>
 
     <section class="thread empty" id="thread">
@@ -924,7 +1091,27 @@ button { cursor: pointer; }
   ];
 
   const TABS = [{id:'all',label:'Alla'},{id:'unread',label:'Olästa'},{id:'mine',label:'Mina'},{id:'high-risk',label:'Hög risk'},{id:'today',label:'Idag'}];
-  const state = { threads:[...DEMO], selectedId:DEMO[0].id, tab:'all', live:false };
+  const state = { threads:[...DEMO], selectedId:DEMO[0].id, tab:'all', live:false, sortBy:'newest', multiSelect:new Set(), lastClickedId:null };
+  const SORT_LABELS = { newest:'Nyaste', oldest:'Äldsta', risk:'Hög risk', ai:'AI-prioritet' };
+  // AI-prio är en heuristisk score: hög risk=10, oläst=4, lane act-now=6, lane review=4, lane bookable=3
+  function aiPriorityScore(t) {
+    let s = 0;
+    if ((t.tags||[]).some(g=>g.tone==='danger')) s += 10;
+    if (t.unread) s += 4;
+    if (t.lane==='act-now') s += 6;
+    else if (t.lane==='review') s += 4;
+    else if (t.lane==='bookable') s += 3;
+    else if (t.lane==='sprint') s += 2;
+    if (/deadline|måndag|före/i.test(t.subject||'')) s += 3;
+    return s;
+  }
+  function timeRank(t) {
+    // ungefärlig tid-rank baserat på t.time
+    if (/Idag|^\d/.test(t.time)) return 100;
+    if (/Igår/i.test(t.time)) return 50;
+    if (/Mån|Tis|Ons|Tor|Fre/i.test(t.time)) return 30;
+    return 10;
+  }
   const $ = s => document.querySelector(s);
   const escHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const ico = (id) => `<svg><use href="#${id}"/></svg>`;
@@ -941,11 +1128,16 @@ button { cursor: pointer; }
       </button>`).join('');
   }
   function visibleThreads() {
-    let v = state.threads;
+    let v = state.threads.slice();
     if (state.tab==='unread') v = v.filter(t=>t.unread);
     if (state.tab==='mine') v = v.filter(t=>/Fazli/i.test(t.owner||''));
     if (state.tab==='high-risk') v = v.filter(t=>(t.tags||[]).some(g=>g.tone==='danger'));
     if (state.tab==='today') v = v.filter(t=>/Idag/i.test(t.time));
+    // Sort
+    if (state.sortBy==='oldest') v.sort((a,b)=>timeRank(a)-timeRank(b));
+    else if (state.sortBy==='risk') v.sort((a,b)=>{ const ra=(a.tags||[]).some(g=>g.tone==='danger')?1:0; const rb=(b.tags||[]).some(g=>g.tone==='danger')?1:0; if (rb!==ra) return rb-ra; return timeRank(b)-timeRank(a); });
+    else if (state.sortBy==='ai') v.sort((a,b)=>aiPriorityScore(b)-aiPriorityScore(a));
+    else /* newest */ v.sort((a,b)=>timeRank(b)-timeRank(a));
     return v;
   }
   function renderRows() {
@@ -958,7 +1150,8 @@ button { cursor: pointer; }
       const unread = t.unread?' unread':'';
       const trail = (t.mailboxTrail||[]).map(([l,c])=>`<span class="mb" style="background:${c}">${l}</span>`).join('');
       const tags = (t.tags||[]).slice(0,2).map(g=>`<span class="tag ${g.tone}">${g.icon?ico(g.icon):''}${escHtml(g.label)}</span>`).join('');
-      return `<div class="row${sel}${unread}" data-id="${t.id}" data-lane="${t.lane}">
+      const multi = state.multiSelect.has(t.id) ? ' row-selected-multi' : '';
+      return `<div class="row${sel}${unread}${multi}" data-id="${t.id}" data-lane="${t.lane}">
         <span class="avatar">${escHtml(t.initials)}</span>
         <div class="body">
           <div class="top">
@@ -971,6 +1164,12 @@ button { cursor: pointer; }
             ${tags}
             ${trail?`<span class="mailbox-trail">${trail}</span>`:''}
           </div>
+        </div>
+        <div class="quick-actions">
+          <button class="primary" data-quick="reply" data-id="${t.id}" title="Svara">${ico('i-reply')}</button>
+          <button data-quick="snooze" data-id="${t.id}" title="Snooza">${ico('i-clock')}</button>
+          <button class="success" data-quick="done" data-id="${t.id}" title="Markera klar">${ico('i-check')}</button>
+          <button class="danger" data-quick="delete" data-id="${t.id}" title="Radera">${ico('i-trash')}</button>
         </div>
       </div>`;
     }).join('');
@@ -1129,12 +1328,150 @@ button { cursor: pointer; }
 
   function renderAll() { renderTabs(); renderRows(); renderThread(); renderTodayStats(); renderMailboxBars(); }
 
+  // ==== Toast ====
+  function toast(msg) {
+    let el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,0.3);opacity:0;transition:opacity 0.2s, transform 0.2s;';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    el.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(el._t);
+    el._t = setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateX(-50%) translateY(8px)'; }, 1800);
+  }
+
+  // ==== Bulk-bar ====
+  function renderBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    const num = document.getElementById('bulk-num');
+    if (!bar) return;
+    const c = state.multiSelect.size;
+    if (c > 0) { bar.classList.add('show'); if (num) num.textContent = c; }
+    else { bar.classList.remove('show'); }
+  }
+
+  // ==== Sort menu ====
+  function toggleSortMenu(force) {
+    const menu = document.getElementById('sort-menu');
+    if (!menu) return;
+    const open = force !== undefined ? force : !menu.classList.contains('open');
+    menu.classList.toggle('open', open);
+  }
+
+  // ==== Live-pip flash on simulated new mail ====
+  let livePipTimer = null;
+  function simulateLiveActivity() {
+    if (livePipTimer) clearInterval(livePipTimer);
+    livePipTimer = setInterval(() => {
+      const pip = document.getElementById('live-pip');
+      if (!pip) return;
+      pip.classList.remove('flash');
+      // force reflow + add
+      void pip.offsetWidth;
+      pip.classList.add('flash');
+      pip.firstElementChild.style.background = '#22d36a';
+      setTimeout(()=>{ pip.classList.remove('flash'); pip.firstElementChild.style.background = ''; }, 1600);
+    }, 22000);
+  }
+
   function bind() {
     document.addEventListener('click', ev=>{
+      // Sort menu trigger
+      const sortTrig = ev.target.closest('#sort-trigger');
+      if (sortTrig) { ev.stopPropagation(); toggleSortMenu(); return; }
+      const sortItem = ev.target.closest('.sort-menu .item');
+      if (sortItem) {
+        state.sortBy = sortItem.dataset.sort;
+        document.getElementById('sort-label').textContent = SORT_LABELS[state.sortBy] || 'Nyaste';
+        document.querySelectorAll('.sort-menu .item').forEach(i=>i.classList.toggle('active', i===sortItem));
+        toggleSortMenu(false);
+        renderRows();
+        return;
+      }
+      // Click outside menu closes it
+      if (!ev.target.closest('.sort-menu')) toggleSortMenu(false);
+
+      // Bulk actions
+      const bulkBtn = ev.target.closest('[data-bulk]');
+      if (bulkBtn) {
+        const action = bulkBtn.dataset.bulk;
+        const c = state.multiSelect.size;
+        const labels = { done:'klara', snooze:'snoozade', assign:'tilldelade', delete:'raderade' };
+        toast(`${c} trådar ${labels[action]||action}`);
+        if (action === 'delete' || action === 'done') {
+          state.threads = state.threads.filter(t => !state.multiSelect.has(t.id));
+        }
+        state.multiSelect.clear();
+        renderRows();
+        renderBulkBar();
+        renderTodayStats();
+        return;
+      }
+      const bulkClear = ev.target.closest('#bulk-clear');
+      if (bulkClear) { state.multiSelect.clear(); renderRows(); renderBulkBar(); return; }
+
+      // Quick-actions on row
+      const quick = ev.target.closest('[data-quick]');
+      if (quick) {
+        ev.stopPropagation();
+        const action = quick.dataset.quick;
+        const id = quick.dataset.id;
+        const labels = { reply:'Svar öppnat', snooze:'Snoozad', done:'Markerad klar', delete:'Raderad' };
+        toast(labels[action] || action);
+        if (action === 'delete' || action === 'done') {
+          state.threads = state.threads.filter(t => t.id !== id);
+          if (state.selectedId === id) state.selectedId = state.threads[0]?.id;
+        }
+        renderRows();
+        renderThread();
+        renderTodayStats();
+        return;
+      }
+
+      // Tab
       const tab = ev.target.closest('[data-tab]');
       if (tab) { state.tab = tab.dataset.tab; renderTabs(); renderRows(); return; }
+
+      // Row click — handle shift+click for multi-select
       const row = ev.target.closest('.row[data-id]');
-      if (row) { state.selectedId = row.dataset.id; renderRows(); renderThread(); return; }
+      if (row) {
+        const id = row.dataset.id;
+        if (ev.shiftKey) {
+          // range select from lastClickedId to id
+          const v = visibleThreads();
+          const lastIdx = state.lastClickedId ? v.findIndex(t=>t.id===state.lastClickedId) : -1;
+          const curIdx = v.findIndex(t=>t.id===id);
+          if (lastIdx >= 0 && curIdx >= 0) {
+            const [a, b] = lastIdx < curIdx ? [lastIdx, curIdx] : [curIdx, lastIdx];
+            for (let i=a; i<=b; i++) state.multiSelect.add(v[i].id);
+          } else {
+            state.multiSelect.add(id);
+          }
+          renderRows();
+          renderBulkBar();
+          return;
+        }
+        if (ev.metaKey || ev.ctrlKey) {
+          // toggle selection
+          if (state.multiSelect.has(id)) state.multiSelect.delete(id); else state.multiSelect.add(id);
+          state.lastClickedId = id;
+          renderRows();
+          renderBulkBar();
+          return;
+        }
+        // Normal click
+        state.lastClickedId = id;
+        if (state.multiSelect.size > 0) state.multiSelect.clear();
+        state.selectedId = id;
+        renderRows();
+        renderThread();
+        renderBulkBar();
+        return;
+      }
     });
     document.addEventListener('keydown', ev=>{
       if (['INPUT','TEXTAREA','SELECT'].includes(ev.target.tagName)) return;
@@ -1183,7 +1520,7 @@ button { cursor: pointer; }
     };
   }
 
-  async function init() { bind(); bindPresence(); bindShortcuts(); await tryLoadLive(); renderAll(); }
+  async function init() { bind(); bindPresence(); bindShortcuts(); await tryLoadLive(); renderAll(); simulateLiveActivity(); }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init, {once:true});
   else init();
 })();
