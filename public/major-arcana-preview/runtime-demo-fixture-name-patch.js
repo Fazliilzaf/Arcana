@@ -226,6 +226,13 @@
       followup.style.alignSelf = 'start';
     }
     ws.style.gridTemplateRows = 'auto';
+    // FIX15: focus-layout är default 348px 348px (lika delar) — mail-content
+    // klämmer för smalt. Bredda mail-area till 2/3, intel till 1/3.
+    const focusLayout = document.querySelector('.focus-layout');
+    if (focusLayout) {
+      focusLayout.style.gridTemplateColumns = 'minmax(420px, 2fr) minmax(260px, 1fr)';
+      focusLayout.style.gap = '14px';
+    }
   }
 
   function renderFocusPanelForFixture(fb) {
