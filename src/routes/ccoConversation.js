@@ -120,6 +120,10 @@ function createCcoConversationRouter({
   openai = null,
   openaiModel = '',
   graphSendConnector = null,
+  graphReadConnector = null,
+  runtimeStreamRouter = null,
+  mailboxIdsForSync = [],
+  syncLookbackDays = 14,
   ccoConversationStateStore = null,
   ccoConversationNotesStore = null,
   defaultTenantId = 'cco',
@@ -562,6 +566,90 @@ function createCcoConversationRouter({
           ok: false,
           error: isTooLong ? 'too_long' : 'internal_error',
           detail: message,
+        });
+      }
+    }
+  );
+
+  // ----- Manuell mailbox-sync trigger -----
+  // POST /cco/runtime/sync   (body: { mailboxIds?: string[], lookbackDays?: number })
+  // Triggar Microsoft Graph mailbox-backfill för de angivna mailboxarna
+  // (eller defaults). När det är klart: broadcasta ett SSE-event så att
+  // frontend refreshar worklisten.
+  let syncInFlight = false;
+  router.post(
+    '/cco/runtime/sync',
+    authMiddleware,
+    express.json({ limit: '8kb' }),
+    async (req, res) => {
+      try {
+        if (syncInFlight) {
+          return res.status(429).json({ ok: false, error: 'sync_in_flight', detail: 'En sync pågår redan.' });
+        }
+        if (!graphReadConnector) {
+          return res.status(503).json({ ok: false, error: 'graph_read_unavailable', detail: 'ARCANA_GRAPH_READ_ENABLED måste vara true.' });
+        }
+        if (!ccoMailboxTruthStore) {
+          return res.status(503).json({ ok: false, error: 'mailbox_truth_store_unavailable' });
+        }
+        const reqMailboxIds = Array.isArray(asObject(req.body).mailboxIds)
+          ? req.body.mailboxIds.map((s) => normalizeText(s).toLowerCase()).filter(Boolean)
+          : [];
+        const mailboxIds = reqMailboxIds.length > 0 ? reqMailboxIds : (mailboxIdsForSync || []);
+        if (mailboxIds.length === 0) {
+          return res.status(400).json({ ok: false, error: 'no_mailboxes', detail: 'Inga mailboxar att synca.' });
+        }
+        const lookbackDays = Math.max(1, Math.min(90, Number(asObject(req.body).lookbackDays) || syncLookbackDays || 14));
+        syncInFlight = true;
+        const startedAt = new Date().toISOString();
+        // Kör bakgrundskörningen — vi väntar inte på fullt resultat innan
+        // vi svarar (kan ta minuter); vi svarar omedelbart med "started"
+        // och broadcastar ett event när det är klart.
+        const runPromise = (async () => {
+          try {
+            const { runGraphBackfill } = require('../ops/bootstrapRunner');
+            const result = await runGraphBackfill({
+              graphReadConnector,
+              ccoMailboxTruthStore,
+              mailboxIds,
+              lookbackDays,
+              logger: console,
+            });
+            if (runtimeStreamRouter && typeof runtimeStreamRouter.broadcast === 'function') {
+              runtimeStreamRouter.broadcast('worklist_updated', {
+                source: 'manual_sync',
+                mailboxIds,
+                folderCount: result?.folderCount || 0,
+                completedAt: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.warn('[cco-sync] backfill misslyckades', err?.message);
+            if (runtimeStreamRouter && typeof runtimeStreamRouter.broadcast === 'function') {
+              runtimeStreamRouter.broadcast('worklist_sync_failed', {
+                error: String(err?.message || err),
+                completedAt: new Date().toISOString(),
+              });
+            }
+          } finally {
+            syncInFlight = false;
+          }
+        })();
+        // Don't block the response on the async runPromise — handle 'unhandled rejection' silently above
+        runPromise.catch(() => {});
+        return res.json({
+          ok: true,
+          started: true,
+          startedAt,
+          mailboxIds,
+          lookbackDays,
+        });
+      } catch (err) {
+        syncInFlight = false;
+        return res.status(500).json({
+          ok: false,
+          error: 'sync_failed',
+          detail: String((err && err.message) || err),
         });
       }
     }

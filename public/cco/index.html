@@ -127,6 +127,9 @@ button { cursor: pointer; }
 }
 .status-dot.demo { background: var(--yellow); box-shadow: 0 0 0 3px rgba(245, 180, 0, 0.18); }
 @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.85); opacity: 0.7; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.icon-btn.is-syncing svg { animation: spin 0.9s linear infinite; }
+.icon-btn[disabled] { opacity: 0.6; cursor: not-allowed; }
 
 .compose-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -694,6 +697,7 @@ button { cursor: pointer; }
     <symbol id="i-reply" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></symbol>
     <symbol id="i-mail-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8"/><path d="m22 7-10 5L2 7"/><path d="M19 16v6M16 19h6"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
     <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
@@ -726,6 +730,7 @@ button { cursor: pointer; }
         <span class="status-dot demo"></span>
         Demo
       </span>
+      <button class="icon-btn" id="sync-btn" title="Hämta nya mejl nu (sync)"><svg width="15" height="15"><use href="#i-refresh"/></svg></button>
       <button class="icon-btn" title="Inställningar"><svg width="15" height="15"><use href="#i-settings"/></svg></button>
       <button class="compose-btn">
         <svg><use href="#i-plus"/></svg>
@@ -1069,6 +1074,8 @@ button { cursor: pointer; }
       if (actionBtn) { applyThreadAction(actionBtn.dataset.threadAction, actionBtn); return; }
       // Notes: post button
       if (ev.target.closest('#note-post-btn')) { postNote(); return; }
+      // Manuell mailbox-sync
+      if (ev.target.closest('#sync-btn')) { triggerSync(); return; }
     });
     document.addEventListener('keydown', ev=>{
       // Composer keys
@@ -1443,7 +1450,103 @@ button { cursor: pointer; }
     finally { thread.summaryLoading = false; }
   }
 
-  async function init() { bind(); await tryLoadLive(); renderAll(); }
+  // ==== Manuell sync + SSE realtidsuppdatering ====
+  let _sseSource = null;
+  async function triggerSync() {
+    const btn = document.getElementById('sync-btn');
+    const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+    if (!tok) {
+      alert('Saknar admin-token — gå till admin-flow för att logga in.');
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.classList.add('is-syncing'); btn.title = 'Synkar…'; }
+    try {
+      const r = await fetch('/api/v1/cco/runtime/sync', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok || !j.ok) {
+        alert('Sync misslyckades: ' + (j.detail || j.error || ('HTTP ' + r.status)));
+      }
+      // Backend svarar omedelbart med "started"; SSE-event signalerar när det är klart.
+      // Som fallback (om SSE inte är ansluten) — refresha efter 8s.
+      setTimeout(()=>{
+        if (btn) { btn.disabled = false; btn.classList.remove('is-syncing'); btn.title = 'Hämta nya mejl nu (sync)'; }
+      }, 6000);
+    } catch (e) {
+      alert('Nätverksfel: ' + (e?.message || e));
+      if (btn) { btn.disabled = false; btn.classList.remove('is-syncing'); btn.title = 'Hämta nya mejl nu (sync)'; }
+    }
+  }
+  async function refreshWorklist() {
+    if (!state.live) return;
+    const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+    if (!tok) return;
+    try {
+      const r = await fetch('/api/v1/cco/runtime/worklist/consumer?limit=50', { headers:{Authorization:'Bearer '+tok} });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.ok || !Array.isArray(j.rows)) return;
+      const prevSelectedId = state.selectedId;
+      const prevById = new Map(state.threads.map(t => [t.id, t]));
+      state.threads = j.rows.map(mapApiRow).map(newT => {
+        // Behåll ev. cachade fält (conversationLoaded, _notes, etc) från föregående version
+        const prev = prevById.get(newT.id);
+        if (prev) {
+          newT.conversation = prev.conversationLoaded ? prev.conversation : newT.conversation;
+          newT.conversationLoaded = prev.conversationLoaded;
+          newT.summaryLoaded = prev.summaryLoaded;
+          newT.aiTldr = prev.aiTldr || newT.aiTldr;
+          newT.aiPoints = prev.aiPoints || newT.aiPoints;
+          newT.risk = prev.risk || newT.risk;
+          newT.nextStep = prev.nextStep || newT.nextStep;
+          newT._notes = prev._notes;
+        }
+        return newT;
+      });
+      // Behåll vald tråd om den fortfarande finns; annars välj första
+      const exists = state.threads.find(t => t.id === prevSelectedId);
+      state.selectedId = exists ? prevSelectedId : (state.threads[0]?.id || null);
+      const status = $('#conn-status');
+      if (status) status.innerHTML = `<span class="status-dot"></span> Live · ${state.threads.length}`;
+      renderRows();
+      // Re-rendera tråden bara om vald har bytts
+      if (!exists) renderThread();
+    } catch (_e) { /* swallow */ }
+  }
+  function connectSse() {
+    if (typeof EventSource === 'undefined') return;
+    const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+    if (!tok) return;
+    // EventSource stöder inte Authorization-headers direkt — vi skickar token som query
+    // Backend måste tillåta detta (eller använd cookie-based auth). Om servern kräver
+    // Bearer-header i headern → SSE-anslutningen failar tyst och vi faller tillbaka på manuell refresh.
+    try {
+      const url = `/api/v1/cco/runtime/stream?token=${encodeURIComponent(tok)}`;
+      _sseSource = new EventSource(url);
+      _sseSource.addEventListener('worklist_updated', (ev) => {
+        // Sync klar — refresha listan + visa kort feedback
+        refreshWorklist();
+        const btn = document.getElementById('sync-btn');
+        if (btn) { btn.disabled = false; btn.classList.remove('is-syncing'); btn.title = 'Hämta nya mejl nu (sync)'; }
+      });
+      _sseSource.addEventListener('worklist_sync_failed', (ev) => {
+        const btn = document.getElementById('sync-btn');
+        if (btn) { btn.disabled = false; btn.classList.remove('is-syncing'); btn.title = 'Hämta nya mejl nu (sync)'; }
+      });
+      _sseSource.addEventListener('poll', () => {
+        // Periodic poll — refresha listan tyst
+        refreshWorklist();
+      });
+      _sseSource.onerror = () => {
+        // Auto-reconnect hanteras av EventSource. Inget extra behövs.
+      };
+    } catch (_e) { /* SSE inte tillgängligt — kör utan realtid */ }
+  }
+
+  async function init() { bind(); const ok = await tryLoadLive(); renderAll(); if (ok) connectSse(); }
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded', init, {once:true});
   else init();
 })();

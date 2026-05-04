@@ -1219,12 +1219,18 @@ process.once('SIGTERM', () => {
   );
 
   // P7: Real-time stream för CCO frontend (heartbeat + poll-trigger)
-  app.use('/api/v1', createCcoRuntimeStreamRouter({
+  const ccoRuntimeStreamRouter = createCcoRuntimeStreamRouter({
     pollIntervalMs: 10000,
     heartbeatIntervalMs: 30000,
-  }));
+  });
+  app.use('/api/v1', ccoRuntimeStreamRouter);
 
-  // CCO Conversation messages — full tråd-historik + AI-summary + reply + Klar/Senare + notes
+  // Default mailboxar för manuell sync — använd MAILBOX_ALLOWLIST om satt,
+  // annars HairTP-defaults
+  const defaultSyncMailboxIds = String(process.env.ARCANA_MAILBOX_ALLOWLIST || '')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+  // CCO Conversation messages — full tråd-historik + AI-summary + reply + Klar/Senare + notes + sync
   app.use(
     '/api/v1',
     createCcoConversationRouter({
@@ -1233,6 +1239,10 @@ process.once('SIGTERM', () => {
       openai,
       openaiModel: config.openaiModel,
       graphSendConnector,
+      graphReadConnector,
+      runtimeStreamRouter: ccoRuntimeStreamRouter,
+      mailboxIdsForSync: defaultSyncMailboxIds,
+      syncLookbackDays: Number(process.env.ARCANA_CCO_SYNC_LOOKBACK_DAYS) || 14,
       ccoConversationStateStore,
       ccoConversationNotesStore,
       defaultTenantId: 'cco',
