@@ -321,6 +321,7 @@ function scheduleBootstrap(opts = {}) {
 
 module.exports = {
   runBootstrap,
+  runGraphBackfill,
   scheduleBootstrap,
   getBootstrapStatus,
   isEnabled,
