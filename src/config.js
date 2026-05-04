@@ -521,7 +521,14 @@ const config = {
       .filter(Boolean);
     return configured.length > 0
       ? configured
-      : ['kons@hairtpclinic.com', 'info@hairtpclinic.com', 'contact@hairtpclinic.com', 'egzona@hairtpclinic.com'];
+      : [
+          'kons@hairtpclinic.com',
+          'info@hairtpclinic.com',
+          'contact@hairtpclinic.com',
+          'egzona@hairtpclinic.com',
+          'fazli@hairtpclinic.com',
+          'marknad@hairtpclinic.com',
+        ];
   })(),
   schedulerCcoHistoryRecentWindowDays: asInt(
     process.env.ARCANA_SCHEDULER_CCO_HISTORY_RECENT_WINDOW_DAYS,
