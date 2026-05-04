@@ -1245,6 +1245,7 @@ process.once('SIGTERM', () => {
       syncLookbackDays: Number(process.env.ARCANA_CCO_SYNC_LOOKBACK_DAYS) || 14,
       ccoConversationStateStore,
       ccoConversationNotesStore,
+      clientoBookingStore,
       defaultTenantId: 'cco',
     })
   );

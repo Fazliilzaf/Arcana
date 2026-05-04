@@ -29,6 +29,64 @@ function buildHeuristicDraft({ customerName, latestInboundBody, ownerName }) {
   return `${greeting}\n\nTack för ditt mejl. Vi återkommer skyndsamt med nästa steg.\n\n${sign}`;
 }
 
+// Generera nästa N lediga slots (heuristisk — antar arbetsdagar mån-fre 09-17 med lunch 12-13).
+// Hoppar över datum då kunden redan har en bokning.
+function generateSuggestedSlots({ existingBookings = [], count = 6, startFromIso = null, slotMinutes = 30 } = {}) {
+  const startMs = startFromIso ? Date.parse(startFromIso) : Date.now();
+  const safeStart = Number.isFinite(startMs) ? startMs : Date.now();
+  // Börja från nästa heltimme + minst 24h framåt (klinik behöver ledtid)
+  const ledtidMs = 24 * 60 * 60 * 1000;
+  const cursor = new Date(safeStart + ledtidMs);
+  cursor.setMinutes(0, 0, 0);
+  const slotsPerDay = ['09:00', '11:00', '13:30', '15:00'];
+  const existingDays = new Set(
+    (existingBookings || [])
+      .map((b) => normalizeText(b?.startsAt))
+      .filter(Boolean)
+      .map((iso) => iso.slice(0, 10))
+  );
+  const out = [];
+  let safety = 0;
+  while (out.length < count && safety < 60) {
+    safety += 1;
+    const day = cursor.getDay(); // 0=söndag, 6=lördag
+    if (day === 0 || day === 6) {
+      cursor.setDate(cursor.getDate() + 1);
+      continue;
+    }
+    const dayKey = cursor.toISOString().slice(0, 10);
+    if (existingDays.has(dayKey)) {
+      cursor.setDate(cursor.getDate() + 1);
+      continue;
+    }
+    for (const slotTime of slotsPerDay) {
+      if (out.length >= count) break;
+      const [hh, mm] = slotTime.split(':').map(Number);
+      const slot = new Date(cursor);
+      slot.setHours(hh, mm, 0, 0);
+      if (slot.getTime() <= Date.now() + ledtidMs) continue;
+      out.push({
+        startsAt: slot.toISOString(),
+        durationMinutes: slotMinutes,
+        weekday: ['Sön', 'Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör'][slot.getDay()],
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+function describeSlotSv(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const wd = ['söndag', 'måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag'][d.getDay()];
+  const day = d.getDate();
+  const mon = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'][d.getMonth()];
+  const time = d.toLocaleTimeString('sv', { hour: '2-digit', minute: '2-digit' });
+  return `${wd} ${day} ${mon} kl ${time}`;
+}
+
 async function generateOpenAIReply({ openai, model, messages, customerName, ownerName, subject, tone = 'warm' }) {
   if (!openai || !model) return null;
   const toneInstruction = (() => {
@@ -169,6 +227,7 @@ function createCcoConversationRouter({
   syncLookbackDays = 14,
   ccoConversationStateStore = null,
   ccoConversationNotesStore = null,
+  clientoBookingStore = null,
   defaultTenantId = 'cco',
 } = {}) {
   const router = express.Router();
@@ -329,6 +388,152 @@ function createCcoConversationRouter({
         return res.status(500).json({
           ok: false,
           error: 'internal_error',
+          detail: String((err && err.message) || err),
+        });
+      }
+    }
+  );
+
+  // ----- Cliento-bokningar: kund-historik + föreslagna lediga tider -----
+  // GET /cco/runtime/conversation/:key/bookings  → { existingBookings, suggestedSlots }
+  router.get(
+    '/cco/runtime/conversation/:key/bookings',
+    authMiddleware,
+    (req, res) => {
+      try {
+        if (!ccoMailboxTruthStore || typeof ccoMailboxTruthStore.listMessages !== 'function') {
+          return res.status(503).json({ ok: false, error: 'mailbox_truth_store_unavailable' });
+        }
+        const key = normalizeText(req.params.key);
+        if (!key) return res.status(400).json({ ok: false, error: 'missing_conversation_key' });
+        const sorted = fetchSortedConversationMessages(ccoMailboxTruthStore, key);
+        const firstInbound = sorted.find((m) => deriveDir(asObject(m).folderType) === 'inbound') || sorted[0] || {};
+        const customerEmail =
+          normalizeText(asObject(asObject(firstInbound).from).emailAddress?.address) ||
+          normalizeText(firstInbound.senderEmail) ||
+          normalizeText(firstInbound.fromAddress) ||
+          '';
+        let existingBookings = [];
+        if (clientoBookingStore && typeof clientoBookingStore.getBookingsForCustomer === 'function' && customerEmail) {
+          existingBookings = clientoBookingStore.getBookingsForCustomer({
+            tenantId: defaultTenantId,
+            customerEmail,
+          }) || [];
+        }
+        const suggestedSlots = generateSuggestedSlots({
+          existingBookings,
+          count: 6,
+          slotMinutes: 30,
+        }).map((s) => ({
+          ...s,
+          label: describeSlotSv(s.startsAt),
+        }));
+        // Sortera existerande bokningar — kommande först (status='upcoming' eller startsAt > now)
+        const nowMs = Date.now();
+        const sortedBookings = [...existingBookings]
+          .map((b) => ({
+            bookingId: normalizeText(b.bookingId),
+            startsAt: normalizeText(b.startsAt),
+            durationMinutes: Number(b.durationMinutes) || null,
+            service: normalizeText(b.service) || normalizeText(b.serviceType) || null,
+            staff: normalizeText(b.staff) || normalizeText(b.staffName) || null,
+            status: normalizeText(b.status) || 'unknown',
+            label: describeSlotSv(b.startsAt),
+            isUpcoming: b.startsAt && Date.parse(b.startsAt) > nowMs && b.status !== 'cancelled',
+          }))
+          .sort((a, b) => {
+            // upcoming först (asc), sen past (desc)
+            if (a.isUpcoming && !b.isUpcoming) return -1;
+            if (!a.isUpcoming && b.isUpcoming) return 1;
+            return String(a.isUpcoming ? a.startsAt : b.startsAt).localeCompare(
+              String(a.isUpcoming ? b.startsAt : a.startsAt)
+            );
+          });
+        return res.json({
+          ok: true,
+          conversationKey: key,
+          customerEmail: customerEmail || null,
+          existingBookings: sortedBookings,
+          suggestedSlots,
+        });
+      } catch (err) {
+        return res.status(500).json({
+          ok: false,
+          error: 'internal_error',
+          detail: String((err && err.message) || err),
+        });
+      }
+    }
+  );
+
+  // ----- Generera bekräftelse-utkast med vald tid -----
+  // POST /cco/runtime/conversation/:key/booking-confirm  body: { slot: ISO }
+  // Returnerar AI-utkast som bekräftar tiden — operatören kan justera + skicka
+  router.post(
+    '/cco/runtime/conversation/:key/booking-confirm',
+    authMiddleware,
+    express.json({ limit: '8kb' }),
+    async (req, res) => {
+      try {
+        if (!ccoMailboxTruthStore || typeof ccoMailboxTruthStore.listMessages !== 'function') {
+          return res.status(503).json({ ok: false, error: 'mailbox_truth_store_unavailable' });
+        }
+        const key = normalizeText(req.params.key);
+        if (!key) return res.status(400).json({ ok: false, error: 'missing_conversation_key' });
+        const slotIso = normalizeText(asObject(req.body).slot);
+        if (!slotIso || Number.isNaN(Date.parse(slotIso))) {
+          return res.status(400).json({ ok: false, error: 'invalid_slot', detail: 'slot måste vara giltig ISO-tid.' });
+        }
+        const sorted = fetchSortedConversationMessages(ccoMailboxTruthStore, key);
+        if (sorted.length === 0) {
+          return res.status(404).json({ ok: false, error: 'conversation_not_found' });
+        }
+        const firstInbound = sorted.find((m) => deriveDir(asObject(m).folderType) === 'inbound') || sorted[0];
+        const customerName = deriveFromName(firstInbound);
+        const subject = normalizeText(asObject(firstInbound).subject) || '';
+        const lastOutbound = [...sorted].reverse().find((m) => deriveDir(asObject(m).folderType) === 'outbound');
+        const ownerName = lastOutbound ? deriveFromName(lastOutbound) : '';
+        const inputMessages = sorted.map(toSummarizeInputMessage);
+        const slotLabel = describeSlotSv(slotIso);
+
+        // Bygg en mer specifik prompt — be GPT bekräfta valda tiden
+        let draft = null;
+        if (openai && openaiModel) {
+          const sys = 'Du är AI-assistent för Hair TP Clinic. Skriv ett kort bekräftelse-mejl på svenska som bekräftar en föreslagen bokningstid. Behåll varm och professionell ton. Skriv inget om priser eller behandlingsdetaljer som inte står i tråden.';
+          const userMsg = `Kund: ${customerName}\nÄmne: ${subject || '(utan ämne)'}\nKundens senaste mejl: ${deriveBody(firstInbound).slice(0, 600)}\n\nUppgift: Skriv ett bekräftelse-mejl till kunden. Föreslå tiden: ${slotLabel}. Be kunden bekräfta. Avsluta med "Mvh, ${ownerName || 'Hair TP Clinic'}". Returnera ENDAST mejltext (max 5 meningar, ingen ämnesrad).`;
+          try {
+            const completion = await openai.chat.completions.create({
+              model: openaiModel,
+              temperature: 0.3,
+              max_tokens: 350,
+              messages: [
+                { role: 'system', content: sys },
+                { role: 'user', content: userMsg },
+              ],
+            });
+            const text = completion?.choices?.[0]?.message?.content;
+            if (typeof text === 'string' && text.trim()) draft = text.trim();
+          } catch (_e) { /* fall through */ }
+        }
+        if (!draft) {
+          // Heuristisk fallback
+          const greeting = customerName ? `Hej ${customerName.split(/\s+/)[0]}!` : 'Hej!';
+          const sign = ownerName ? `Mvh,\n${ownerName}\nHair TP Clinic` : 'Mvh,\nHair TP Clinic';
+          draft = `${greeting}\n\nTack för ditt mejl. Vi har en ledig tid ${slotLabel} — passar det dig? Bekräfta gärna så bokar vi in dig.\n\n${sign}`;
+        }
+        return res.json({
+          ok: true,
+          conversationKey: key,
+          slot: slotIso,
+          slotLabel,
+          draft,
+          source: openai && openaiModel ? 'openai' : 'heuristic',
+          generatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        return res.status(500).json({
+          ok: false,
+          error: 'booking_confirm_failed',
           detail: String((err && err.message) || err),
         });
       }

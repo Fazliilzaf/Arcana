@@ -627,6 +627,39 @@ button { cursor: pointer; }
 }
 .timeline li:first-child .dot { background: var(--accent-grad); border-color: transparent; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12); }
 
+/* Booking (Cliento-bokningar + föreslagna tider) */
+#booking-existing { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.booking-card {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 7px;
+  background: var(--bg-soft);
+  font-size: 11.5px;
+  border-left: 2px solid var(--accent-soft);
+}
+.booking-card.upcoming { border-left-color: var(--accent); background: var(--accent-soft); }
+.booking-card .b-info { flex: 1; min-width: 0; }
+.booking-card .b-when { font-weight: 700; color: var(--text); }
+.booking-card .b-meta { font-size: 10.5px; color: var(--text-3); margin-top: 1px; }
+.booking-card .b-status {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+}
+.booking-card.upcoming .b-status { background: var(--accent); color: #fff; }
+.booking-empty { font-size: 11px; color: var(--text-3); font-style: italic; padding: 4px 0; }
+.booking-slot-label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--text-3); margin: 6px 0 6px; }
+.booking-slots { display: flex; flex-wrap: wrap; gap: 5px; }
+.booking-slot {
+  padding: 5px 10px; border-radius: 7px;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+.booking-slot:hover { background: var(--accent-soft); color: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 30%, transparent); transform: translateY(-1px); }
+.booking-slot[disabled] { opacity: 0.5; cursor: not-allowed; transform: none; }
+
 /* Notes (interna anteckningar per tråd) */
 .notes-count { color: var(--text-3); font-weight: 600; font-size: 10px; margin-left: 4px; }
 .notes-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; max-height: 200px; overflow-y: auto; }
@@ -1076,6 +1109,12 @@ button { cursor: pointer; }
         <div class="head">${ico('i-history')} Tidslinje</div>
         <ul class="timeline">${tl}</ul>
       </div>
+      <div class="ctx-section" id="booking-section" style="display:none;">
+        <div class="head">${ico('i-calendar')} Bokning</div>
+        <div id="booking-existing"></div>
+        <div class="booking-slot-label">Föreslagna tider</div>
+        <div class="booking-slots" id="booking-slots"></div>
+      </div>
       <div class="ctx-section">
         <div class="head">${ico('i-edit')} Anteckningar <span class="notes-count" id="notes-count"></span></div>
         <div class="notes-list" id="notes-list">${state.live ? '<div class="notes-empty" id="notes-empty">Laddar…</div>' : '<div class="notes-empty">Demo-läge — inga sparade anteckningar.</div>'}</div>
@@ -1087,7 +1126,7 @@ button { cursor: pointer; }
           </div>
         </div>
       </div>`;
-    if (state.live && t.id) loadNotes(t);
+    if (state.live && t.id) { loadNotes(t); loadBookings(t); }
   }
   function renderAll() { renderTabs(); renderRows(); renderThread(); }
 
@@ -1137,6 +1176,9 @@ button { cursor: pointer; }
       if (ev.target.closest('#note-post-btn')) { postNote(); return; }
       // Manuell mailbox-sync
       if (ev.target.closest('#sync-btn')) { triggerSync(); return; }
+      // Cliento booking slot click
+      const slotBtn = ev.target.closest('[data-booking-slot]');
+      if (slotBtn) { confirmBookingSlot(slotBtn.dataset.bookingSlot, slotBtn); return; }
     });
     document.addEventListener('keydown', ev=>{
       // Composer keys
@@ -1318,6 +1360,101 @@ button { cursor: pointer; }
         t.lifecycle = 'Senare';
       }
       renderRows(); renderThread();
+    } catch (e) {
+      alert('Nätverksfel: ' + (e?.message || e));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // ==== Cliento-bokningar: ladda + 1-klick-bekräfta ====
+  async function loadBookings(thread) {
+    if (!thread || !thread.id) return;
+    const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+    if (!tok) return;
+    try {
+      const r = await fetch(`/api/v1/cco/runtime/conversation/${encodeURIComponent(thread.id)}/bookings`, {
+        headers:{ Authorization:'Bearer '+tok }
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j.ok) return;
+      const section = document.getElementById('booking-section');
+      const existingDiv = document.getElementById('booking-existing');
+      const slotsDiv = document.getElementById('booking-slots');
+      if (!section) return;
+      // Visa sektionen om vi har antingen befintliga bokningar ELLER intent verkar bookings-relaterad
+      const intentLooksBookable = String(thread.nextStep||'').toLowerCase().match(/bok|tid|konsult/);
+      const hasExisting = Array.isArray(j.existingBookings) && j.existingBookings.length > 0;
+      const showSection = hasExisting || intentLooksBookable;
+      section.style.display = showSection ? '' : 'none';
+      if (!showSection) return;
+      // Existing bookings
+      if (existingDiv) {
+        if (hasExisting) {
+          existingDiv.innerHTML = j.existingBookings.slice(0, 5).map(b => `
+            <div class="booking-card${b.isUpcoming ? ' upcoming' : ''}">
+              <div class="b-info">
+                <div class="b-when">${escNote(b.label)}</div>
+                ${b.service || b.staff ? `<div class="b-meta">${escNote([b.service, b.staff].filter(Boolean).join(' · '))}</div>` : ''}
+              </div>
+              <span class="b-status">${b.isUpcoming ? 'Kommande' : 'Tidigare'}</span>
+            </div>
+          `).join('');
+        } else {
+          existingDiv.innerHTML = '<div class="booking-empty">Inga tidigare bokningar i Cliento.</div>';
+        }
+      }
+      // Suggested slots
+      if (slotsDiv) {
+        if (Array.isArray(j.suggestedSlots) && j.suggestedSlots.length > 0) {
+          slotsDiv.innerHTML = j.suggestedSlots.map(s => {
+            const labelShort = s.label.replace(/^([a-zåäö]+)\s+(\d+\s+[a-zåäö]+)\s+kl\s+/i, '$1 $2 ');
+            return `<button class="booking-slot" data-booking-slot="${escNote(s.startsAt)}" title="${escNote(s.label)}">${escNote(labelShort)}</button>`;
+          }).join('');
+        } else {
+          slotsDiv.innerHTML = '';
+        }
+      }
+    } catch (_e) { /* swallow */ }
+  }
+  async function confirmBookingSlot(slotIso, btn) {
+    const t = state.threads.find(x => x.id === state.selectedId);
+    if (!t || !state.live) return;
+    const tok = (()=>{ try{return localStorage.getItem('ARCANA_ADMIN_TOKEN')||'';}catch{return '';} })();
+    if (!tok) { alert('Saknar admin-token.'); return; }
+    if (btn) btn.disabled = true;
+    // Öppna composer + visa "Genererar bekräftelse..."
+    const wrap = document.getElementById('composer-wrap');
+    if (wrap) wrap.classList.add('is-open');
+    const ta = document.getElementById('composer-input');
+    const bar = document.getElementById('ai-draft-bar');
+    const pill = document.getElementById('ai-draft-pill');
+    if (bar) bar.style.display = 'flex';
+    if (pill) { pill.classList.add('loading'); pill.classList.remove('heuristic'); pill.innerHTML = `<svg style="width:10px;height:10px;"><use href="#i-sparkles"/></svg> Genererar bekräftelse…`; }
+    try {
+      const r = await fetch(`/api/v1/cco/runtime/conversation/${encodeURIComponent(t.id)}/booking-confirm`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + tok, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot: slotIso })
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok || !j.ok) {
+        alert('Misslyckades: ' + (j.detail || j.error || ('HTTP ' + r.status)));
+        return;
+      }
+      if (ta) {
+        ta.value = j.draft || '';
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(200, ta.scrollHeight) + 'px';
+        ta.focus();
+      }
+      if (pill) {
+        pill.classList.remove('loading');
+        const label = j.source === 'openai' ? `📅 Bekräftelse · ${j.slotLabel}` : `Bekräftelse (heuristisk) · ${j.slotLabel}`;
+        pill.innerHTML = `<svg style="width:10px;height:10px;"><use href="#i-sparkles"/></svg> ${label}`;
+        if (j.source !== 'openai') pill.classList.add('heuristic');
+      }
     } catch (e) {
       alert('Nätverksfel: ' + (e?.message || e));
     } finally {
