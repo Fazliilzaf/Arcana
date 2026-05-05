@@ -472,6 +472,204 @@
   }
 
   // ============================================================
+  // P2-3: Räknare per mailbox i mailbox-väljaren
+  // ============================================================
+  //
+  // Bygger en karta { mailboxKey → count } från worklist-API och DOM-patchar
+  // mailbox-rader i dropdown så att de visar "Egzona · 47" istället för bara
+  // "Egzona". Köras varje gång dropdown öppnas.
+
+  const mailboxCountMap = new Map();
+
+  function rebuildMailboxCounts(rows) {
+    mailboxCountMap.clear();
+    if (!Array.isArray(rows)) return;
+    for (const row of rows) {
+      // Möjliga källor till mailbox-id i raden
+      const candidates = [
+        row?.mailboxId,
+        row?.mailbox?.id,
+        row?.mailbox?.key,
+        row?.mailbox?.address,
+        row?.assignedMailboxId,
+        row?.primaryMailboxId,
+      ].filter(Boolean);
+      for (const c of candidates) {
+        const norm = String(c).toLowerCase();
+        // Bryt ned email till localpart om det är en address
+        const localpart = norm.includes('@') ? norm.split('@')[0] : norm;
+        // Normalisera "kons-svar" → "kons"
+        const key = localpart.replace(/[^a-z0-9]/g, '').replace(/^(contact|egzona|fazli|info|kons|marknad).*$/, '$1');
+        if (!key) continue;
+        mailboxCountMap.set(key, (mailboxCountMap.get(key) || 0) + 1);
+      }
+    }
+  }
+
+  async function fetchMailboxCounts() {
+    try {
+      const token = localStorage.getItem('ARCANA_ADMIN_TOKEN') || '';
+      if (!token) return;
+      const res = await fetch('/api/v1/cco/runtime/worklist', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const rows = Array.isArray(data?.rows) ? data.rows : [];
+      rebuildMailboxCounts(rows);
+    } catch (e) { /* tyst */ }
+  }
+
+  function applyMailboxCountsToDom() {
+    if (mailboxCountMap.size === 0) return;
+    // Hitta alla mailbox-options i dropdown
+    const labels = document.querySelectorAll('label');
+    labels.forEach(label => {
+      const cb = label.querySelector('input[type="checkbox"]');
+      if (!cb) return;
+      const text = (label.textContent || '').toLowerCase();
+      const matched = DEFAULT_MAILBOXES.find(m => text.includes(m));
+      if (!matched) return;
+      const count = mailboxCountMap.get(matched) || 0;
+      // Hitta primär label-text-noden (oftast en <span> eller direkt textnode)
+      // Lägg till count-suffix som ett <span class="shim-mbx-count"> om det inte redan finns
+      if (label.querySelector('.shim-mbx-count')) {
+        label.querySelector('.shim-mbx-count').textContent = count > 0 ? ` · ${count}` : '';
+        return;
+      }
+      const countSpan = document.createElement('span');
+      countSpan.className = 'shim-mbx-count';
+      countSpan.style.cssText = 'opacity:0.7;margin-left:6px;font-variant-numeric:tabular-nums;font-size:0.85em;';
+      countSpan.textContent = count > 0 ? ` · ${count}` : '';
+      // Hitta sista text-element i label (inte input)
+      const labelTextEl = Array.from(label.children).find(c => c.tagName !== 'INPUT' && c.classList?.length > 0)
+        || label;
+      labelTextEl.appendChild(countSpan);
+    });
+  }
+
+  function bootstrapMailboxCounts() {
+    // Initial fetch
+    fetchMailboxCounts().then(applyMailboxCountsToDom);
+    // Re-applicera när DOM ändras (dropdown öppnas/stängs)
+    const obs = new MutationObserver(() => {
+      // Throttle: kör max var 250ms
+      if (bootstrapMailboxCounts._t) return;
+      bootstrapMailboxCounts._t = setTimeout(() => {
+        applyMailboxCountsToDom();
+        bootstrapMailboxCounts._t = null;
+      }, 250);
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+    // Re-fetcha periodiskt
+    setInterval(() => {
+      fetchMailboxCounts().then(applyMailboxCountsToDom);
+    }, 60000);
+  }
+
+  // ============================================================
+  // P2-1: Översätt raw status-codes som leakar till DOM
+  // ============================================================
+  //
+  // app.js har nu utökad humanizeCode-mapping (commit P2-1) men om någon
+  // render-path går runt humanizeCode kan koden fortfarande synas. Detta är
+  // en defensiv DOM-replace som fångar raw codes och översätter.
+
+  const STATUS_LABEL_MAP = {
+    needs_reply: 'Behöver svar',
+    needs_action: 'Behöver åtgärd',
+    needs_review: 'Behöver granskning',
+    in_progress: 'Pågår',
+    in_review: 'Under granskning',
+    ready_to_book: 'Redo att boka',
+    ready_now: 'Redo att boka',
+    low_confidence: 'Låg konfidens',
+    high_confidence: 'Hög konfidens',
+    waiting: 'Väntar',
+    waiting_reply: 'Väntar på svar',
+    waiting_customer: 'Väntar på kund',
+    awaiting_customer: 'Väntar på kund',
+    awaiting_owner: 'Behöver åtgärd',
+    awaiting_confirmation: 'Väntar på bekräftelse',
+    closed: 'Stängd',
+    resolved: 'Löst',
+    done: 'Klar',
+    paused: 'Pausad',
+    snoozed: 'Senare',
+    escalated: 'Eskalerad',
+    open: 'Öppen',
+    reopened: 'Återöppnad',
+    pending: 'Väntar',
+    scheduled: 'Schemalagd',
+    booked: 'Bokad',
+    cancelled: 'Avbokad',
+    no_show: 'Uteblev',
+    response_needed: 'Svar krävs',
+    follow_up_pending: 'Återbesök väntar',
+    booking_ready: 'Redo att boka',
+    blocked_medical: 'Medicinsk kontroll',
+    not_relevant: 'Ej relevant',
+    active_dialogue: 'Aktiv dialog',
+  };
+
+  // Title-cased English varianter (humanizeCode-fallbacks)
+  const STATUS_LABEL_TITLECASE = {};
+  for (const [k, v] of Object.entries(STATUS_LABEL_MAP)) {
+    const titleCased = k.split(/[_-]+/).map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+    STATUS_LABEL_TITLECASE[titleCased] = v;
+  }
+
+  function translateStatusText(text) {
+    if (!text || typeof text !== 'string') return null;
+    const trimmed = text.trim();
+    // Exakt match på snake_case raw
+    const lower = trimmed.toLowerCase();
+    if (STATUS_LABEL_MAP[lower]) return STATUS_LABEL_MAP[lower];
+    // Exakt match på title-cased English ("In Progress")
+    if (STATUS_LABEL_TITLECASE[trimmed]) return STATUS_LABEL_TITLECASE[trimmed];
+    return null;
+  }
+
+  function fixStatusLabelsInRoot(root) {
+    const target = root || document.body;
+    if (!target) return;
+    // Begränsa till element som troligen är status-pills (inte hela body)
+    const candidates = target.querySelectorAll('[class*="status"], [data-status], [class*="tag"], [class*="badge"], [class*="chip"], [class*="pill"]');
+    candidates.forEach(el => {
+      // Bara om elementet bara har text-innehåll (inga child-element)
+      if (el.children.length > 0) {
+        // Kolla bara direkt-text noder
+        for (const node of el.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const translated = translateStatusText(node.nodeValue);
+            if (translated && translated !== node.nodeValue.trim()) {
+              node.nodeValue = node.nodeValue.replace(node.nodeValue.trim(), translated);
+            }
+          }
+        }
+        return;
+      }
+      const translated = translateStatusText(el.textContent);
+      if (translated && translated !== el.textContent.trim()) {
+        el.textContent = translated;
+      }
+    });
+  }
+
+  function bootstrapStatusLabelFix() {
+    fixStatusLabelsInRoot();
+    const obs = new MutationObserver((mutations) => {
+      let needsScan = false;
+      for (const m of mutations) {
+        if (m.addedNodes.length > 0) needsScan = true;
+        if (m.type === 'characterData') needsScan = true;
+      }
+      if (needsScan) fixStatusLabelsInRoot();
+    });
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  // ============================================================
   // Bootstrap
   // ============================================================
 
@@ -485,6 +683,8 @@
     try { bootstrapMailboxPersistence(); } catch (e) { console.warn('[fix-shim] mailbox-persistens fel:', e); }
     try { bootstrapThreadCardClickFix(); } catch (e) { console.warn('[fix-shim] thread-card-click fel:', e); }
     try { bootstrapLivePill(); } catch (e) { console.warn('[fix-shim] live-pill fel:', e); }
+    try { bootstrapStatusLabelFix(); } catch (e) { console.warn('[fix-shim] status-label-fix fel:', e); }
+    try { bootstrapMailboxCounts(); } catch (e) { console.warn('[fix-shim] mailbox-counts fel:', e); }
     try {
       // Fetcha worklist-API först så namn-kartan finns innan observer scannar
       await fetchWorklistAndBuildMap();
@@ -498,6 +698,6 @@
         updateLivePill();
       }, 60000); // Var 60 sek
     } catch (e) { console.warn('[fix-shim] okänd-avsändare-fix fel:', e); }
-    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare + thread-card-click + live-pill)');
+    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare + thread-card-click + live-pill + status-labels + mailbox-counts)');
   }
 })();

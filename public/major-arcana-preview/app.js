@@ -5004,6 +5004,26 @@
       repeat: "Återkommande",
       needs_reply: "Behöver svar",
       response_needed: "Svar krävs",
+      in_progress: "Pågår",
+      in_review: "Under granskning",
+      low_confidence: "Låg konfidens",
+      high_confidence: "Hög konfidens",
+      waiting: "Väntar",
+      waiting_reply: "Väntar på svar",
+      waiting_customer: "Väntar på kund",
+      closed: "Stängd",
+      resolved: "Löst",
+      done: "Klar",
+      paused: "Pausad",
+      snoozed: "Senare",
+      escalated: "Eskalerad",
+      open: "Öppen",
+      reopened: "Återöppnad",
+      pending: "Väntar",
+      scheduled: "Schemalagd",
+      booked: "Bokad",
+      cancelled: "Avbokad",
+      no_show: "Uteblev",
       awaiting_customer: "Väntar på kund",
       awaiting_owner: "Behöver åtgärd",
       awaiting_confirmation: "Väntar på bekräftelse",
@@ -9070,9 +9090,27 @@
         compactRuntimeCopy(
           latestOutcome?.detail ||
             latestAction?.summary ||
-            (normalizeKey(latestMessage?.direction) === "outbound"
-              ? "Senaste händelsen i tråden var ett utgående svar från kliniken."
-              : "Senaste händelsen i tråden var ett inkommande mail från kunden."),
+            // P2-2: Använd faktisk mejl-preview innan generisk fallback
+            (() => {
+              const messagePreview = asText(
+                latestMessage?.preview,
+                asText(
+                  latestMessage?.bodyPreview,
+                  asText(
+                    extractPreviewTextFromHtml(latestMessage?.bodyHtml),
+                    asText(latestMessage?.body, "")
+                  )
+                )
+              );
+              if (messagePreview && messagePreview.length > 8) {
+                return messagePreview.length > 120
+                  ? `${messagePreview.slice(0, 117)}…`
+                  : messagePreview;
+              }
+              return normalizeKey(latestMessage?.direction) === "outbound"
+                ? "Senaste händelsen i tråden var ett utgående svar från kliniken."
+                : "Senaste händelsen i tråden var ett inkommande mail från kunden.";
+            })(),
           "Ingen dominant risk identifierad.",
           140
         )
