@@ -321,6 +321,53 @@
   }
 
   // ============================================================
+  // P1-1: Klick på thread-card uppdaterar inte FOKUSYTA
+  // ============================================================
+  //
+  // App.js har en delegerad click-handler någonstans men träffas inte konsekvent
+  // av enkelt click. Vi lyssnar globalt på click som bubblar upp till
+  // .thread-card och dispatchar en kedja av events som app.js sannolikt lyssnar
+  // på (pointerdown + pointerup + click + mousedown). Plus markerar kortet som
+  // selected via DOM-class så användaren ser visuell feedback omedelbart.
+
+  function handleThreadCardClick(event) {
+    const card = event.target.closest('.thread-card');
+    if (!card) return;
+    // Skippa om klicket var på en knapp/action inom kortet (de har egna handlers)
+    if (event.target.closest('button, [role="button"], [data-quick-action], a, input, label')) return;
+    // Förhindra dubbel-trigger
+    if (card.dataset.shimSelectInFlight === '1') return;
+    card.dataset.shimSelectInFlight = '1';
+
+    // Visuell feedback omedelbart: markera detta som selected, avmarkera andra
+    document.querySelectorAll('.thread-card.is-selected, .thread-card.thread-card-selected').forEach(c => {
+      if (c !== card) {
+        c.classList.remove('is-selected', 'thread-card-selected');
+      }
+    });
+    card.classList.add('is-selected', 'thread-card-selected');
+    card.setAttribute('aria-pressed', 'true');
+
+    // Dispatcha pointer-event-kedja för att triggra app.js's delegerade handler
+    const eventTypes = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+    for (const ev of eventTypes) {
+      const e = new PointerEvent(ev, {
+        bubbles: true, cancelable: true,
+        pointerType: 'mouse', button: 0,
+      });
+      card.dispatchEvent(e);
+    }
+
+    setTimeout(() => { delete card.dataset.shimSelectInFlight; }, 200);
+  }
+
+  function bootstrapThreadCardClickFix() {
+    // Lyssna på capture-fas så vi får eventet innan app.js
+    document.addEventListener('click', handleThreadCardClick, false);
+    console.log('[fix-shim] thread-card click-handler aktiv');
+  }
+
+  // ============================================================
   // Bootstrap
   // ============================================================
 
@@ -332,6 +379,7 @@
 
   async function init() {
     try { bootstrapMailboxPersistence(); } catch (e) { console.warn('[fix-shim] mailbox-persistens fel:', e); }
+    try { bootstrapThreadCardClickFix(); } catch (e) { console.warn('[fix-shim] thread-card-click fel:', e); }
     try {
       // Fetcha worklist-API först så namn-kartan finns innan observer scannar
       await fetchWorklistAndBuildMap();
@@ -344,6 +392,6 @@
         scanAndFixUnknownSenders();
       }, 60000); // Var 60 sek
     } catch (e) { console.warn('[fix-shim] okänd-avsändare-fix fel:', e); }
-    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare via worklist-API)');
+    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare + thread-card-click)');
   }
 })();
