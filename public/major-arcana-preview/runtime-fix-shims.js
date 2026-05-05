@@ -83,6 +83,76 @@
     return applied > 0;
   }
 
+  function findMailboxToggleButton() {
+    // Försök olika selektorer
+    const selectors = [
+      '[data-mailbox-toggle]',
+      '[data-mailbox-picker-toggle]',
+      '[data-truth-mailbox-toggle]',
+      '.mailbox-toggle',
+      '.mailbox-picker-toggle',
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    // Fallback: text-baserad sökning. Mailbox-väljaren har label som "Hair TP Clinic - Inga mailboxar"
+    // eller "Hair TP Clinic - Egzona +5"
+    const candidates = document.querySelectorAll('button, label, [role="button"], [role="combobox"]');
+    for (const el of candidates) {
+      const txt = (el.textContent || '').trim();
+      if (txt.length > 0 && txt.length < 80 && /Hair TP Clinic|mailboxar|mailboxes/i.test(txt)) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  async function autoOpenAndApplyAtBootstrap() {
+    const persisted = readPersistedMailboxes();
+    if (!persisted || persisted.length === 0) return;
+
+    // Vänta först på att appen är någorlunda klar
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Kolla om checkboxes redan finns i DOM (dropdown öppen)
+    const existingCheckboxes = Array.from(document.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => {
+        const lbl = (cb.closest('label')?.textContent || '').toLowerCase();
+        return DEFAULT_MAILBOXES.some(m => lbl.includes(m));
+      });
+    if (existingCheckboxes.length > 0) {
+      // Kanske redan öppen — försök applicera direkt
+      applyPersistedMailboxes();
+      return;
+    }
+
+    // Annars: hitta toggle och öppna
+    const toggle = findMailboxToggleButton();
+    if (!toggle) {
+      console.warn('[fix-shim] Hittar inte mailbox-toggle vid bootstrap — kan inte återställa val automatiskt');
+      return;
+    }
+
+    // Klicka för att öppna dropdown
+    toggle.click();
+    await new Promise(r => setTimeout(r, 600)); // Vänta på render
+
+    // Klicka checkboxes
+    const applied = applyPersistedMailboxes();
+
+    // Stäng dropdown genom att klicka utanför
+    await new Promise(r => setTimeout(r, 300));
+    const outside = document.body;
+    outside.click();
+    // Klick på Escape som backup
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    if (applied) {
+      console.log('[fix-shim] Auto-återställde', persisted.length, 'mailbox-val vid bootstrap');
+    }
+  }
+
   function watchMailboxChanges() {
     // Lyssna på alla checkbox-changes globalt och spara tillstånd
     document.addEventListener('change', (e) => {
@@ -106,19 +176,21 @@
 
   function bootstrapMailboxPersistence() {
     watchMailboxChanges();
-    // Vänta på att DOM är ready och försök applicera flera gånger
+    // Strategi 1: om dropdown råkar vara öppen vid någon polling-tick
     let attempts = 0;
-    const maxAttempts = 20;
+    const maxAttempts = 6;
     const interval = setInterval(() => {
       attempts += 1;
       const container = findMailboxRowsInDom();
-      if (container || attempts >= maxAttempts) {
+      if (container) {
         clearInterval(interval);
-        if (container) {
-          applyPersistedMailboxes();
-        }
+        applyPersistedMailboxes();
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
       }
     }, 500);
+    // Strategi 2: forcera öppna dropdown och applicera
+    autoOpenAndApplyAtBootstrap().catch(e => console.warn('[fix-shim] auto-open fel:', e));
   }
 
   // ============================================================
