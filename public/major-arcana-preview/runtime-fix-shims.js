@@ -122,8 +122,54 @@
   }
 
   // ============================================================
-  // P0-2: "Okänd avsändare" fallback från email
+  // P0-2: "Okänd avsändare" fallback från worklist-API
   // ============================================================
+
+  // Map: threadId → { name, email }
+  const threadCustomerMap = new Map();
+
+  async function fetchWorklistAndBuildMap() {
+    try {
+      const token = localStorage.getItem('ARCANA_ADMIN_TOKEN') || '';
+      if (!token) return false;
+      const res = await fetch('/api/v1/cco/runtime/worklist', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const rows = Array.isArray(data?.rows) ? data.rows : [];
+      let added = 0;
+      for (const row of rows) {
+        const id = row.id || row.conversationKey || row.conversation?.key || row.conversation?.mailboxConversationId;
+        if (!id) continue;
+        const customer = row.customer || {};
+        const name = customer.name || row.customerName || '';
+        const email = customer.email || row.customerEmail || '';
+        // Lagra med flera nyckelvarianter eftersom DOM-id kan vara annan format
+        const norm = String(id).toLowerCase();
+        threadCustomerMap.set(norm, { name, email });
+        // Spara även lowercase utan symboler för fuzzy match
+        const stripped = norm.replace(/[^a-z0-9]/g, '');
+        threadCustomerMap.set(stripped, { name, email });
+        added += 1;
+      }
+      console.log('[fix-shim] Hämtade', added, 'trådar från worklist-API → kund-namn-karta');
+      return added > 0;
+    } catch (e) {
+      console.warn('[fix-shim] worklist-fetch fel:', e);
+      return false;
+    }
+  }
+
+  function lookupCustomerForCard(cardEl) {
+    const tid = cardEl.dataset.runtimeThread || cardEl.dataset.historyConversation || cardEl.dataset.threadId;
+    if (!tid) return null;
+    const norm = String(tid).toLowerCase();
+    if (threadCustomerMap.has(norm)) return threadCustomerMap.get(norm);
+    const stripped = norm.replace(/[^a-z0-9]/g, '');
+    if (threadCustomerMap.has(stripped)) return threadCustomerMap.get(stripped);
+    return null;
+  }
 
   function humanizeLocalpart(localpart) {
     if (!localpart) return '';
@@ -147,29 +193,34 @@
     while ((n = walker.nextNode())) targets.push(n);
     if (targets.length === 0) return;
 
-    // Försök hitta email någonstans i kortet eller dess data-attribut
-    let email = '';
-    // Kolla data-attribut på kortet och alla descendants
-    const allElements = [cardEl, ...cardEl.querySelectorAll('*')];
-    for (const el of allElements) {
-      for (const attr of el.attributes || []) {
-        const v = attr.value || '';
-        const m = v.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-        if (m) { email = m[0]; break; }
+    // Slå upp kund-data i karta byggd från worklist-API
+    let humanName = '';
+    const customer = lookupCustomerForCard(cardEl);
+    if (customer?.name) {
+      humanName = customer.name;
+    } else if (customer?.email) {
+      humanName = humanizeLocalpart(customer.email.split('@')[0]);
+    }
+
+    // Fallback: leta efter email i DOM (om kortet ändå har email någonstans)
+    if (!humanName) {
+      let email = '';
+      const allElements = [cardEl, ...cardEl.querySelectorAll('*')];
+      for (const el of allElements) {
+        for (const attr of el.attributes || []) {
+          const m = (attr.value || '').match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+          if (m) { email = m[0]; break; }
+        }
+        if (email) break;
       }
-      if (email) break;
-    }
-    // Fallback: leta i hela kortets textinnehåll
-    if (!email) {
-      const m = cardEl.textContent.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-      if (m) email = m[0];
+      if (!email) {
+        const m = cardEl.textContent.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+        if (m) email = m[0];
+      }
+      if (email) humanName = humanizeLocalpart(email.split('@')[0]);
     }
 
-    if (!email) return; // Kan inte fixa utan email
-
-    const localpart = email.split('@')[0];
-    const humanName = humanizeLocalpart(localpart);
-    if (!humanName) return;
+    if (!humanName) return; // Vi har inget att ersätta med
 
     targets.forEach(textNode => {
       textNode.nodeValue = textNode.nodeValue.replace(/Okänd avsändare/gi, humanName);
@@ -207,9 +258,20 @@
     init();
   }
 
-  function init() {
+  async function init() {
     try { bootstrapMailboxPersistence(); } catch (e) { console.warn('[fix-shim] mailbox-persistens fel:', e); }
-    try { observeUnknownSenders(); } catch (e) { console.warn('[fix-shim] okänd-avsändare-fix fel:', e); }
-    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare)');
+    try {
+      // Fetcha worklist-API först så namn-kartan finns innan observer scannar
+      await fetchWorklistAndBuildMap();
+      observeUnknownSenders();
+      // Re-fetcha kartan + re-scan periodiskt så nya trådar får namn
+      setInterval(async () => {
+        await fetchWorklistAndBuildMap();
+        // Forcera re-scan på alla kort genom att rensa shim-fixed-flag
+        document.querySelectorAll('.thread-card[data-shim-name-fixed]').forEach(c => delete c.dataset.shimNameFixed);
+        scanAndFixUnknownSenders();
+      }, 60000); // Var 60 sek
+    } catch (e) { console.warn('[fix-shim] okänd-avsändare-fix fel:', e); }
+    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare via worklist-API)');
   }
 })();
