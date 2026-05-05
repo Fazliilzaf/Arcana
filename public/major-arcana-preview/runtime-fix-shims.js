@@ -377,6 +377,101 @@
   }
 
   // ============================================================
+  // P1-4: Live-räknare i topbar (preview-live-pill)
+  // ============================================================
+  //
+  // Pill defaultar till "Demo" (gul). När live-data finns visar pill
+  // "Live · N" (grön/teal) där N = antal trådar i nuvarande lista.
+  // Live-tillstånd avgörs av:
+  //   1. window.__ccoWorkspace?.getState?.()?.runtime?.live === true, ELLER
+  //   2. det finns minst 1 .thread-card i DOM (= preview har laddat riktig data)
+
+  let livePillTimer = null;
+  let lastPillSig = '';
+
+  function detectLiveState() {
+    let isLive = false;
+    let threadCount = 0;
+    try {
+      const ws = window.__ccoWorkspace;
+      if (ws && typeof ws.getState === 'function') {
+        const st = ws.getState();
+        const runtime = st?.runtime || {};
+        if (runtime.live === true || runtime.mode === 'live') isLive = true;
+        if (Array.isArray(runtime.threads)) {
+          threadCount = runtime.threads.length;
+          if (threadCount > 0) isLive = true;
+        } else if (Array.isArray(st?.threads)) {
+          threadCount = st.threads.length;
+        }
+      }
+    } catch (e) { /* tyst */ }
+
+    // Räkna .thread-card i DOM som fallback / bekräftelse
+    const domCount = document.querySelectorAll('.thread-card').length;
+    if (domCount > 0) {
+      isLive = true;
+      threadCount = Math.max(threadCount, domCount);
+    }
+
+    // Om mailboxar är valda och token finns men inga trådar — fortfarande "Live · 0"
+    // istället för Demo, så användaren förstår att det är riktig data men tomt.
+    try {
+      const token = localStorage.getItem('ARCANA_ADMIN_TOKEN');
+      const mailboxes = localStorage.getItem(LS_KEY_SELECTED);
+      if (token && mailboxes && JSON.parse(mailboxes)?.length > 0) {
+        isLive = true;
+      }
+    } catch (e) { /* tyst */ }
+
+    return { isLive, threadCount };
+  }
+
+  function updateLivePill() {
+    const pill = document.getElementById('preview-live-status');
+    if (!pill) return;
+
+    const { isLive, threadCount } = detectLiveState();
+    const labelEl = pill.querySelector('.preview-live-pill-label');
+    if (!labelEl) return;
+
+    const newLabel = isLive ? `Live · ${threadCount}` : 'Demo';
+    const newDemoClass = !isLive;
+    const sig = `${newLabel}|${newDemoClass}`;
+    if (sig === lastPillSig) return;
+    lastPillSig = sig;
+
+    labelEl.textContent = newLabel;
+    pill.classList.toggle('preview-live-pill--demo', newDemoClass);
+    pill.title = isLive
+      ? `Live-data — ${threadCount} tråd${threadCount === 1 ? '' : 'ar'} i kö`
+      : 'Demo-läge — välj mailboxar för att hämta live-data';
+  }
+
+  function bootstrapLivePill() {
+    // Initial uppdatering så pill inte sitter och säger "Demo" oändligt
+    updateLivePill();
+    // Snabb polling i början, sen lugnare
+    let ticks = 0;
+    livePillTimer = setInterval(() => {
+      ticks += 1;
+      updateLivePill();
+      if (ticks === 30) {
+        // Efter 30 snabba ticks (~30s) — sänk frekvensen
+        clearInterval(livePillTimer);
+        livePillTimer = setInterval(updateLivePill, 5000);
+      }
+    }, 1000);
+
+    // Lyssna också på custom events från app.js / shim
+    window.addEventListener('cco:state-change', updateLivePill);
+    window.addEventListener('cco:runtime-update', updateLivePill);
+    document.addEventListener('change', (e) => {
+      if (e.target?.type === 'checkbox') setTimeout(updateLivePill, 200);
+    }, true);
+  }
+
+  // ============================================================
   // Bootstrap
   // ============================================================
 
@@ -389,6 +484,7 @@
   async function init() {
     try { bootstrapMailboxPersistence(); } catch (e) { console.warn('[fix-shim] mailbox-persistens fel:', e); }
     try { bootstrapThreadCardClickFix(); } catch (e) { console.warn('[fix-shim] thread-card-click fel:', e); }
+    try { bootstrapLivePill(); } catch (e) { console.warn('[fix-shim] live-pill fel:', e); }
     try {
       // Fetcha worklist-API först så namn-kartan finns innan observer scannar
       await fetchWorklistAndBuildMap();
@@ -399,8 +495,9 @@
         // Forcera re-scan på alla kort genom att rensa shim-fixed-flag
         document.querySelectorAll('.thread-card[data-shim-name-fixed]').forEach(c => delete c.dataset.shimNameFixed);
         scanAndFixUnknownSenders();
+        updateLivePill();
       }, 60000); // Var 60 sek
     } catch (e) { console.warn('[fix-shim] okänd-avsändare-fix fel:', e); }
-    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare + thread-card-click)');
+    console.log('[fix-shim] runtime-fix-shims aktiv (mailbox-persistens + okänd-avsändare + thread-card-click + live-pill)');
   }
 })();
