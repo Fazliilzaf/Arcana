@@ -767,7 +767,11 @@
 }
 
 .queue-history-list[data-queue-list-mode="live"] {
-  display: grid;
+  /* FIX(v27.1): display: grid utan explicit grid-template-rows kraschar rendering
+     när listan har många children (>30). Cards collapsar till sub-pixel-höjd.
+     display: flex med flex-direction: column ger samma vertikala stacking utan bugg. */
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   padding: 0;
   border: 0;
@@ -779,6 +783,9 @@
   /* FIX7: hård isolering — varje kort är sin egen stacking-kontext så
      pseudo-element/transforms inte kan blöda upp i grannkortet vid 4+ mailboxar */
   isolation: isolate;
+}
+.queue-history-list[data-queue-list-mode="live"] > .thread-card {
+  flex: 0 0 auto;
 }
 
 /* FIX7: defensiv kort-isolering — säkerställ att varje thread-card är
