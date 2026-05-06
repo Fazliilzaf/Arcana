@@ -372,13 +372,16 @@ html.v3-skin-active .queue-history-list .thread-card .card-strip .meta .meta-dat
 
 /* Star-knapp som ::before på thread-card (klickbart-look) */
 html.v3-skin-active .queue-history-list .thread-card.thread-card.thread-card {
-  grid-template: "star rail body strip" / 24px 4px 1fr auto !important;
-  column-gap: 8px !important;
-  padding-left: 8px !important;
+  grid-template: "rail body strip" / 4px 1fr auto !important;
+  column-gap: 10px !important;
+  padding-left: 32px !important;
 }
 html.v3-skin-active .queue-history-list .thread-card::before {
   content: '';
-  grid-area: star;
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 22px;
   height: 22px;
   border-radius: 999px;
@@ -386,10 +389,9 @@ html.v3-skin-active .queue-history-list .thread-card::before {
   background-size: 14px 14px;
   background-position: center;
   background-repeat: no-repeat;
-  align-self: center;
-  justify-self: center;
   cursor: pointer;
   transition: background-color 120ms ease, transform 120ms ease;
+  z-index: 2;
 }
 html.v3-skin-active .queue-history-list .thread-card:hover::before {
   background-color: rgba(168,116,76,0.10);
