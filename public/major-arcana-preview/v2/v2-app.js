@@ -1,8 +1,8 @@
 /**
  * v2-app.js — HairTP Clinic CCO v2 Linear-style Inkorg
  *
- * MVP iteration 1:
- * - Sidebar: VYER + MAILBOXAR (7 dgn) + SYSTEM
+ * MVP iteration 1.1:
+ * - Sidebar: v1-bubble-pills VYER + MAILBOX-väljare + FILTER + SYSTEM
  * - Main: Inkorg-list med trådar (avatars, tags, tider)
  * - Höger: placeholder (kommer senare)
  *
@@ -20,39 +20,49 @@
     { key: 'marknad', label: 'Marknad', color: 'var(--v2-mbx-marknad)' },
   ];
 
+  // VYER — v1's bubble-pill design (14 vyer)
   const VIEWS = [
-    { key: 'inkorg', label: 'Inkorg', icon: '📥' },
-    { key: 'agera_nu', label: 'Agera nu', icon: '⚡' },
-    { key: 'sprint', label: 'Sprint', icon: '📈' },
-    { key: 'bokningar', label: 'Bokningar', icon: '📅' },
-    { key: 'granska', label: 'Granska', icon: '👁' },
-    { key: 'senare', label: 'Senare', icon: '⏸' },
-    { key: 'klara', label: 'Klara', icon: '✓' },
+    { key: 'all',       label: 'Alla',      color: 'orange' },
+    { key: 'agera_nu',  label: 'Agera nu',  color: 'pink' },
+    { key: 'sprint',    label: 'Sprint',    color: 'green' },
+    { key: 'senare',    label: 'Senare',    color: 'purple' },
+    { key: 'skickade',  label: 'Skickade',  color: 'cyan' },
+    { key: 'historik',  label: 'Historik',  color: 'indigo' },
+    { key: 'studio',    label: 'Studio',    color: 'green' },
+    { key: 'klar',      label: 'Klar',      color: 'green' },
+    { key: 'radera',    label: 'Radera',    color: 'red' },
+    { key: 'admin',     label: 'Admin',     color: 'blue' },
+    { key: 'granska',   label: 'Granska',   color: 'indigo' },
+    { key: 'oklart',    label: 'Oklart',    color: 'purple' },
+    { key: 'bokning',   label: 'Bokning',   color: 'cyan' },
+    { key: 'medicinsk', label: 'Medicinsk', color: 'red' },
+  ];
+
+  // FILTER — v1's bubble-pill design (5 filter)
+  const FILTERS = [
+    { key: 'follow_up', label: 'Uppfölj.', color: 'blue' },
+    { key: 'unowned',   label: 'Oägda',    color: 'orange' },
+    { key: 'high_risk', label: 'Hög risk', color: 'red' },
+    { key: 'today',     label: 'Idag',     color: 'pink' },
+    { key: 'tomorrow',  label: 'Imorgon',  color: 'pink' },
   ];
 
   const SYSTEM_LINKS = [
-    { key: 'kunder', label: 'Kunder', icon: '👥', shortcut: '⌘8' },
-    { key: 'automatisering', label: 'Automatisering', icon: '⚡', shortcut: '⌘9' },
-    { key: 'analys', label: 'Analys', icon: '📊' },
-    { key: 'mallar', label: 'Mallar', icon: '📋' },
-  ];
-
-  const FILTERS = [
-    { key: 'all', label: 'Alla' },
-    { key: 'unread', label: 'Olästa' },
-    { key: 'mine', label: 'Mina' },
-    { key: 'high_risk', label: 'Hög risk' },
-    { key: 'today', label: 'Idag' },
+    { key: 'kunder',           label: 'Kunder',          icon: '👥', shortcut: '⌘8' },
+    { key: 'automatisering',   label: 'Automatisering',  icon: '⚡', shortcut: '⌘9' },
+    { key: 'analys',           label: 'Analys',          icon: '📊' },
+    { key: 'mallar',           label: 'Mallar',          icon: '📋' },
   ];
 
   const state = {
-    activeView: 'inkorg',
-    activeFilter: 'all',
+    activeView: 'all',
+    activeFilter: null, // INGEN aktiv filter som standard — FILTER är toggles
     selectedThreadId: null,
+    selectedMailboxKeys: ['egzona'], // default: Egzona vald
     threads: [],
     mailboxCounts: {},
     isLive: false,
-    sortBy: 'newest', // newest | oldest | priority
+    sortBy: 'newest',
     user: { name: 'Fazli Krasniqi', email: 'info@fazli.se', initials: 'FK' },
   };
 
@@ -105,7 +115,6 @@
   function buildMailboxCounts(rows) {
     const counts = {};
     DEFAULT_MAILBOXES.forEach(m => counts[m.key] = 0);
-    // Senaste 7 dagar
     const now = Date.now();
     const cutoff = now - 7 * 24 * 60 * 60 * 1000;
     rows.forEach(row => {
@@ -121,16 +130,27 @@
   }
 
   function buildViewCounts(rows) {
-    const counts = { inkorg: rows.length };
+    // v1-mappning: alla 14 vyer
+    const counts = {};
+    VIEWS.forEach(v => counts[v.key] = 0);
+    counts.all = rows.length;
+
     const laneMap = {
       'act-now': 'agera_nu', 'agera_nu': 'agera_nu', 'now': 'agera_nu',
       'sprint': 'sprint',
-      'booking': 'bokningar', 'bokning': 'bokningar',
-      'review': 'granska', 'granska': 'granska',
       'later': 'senare', 'senare': 'senare', 'snooze': 'senare',
-      'done': 'klara', 'klar': 'klara', 'complete': 'klara',
+      'sent': 'skickade', 'skickade': 'skickade',
+      'history': 'historik', 'historik': 'historik',
+      'studio': 'studio',
+      'done': 'klar', 'klar': 'klar', 'complete': 'klar',
+      'trash': 'radera', 'delete': 'radera', 'radera': 'radera',
+      'admin': 'admin',
+      'review': 'granska', 'granska': 'granska',
+      'unclear': 'oklart', 'oklart': 'oklart',
+      'booking': 'bokning', 'bokning': 'bokning',
+      'medical': 'medicinsk', 'medicinsk': 'medicinsk',
     };
-    VIEWS.forEach(v => { if (v.key !== 'inkorg') counts[v.key] = 0; });
+
     rows.forEach(row => {
       const lane = String(row?.lane || row?.laneId || '').toLowerCase();
       const mappedView = laneMap[lane];
@@ -143,11 +163,10 @@
 
   function buildFilterCounts(rows) {
     const counts = {
-      all: rows.length,
-      unread: rows.filter(r => r?.isUnread || r?.unread || r?.unreadInbound).length,
-      mine: rows.filter(r => {
+      follow_up: rows.filter(r => r?.followUpDueAt || r?.followUpSuggestedAt).length,
+      unowned: rows.filter(r => {
         const owner = String(r?.ownerEmail || r?.assignedTo || '').toLowerCase();
-        return owner.includes(state.user.email.toLowerCase());
+        return !owner;
       }).length,
       high_risk: rows.filter(r => {
         const risk = String(r?.riskLevel || r?.dominantRisk || r?.slaStatus || '').toLowerCase();
@@ -159,6 +178,14 @@
         const d = new Date(ts);
         const today = new Date();
         return d.toDateString() === today.toDateString();
+      }).length,
+      tomorrow: rows.filter(r => {
+        const ts = r?.followUpDueAt || r?.followUpSuggestedAt;
+        if (!ts) return false;
+        const d = new Date(ts);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        return d.toDateString() === tomorrow.toDateString();
       }).length,
     };
     return counts;
@@ -191,7 +218,7 @@
       const time = d.toTimeString().slice(0,5);
       tags.push({ key: 'snooze', icon: '💤', label: `Snooze ${day} ${time}` });
     }
-    return tags.slice(0, 2); // max 2 tags
+    return tags.slice(0, 2);
   }
 
   function deriveAvatarInitials(name) {
@@ -216,9 +243,7 @@
     if (isNaN(d.getTime())) return '';
     const now = new Date();
     const sameDay = d.toDateString() === now.toDateString();
-    if (sameDay) {
-      return d.toTimeString().slice(0, 5);
-    }
+    if (sameDay) return d.toTimeString().slice(0, 5);
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) return 'Igår';
@@ -247,6 +272,13 @@
     return local.replace(/[._-]+/g, ' ').split(' ').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   }
 
+  function getMailboxLabel() {
+    if (!state.selectedMailboxKeys.length) return 'Alla mailboxar';
+    const first = DEFAULT_MAILBOXES.find(m => m.key === state.selectedMailboxKeys[0]);
+    const extra = state.selectedMailboxKeys.length - 1;
+    return `Hair TP Clinic — ${first?.label || '?'}${extra > 0 ? ` +${extra}` : ''}`;
+  }
+
   // ============================================================
   // Rendering
   // ============================================================
@@ -256,49 +288,81 @@
     if (!sidebar) return;
 
     const viewCounts = buildViewCounts(state.threads);
-    const sidebarHtml = [];
+    const filterCounts = buildFilterCounts(state.threads);
+    const html = [];
+
+    // Brand-rad
+    html.push(
+      `<div class="v2-sidebar-brand">` +
+      `<span class="v2-brand-mark">HT</span>` +
+      `<span class="v2-brand-name">HairTP Clinic</span>` +
+      `</div>`
+    );
 
     // VYER
-    sidebarHtml.push('<div class="v2-sidebar-section">');
-    sidebarHtml.push('<div class="v2-sidebar-section-title">Vyer</div>');
+    html.push('<div class="v2-sidebar-section">');
+    html.push('<div class="v2-sidebar-section-title">Vyer</div>');
+    html.push('<div class="v2-pill-list">');
     VIEWS.forEach(v => {
       const isActive = state.activeView === v.key;
       const count = viewCounts[v.key] ?? 0;
-      sidebarHtml.push(
-        `<div class="v2-sidebar-item ${isActive ? 'is-active' : ''}" data-view="${v.key}">` +
-        `<span class="v2-sidebar-item-icon">${v.icon}</span>` +
-        `<span class="v2-sidebar-item-label">${v.label}</span>` +
-        `<span class="v2-sidebar-item-count">${count}</span>` +
-        `</div>`
+      html.push(
+        `<button type="button" class="v2-pill ${isActive ? 'is-active' : ''}" data-color="${v.color}" data-view="${v.key}">` +
+        `<span class="v2-pill-label">${v.label}</span>` +
+        `<span class="v2-pill-count">${count}</span>` +
+        `</button>`
       );
     });
-    sidebarHtml.push('</div>');
+    html.push('</div></div>');
 
-    // MAILBOXAR · 7 DGN
-    sidebarHtml.push('<div class="v2-sidebar-section">');
-    sidebarHtml.push('<div class="v2-sidebar-section-title">Mailboxar · 7 dgn<span class="v2-sidebar-section-title-add" title="Lägg till mailbox">+</span></div>');
-    const maxCount = Math.max(1, ...Object.values(state.mailboxCounts));
+    // MAILBOX-VÄLJARE
+    html.push('<div class="v2-sidebar-section">');
+    html.push('<div class="v2-sidebar-section-title">Mailbox</div>');
+    html.push(
+      `<button type="button" class="v2-mailbox-selector" data-mailbox-selector>` +
+      `<span class="v2-mailbox-selector-icon">📬</span>` +
+      `<span class="v2-mailbox-selector-label">${escapeHtml(getMailboxLabel())}</span>` +
+      `<span class="v2-mailbox-selector-caret">▾</span>` +
+      `</button>`
+    );
+
+    // mailbox dropdown (alltid synlig som lista, kompakt)
+    html.push('<div class="v2-mailbox-list">');
     DEFAULT_MAILBOXES.forEach(m => {
       const count = state.mailboxCounts[m.key] || 0;
-      const barWidth = Math.max(8, Math.round((count / maxCount) * 100));
-      sidebarHtml.push(
-        `<div class="v2-mailbox-row" data-mailbox="${m.key}" style="--mbx-color:${m.color};--mbx-bar-width:${barWidth}%">` +
-        `<div class="v2-mailbox-row-head">` +
+      const isSelected = state.selectedMailboxKeys.includes(m.key);
+      html.push(
+        `<div class="v2-mailbox-row ${isSelected ? 'is-selected' : ''}" data-mailbox="${m.key}" style="--mbx-color:${m.color}">` +
         `<span class="v2-mailbox-dot"></span>` +
         `<span class="v2-mailbox-name">${m.label}</span>` +
         `<span class="v2-mailbox-count">${count}</span>` +
-        `</div>` +
-        `<div class="v2-mailbox-bar"></div>` +
         `</div>`
       );
     });
-    sidebarHtml.push('</div>');
+    html.push('</div>');
+    html.push('</div>');
+
+    // FILTER
+    html.push('<div class="v2-sidebar-section">');
+    html.push('<div class="v2-sidebar-section-title">Filter</div>');
+    html.push('<div class="v2-pill-list">');
+    FILTERS.forEach(f => {
+      const isActive = state.activeFilter === f.key;
+      const count = filterCounts[f.key] ?? 0;
+      html.push(
+        `<button type="button" class="v2-pill ${isActive ? 'is-active' : ''}" data-color="${f.color}" data-filter="${f.key}">` +
+        `<span class="v2-pill-label">${f.label}</span>` +
+        `<span class="v2-pill-count">${count}</span>` +
+        `</button>`
+      );
+    });
+    html.push('</div></div>');
 
     // SYSTEM
-    sidebarHtml.push('<div class="v2-sidebar-section">');
-    sidebarHtml.push('<div class="v2-sidebar-section-title">System</div>');
+    html.push('<div class="v2-sidebar-section">');
+    html.push('<div class="v2-sidebar-section-title">System</div>');
     SYSTEM_LINKS.forEach(s => {
-      sidebarHtml.push(
+      html.push(
         `<div class="v2-sidebar-item" data-system="${s.key}">` +
         `<span class="v2-sidebar-item-icon">${s.icon}</span>` +
         `<span class="v2-sidebar-item-label">${s.label}</span>` +
@@ -306,10 +370,10 @@
         `</div>`
       );
     });
-    sidebarHtml.push('</div>');
+    html.push('</div>');
 
-    // User-info längst ner
-    sidebarHtml.push(
+    // User
+    html.push(
       `<div class="v2-sidebar-user">` +
       `<div class="v2-user-avatar">${state.user.initials}</div>` +
       `<div class="v2-user-info">` +
@@ -319,9 +383,9 @@
       `</div>`
     );
 
-    sidebar.innerHTML = sidebarHtml.join('');
+    sidebar.innerHTML = html.join('');
 
-    // Wire up click handlers
+    // Wire up
     sidebar.querySelectorAll('[data-view]').forEach(el => {
       el.addEventListener('click', () => {
         state.activeView = el.dataset.view;
@@ -329,9 +393,25 @@
         renderMain();
       });
     });
+    sidebar.querySelectorAll('[data-filter]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.activeFilter = state.activeFilter === el.dataset.filter ? null : el.dataset.filter;
+        renderSidebar();
+        renderMain();
+      });
+    });
+    sidebar.querySelectorAll('[data-mailbox]').forEach(el => {
+      el.addEventListener('click', () => {
+        const k = el.dataset.mailbox;
+        const i = state.selectedMailboxKeys.indexOf(k);
+        if (i >= 0) state.selectedMailboxKeys.splice(i, 1);
+        else state.selectedMailboxKeys.push(k);
+        renderSidebar();
+        renderMain();
+      });
+    });
     sidebar.querySelectorAll('[data-system]').forEach(el => {
       el.addEventListener('click', () => {
-        // TODO: navigera till respektive vy
         console.log('[v2] system link clicked:', el.dataset.system);
       });
     });
@@ -342,23 +422,19 @@
     if (!main) return;
 
     const visibleThreads = applyViewAndFilter(state.threads);
-    const filterCounts = buildFilterCounts(visibleThreads.beforeFilter);
 
     const headerHtml = (
       `<div class="v2-main-header">` +
       `<div class="v2-main-header-row">` +
       `<h1 class="v2-main-title">` +
-      `${VIEWS.find(v => v.key === state.activeView)?.label || 'Inkorg'}` +
+      `${VIEWS.find(v => v.key === state.activeView)?.label || 'Alla'}` +
       `<span class="v2-main-subtitle">${visibleThreads.afterFilter.length} trådar idag</span>` +
       `</h1>` +
       `<span class="v2-live-pill"><span class="v2-live-pill-dot"></span>${state.isLive ? 'LIVE' : 'Demo'}</span>` +
       `</div>` +
-      `<div class="v2-filters-row">` +
-      FILTERS.map(f =>
-        `<div class="v2-filter-chip ${state.activeFilter === f.key ? 'is-active' : ''}" data-filter="${f.key}">` +
-        `${f.label}<span class="v2-filter-chip-count">${filterCounts[f.key] ?? 0}</span>` +
-        `</div>`
-      ).join('') +
+      `<div class="v2-main-meta">` +
+      `<span class="v2-main-meta-item"><span class="v2-main-meta-dot"></span>${escapeHtml(getMailboxLabel())}</span>` +
+      (state.activeFilter ? `<span class="v2-main-meta-item v2-main-meta-filter">Filter: ${FILTERS.find(f => f.key === state.activeFilter)?.label}</span>` : '') +
       `<button class="v2-sort-button" type="button" data-sort-toggle>≡ Nyaste ▾</button>` +
       `</div>` +
       `</div>`
@@ -413,13 +489,6 @@
 
     main.innerHTML = headerHtml + listHtml;
 
-    // Wire up
-    main.querySelectorAll('[data-filter]').forEach(el => {
-      el.addEventListener('click', () => {
-        state.activeFilter = el.dataset.filter;
-        renderMain();
-      });
-    });
     main.querySelectorAll('[data-thread-id]').forEach(el => {
       el.addEventListener('click', () => {
         state.selectedThreadId = el.dataset.threadId;
@@ -430,16 +499,32 @@
   }
 
   function applyViewAndFilter(allThreads) {
-    // Steg 1: filter by view
     let filtered = allThreads.slice();
-    if (state.activeView !== 'inkorg') {
+
+    // Mailbox-filter
+    if (state.selectedMailboxKeys.length > 0 && state.selectedMailboxKeys.length < DEFAULT_MAILBOXES.length) {
+      filtered = filtered.filter(r => {
+        const k = getMailboxKey(r);
+        return k && state.selectedMailboxKeys.includes(k);
+      });
+    }
+
+    // Vy-filter
+    if (state.activeView !== 'all') {
       const viewLaneMap = {
-        agera_nu: ['act-now', 'agera_nu', 'now'],
-        sprint: ['sprint'],
-        bokningar: ['booking', 'bokning'],
-        granska: ['review', 'granska'],
-        senare: ['later', 'senare', 'snooze'],
-        klara: ['done', 'klar', 'complete'],
+        agera_nu:  ['act-now', 'agera_nu', 'now'],
+        sprint:    ['sprint'],
+        senare:    ['later', 'senare', 'snooze'],
+        skickade:  ['sent', 'skickade'],
+        historik:  ['history', 'historik'],
+        studio:    ['studio'],
+        klar:      ['done', 'klar', 'complete'],
+        radera:    ['trash', 'delete', 'radera'],
+        admin:     ['admin'],
+        granska:   ['review', 'granska'],
+        oklart:    ['unclear', 'oklart'],
+        bokning:   ['booking', 'bokning'],
+        medicinsk: ['medical', 'medicinsk'],
       };
       const lanes = viewLaneMap[state.activeView] || [];
       filtered = filtered.filter(r => {
@@ -447,14 +532,16 @@
         return lanes.includes(lane);
       });
     }
+
     const beforeFilter = filtered.slice();
-    // Steg 2: filter by chip
-    if (state.activeFilter === 'unread') {
-      filtered = filtered.filter(r => r?.isUnread || r?.unread || r?.unreadInbound);
-    } else if (state.activeFilter === 'mine') {
+
+    // Pill-filter (toggle)
+    if (state.activeFilter === 'follow_up') {
+      filtered = filtered.filter(r => r?.followUpDueAt || r?.followUpSuggestedAt);
+    } else if (state.activeFilter === 'unowned') {
       filtered = filtered.filter(r => {
         const owner = String(r?.ownerEmail || r?.assignedTo || '').toLowerCase();
-        return owner.includes(state.user.email.toLowerCase());
+        return !owner;
       });
     } else if (state.activeFilter === 'high_risk') {
       filtered = filtered.filter(r => {
@@ -468,8 +555,17 @@
         const d = new Date(ts);
         return d.toDateString() === new Date().toDateString();
       });
+    } else if (state.activeFilter === 'tomorrow') {
+      filtered = filtered.filter(r => {
+        const ts = r?.followUpDueAt || r?.followUpSuggestedAt;
+        if (!ts) return false;
+        const d = new Date(ts);
+        const tom = new Date(); tom.setDate(tom.getDate() + 1);
+        return d.toDateString() === tom.toDateString();
+      });
     }
-    // Steg 3: sort
+
+    // Sort
     filtered.sort((a, b) => {
       const ta = new Date(a?.timing?.lastInboundAt || a?.timing?.lastActivityAt || a?.updatedAt || 0).getTime();
       const tb = new Date(b?.timing?.lastInboundAt || b?.timing?.lastActivityAt || b?.updatedAt || 0).getTime();
@@ -491,7 +587,6 @@
       intel.innerHTML = `<div class="v2-intel-empty">Tråden hittades inte.</div>`;
       return;
     }
-    // MVP: enkel info — höger panel kommer integreras med v1's full intel-panel senare
     intel.innerHTML = `<div class="v2-intel-empty">Kundintelligens kommer i nästa iteration. Tråd: ${escapeHtml(getCustomerName(thread))}</div>`;
   }
 
@@ -522,12 +617,10 @@
     renderBackToV1();
     document.getElementById('v2-app').dataset.v2State = 'loading';
 
-    // Initial render med tom state
     renderSidebar();
     document.getElementById('v2-main').innerHTML = `<div class="v2-loading">Laddar trådar…</div>`;
     renderIntel();
 
-    // Hämta data
     const rows = await fetchWorklist();
     state.threads = rows;
     state.mailboxCounts = buildMailboxCounts(rows);
@@ -537,7 +630,6 @@
     renderSidebar();
     renderMain();
 
-    // Refresha var 60 sek
     setInterval(async () => {
       const rows = await fetchWorklist();
       if (rows.length > 0) {
@@ -549,7 +641,7 @@
       }
     }, 60000);
 
-    console.log('[v2] CCO v2 inkorg klar. Trådar:', rows.length);
+    console.log('[v2] CCO v2 inkorg klar (v1-bubbles). Trådar:', rows.length);
   }
 
   if (document.readyState === 'loading') {
