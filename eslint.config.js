@@ -277,6 +277,30 @@ module.exports = [
     },
   },
   {
+    /* Personalportalens fristående skript (WP-002/007/008b/010).
+       De är UMD: körs i webbläsaren men exporterar via module.exports så att
+       testerna kan require:a de rena renderfunktionerna. Utan en regel föll
+       de igenom till standardläget — inga globaler, sourceType module — och
+       gav 40+ no-undef på module, window och fetch.
+
+       Det märktes inte förrän någon rörde dem, eftersom lint-staged bara
+       lintar STAGED filer: de fyra kom in i main utan att någon gång ha
+       passerat grinden. staff-portal-session.js och -role-management.js
+       råkade passera för att de aldrig nämner module eller window på
+       toppnivå — ett sammanträffande, inte en regel.
+
+       Samma form som public/app.js-blocket ovan. */
+    files: ['public/staff-portal-*.js', 'public/staff-agent-*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: {
+        ...globals.browser,
+        ...globals.commonjs,
+      },
+    },
+  },
+  {
     files: ['public/admin/**/*.js', 'public/admin.js'],
     languageOptions: {
       ecmaVersion: 2022,

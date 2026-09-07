@@ -51,31 +51,59 @@
       return Object.prototype.hasOwnProperty.call(AGENT_WORKSPACES, a);
     });
     if (!known.length) {
-      return '<div class="workspaces-empty">Du har ännu inga tilldelade AI-arbetsytor.</div>';
+      // "Du har ännu inga…" började med Du och matchade inte portalens
+      // TOMMONSTER (/^(inga |inget |ingen |alla |tomt|—|inte )/i), så
+      // beskedet fick aldrig .tomt-tillstand. Formen på meningen är alltså
+      // funktionell här, inte bara stilistisk.
+      return '<div class="live-note workspaces-empty">Inga AI-arbetsytor är tilldelade ännu.</div>';
     }
-    return ORDER
-      .filter(function (a) { return known.indexOf(a) !== -1; })
+    return ORDER.filter(function (a) {
+      return known.indexOf(a) !== -1;
+    })
       .map(function (a) {
         var ws = AGENT_WORKSPACES[a];
         if (!ws.href) {
           return (
-            '<div class="workspace-card workspace-card--soon" data-agent="' + esc(a) + '">' +
-            '<span class="workspace-label">' + esc(ws.label) + '</span>' +
+            '<div class="workspace-card workspace-card--soon" data-agent="' +
+            esc(a) +
+            '">' +
+            '<span class="workspace-label">' +
+            esc(ws.label) +
+            '</span>' +
             '<span class="workspace-soon">Kommer snart</span></div>'
           );
         }
         return (
-          '<a class="workspace-card" data-agent="' + esc(a) + '" href="' + esc(ws.href) + '">' +
-          '<span class="workspace-label">' + esc(ws.label) + '</span></a>'
+          '<a class="workspace-card" data-agent="' +
+          esc(a) +
+          '" href="' +
+          esc(ws.href) +
+          '">' +
+          '<span class="workspace-label">' +
+          esc(ws.label) +
+          '</span></a>'
         );
       })
       .join('');
   }
 
   function readToken() {
+    // `root` var UMD-omslutningens parameter, inte fabrikens. Inuti den här
+    // funktionen fanns namnet aldrig, så raden kastade ReferenceError vid
+    // varje anrop — tyst uppäten av catch:en nedanför. Följden: token blev
+    // alltid tom sträng, anropet till entitlement-API:t gick utan
+    // x-auth-token, svarade 401, och panelen visade "Inga AI-arbetsytor"
+    // oavsett vad ägaren faktiskt hade delat ut.
+    //
+    // Hittat av eslint (no-undef) när filen för första gången kom att
+    // lintas — den och tre systerfiler låg i main utan att någon gång ha
+    // passerat grinden, eftersom lint-staged bara lintar STAGED filer.
     try {
-      if (root && root.localStorage) return root.localStorage.getItem(TOKEN_KEY) || '';
-    } catch (e) { /* ignore */ }
+      var g = typeof window !== 'undefined' ? window : globalThis;
+      if (g && g.localStorage) return g.localStorage.getItem(TOKEN_KEY) || '';
+    } catch {
+      /* localStorage kan kasta i privat läge — tom token duger */
+    }
     return '';
   }
 
@@ -86,7 +114,10 @@
     if (token) headers['x-auth-token'] = token;
     fetch('/api/v1/staff/agent-entitlements/me', { headers: headers })
       .then(function (r) {
-        if (!r.ok) { container.innerHTML = renderWorkspacesHtml([]); return null; }
+        if (!r.ok) {
+          container.innerHTML = renderWorkspacesHtml([]);
+          return null;
+        }
         return r.json();
       })
       .then(function (body) {

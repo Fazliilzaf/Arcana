@@ -37,6 +37,16 @@
         --text3: #6e675d;
         --border: rgba(var(--brand-rgb), 0.1);
         --surface: rgba(255, 255, 255, 0.88);
+        /* NOT, så nästa agent inte gör om felet: här låg en stund tre tokens
+           lånade ur CEO-designfacit (--serif Iowan/Palatino, --accent2 #e0729d
+           och facits stora skugga). De togs bort igen samma dag.
+
+           Facit är formspråket för CEO-vyn. Personalportalen är genomgående
+           sans med de fyra djuptokens som sitt eget språk. Att plocka in en
+           serif på två sektioner gjorde inte portalen varmare — den fick två
+           röster, och ägaren såg det direkt på en skärmbild. Vill man byta
+           typografi är det ett pass över hela filen, inte ett lån i en
+           bisats. */
         --rose-top: rgba(252, 233, 240, 0.98);
         --rose-bot: rgba(241, 207, 220, 0.95);
         --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 241, 236, 0.86));
@@ -3089,6 +3099,697 @@
           order: 3;
         }
       }
+      /* ══ Personal & roller · Godkännanden · Arbetsytor ═══════════════
+         Dessa tre sektioner kom in med P0-004 och WP-002/007/008b/010 och
+         hade noll rader stil. Inte "enkel" stil — noll. Webbläsarens
+         standardutseende på input, select och checkbox mitt i en portal där
+         allt annat bär ORD-242:s djupspråk. Det var därför de stack ut.
+
+         Ingenting nytt uppfinns här. Recepten är portalens egna:
+         upphöjt kort = --djup-mellan, allt som ligger INUTI ett kort sänks
+         med --djup-nedsankt (T-203), färg via --ton, aldrig en hex. */
+
+      .rm-panel,
+      #staff-approvals,
+      .agent-workspaces {
+        gap: 12px;
+      }
+
+      /* ── Bjud in ny personal ──────────────────────────────────────
+         Ett upphöjt kort, för det är en handling. Fälten sänks ner i det,
+         eftersom de ligger inuti. Samma inversion som resten av portalen. */
+      .rm-invite-form {
+        display: grid;
+        /* Tre fält plus knapp på EN rad så länge det får plats. Vid 720px
+           staplade den förut till fyra fullbreda grå lådor ovanpå varandra
+           — en vägg av kontroller för en handling man gör sällan. Nu bryter
+           den i två steg: fälten delar rad, knappen får sin egen. */
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, auto) auto;
+        gap: 10px 12px;
+        align-items: end;
+        padding: 14px;
+        border-radius: 16px;
+        background: var(--card-bg);
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow: var(--djup-mellan);
+      }
+
+      .rm-invite-form input,
+      .rm-invite-form select,
+      .rm-role-select {
+        /* ORD-239: 44px träffyta. Ett rollbyte görs med tummen i en klinik,
+           inte med musen vid ett skrivbord. */
+        min-height: 44px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        font-size: var(--txt-liten);
+        font-weight: 600;
+        color: var(--brand);
+        font-family: inherit;
+      }
+
+      .rm-invite-form input::placeholder {
+        color: var(--text3);
+        font-weight: 500;
+      }
+
+      .rm-invite-form input:focus-visible,
+      .rm-invite-form select:focus-visible,
+      .rm-role-select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* Primärknappen följer portalens egen .btn.primary — samma gröna, samma
+         --djup-lyft. Den bar en stund facits rosgradient, men portalens
+         primära handling ÄR grön överallt annars, och en avvikande knapp på
+         en enda yta läser som en bugg, inte som betoning. */
+      .rm-invite-form button[type='submit'] {
+        --ton: var(--sage-rgb);
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: var(--sage);
+        color: rgba(255, 255, 255, 0.97);
+        box-shadow: var(--djup-lyft);
+        font-size: var(--txt-liten);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      /* ── Ett kort per person ──────────────────────────────────────
+         Samma anatomi som godkännandekortet, för det är den som känns hel:
+         färgat monogram · rubrik · metarad · en rad piller som säger vad
+         saken ÄR · hopfälld handling · statuspill i handlingskolumnen.
+
+         Vägen hit gick via två fel. Först ett .item-card med sex
+         alltid-öppna kryssrutor — 500 px per person, nio tiondelar
+         kontroller. Sedan en .doc-row, som blev kompakt men tunn: en
+         namnremsa utan innehåll.
+
+         Det som gör godkännandekortet helt är pillerraden. Den säger
+         COMMIT · WRITE · TESTER GRÖNA innan man klickat någonstans. Samma
+         sak för en person är vilka arbetsytor hen har — och de låg gömda
+         bakom en utfällning. Nu står de på kortet. */
+      /* INGET flex-wrap. Jag satte det först av gammal vana och då sköts
+         rollpillret ner till kortets fot i stället för upp bredvid
+         e-posten — kortet fick två fötter och ingen topp. Kroppen tar
+         resten av bredden, pillret står kvar i ögonhöjd. */
+      .rm-row > .item-body {
+        flex: 1;
+        min-width: 0;
+      }
+
+      /* Rollpillret hör till identiteten och ska stå i ögonhöjd med
+         e-posten, inte sjunka till kortets fot. .item-actions är
+         flex-end i grundreceptet eftersom knappar hör hemma längst ner —
+         men det här är en etikett, inte en knapp. */
+      .rm-row > .item-actions {
+        align-self: flex-start;
+        flex: none;
+      }
+
+      .rm-piller {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      /* Arbetsytepillren bär agentens kulör, samma sex som överallt annars. */
+      .rm-ytpill[data-agent='CEO'] {
+        --pill-ton: var(--accent-rgb);
+      }
+      .rm-ytpill[data-agent='CCO'] {
+        --pill-ton: var(--info-rgb);
+      }
+      .rm-ytpill[data-agent='CFO'] {
+        --pill-ton: var(--sage-rgb);
+      }
+      .rm-ytpill[data-agent='CMO'] {
+        --pill-ton: var(--violet-rgb);
+      }
+      .rm-ytpill[data-agent='CAO'] {
+        --pill-ton: var(--amber-rgb);
+      }
+      .rm-ytpill[data-agent='COO'] {
+        --pill-ton: var(--danger-rgb);
+      }
+
+      .rm-ytpill {
+        --pill-ton: var(--brand-rgb);
+        border-color: rgba(var(--pill-ton), 0.38);
+        background: rgba(var(--pill-ton), 0.1);
+        color: rgba(var(--pill-ton), 1);
+      }
+
+      /* Ingen tilldelning är ett sant och vanligt läge, inte ett fel. Det
+         ska synas som frånvaro — nedsänkt och tyst, inte som en varning. */
+      .rm-ytpill--tom {
+        border-color: transparent;
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        color: var(--text3);
+      }
+
+      /* Monogrammet bär rollens kulör via --cc-rgb, samma kanal som
+         .item-icon redan läser och som godkännandekortet använder. */
+      .rm-row[data-roll='OWNER'] {
+        --cc-rgb: var(--accent-rgb);
+      }
+      .rm-row[data-roll='KONSULT'] {
+        --cc-rgb: var(--info-rgb);
+      }
+      .rm-row[data-roll='PERSONAL'] {
+        --cc-rgb: var(--sage-rgb);
+      }
+      .rm-row[data-roll='FINANCE'] {
+        --cc-rgb: var(--amber-rgb);
+      }
+      .rm-row[data-roll='REVISOR'] {
+        --cc-rgb: var(--violet-rgb);
+      }
+
+      .rm-monogram {
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        color: rgba(var(--cc-rgb, var(--brand-rgb)), 1);
+      }
+
+      .rm-email {
+        overflow-wrap: anywhere;
+      }
+
+      /* Rollpillret ärver kulör ur rollen — samma sex som agenterna, så en
+         blick räcker för att se vem som är vad i en lista på tolv. */
+      .rm-row[data-roll='OWNER'] .rm-rollpill {
+        --pill-ton: var(--accent-rgb);
+      }
+      .rm-row[data-roll='KONSULT'] .rm-rollpill {
+        --pill-ton: var(--info-rgb);
+      }
+      .rm-row[data-roll='PERSONAL'] .rm-rollpill {
+        --pill-ton: var(--sage-rgb);
+      }
+      .rm-row[data-roll='FINANCE'] .rm-rollpill {
+        --pill-ton: var(--amber-rgb);
+      }
+      .rm-row[data-roll='REVISOR'] .rm-rollpill {
+        --pill-ton: var(--violet-rgb);
+      }
+
+      .rm-rollpill {
+        --pill-ton: var(--brand-rgb);
+        border-color: rgba(var(--pill-ton), 0.4);
+        background: rgba(var(--pill-ton), 0.1);
+        color: rgba(var(--pill-ton), 1);
+      }
+
+      /* Utfällningen ligger i item-body och behöver ingen egen bredd. */
+      .rm-andra {
+        display: block;
+      }
+
+      /* ── Utfällbart, en gång för alla tre ────────────────────────
+         "Ändra" utan pil är bara ett ord — ägaren läste det som en etikett
+         och inte som något klickbart, vilket det såg ut som eftersom
+         webbläsarens egen triangel är dold av list-style: none.
+
+         Portalen hade noll <details> före det här, så det finns inget
+         befintligt mönster att ärva. Regeln gäller därför alla tre på en
+         gång: rollbytet, arbetsytorna och godkännandekortets teknik. */
+      .rm-andra > summary,
+      .rm-ytor > summary,
+      .approval-teknik > summary {
+        cursor: pointer;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        list-style: none;
+        font-size: var(--txt-etikett);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--text3);
+      }
+
+      /* Safari ritar en egen triangel via ::-webkit-details-marker som
+         list-style: none inte tar bort. */
+      .rm-andra > summary::-webkit-details-marker,
+      .rm-ytor > summary::-webkit-details-marker,
+      .approval-teknik > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .rm-andra > summary::before,
+      .rm-ytor > summary::before,
+      .approval-teknik > summary::before {
+        content: '';
+        flex: none;
+        width: 7px;
+        height: 7px;
+        border-right: 1.5px solid currentColor;
+        border-bottom: 1.5px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 0.15s ease;
+      }
+
+      .rm-andra[open] > summary::before,
+      .rm-ytor[open] > summary::before,
+      .approval-teknik[open] > summary::before {
+        transform: rotate(45deg);
+      }
+
+      /* ORD-244 §4 — den som stängt av rörelse ska inte få en snurrande pil. */
+      @media (prefers-reduced-motion: reduce) {
+        .rm-andra > summary::before,
+        .rm-ytor > summary::before,
+        .approval-teknik > summary::before {
+          transition: none;
+        }
+      }
+
+      .rm-andra > summary:hover,
+      .rm-ytor > summary:hover,
+      .approval-teknik > summary:hover {
+        color: var(--brand);
+      }
+
+      .rm-styr {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .rm-styr .rm-role-select {
+        flex: 1 1 200px;
+      }
+
+      .rm-save {
+        min-height: 44px;
+        white-space: nowrap;
+      }
+
+      /* Tomlägena ÄR .live-note och får .tomt-tillstand av
+         uppdateraSektioner när sektionen är tom — grön ✓-cirkel, salviaton,
+         generös luft (ORD-235 §3). Här stod förut en egen grå ruta som
+         gjorde ungefär samma sak, sämre. Kvar behövs bara marginalen. */
+      .rm-empty,
+      .approvals-empty,
+      .workspaces-empty {
+        margin: 0;
+      }
+
+      /* ── Fälten i inbjudningsformuläret ─────────────────────────── */
+      .rm-falt {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .rm-falt-etikett {
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* Knappen står i sista kolumnen och ska ligga i linje med fälten,
+         inte med etiketterna ovanför dem. */
+      .rm-invite-form button[type='submit'] {
+        align-self: end;
+      }
+
+      .rm-status:not(:empty) {
+        padding: 9px 13px;
+        border-radius: 12px;
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        font-size: var(--txt-liten);
+        font-weight: 700;
+        color: var(--text2);
+      }
+
+      /* ── AI-arbetsytor per person (WP-008b) ───────────────────────
+         Sex nakna kryssrutor på en rad var det som gjorde raden till en
+         blankett. De ligger inuti kortet, alltså sänks de ner. */
+      .agent-access-panel {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+        padding: 11px 13px;
+        border-radius: 12px;
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+      }
+
+      .agent-access-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        /* 44px, inte 32. Jag satte först 32 för att raden är ett litet
+           piller — men den är klickbar, och då gäller ORD-239:s golv.
+           Testet fångade det innan ägaren såg det. */
+        min-height: 44px;
+        padding: 0 13px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        font-size: var(--txt-etikett);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--text2);
+        cursor: pointer;
+      }
+
+      .agent-access-check {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--sage);
+        cursor: pointer;
+      }
+
+      /* E-posten står redan som radens rubrik och en gång till i
+         summaryn man just öppnade. Tredje gången i versaler ovanför
+         kryssrutorna är brus — men elementet lämnas kvar för skärmläsare,
+         som annars möter sex kryssrutor utan att veta vems de är. */
+      .agent-access-user {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      /* ── Godkännanden (WP-010) ────────────────────────────────────
+         Ett godkännande är ett beslut någon ska fatta. Det ska se ut som
+         ett ärende, inte som en textrad. */
+      .approval-card {
+        /* Ärver yta, djup, radie och statuskant från .item-card. Här stod
+           förut hela kortreceptet en gång till — en kopia som såg identisk ut
+           tills någon ändrar originalet. */
+        flex-wrap: wrap;
+
+        /* Åldersglöden dämpad — men BARA här.
+           Ägaren såg att det försenade kortet läste som "rosa" i stället för
+           "brådskande". Min första rättelse sänkte --alder-n/--alder-f i
+           .alder-vantat och .alder-forsenad, alltså portalens gemensamma
+           åldersskala. Uppdraget var en sektion; jag ändrade tonen i hela
+           portalen och kalibrerade om ORD-235 på vägen.
+
+           Skalan är återställd till sina ursprungsvärden. Godkännandekorten
+           är dessutom tätare packade än portalens övriga listor — tre piller,
+           en utfällning och en knapprad på samma kort — så glöden som är
+           lagom på en gles lista blir för mycket här. Det är en egenskap hos
+           DEN HÄR listan, och hör därför hemma i den här regeln. */
+        --alder-n: 0.09;
+        --alder-f: 0.16;
+      }
+
+      /* Knapparna ÄR .btn och .btn.primary. Hierarkin — primär lyfter,
+         sekundär sjunker — är redan avgjord i ORD-243 och gäller portalens
+         alla 61 knappar. Här stod en gång två egna knappregler som gjorde
+         exakt samma sak med egna värden; det är så en kodbas får två sanningar
+         om vad "primär" betyder. Kvar står bara träffytan. */
+      .approval-approve,
+      .approval-reject {
+        min-height: 44px;
+      }
+
+      .approval-reject {
+        color: var(--danger);
+      }
+
+      .approval-status:not(:empty) {
+        padding: 9px 13px;
+        border-radius: 12px;
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        font-size: var(--txt-liten);
+        font-weight: 700;
+        color: var(--text2);
+      }
+
+      .approval-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      /* ── Mina arbetsytor (WP-002) ─────────────────────────────── */
+      .agent-workspaces {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .workspace-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 15px;
+        border-radius: 16px;
+        background: var(--card-bg);
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow: var(--djup-mellan);
+        font-size: var(--txt-liten);
+        font-weight: 700;
+        color: var(--brand);
+      }
+
+      /* "Snart" är inte tillgängligt än, och ska inte se tillgängligt ut.
+         ORD-244 §2: det avstängda SER avstängt ut. */
+      .workspace-card--soon {
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        border-color: transparent;
+        color: var(--text2);
+      }
+
+      .workspace-soon {
+        margin-left: auto;
+        padding: 3px 9px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text3);
+      }
+
+      /* ── Färg som identitet, inte dekoration ─────────────────────
+         Sex identiska grå piller tvingar läsning av varje etikett för att
+         hitta en roll. Portalen har redan sex kulörer i :root — en per
+         roll gör tråget sökbart med ögat, och färgen bär ingen ny
+         betydelse utöver den etiketten redan säger. */
+      .agent-access-row[data-agent='CEO'] {
+        --roll: var(--accent-rgb);
+      }
+      .agent-access-row[data-agent='CCO'] {
+        --roll: var(--info-rgb);
+      }
+      .agent-access-row[data-agent='CFO'] {
+        --roll: var(--sage-rgb);
+      }
+      .agent-access-row[data-agent='CMO'] {
+        --roll: var(--violet-rgb);
+      }
+      .agent-access-row[data-agent='CAO'] {
+        --roll: var(--amber-rgb);
+      }
+      .agent-access-row[data-agent='COO'] {
+        --roll: var(--danger-rgb);
+      }
+
+      .agent-access-row {
+        --roll: var(--brand-rgb);
+        border-color: rgba(var(--roll), 0.28);
+        color: rgba(var(--roll), 0.95);
+      }
+
+      /* Vald roll fylls med sin egen kulör. Skillnaden mellan på och av
+         ska synas på en meters håll, inte kräva att man letar bock. */
+      .agent-access-row:has(.agent-access-check:checked) {
+        background: linear-gradient(180deg, rgba(var(--roll), 0.16), rgba(var(--roll), 0.09));
+        border-color: rgba(var(--roll), 0.55);
+        box-shadow: var(--djup-liten);
+      }
+
+      .agent-access-check {
+        accent-color: rgb(var(--roll));
+      }
+
+      /* ── Godkännandekortet ─────────────────────────────────────
+         Kortet ÄR ett .item-card.pending. Ikonen, titeln, metaraden,
+         knappraden och statuskanten kommer därifrån. Kvar här står bara
+         agentens kulör och den hopfällda tekniken.
+
+         Agentens kulör körs genom --cc-rgb, samma variabel som .item-icon
+         redan läser (ORD-225 §2 kopplade in den). Ingen ny mekanism —
+         godkännandekortet talar om vem via den kanal portalen har. */
+      .approval-card[data-agent^='CEO'] {
+        --cc-rgb: var(--accent-rgb);
+      }
+      .approval-card[data-agent^='CCO'] {
+        --cc-rgb: var(--info-rgb);
+      }
+      .approval-card[data-agent^='CFO'] {
+        --cc-rgb: var(--sage-rgb);
+      }
+      .approval-card[data-agent^='CMO'] {
+        --cc-rgb: var(--violet-rgb);
+      }
+      .approval-card[data-agent^='CAO'] {
+        --cc-rgb: var(--amber-rgb);
+      }
+      .approval-card[data-agent^='COO'] {
+        --cc-rgb: var(--danger-rgb);
+      }
+
+      /* Monogrammet är tre versaler i en cirkel byggd för en emoji. */
+      .approval-card .item-icon {
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        color: var(--text2);
+      }
+
+      .approval-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      /* Tekniken hopfälld — samma <details>-mönster som portalens telemetri. */
+      .approval-teknik > summary {
+        cursor: pointer;
+        font-size: var(--txt-etikett);
+        font-weight: 700;
+        color: var(--text3);
+      }
+
+      .approval-teknik[open] > summary {
+        margin-bottom: 6px;
+      }
+
+      /* Ledtext och värde i två kolumner. Ett värde utan ledtext är en
+         sträng man får gissa betydelsen av. */
+      .approval-fakta {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 14px;
+        margin: 0;
+        align-items: baseline;
+      }
+
+      .approval-fakta > dt {
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text3);
+        white-space: nowrap;
+      }
+
+      .approval-fakta > dd {
+        margin: 0;
+        font-size: var(--txt-etikett);
+        font-weight: 600;
+        color: var(--text2);
+        min-width: 0;
+      }
+
+      /* Filerna staplas under sin ledtext i stället för att flyta i rad. */
+      .approval-fakta > dd > .approval-files {
+        gap: 2px;
+      }
+
+      @media (max-width: 560px) {
+        .approval-fakta {
+          grid-template-columns: 1fr;
+          gap: 2px;
+        }
+        .approval-fakta > dd {
+          margin-bottom: 6px;
+        }
+      }
+
+      .approval-files {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .approval-file {
+        display: block;
+        font-size: var(--txt-etikett);
+        overflow-wrap: anywhere;
+      }
+
+      .approval-file-dir {
+        color: var(--text3);
+      }
+
+      .approval-file-name {
+        font-weight: 800;
+        color: var(--text2);
+      }
+
+      .approval-diffstat {
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        color: var(--text2);
+      }
+
+      /* ── Kanonmarkeringen i sidhuvudet ───────────────────────────
+         Diskret med flit. Den ska gå att hitta när man undrar, inte tävla
+         med klinikens namn när man inte undrar. */
+      .portal-kanon {
+        display: inline-flex;
+        align-items: center;
+        align-self: flex-start;
+        margin-top: 6px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--nedsankt-yta);
+        box-shadow: var(--djup-nedsankt);
+        font-size: var(--txt-etikett);
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text3);
+        cursor: help;
+      }
+
+      /* I handen staplas formuläret och raden. Fyra kolumner på 375px gör
+         varje fält 60px brett, vilket är oanvändbart. */
+      @media (max-width: 720px) {
+        .rm-invite-form {
+          /* Två fält per rad i stället för ett — e-post och lösenord är
+             båda korta, och en kolumn gav fyra slabbar i höjd. */
+          grid-template-columns: 1fr 1fr;
+        }
+        .rm-invite-form > :nth-child(3),
+        .rm-invite-form > button[type='submit'] {
+          grid-column: 1 / -1;
+        }
+      }
     </style>
   </head>
   <body>
@@ -3118,6 +3819,17 @@
                "Hair TP Clinic" — Curatiio nämndes inte i filen. -->
           <div class="logo">Klinik okänd</div>
           <div class="portal-name">Personalportal</div>
+          <!-- Vilken yta som gäller har kostat tid att reda ut mer än en gång:
+               /staff servar preview-SPA:t i public/major-arcana-preview/, medan
+               ALLT designarbete (ORD-225→244) och WP-002/007/008b/010/011 ligger
+               här. Markeringen står i gränssnittet och inte bara i en kommentar,
+               eftersom den som är osäker tittar på skärmen, inte i koden. -->
+          <div
+            class="portal-kanon"
+            title="Den gällande personalportalen. Andra staff-ytor i repot är historik eller förhandsvisning."
+          >
+            Kanonisk yta
+          </div>
         </div>
 
         <div class="role-badge nurse" id="roleBadge">
@@ -4075,17 +4787,41 @@
           <div class="section-title">Personal &amp; roller</div>
           <div id="staff-role-management" class="live-panel rm-panel" hidden>
             <div class="rm-status"></div>
+            <!-- ORD-236 · Fälten bar bara platshållartext. Den försvinner i
+                 samma sekund man börjar skriva, så den som blir avbruten
+                 mitt i vet inte längre vilket fält som är vilket — och en
+                 skärmläsare fick aldrig något namn alls. Etiketten är både
+                 en läsbarhets- och tillgänglighetsfråga. -->
             <form class="rm-invite-form">
-              <input class="rm-email-input" type="email" placeholder="E-post" required />
-              <input class="rm-password-input" type="password" placeholder="Lösenord" required />
-              <select class="rm-role-input" required>
-                <option value="">Välj roll…</option>
-                <option value="KONSULT">Läkare / Konsult</option>
-                <option value="PERSONAL">Personal / Sjuksköterska</option>
-                <option value="FINANCE">Ekonomi</option>
-                <option value="REVISOR">Revisor</option>
-                <option value="OPERATOR">Legacy / Operatör</option>
-              </select>
+              <label class="rm-falt">
+                <span class="rm-falt-etikett">E-post</span>
+                <input
+                  class="rm-email-input"
+                  type="email"
+                  placeholder="namn@hairtpclinic.com"
+                  required
+                />
+              </label>
+              <label class="rm-falt">
+                <span class="rm-falt-etikett">Tillfälligt lösenord</span>
+                <input
+                  class="rm-password-input"
+                  type="password"
+                  placeholder="Byts vid första inloggningen"
+                  required
+                />
+              </label>
+              <label class="rm-falt">
+                <span class="rm-falt-etikett">Roll</span>
+                <select class="rm-role-input" required>
+                  <option value="">Välj roll…</option>
+                  <option value="KONSULT">Läkare / Konsult</option>
+                  <option value="PERSONAL">Personal / Sjuksköterska</option>
+                  <option value="FINANCE">Ekonomi</option>
+                  <option value="REVISOR">Revisor</option>
+                  <option value="OPERATOR">Legacy / Operatör</option>
+                </select>
+              </label>
               <button type="submit">Bjud in</button>
             </form>
             <div class="rm-staff-list"></div>
@@ -4125,7 +4861,8 @@
           }
           globalThis.ArcanaStaffWorkspaces.loadWorkspaces(el);
         }
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountWorkspaces);
+        if (document.readyState === 'loading')
+          document.addEventListener('DOMContentLoaded', mountWorkspaces);
         else mountWorkspaces();
       })();
     </script>

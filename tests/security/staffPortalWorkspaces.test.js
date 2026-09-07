@@ -3,7 +3,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { renderWorkspacesHtml, AGENT_WORKSPACES } = require('../../public/staff-portal-workspaces.js');
+const {
+  renderWorkspacesHtml,
+  AGENT_WORKSPACES,
+} = require('../../public/staff-portal-workspaces.js');
 
 function cards(html) {
   return (html.match(/data-agent="([A-Z]+)"/g) || []).map((s) => s.replace(/data-agent="|"/g, ''));
@@ -11,7 +14,19 @@ function cards(html) {
 
 test('WP-002/B: 5. 0 entitlements -> neutralt läge', () => {
   const html = renderWorkspacesHtml([]);
-  assert.match(html, /inga tilldelade AI-arbetsytor/);
+  // Ordalydelsen ändrad 2026-09-07, och testet med den. Beskedet löd
+  // "Du har ännu inga tilldelade AI-arbetsytor." — vilket börjar med "Du"
+  // och därför ALDRIG matchade portalens TOMMONSTER
+  // (/^(inga |inget |ingen |alla |tomt|—|inte )/i). Följden var att
+  // uppdateraSektioner inte kände igen det som ett tomt besked, så
+  // .tomt-tillstand aldrig sattes och rutan förblev grå i stället för att
+  // få portalens gröna tomläge.
+  //
+  // Meningens FORM är alltså funktionell här, inte stilistisk. Testets
+  // avsikt — "tomt läge säger att inga arbetsytor är tilldelade" — är
+  // oförändrad; bara strängen den mäter mot har följt med.
+  assert.match(html, /Inga AI-arbetsytor är tilldelade ännu/);
+  assert.match(html, /^\s*<div class="live-note/);
 });
 
 test('WP-002/B: 6. CCO -> endast CCO visas', () => {

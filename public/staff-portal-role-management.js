@@ -109,9 +109,16 @@
     }
 
     function activeAgentsFor(email) {
-      const key = String(email || '').trim().toLowerCase();
+      const key = String(email || '')
+        .trim()
+        .toLowerCase();
       return _entitlements
-        .filter((e) => String(e?.userId || '').trim().toLowerCase() === key && e?.status === 'active')
+        .filter(
+          (e) =>
+            String(e?.userId || '')
+              .trim()
+              .toLowerCase() === key && e?.status === 'active'
+        )
         .map((e) => e.agent)
         .sort();
     }
@@ -132,7 +139,11 @@
       const list = container.querySelector('.rm-staff-list');
       if (!list) return;
       if (!members.length) {
-        list.innerHTML = '<p class="rm-empty">Ingen personal ännu.</p>';
+        // .live-note ger portalens kanoniska tomläge. Texten börjar med
+        // "Ingen" och matchar TOMMONSTER, så uppdateraSektioner sätter
+        // .tomt-tillstand själv.
+        list.innerHTML =
+          '<p class="live-note rm-empty">Ingen personal är upplagd ännu. Bjud in första kollegan ovan.</p>';
         return;
       }
       list.innerHTML = members
@@ -148,12 +159,59 @@
             hasAgentAccess && userId
               ? agentAccess.renderAgentAccessHtml(userId, activeAgentsFor(userId), email)
               : '';
+          // Portalens kanoniska PERSONKORT är .doc-row: initialer, namn,
+          // och rollen som ett pill längst ut (renderKollegaKort i
+          // staff-portal.html). Tre element.
+          //
+          // Raden byggdes först som ett .item-card med sex alltid-öppna
+          // kryssrutor och två fullbreda kontroller staplade under — runt
+          // 500 px per person mot Kollegors 50, och rollen syntes inte alls
+          // eftersom den låg inne i en <select>. Man såg vad man kunde GÖRA
+          // med personen, aldrig vem hen var.
+          //
+          // Nu: identitet och nuvarande roll är kortet. Att ändra roll och
+          // dela ut arbetsytor är handlingar man fäller ut när man vill dem.
+          const initialer = String(email || '?')
+            .replace(/@.*$/, '')
+            .slice(0, 2)
+            .toUpperCase();
+          // ROLE_LABELS finns sedan tidigare i den här filen och används av
+          // roleOptions. Jag skrev först ROLLETIKETT — ett nytt namn för en
+          // karta som redan fanns tre rader bort.
+          const rollEtikett = ROLE_LABELS[role] || role || 'Okänd roll';
+          const aktiva = activeAgentsFor(userId);
+          // De tilldelade arbetsytorna som piller på kortet. De låg gömda
+          // bakom en utfällning — men det är just det som ÄR sant om en
+          // person: vad hen har tillgång till. Samma grepp som
+          // godkännandekortets COMMIT/WRITE-rad: en rad korta piller som
+          // säger vad saken är innan man behöver klicka någonstans.
+          const ytPiller = aktiva.length
+            ? aktiva
+                .map((a) => `<span class="pill rm-ytpill" data-agent="${esc(a)}">${esc(a)}</span>`)
+                .join('')
+            : '<span class="pill rm-ytpill rm-ytpill--tom">Inga arbetsytor</span>';
           return (
-            `<div class="rm-row" data-membership-id="${esc(id)}">` +
-            `<span class="rm-email">${esc(email)}</span>` +
+            `<div class="item-card rm-row" data-membership-id="${esc(id)}" data-roll="${esc(role)}">` +
+            `<div class="item-icon rm-monogram">${esc(initialer)}</div>` +
+            `<div class="item-body">` +
+            `<div class="item-title rm-email">${esc(email)}</div>` +
+            // Rollen stod först både som metarad och som pill — samma ord
+            // två gånger med tre raders mellanrum. Metaraden bär i stället
+            // det pillret inte kan säga: hur många av sex ytor som delats ut.
+            `<div class="item-meta">${aktiva.length} av 6 AI-arbetsytor</div>` +
+            `<div class="rm-piller avstand-over">${ytPiller}</div>` +
+            `<details class="rm-andra avstand-over">` +
+            `<summary>Ändra roll och arbetsytor</summary>` +
+            `<div class="rm-styr">` +
             `<select class="rm-role-select">${roleOptions(role)}</select>` +
-            `<button class="rm-save" type="button">Spara roll</button>` +
+            `<button class="btn rm-save" type="button">Spara roll</button>` +
+            `</div>` +
             accessHtml +
+            `</details>` +
+            `</div>` +
+            `<div class="item-actions">` +
+            `<span class="pill rm-rollpill">${esc(rollEtikett)}</span>` +
+            `</div>` +
             `</div>`
           );
         })
@@ -189,7 +247,9 @@
         panel.querySelectorAll('.agent-access-check').forEach((box) => {
           box.addEventListener('change', async () => {
             const next = [];
-            panel.querySelectorAll('.agent-access-check:checked').forEach((c) => next.push(c.value));
+            panel
+              .querySelectorAll('.agent-access-check:checked')
+              .forEach((c) => next.push(c.value));
             const diff = agentAccess.buildDiff(activeAgentsFor(userId), next);
             status('Sparar behörigheter…');
             let failed = false;
@@ -269,6 +329,8 @@
 
   const api = { ROLE_LABELS, ASSIGNABLE_ROLES, normalizeRoleChoice, buildInvitePayload, mount };
   root.ArcanaStaffRoleManagement = api;
-  /* eslint-disable-next-line no-undef */
+  // Undantaget som stod här behövs inte längre: public/staff-portal-*.js har
+  // fått en egen regel i eslint.config.js med browser- och commonjs-globaler.
+  // Ett kvarglömt eslint-disable är värre än inget — det döljer nästa fel.
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
