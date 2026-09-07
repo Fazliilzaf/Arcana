@@ -24,6 +24,24 @@ function normalizeStatus(v) {
   const s = normalizeText(v).toUpperCase();
   return STATUSES.includes(s) ? s : 'PENDING';
 }
+
+/**
+ * WP-012 — additive lifecycle/attempt metadata. Old records predating these
+ * fields stay readable; reading one yields safe defaults instead of `undefined`.
+ * Purely additive — does not change the state-machine shape (no new STATUS).
+ */
+function normalizeApprovalRecord(rec) {
+  if (!rec || typeof rec !== 'object') return rec;
+  const attemptCount = Number(rec.attemptCount);
+  return {
+    ...rec,
+    attemptCount: Number.isFinite(attemptCount) ? attemptCount : 0,
+    lastAttemptAt: normalizeText(rec.lastAttemptAt) || null,
+    lastError: normalizeText(rec.lastError) || null,
+    executionCommitSha: normalizeText(rec.executionCommitSha) || null,
+  };
+}
+
 function emptyState() {
   return { version: 2, createdAt: nowIso(), updatedAt: nowIso(), requests: [] };
 }
@@ -84,7 +102,7 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
 
   function get(id) {
     const rec = state.requests.find((r) => r.id === normalizeText(id));
-    return rec ? { ...rec } : null;
+    return rec ? normalizeApprovalRecord(rec) : null;
   }
 
   /**
@@ -119,13 +137,18 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
       approvedAt: null,
       rejectedAt: null,
       executedAt: null,
+      // WP-012 — additive attempt/lifecycle metadata (safe defaults for old JSON).
+      attemptCount: 0,
+      lastAttemptAt: null,
+      lastError: null,
+      executionCommitSha: null,
     };
     state.requests.push(rec);
     await save();
-    return { ...rec };
+    return normalizeApprovalRecord(rec);
   }
 
-  function listAll() { return state.requests.map((r) => ({ ...r })); }
+  function listAll() { return state.requests.map(normalizeApprovalRecord); }
 
   /** Pending, ej utgångna, filterbara på tenant + approvalClass. */
   function listPending({ tenant = '', approvalClass = '' } = {}) {
@@ -138,12 +161,12 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
         if (approvalClass && normalizeText(r.approvalClass) !== normalizeText(approvalClass)) return false;
         return true;
       })
-      .map((r) => ({ ...r }));
+      .map(normalizeApprovalRecord);
   }
 
   function listForTenant(tenant) {
     const t = normalizeText(tenant);
-    return state.requests.filter((r) => normalizeText(r.tenant) === t).map((r) => ({ ...r }));
+    return state.requests.filter((r) => normalizeText(r.tenant) === t).map(normalizeApprovalRecord);
   }
 
   /** Övergång: PENDING → godkänt. Returnerar null vid ogiltig/utgången status. */
@@ -155,7 +178,7 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     rec.approvedBy = normalizeText(approver) || null;
     rec.approvedAt = nowIso();
     await save();
-    return { ...rec };
+    return normalizeApprovalRecord(rec);
   }
 
   /** Övergång: PENDING → REJECTED. Historik behålls. */
@@ -167,7 +190,7 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     rec.rejectedAt = nowIso();
     rec.rejectReason = normalizeText(reason) || null;
     await save();
-    return { ...rec };
+    return normalizeApprovalRecord(rec);
   }
 
   /** Övergång: APPROVED → EXECUTED. Endast giltig om snapshot redan verifierats. */
@@ -180,7 +203,7 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     rec.status = 'EXECUTED';
     rec.executedAt = nowIso();
     await save();
-    return { ...rec };
+    return normalizeApprovalRecord(rec);
   }
 
   /** Markera utgångna PENDING → EXPIRED (sweep; returnerar antal). */
@@ -197,6 +220,55 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     return count;
   }
 
+  /**
+   * WP-012 — deterministic attempt recording. Every legitimate execution attempt
+   * increments attemptCount and stamps lastAttemptAt. `error` (when given)
+   * records a truthful failure; when omitted the attempt is clean and any prior
+   * lastError is cleared. Never sets executionCommitSha / status.
+   */
+  async function recordAttempt(id, { error = null } = {}) {
+    const rec = state.requests.find((r) => r.id === normalizeText(id));
+    if (!rec) return null;
+    rec.attemptCount = (Number.isFinite(Number(rec.attemptCount)) ? Number(rec.attemptCount) : 0) + 1;
+    rec.lastAttemptAt = nowIso();
+    const err = normalizeText(error);
+    rec.lastError = err || null;
+    await save();
+    return normalizeApprovalRecord(rec);
+  }
+
+  /**
+   * WP-012 — bind the ACTUAL execution commit SHA to the approval. The SHA must
+   * be a real git SHA-1/SHA-256 hex string (it is only ever set from the value
+   * returned by commitCandidate); a value is never fabricated here.
+   */
+  async function bindExecutionCommit(id, sha) {
+    const rec = state.requests.find((r) => r.id === normalizeText(id));
+    if (!rec) return null;
+    const s = normalizeText(sha);
+    if (!/^[0-9a-f]{40,64}$/i.test(s)) return { ok: false, reason: 'invalid_execution_sha' };
+    rec.executionCommitSha = s.toLowerCase();
+    await save();
+    return normalizeApprovalRecord(rec);
+  }
+
+  /**
+   * WP-012 §11 — honest lifecycle cleanup. An APPROVED record that has aged past
+   * its TTL is terminalized to EXPIRED (no execution, no retry) when encountered
+   * by the canonical lifecycle/read/retry path. Execution authority was already
+   * denied by WP-011; this only makes the durable authorization state honest.
+   * WP-011 freshness enforcement is NOT weakened.
+   */
+  async function terminalizeExpiredApproved(id) {
+    const rec = state.requests.find((r) => r.id === normalizeText(id));
+    if (!rec) return null;
+    if (rec.status === 'APPROVED' && isExpired(rec)) {
+      rec.status = 'EXPIRED';
+      await save();
+    }
+    return normalizeApprovalRecord(rec);
+  }
+
   return {
     STATUSES,
     create,
@@ -209,6 +281,9 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     execute,
     expirePending,
     assertFresh,
+    recordAttempt,
+    bindExecutionCommit,
+    terminalizeExpiredApproved,
   };
 }
 
