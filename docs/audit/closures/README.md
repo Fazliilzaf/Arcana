@@ -14,6 +14,7 @@ chat says it is closed; it is closed when there is a record here.
 | P0-004           | Staff RBAC: canonical role model, role management, REVISOR finance | **VERIFIED CLOSED** | 2026-09-06 | [P0-004-CLOSURE.md](P0-004-CLOSURE.md)                 |
 | P1-001 / P1-002  | Conversation state keyed under `cco`, no single tenant source      | **VERIFIED CLOSED** | 2026-09-06 | [P1-001-002-CLOSURE.md](P1-001-002-CLOSURE.md)         |
 | P1-003 / P1-004  | Customer dossier read a client tenant; global alias list           | **VERIFIED CLOSED** | 2026-09-06 | [P1-003-004-CLOSURE.md](P1-003-004-CLOSURE.md)         |
+| WP-010           | Approval snapshot content-bound; task_id path traversal            | **VERIFIED CLOSED** | 2026-09-07 | [WP-010-CLOSURE.md](WP-010-CLOSURE.md)                 |
 
 ## Why this exists
 
