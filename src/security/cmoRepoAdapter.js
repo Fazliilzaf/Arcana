@@ -296,17 +296,27 @@ function createCmoRepoAdapter({
   }
 
   /**
-   * WP-010 (DEL F/G): verifiera att ett APPROVED write_candidate fortfarande är
-   * giltigt (TOCTOU). Returnerar {ok, reason, context} utan att mutera något.
+   * WP-010 (DEL F/G) + WP-011: verifiera att ett APPROVED write_candidate fortfarande
+   * är giltigt (TOCTOU) INNAN den irreversibla exekveringen. Returnerar
+   * {ok, reason, context} utan att mutera något.
+   *
+   * WP-011 — freshness (canonical TTL) must hold AT THIS authority boundary,
+   * i.e. immediately before commitCandidate. Authorization is NOT
+   * status==='APPROVED' alone; it is APPROVED AND fresh AND snapshot-valid.
+   * Single source: approvalStore.assertFresh (same helper as store.execute).
    */
   async function verifyWriteSnapshot(approvalId, approvalStore = null) {
-    if (!approvalStore || typeof approvalStore.get !== 'function') {
+    if (!approvalStore || typeof approvalStore.get !== 'function' || typeof approvalStore.assertFresh !== 'function') {
       return { ok: false, reason: 'approval_store_unavailable' };
     }
     const approval = await approvalStore.get(approvalId);
     if (!approval) return { ok: false, reason: 'approval_not_found' };
     if (approval.status !== 'APPROVED') return { ok: false, reason: `approval_status_${String(approval.status).toLowerCase()}` };
     if (approval.action !== 'cmo.content.write_candidate') return { ok: false, reason: 'not_write_candidate' };
+
+    // WP-011 — fail-closed freshness check (expired/unprovable ⇒ deny).
+    const fresh = approvalStore.assertFresh(approval);
+    if (!fresh.ok) return fresh;
 
     const check = checkCandidateSnapshot(approval);
     if (!check.ok) return check;
