@@ -211,50 +211,64 @@ function getChangesDetailed(worktreeDir, baseSha) {
  *   - D:     contentSha256 = null (status D är själva deletion-markören).
  *   - R:     sourcePath = gammal sökväg (porcelain "old -> new").
  * Sortering är deterministisk (path, sedan sourcePath).
+ *
+ * Använder `--porcelain=v1 -z` (NUL-separerad, unquoted) så att filnamn med
+ * non-ASCII/quote/backslash INTE quote-escapes av Git — det citerade namnet
+ * skulle annars inte matcha filsystemet och content-bindningen tyst tappas.
+ *
+ * FAIL CLOSED: en non-deletion entry vars content inte kan läsas kastar
+ * `snapshot_content_unreadable` (aldrig tyst contentSha256: null för en
+ * existerande fil).
  */
 function getContentSnapshotEntries(worktreeDir) {
   const entries = [];
+  let porcelain;
   try {
-    const porcelain = runGitRaw(worktreeDir, ['status', '--porcelain']);
-    for (const line of porcelain.split('\n').filter(Boolean)) {
-      const xy = line.slice(0, 2);
-      const rest = line.slice(3);
-      let status;
-      if (xy === '??') status = 'A';
-      else if (xy.includes('R')) status = 'R';
-      else if (xy.includes('D')) status = 'D';
-      else if (xy.includes('A')) status = 'A';
-      else status = 'M';
-
-      let filePath = rest;
-      let sourcePath = null;
-      if (status === 'R') {
-        const idx = rest.indexOf(' -> ');
-        if (idx >= 0) {
-          sourcePath = rest.slice(0, idx);
-          filePath = rest.slice(idx + 4);
-        }
-      }
-
-      let contentSha256 = null;
-      if (status !== 'D') {
-        try {
-          const buf = fs.readFileSync(path.join(worktreeDir, filePath));
-          contentSha256 = crypto.createHash('sha256').update(buf).digest('hex');
-        } catch {
-          contentSha256 = null;
-        }
-      }
-      entries.push({
-        path: filePath,
-        status,
-        ...(sourcePath !== null ? { sourcePath } : {}),
-        contentSha256,
-      });
-    }
+    porcelain = runGitRaw(worktreeDir, ['status', '--porcelain=v1', '-z']);
   } catch {
-    /* inga ändringar */
+    return []; // git ej tillgänglig → inga ändringar
   }
+
+  const tokens = porcelain.split('\0');
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.length < 4) continue; // minsta giltiga: "XY path"
+    const xy = token.slice(0, 2);
+    const pathStr = token.slice(3);
+    let status;
+    if (xy === '??') status = 'A';
+    else if (xy.includes('R')) status = 'R';
+    else if (xy.includes('D')) status = 'D';
+    else if (xy.includes('A')) status = 'A';
+    else status = 'M';
+
+    let filePath = pathStr;
+    let sourcePath = null;
+    if (status === 'R') {
+      // -z rename-format: `R  NEW\0OLD\0` — nästa token är källan.
+      sourcePath = tokens[i + 1] || null;
+      i += 1;
+    }
+
+    let contentSha256 = null;
+    if (status !== 'D') {
+      try {
+        const buf = fs.readFileSync(path.join(worktreeDir, filePath));
+        contentSha256 = crypto.createHash('sha256').update(buf).digest('hex');
+      } catch {
+        const err = new Error(`snapshot_content_unreadable: ${filePath}`);
+        err.statusCode = 409;
+        throw err;
+      }
+    }
+    entries.push({
+      path: filePath,
+      status,
+      ...(sourcePath !== null ? { sourcePath } : {}),
+      contentSha256,
+    });
+  }
+
   entries.sort((a, b) => {
     const ka = `${a.path}\u0000${a.sourcePath || ''}`;
     const kb = `${b.path}\u0000${b.sourcePath || ''}`;

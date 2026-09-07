@@ -213,7 +213,13 @@ function createCmoRepoAdapter({
     }
 
     const changes = getChangesDetailed(rt.worktreeDir, rt.baseSha);
-    const contentEntries = getContentSnapshotEntries(rt.worktreeDir);
+    let contentEntries;
+    try {
+      contentEntries = getContentSnapshotEntries(rt.worktreeDir);
+    } catch (error) {
+      // B-1 fail closed: en existerande kandidatfil kunde inte content-hashas.
+      return { ok: false, reason: 'snapshot_content_unreadable', detail: error?.message || '' };
+    }
     const snapshotHash = computeContentSnapshotHash({
       baseSha: rt.baseSha,
       repoId: rt.repo.repoId,
@@ -266,7 +272,13 @@ function createCmoRepoAdapter({
     if (rt.error) return { ok: false, reason: rt.error };
     if (rt.baseSha !== approval.baseSha) return { ok: false, reason: 'base_sha_changed' };
     const changes = getChangesDetailed(rt.worktreeDir, rt.baseSha);
-    const contentEntries = getContentSnapshotEntries(rt.worktreeDir);
+    let contentEntries;
+    try {
+      contentEntries = getContentSnapshotEntries(rt.worktreeDir);
+    } catch {
+      // B-1 fail closed: en existerande kandidatfil kunde inte content-hashas.
+      return { ok: false, reason: 'snapshot_content_unreadable' };
+    }
     const snapshotHash = computeContentSnapshotHash({
       baseSha: rt.baseSha,
       repoId: approval.repoId,
