@@ -52,9 +52,34 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
 
   async function save() { state.updatedAt = nowIso(); await writeJsonAtomic(filePath, state); }
 
+  /**
+   * WP-011 — canonical expiry truth (fail CLOSED).
+   * An approval is fresh only while its persisted requestedAt is a provable,
+   * non-future timestamp AND requestedAt + ttlMs is still in the future.
+   *
+   * Fail-closed rules (unprovable/impossible freshness ⇒ expired ⇒ deniable):
+   *   - missing / empty requestedAt        → not finite  → EXPIRED
+   *   - malformed / non-finite requestedAt → not finite  → EXPIRED
+   *   - materially future requestedAt      → at > now    → EXPIRED
+   *     (a future timestamp must never extend approval authority)
+   * Boundary semantics preserved from prior code: `<=` (requestedAt + ttlMs <= now ⇒ expired).
+   */
   function isExpired(rec, now = Date.now()) {
     const at = Date.parse(rec?.requestedAt || '');
-    return Number.isFinite(at) && at + (Number(ttlMs) || 0) <= now;
+    if (!Number.isFinite(at)) return true;
+    if (at > now) return true;
+    return at + (Number(ttlMs) || 0) <= now;
+  }
+
+  /**
+   * WP-011 — canonical freshness helper. Single source of truth for TTL validity,
+   * used by every active approval-consumption authority boundary (approve /
+   * listPending / execute / verifyWriteSnapshot). Returns {ok:true} or
+   * {ok:false, reason:'expired'}.
+   */
+  function assertFresh(rec, now = Date.now()) {
+    if (isExpired(rec, now)) return { ok: false, reason: 'expired' };
+    return { ok: true };
   }
 
   function get(id) {
@@ -149,6 +174,9 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
   async function execute(id) {
     const rec = state.requests.find((r) => r.id === normalizeText(id));
     if (!rec || rec.status !== 'APPROVED') return null;
+    // WP-011: freshness must hold BEFORE the irreversible APPROVED→EXECUTED
+    // transition. On deny: no status change, no executedAt, no side effect.
+    if (isExpired(rec)) return null;
     rec.status = 'EXECUTED';
     rec.executedAt = nowIso();
     await save();
@@ -180,6 +208,7 @@ async function createApprovalRequestStore({ filePath, ttlMs = 24 * 60 * 60 * 100
     reject,
     execute,
     expirePending,
+    assertFresh,
   };
 }
 
