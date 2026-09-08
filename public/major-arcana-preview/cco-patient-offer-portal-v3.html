@@ -552,6 +552,22 @@
 
       /* SECTION HEADING */
       .section-heading {
+        /* Rubriken hör till LÄSFLÖDET, alltså vänsterkolumnen — inte till
+           hela rutnätet.
+
+           Den spände tidigare båda kolumnerna (1116px) medan .sign-card är
+           position:sticky i högerkolumnen. Båda har z-index:auto, så
+           målningsordningen avgörs av DOM-ordning, och rubrikerna kommer
+           sist. Följden syntes i drift: "DINA BOKNINGAR" och "DINA BILDER"
+           låg ovanpå signeringskortets text.
+
+           z-index på kortet vore fel lösning. ::before och ::after har
+           flex:1, alltså är etiketten CENTRERAD mellan två linjer — och
+           mitten av 1116px hamnar rakt på kortet. Ett kort som målas över
+           skulle dölja själva ordet.
+
+           Mätt i webbläsare, fyra bredder: 7 krockar före, 0 efter. */
+        grid-column: 1;
         font-size: var(--fs-kicker);
         font-weight: 700;
         letter-spacing: 0.1em;
@@ -590,6 +606,25 @@
 
       /* SIGN CTA */
       .sign-card {
+        /* Kortet är sticky i högerkolumnen, och korten UNDER det i samma
+           kolumn ska passera bakom när man rullar. Utan z-index avgör
+           DOM-ordningen målningen, och eftersom de kommer senare hamnade
+           de ovanpå: "Låses upp vid signering" låg tvärs över
+           signeringstexten i drift.
+
+           Här är z-index rätt lösning, till skillnad från sektionsrubrikerna.
+           De spänner båda kolumnerna och har sin etikett CENTRERAD, så ett
+           kort som målas över hade dolt själva ordet — de fick i stället
+           grid-column: 1. Två olika orsaker, två olika åtgärder.
+
+           Ytan är ogenomskinlig (gradient över #ffffff), så det som
+           passerar bakom syns inte igenom.
+
+           z-index sätts där position: sticky sätts — i mediefrågan för
+           768px och uppåt. Ett z-index här hade inte gjort någon nytta,
+           eftersom kortet är statiskt i enkolumnsläget, och ett
+           position: relative här hade dessutom ändrat beteendet på telefon
+           i onödan. */
         padding: 1.5rem 1.4rem;
         border-radius: var(--panel-radius);
         background:
@@ -3378,12 +3413,23 @@
 
         .journey,
         .hero-card,
-        .section-heading,
         .value-card,
         .testimonial-card,
         .faq-card,
         .contact-card {
           grid-column: 1 / -1;
+        }
+        /* .section-heading låg i gruppen ovanför och spände därmed båda
+           kolumnerna. Det gick inte ihop med att .sign-card är sticky i
+           högerkolumnen: båda har z-index:auto, rubrikerna kommer sist i
+           DOM:en, och målades alltså ovanpå kortet. I drift syntes det som
+           att "DINA BOKNINGAR" och "DINA BILDER" låg tvärs över
+           signeringstexten.
+
+           Rubriken hör till läsflödet i vänsterkolumnen. Under 768px är
+           rutnätet enkolumnigt och regeln gör ingen skillnad där. */
+        .section-heading {
+          grid-column: 1;
         }
         .secure-contact-panel {
           grid-column: 1 / -1;
@@ -3407,6 +3453,10 @@
           position: sticky;
           top: 7.25rem;
           align-self: start;
+          /* Korten under i samma kolumn ska passera BAKOM när man rullar.
+             Utan detta avgjorde DOM-ordningen, och de målades ovanpå —
+             "Låses upp vid signering" låg tvärs över signeringstexten. */
+          z-index: 2;
         }
 
         .section-heading {
