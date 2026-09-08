@@ -506,13 +506,66 @@
       }
 
       /* HERO */
+      /* PATIENTBANDET — samma komposition som Hair AI Doctors kundhuvud.
+         Läst ur CustomerProfilePage.tsx, inte påhittat:
+
+             <Card><div class="flex flex-wrap items-start gap-5">
+               <div class="aid-parla ton-orange w-16 h-16 rounded-full">…</div>
+               <div class="flex-1">
+                 <div class="flex flex-wrap items-center gap-3">
+                   <h1>Namn</h1> <Badge/> <Button/> <Button/>
+                 </div>
+                 …metadata som en radbrytande rad ikon+värde
+               </div>
+             </div></Card>
+
+         Portalen staplade i stället kicker / namn / chip lodrätt. Uppmätt
+         vid 1440px: kortet 1116×240 med 88px innehåll och 88px tomrum —
+         mer tomt än innehåll, och allt trängt till vänstra fyrtio procent
+         medan resten låg öde.
+
+         AID lägger ikonen till vänster och statusen BREDVID namnet. Då
+         fyller bandet sin bredd och höjden följer innehållet. */
       .hero-card {
-        padding: 1.5rem 1.4rem 1.25rem;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 1.15rem;
+        padding: 1.5rem 1.4rem;
         border-radius: var(--panel-radius);
         background: var(--card-bg);
         border: var(--card-border);
         box-shadow: var(--card-shadow);
         margin-bottom: var(--gap);
+      }
+      /* Pärlan. Receptet är AID:s .aid-parla — radialt ljus uppe till
+         vänster, ton nedåt, ljuslinje inuti och färgad skugga utåt. */
+      .hero-parla {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        color: var(--accent);
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.75), transparent 60%),
+          linear-gradient(180deg, rgba(var(--accent-rgb), 0.34), rgba(var(--accent-rgb), 0.16));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.7),
+          0 2px 5px rgba(var(--accent-rgb), 0.28);
+      }
+      .hero-text {
+        flex: 1;
+        min-width: 240px;
+      }
+      /* Namnet och statusen på samma rad, som AID:s h1 + Badge. */
+      .hero-rad {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.85rem;
       }
       .greeting {
         font-size: var(--fs-kicker);
@@ -3440,10 +3493,16 @@
         }
 
         .hero-card {
-          min-height: 13rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: flex-end;
+          /* Här låg min-height: 13rem tillsammans med flex-direction:
+             column och justify-content: flex-end. Tomrummet var alltså
+             avsiktligt — kortet hölls högt och innehållet trycktes ned i
+             botten. Uppmätt gav det 88px tomt mot 88px innehåll vid 1440px,
+             och allt trängt till vänstra fyrtio procent.
+
+             Hair AI Doctors kort har ingen min-height alls; höjden följer
+             innehållet, och bandet fyller bredden i stället för höjden.
+             Basregeln sätter nu flex-direction: row — den här överskrev
+             den och gjorde radlayouten verkningslös. */
           padding: 2rem;
         }
 
@@ -3490,9 +3549,7 @@
           grid-template-columns: minmax(0, 1.15fr) minmax(21rem, 0.85fr);
         }
 
-        .hero-card {
-          min-height: 15rem;
-        }
+        /* Ingen min-height. Bandet fyller bredden, inte höjden. */
 
         .timeline-card,
         .value-card,
@@ -3744,25 +3801,44 @@
       </div>
 
       <div class="hero-card">
-        <div class="greeting">Välkommen tillbaka</div>
-        <h1 class="hero-name">
-          <span data-offer-customer-first-name>Adam</span>, <span>din plan är redo.</span>
-        </h1>
-        <div class="appt-chip">
+        <span class="hero-parla" aria-hidden="true">
           <svg
-            width="11"
-            height="11"
+            width="26"
+            height="26"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="2.5"
+            stroke-width="1.9"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           >
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
-          <span data-offer-operation-date>Operation planerad · 15 september 2026</span>
+        </span>
+        <div class="hero-text">
+          <div class="greeting">Välkommen tillbaka</div>
+          <div class="hero-rad">
+            <h1 class="hero-name">
+              <span data-offer-customer-first-name>Adam</span>, <span>din plan är redo.</span>
+            </h1>
+            <div class="appt-chip">
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span data-offer-operation-date>Operation planerad · 15 september 2026</span>
+            </div>
+          </div>
         </div>
       </div>
 
