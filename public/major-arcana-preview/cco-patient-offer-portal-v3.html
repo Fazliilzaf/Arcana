@@ -33,13 +33,30 @@
            inte kosmetik: .step-dot.done hade ytan i var(--success) men
            skuggan i rgba(42, 110, 82) — nästan, men inte, samma gröna.
            Sådant syns aldrig i granskning och alltid i efterhand. */
-        --accent-rgb: 176, 53, 110;
-        --violet-rgb: 107, 49, 201;
-        --gold-rgb: 138, 95, 30;
-        --success-rgb: 47, 111, 84;
-        --warning-rgb: 154, 100, 16;
-        --danger-rgb: 168, 56, 56;
-        --info-rgb: 47, 101, 149;
+        /* SAMMA IDENTITET SOM HAIR AI DOCTOR ────────────────────────
+           Tripletterna bär portalens kulör: washes, kanter, skuggor,
+           tonlinjer. De är nu EXAKT Hair AI Doctors värden, så de två
+           produkterna läser som samma varumärke i stället för två
+           släktingar.
+
+           De solida färgerna längre ned är en ANNAN sak och behåller
+           sitt mörkare steg. Mätt i renderad sida, 640 element: fyra av
+           dem bär liten text som faller under WCAG AA på AID:s ljusare
+           värde — --success på elva element (9 px etiketter), --info på
+           sex (missar med 0,04), --gold på två, --violet på ett.
+
+           Det är inte en kompromiss utan AID:s eget mönster: --brand-green
+           som wash, --ton-gron som bläck. Samma kulör, två steg. Skillnaden
+           är att patientportalen behöver det mörka steget oftare, för den
+           läses av patienter på telefon och bär pris, medicinsk information
+           och signering. */
+        --accent-rgb: 187, 71, 121; /* AID --ton-cerise */
+        --violet-rgb: 138, 92, 201; /* AID --ton-lila */
+        --gold-rgb: 169, 143, 109; /* AID --warm-gold */
+        --success-rgb: 74, 130, 104; /* AID --ton-gron */
+        --warning-rgb: 200, 124, 46; /* AID --ton-orange */
+        --danger-rgb: 217, 87, 117; /* AID --danger */
+        --info-rgb: 58, 123, 184; /* AID --ton-bla */
 
         /* DE NAMNLÖSA SOM ANVÄNDS MEST ──────────────────────────────
            Räknat i filen, utanför :root. Ingen av dem hade ett namn, och
@@ -61,7 +78,7 @@
         --bg-page-rgb: 250, 246, 242;
         --bg-warm-rgb: 255, 252, 248;
         --violet-mist-rgb: 101, 75, 152;
-        --muted-solid: #cabaae;
+        --muted-solid: #c9bcae; /* AID --warm-gray */
         --accent-deep: #8c2455;
         --success-deep: #1b4f3a;
 
@@ -79,28 +96,28 @@
            att den användes på fyra ställen som en naken triplett. */
         --bankid-rgb: 24, 62, 79;
 
-        --accent: #b0356e;
-        --accent-weak: #fdeef4;
-        --accent-weak-bg: #fdeef4;
+        --accent: #bb4779; /* AID --ton-cerise — mätt 4.55, klarar AA */
+        --accent-weak: #fde6ee; /* AID --blush-pale */
+        --accent-weak-bg: #fde6ee;
         --accent-border: rgba(var(--accent-rgb), 0.2);
         --violet: #6b31c9;
-        --violet-bg: rgba(107, 49, 201, 0.12);
+        --violet-bg: rgba(var(--violet-rgb), 0.12);
         --gold: #8a5f1e;
         --gold-bg: rgba(138, 95, 30, 0.14);
         --success: #2f6f54;
         --success-bg: rgba(47, 111, 84, 0.14);
-        --warning: #9a6410;
+        --warning: #c87c2e; /* AID --ton-orange — bär aldrig text i portalen */
         --warning-bg: rgba(154, 100, 16, 0.16);
-        --danger: #a83838;
+        --danger: #d95775; /* AID --danger — bär aldrig text i portalen */
         --danger-bg: rgba(168, 56, 56, 0.14);
         --info: #2f6595;
         --info-bg: rgba(47, 101, 149, 0.14);
 
         /* Text — CCO v3 WCAG-härdad skala */
-        --text-primary: #221c15;
-        --text-secondary: #574d40;
-        --text-tertiary: #6d6354;
-        --text-tertiary-rgb: 109, 99, 84;
+        --text-primary: #2b241d; /* AID --ink */
+        --text-secondary: #574c40; /* AID --text2 */
+        --text-tertiary: #6f6456; /* AID --text3 */
+        --text-tertiary-rgb: 111, 100, 86;
 
         /* BUGG, hittad vid tokenpasset: --text-muted LÄSES på fyra ställen
            (.portal-photo-intro, .portal-photo-card small, .plan-evidence-copy,
@@ -123,7 +140,7 @@
            56,40,28 vinner för att tre av fyra skuggtokens redan bar den.
            Priset är ärligt: sh-xl blir en aning varmare och mörkare, och de
            två korten likaså. Alla tre ligger under 0,4 alfa. */
-        --sh-rgb: 56, 40, 28;
+        --sh-rgb: 60, 42, 30; /* AID:s skuggbläck */
         --sh-sm: 0 1px 2px rgba(var(--sh-rgb), 0.06);
         --sh-md: 0 3px 10px rgba(var(--sh-rgb), 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
         --sh-lg: 0 8px 22px rgba(var(--sh-rgb), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
@@ -1493,12 +1510,12 @@
       }
       .betatid-desc {
         font-size: 0.7rem;
-        color: rgba(var(--info-rgb), 0.7);
+        color: var(--info);
         line-height: 1.4;
       }
       .betatid-expire {
         font-size: 0.67rem;
-        color: rgba(var(--info-rgb), 0.55);
+        color: var(--info);
         margin-top: 0.2rem;
         font-style: italic;
       }
@@ -1523,7 +1540,7 @@
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(var(--info-rgb), 0.55);
+        color: var(--info);
       }
       .reminder-row {
         display: flex;
@@ -1585,7 +1602,7 @@
         background: rgba(var(--info-rgb), 0.06);
         border: 1px solid rgba(var(--info-rgb), 0.12);
         font-size: 0.68rem;
-        color: rgba(var(--info-rgb), 0.8);
+        color: var(--info);
         display: none;
       }
       .reminder-confirm.visible {
@@ -1864,7 +1881,7 @@
       .booking-op .booking-note {
         background: rgba(var(--success-rgb), 0.05);
         border-color: rgba(var(--success-rgb), 0.14);
-        color: rgba(var(--success-rgb), 0.75);
+        color: var(--success);
       }
       .booking-note svg {
         flex-shrink: 0;
@@ -2204,7 +2221,7 @@
         background: rgba(var(--info-rgb), 0.05);
         border: 1px solid rgba(var(--info-rgb), 0.13);
         font-size: 0.68rem;
-        color: rgba(var(--info-rgb), 0.8);
+        color: var(--info);
         line-height: 1.4;
         margin-bottom: 0.72rem;
       }
@@ -3230,7 +3247,11 @@
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        color: var(--accent);
+        /* --accent-deep, inte --accent. Bannerns botten är en varmvit
+           gradient (#f8f1ec i sin mörkaste ände), och där mäter --accent
+           4.38 — under AA. Den mörka änden av samma accent finns redan
+           i paletten och ger marginal utan att byta kulör. */
+        color: var(--accent-deep);
         font-size: 0.68rem;
         font-weight: 900;
         letter-spacing: 0.09em;
