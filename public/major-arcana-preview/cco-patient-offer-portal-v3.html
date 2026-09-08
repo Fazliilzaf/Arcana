@@ -155,6 +155,23 @@
         --sh-lg: 0 8px 22px rgba(var(--sh-rgb), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
         --sh-xl: 0 24px 56px rgba(var(--sh-rgb), 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 
+        /* DEN NEDSÄNKTA YTAN ────────────────────────────────────────
+           ORD-242 gjorde urgröpningen fysiskt korrekt men skrev den som
+           literaler på varje ställe — mätt: rgba(43,37,31,…) upprepat i
+           flera regler utan gemensamt namn. Samma sak som tripletterna
+           ovan led av innan de fick namn: en färg som används på många
+           ställen utan namn är inte ett undantag, den är en del av
+           paletten som ingen skrivit ner.
+
+           Ljuset kommer uppifrån, så den inre skuggan sitter i ÖVERKANT
+           och den vita linjen UNDER kanten. Motsatsen mot det upphöjda
+           kortet, som har vit linje överst. Det är det som gör att ögat
+           läser den ena som en grop och den andra som en platta. */
+        --sank-yta: linear-gradient(180deg, rgba(43, 37, 31, 0.1), rgba(43, 37, 31, 0.03));
+        --sank-skugga:
+          inset 0 2px 4px rgba(43, 37, 31, 0.17), inset 0 1px 1px rgba(43, 37, 31, 0.14),
+          inset 0 0 0 1px rgba(43, 37, 31, 0.06), 0 1px 0 rgba(255, 255, 255, 0.95);
+
         /* KORTRECEPTET — identiskt med Hair AI Doctors .card ───────────
            Uppmätt i renderad AID (inte gissat ur källan): radie 20px,
            kant rgba(255,255,255,0.75), yta 165° i tre stopp, och en
@@ -244,6 +261,319 @@
         --gap: clamp(0.6rem, 0.4rem + 0.55vw, 0.9rem);
         --pad-x: clamp(1rem, 0.5rem + 2vw, 1.5rem);
         --max-w: 490px;
+
+        /* ══ TONKASKADEN ═══════════════════════════════════════════════
+           Hair AI Doctors mönster, hämtat ur frontend/src/index.css.
+
+           Regeln språket vilar på: FÄRGEN BOR I SKUGGAN, ALDRIG I YTAN.
+           Varje kort har identisk varmvit yta. Det enda som skiljer dem
+           är vilken kulör skuggan bär. Det är därför AID känns levande
+           utan att se brokig ut — inga färgade paneler, bara färgat ljus.
+
+           Tripletterna finns redan ovan (--accent-rgb och de andra). Det
+           som saknades var kaskaden: ett --ton som ärvs nedåt så att en
+           skugga kan läsa rgba(var(--ton), α) utan att veta vilken sektion
+           den sitter i.
+
+           FÄLLAN. Ett element UTAN tonklass faller tyst tillbaka på
+           brunt här nedan. Koden ser rätt ut, färgen blir fel, och inget
+           felmeddelande syns. Neutrala ytor ska därför läsa --sh-rgb
+           direkt och aldrig --ton. */
+        --ton: 60, 42, 30;
+      }
+
+      .ton-cerise {
+        --ton: var(--accent-rgb);
+      }
+      .ton-lila {
+        --ton: var(--violet-rgb);
+      }
+      .ton-gron {
+        --ton: var(--success-rgb);
+      }
+      .ton-orange {
+        --ton: var(--warning-rgb);
+      }
+      .ton-bla {
+        --ton: var(--info-rgb);
+      }
+      .ton-guld {
+        --ton: var(--gold-rgb);
+      }
+      /* Den varma är AID:s --ton-varm och finns inte som triplett i
+         portalen sedan tidigare — den används bara här. */
+      .ton-varm {
+        --ton: 240, 150, 74;
+      }
+
+      /* ══ PÄRLAN ════════════════════════════════════════════════════
+         AID:s .aid-parla. Ett runt ljus med högdager uppe till vänster,
+         tonad gradient under och tonad skugga. Sitter vid sektionsrubriker
+         och i kortens vänsterkant. */
+      .parla {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        color: rgb(var(--ton));
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.75), transparent 60%),
+          linear-gradient(180deg, rgba(var(--ton), 0.34), rgba(var(--ton), 0.16));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.7),
+          0 2px 5px rgba(var(--ton), 0.28);
+      }
+      .parla-sm {
+        width: 26px;
+        height: 26px;
+      }
+      .parla-lg {
+        width: 56px;
+        height: 56px;
+      }
+
+      /* AID:s .aid-prick — samma ljus, i miniatyr. */
+      .prick {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 9999px;
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55), transparent 64%),
+          rgb(var(--ton));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.35),
+          0 1px 3px rgba(var(--ton), 0.45);
+      }
+
+      /* ══ TONAT KORT ════════════════════════════════════════════════
+         Samma yta och kant som .card redan har. Skillnaden är att
+         skuggan läser --ton i stället för --sh-rgb, så kortet lyfter i
+         sektionens egen kulör. Läggs PÅ ett kort, ersätter det inte. */
+      .tonad {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          0 2px 6px rgba(var(--ton), 0.1),
+          0 12px 28px rgba(var(--ton), 0.16),
+          0 28px 56px rgba(var(--ton), 0.07);
+      }
+
+      /* ══ STAT-BLOCK ════════════════════════════════════════════════
+         AID:s .aid-stat. Talet bär tonen, etiketten är neutral. */
+      .stat-tal {
+        display: block;
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.5px;
+        color: rgb(var(--ton));
+      }
+      .stat-etikett {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-top: 0.44rem;
+        font-size: 0.65625rem; /* 10.5px */
+        font-weight: 800;
+        line-height: 1.3;
+        letter-spacing: 0.63px;
+        text-transform: uppercase;
+        color: var(--text-tertiary);
+      }
+
+      /* ══ BRUNNEN ═══════════════════════════════════════════════════
+         Frånvaro sjunker. Ersätter de suddade låskorten: ingen blur,
+         ingen hänglås-emoji, bara en nedsänkt yta som säger vad som
+         öppnar den.
+
+         Suddning är fel verktyg för det låsta. Den säger "här finns
+         något du inte får se" och gör innehållet till en lockvara. En
+         brunn säger "här kommer något att finnas" och är ärlig om att
+         det ännu är tomt. */
+      .brunn {
+        border-radius: var(--r-lg);
+        padding: 1.5rem 1.3rem;
+        text-align: center;
+        background: var(--sank-yta);
+        box-shadow: var(--sank-skugga);
+      }
+      .brunn .parla {
+        margin-bottom: 0.6rem;
+      }
+      .brunn-titel {
+        display: block;
+        font-size: var(--fs-body);
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+      }
+      .brunn-copy {
+        margin: 0 auto;
+        max-width: 46ch;
+        font-size: var(--fs-meta);
+        color: var(--text-tertiary);
+      }
+
+      /* ══ TONEN PER SEKTION ═════════════════════════════════════════
+         Vilken kulör ett kort lyfter i sätts här, på komponenten, i
+         stället för med en klass i markupen. Skälet är att markupen då
+         inte behöver röras alls — och en ombyggnad som inte rör markup
+         kan inte tappa en datakrok.
+
+         Tonvalet är inte dekoration utan betydelse. Grönt är analysen
+         och läkningen, lila är planeringen, orange är pengarna och
+         förberedelsen, blått är trygghet och grindar, cerise är
+         beslutet, varmt är tiden. Samma logik som Hair AI Doctor. */
+      .portal-files-panel,
+      .portal-photos-panel,
+      .portal-plan-evidence,
+      .timeline-card {
+        --ton: var(--success-rgb);
+      }
+      .ai-card,
+      .testimonial-card {
+        --ton: var(--violet-rgb);
+      }
+      .value-card,
+      .booking-card {
+        --ton: var(--warning-rgb);
+      }
+      .faq-card {
+        --ton: var(--info-rgb);
+      }
+      .sign-card,
+      .contact-card {
+        --ton: var(--accent-rgb);
+      }
+      .countdown-card {
+        --ton: 240, 150, 74;
+      }
+
+      /* Skuggan läser tonen. Ytan rörs inte — den är identisk på varje
+         kort i hela portalen, och det är hela poängen. Reglerna ligger
+         EFTER .card i filen, så de vinner utan att behöva !important
+         eller uppskruvad specificitet. */
+      .portal-files-panel,
+      .portal-photos-panel,
+      .portal-plan-evidence,
+      .timeline-card,
+      .ai-card,
+      .testimonial-card,
+      .value-card,
+      .booking-card,
+      .faq-card,
+      .contact-card,
+      .card.ton-lila,
+      .card.ton-orange,
+      .card.ton-gron,
+      .card.ton-bla {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          0 2px 6px rgba(var(--ton), 0.1),
+          0 12px 28px rgba(var(--ton), 0.16),
+          0 28px 56px rgba(var(--ton), 0.07);
+      }
+
+      /* ══ SEKTIONSRUBRIKEN FÅR SIN PÄRLA ════════════════════════════
+         Rubriken var tidigare bara versaltext. Pärlan ger sektionen ett
+         ankare och bär dess ton, så att ögat vet var ett nytt stycke
+         börjar utan att en linje behöver dras. Gjord som ::before, så
+         ingen markup behöver ändras. */
+      .section-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      .section-heading::before {
+        content: '';
+        flex: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.75), transparent 60%),
+          linear-gradient(180deg, rgba(var(--ton), 0.34), rgba(var(--ton), 0.16));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.7),
+          0 2px 5px rgba(var(--ton), 0.28);
+      }
+      .section-heading::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(var(--ton), 0.28);
+      }
+
+      /* ══ DET LÅSTA SJUNKER ═════════════════════════════════════════
+         .locked-card hade en ljus yta med suddat innehåll bakom. Det
+         gjorde det låsta till en lockvara: "här finns något du inte får
+         se". En brunn säger i stället "här kommer något att finnas" och
+         är ärlig om att platsen ännu är tom.
+
+         Hänglås-emojin döljs. Meningen bärs redan av .locked-unlock, som
+         säger NÄR det öppnas — det är den upplysning patienten behöver,
+         inte en symbol för att något är stängt. */
+      .locked-card {
+        --ton: var(--info-rgb);
+        background: var(--sank-yta);
+        border: none;
+        box-shadow: var(--sank-skugga);
+      }
+      .locked-card .locked-badge {
+        display: none;
+      }
+      .locked-card .locked-icon {
+        color: rgb(var(--ton));
+      }
+
+      /* ══ TILLVÄXTDIAGRAMMET ════════════════════════════════════════
+         De tolv staplarna fanns redan — det som saknades var fysiken.
+         Bädden sänks ner, staplarna reser sig ur den med ljuslinje i
+         överkant och skugga under. Färgen på varje stapel ligger kvar
+         som inline-stil eftersom den kodar fasen (chockfall, vilofas,
+         tillväxt) och sätts per kolumn; den rörs inte här. */
+      .tl-months {
+        border-radius: var(--r-md);
+        padding: 0.55rem 0.5rem 0.35rem;
+        background: var(--sank-yta);
+        box-shadow: var(--sank-skugga);
+      }
+      .tl-bar {
+        border-radius: 4px 4px 2px 2px;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          0 1px 3px rgba(var(--sh-rgb), 0.18);
+      }
+
+      /* ══ FASPRICKARNA ══════════════════════════════════════════════
+         Låg som platta cirklar med inline-färg. Får samma ljus som
+         .prick: högdager uppe till vänster och en liten skugga under,
+         så att de läser som pärlor i miniatyr i stället för som klistrade
+         punkter. Bakgrundsfärgen kommer fortsatt inline och rörs inte. */
+      .tl-phase-dot {
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.35),
+          0 1px 3px rgba(var(--sh-rgb), 0.28);
+      }
+
+      /* ══ BILDUPPLADDNINGENS LÅS ════════════════════════════════════
+         Grinden fanns redan — kortet bär data-unlock="3" och rutan
+         .photos-locked säger att uppladdning öppnas efter signering.
+         Det som var fel var formen: en STRECKAD kant, samma "urklippt"
+         som det låsta steget i kundresan hade. Nu sjunker den i stället,
+         med samma sats som .brunn och de låsta korten.
+
+         Grinden i sig rörs inte. Det här är enbart hur den ser ut. */
+      .photos-locked {
+        --ton: var(--success-rgb);
+        border: none;
+        background: var(--sank-yta);
+        box-shadow: var(--sank-skugga);
+      }
+      .photos-locked-icon {
+        color: rgb(var(--ton));
       }
 
       *,
@@ -459,10 +789,16 @@
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
         animation: pulse-step 2.4s ease-in-out infinite;
       }
+      /* DET LÅSTA STEGET SJUNKER, det streckas inte.
+         Den streckade kanten sa "urklippt" — ett hål i sidan. Men steget
+         är inte borta, det ligger framför patienten. En nedsänkt bricka
+         säger just det: platsen finns, den är bara inte fylld än.
+         Samma sats som .brunn, så hela språket är konsekvent — innehåll
+         och aktiva val lyfter, frånvaro och kontroller sjunker. */
       .step-dot.locked {
-        background: rgba(var(--muted-rgb), 0.1);
+        background: var(--sank-yta);
         color: var(--text-tertiary);
-        border: 1.5px dashed rgba(var(--muted-rgb), 0.32);
+        box-shadow: var(--sank-skugga);
       }
       @keyframes pulse-step {
         0%,
@@ -535,7 +871,18 @@
         border-radius: var(--panel-radius);
         background: var(--card-bg);
         border: var(--card-border);
-        box-shadow: var(--card-shadow);
+        /* Patientbandet lyfter i accentens kulör, inte i neutralt brunt.
+           Det är sidans första kort och sätter tonen för resten: ytan är
+           densamma som alla andra kort, det enda som skiljer är vilken
+           färg ljuset under det har. --ton sätts här i regeln i stället
+           för via en klass i markupen, så att inget element behöver
+           röras. */
+        --ton: var(--accent-rgb);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          0 2px 6px rgba(var(--ton), 0.1),
+          0 12px 28px rgba(var(--ton), 0.16),
+          0 28px 56px rgba(var(--ton), 0.07);
         margin-bottom: var(--gap);
       }
       /* Pärlan. Receptet är AID:s .aid-parla — radialt ljus uppe till
@@ -2906,8 +3253,8 @@
         font-style: italic;
       }
 
-      /* KLARNA CHIP */
-      .klarna-chip {
+      /* FINANSIERINGSCHIP */
+      .finans-chip {
         display: flex;
         align-items: center;
         gap: 0.4rem;
@@ -2920,10 +3267,10 @@
         font-weight: 600;
         color: rgba(140, 88, 10, 0.85);
       }
-      .klarna-chip svg {
+      .finans-chip svg {
         flex-shrink: 0;
       }
-      .klarna-chip-k {
+      .finans-chip-k {
         font-weight: 800;
         color: rgba(255, 90, 130, 1);
         font-style: italic;
@@ -3995,223 +4342,7 @@
       </section>
 
       <!-- TIDSLINJE -->
-      <div class="timeline-card" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
-        <div class="tl-title">Förväntad hårväxt · Månad 1–12</div>
-        <div class="tl-months" aria-hidden="true">
-          <!-- heights in % of 3.5rem container; colors: danger=shock, warning=vila, cal=start, success=full -->
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 95%; background: rgba(var(--danger-rgb), 0.25)"
-            ></div>
-            <div class="tl-num">1</div>
-          </div>
-          <div class="tl-col">
-            <div class="tl-bar" style="height: 85%; background: rgba(var(--danger-rgb), 0.2)"></div>
-            <div class="tl-num">2</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 30%; background: rgba(var(--warning-rgb), 0.22)"
-            ></div>
-            <div class="tl-num">3</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 38%; background: rgba(var(--warning-rgb), 0.35)"
-            ></div>
-            <div class="tl-num">4</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 48%; background: rgba(var(--warning-rgb), 0.45)"
-            ></div>
-            <div class="tl-num">5</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 58%; background: rgba(var(--warning-rgb), 0.55)"
-            ></div>
-            <div class="tl-num">6</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 70%; background: rgba(var(--success-rgb), 0.45)"
-            ></div>
-            <div class="tl-num">7</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 78%; background: rgba(var(--success-rgb), 0.55)"
-            ></div>
-            <div class="tl-num">8</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 84%; background: rgba(var(--success-rgb), 0.65)"
-            ></div>
-            <div class="tl-num">9</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 90%; background: rgba(var(--success-rgb), 0.75)"
-            ></div>
-            <div class="tl-num">10</div>
-          </div>
-          <div class="tl-col">
-            <div
-              class="tl-bar"
-              style="height: 95%; background: rgba(var(--success-rgb), 0.85)"
-            ></div>
-            <div class="tl-num">11</div>
-          </div>
-          <div class="tl-col">
-            <div class="tl-bar" style="height: 100%; background: var(--success)"></div>
-            <div class="tl-num">12</div>
-          </div>
-        </div>
-        <div class="tl-phases">
-          <span class="tl-phase"
-            ><span class="tl-phase-dot" style="background: rgba(var(--danger-rgb), 0.5)"></span
-            >Chockfall (mån 1–2)</span
-          >
-          <span class="tl-phase"
-            ><span class="tl-phase-dot" style="background: rgba(var(--warning-rgb), 0.6)"></span
-            >Vilofas (mån 3–6)</span
-          >
-          <span class="tl-phase"
-            ><span class="tl-phase-dot" style="background: var(--success)"></span>Synlig tillväxt
-            (mån 7+)</span
-          >
-        </div>
-        <div class="tl-note">
-          Chockfallet i månad 1–2 är normalt och förväntat — hårstråna faller men hårsäckarna är
-          intakta och börjar producera nytt hår.
-        </div>
-      </div>
-
-      <div
-        class="sign-card"
-        id="mainSignCard"
-        data-unlock="1"
-        data-tease-label="🔒 Offert skickas snart"
-      >
-        <div class="status-chip" data-portal-status-chip>
-          <span class="dot"></span>Väntar på din signatur
-        </div>
-        <h3 data-portal-sign-title>Godkänn din behandlingsplan</h3>
-        <p data-portal-sign-copy>
-          Läs igenom offerten nedan och bekräfta nedanstående — sedan signerar du med Mobilt BankID.
-          Juridiskt bindande och säkert.
-        </p>
-        <div class="portal-status-panel" aria-live="polite">
-          <div class="portal-status-row">
-            <span>Offert</span>
-            <strong data-portal-quote-status>Väntar</strong>
-          </div>
-          <div class="portal-status-row">
-            <span>Signering</span>
-            <strong data-portal-esign-status>Ej signerad</strong>
-          </div>
-          <div class="portal-status-row">
-            <span>Betänketid</span>
-            <strong data-portal-cooling-status>Kontrolleras</strong>
-          </div>
-          <div class="portal-status-next" data-portal-next-step>
-            Läs igenom offerten och signera när allt stämmer.
-          </div>
-        </div>
-
-        <div class="medical-warn">
-          <div class="medical-warn-icon">⚠️</div>
-          <div class="medical-warn-text">
-            <strong>Medicinsk information</strong>
-            Informera kliniken om du tar blodförtunnande läkemedel, Minoxidil eller annan
-            hårvårdsbehandling innan du signerar.
-          </div>
-        </div>
-
-        <div class="consent-list">
-          <label class="consent-item">
-            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
-            <span class="consent-label"
-              >Jag har läst och förstår behandlingsplanen och prisspecifikationen</span
-            >
-          </label>
-          <label class="consent-item">
-            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
-            <span class="consent-label"
-              >Jag bekräftar att min uppgivna medicinska historik är korrekt och fullständig</span
-            >
-          </label>
-          <label class="consent-item">
-            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
-            <span class="consent-label"
-              >Jag förstår att det slutliga resultatet varierar individuellt och utvärderas vid 12
-              månader</span
-            >
-          </label>
-        </div>
-
-        <button id="bankidBtn" class="btn-bankid" type="button" onclick="startBankID()">
-          <svg width="22" height="22" viewBox="0 0 44 44" fill="none" aria-hidden="true">
-            <rect width="44" height="44" rx="8" fill="rgba(255,255,255,.15)" />
-            <rect x="7" y="11" width="30" height="6" rx="3" fill="white" />
-            <rect x="7" y="20" width="19" height="6" rx="3" fill="white" />
-            <rect x="7" y="29" width="24" height="6" rx="3" fill="white" />
-          </svg>
-          Signera med Mobilt BankID
-        </button>
-
-        <div class="bankid-signed" id="bankidSigned">
-          <div class="bankid-signed-check">✓</div>
-          <div class="bankid-signed-title">Signering slutförd</div>
-          <div class="bankid-signed-meta">
-            Signerad av <span data-offer-customer-name>Adam Karlsson</span> ·
-            <span id="signedTime"></span><br />Bekräftelse skickas till din e-post
-          </div>
-        </div>
-
-        <!-- NEDRÄKNING (visas efter signering) -->
-        <div class="countdown-card" id="countdownCard">
-          <div class="countdown-days" id="countdownDays">78</div>
-          <div class="countdown-label">dagar till operation</div>
-          <div class="countdown-date">15 september 2026 · kl 08:00 · Hair TP Clinic Göteborg</div>
-          <div class="countdown-msg">
-            🌱 Din resa har börjat. Förberedelseguiden är nu upplåst — läs igenom den lugnt under
-            nästa vecka.
-          </div>
-        </div>
-
-        <button class="btn-pdf" type="button" onclick="window.print()" data-offer-document-pdf>
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Spara offert som PDF
-        </button>
-        <a class="btn-pdf" href="#" target="_blank" rel="noopener" data-offer-document-link hidden>
-          Öppna offertunderlag
-        </a>
-      </div>
-
-      <div class="section-heading" data-unlock="1" data-tease-label="">Din offert</div>
+      <div class="section-heading ton-gron" data-unlock="1" data-tease-label="">Din offert</div>
 
       <div class="card portal-files-panel" data-portal-files-panel hidden>
         <div class="card-title">Mina underlag</div>
@@ -4254,7 +4385,7 @@
         <div class="plan-evidence-zones" data-plan-evidence-zones></div>
       </div>
 
-      <div class="card" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
+      <div class="card ton-lila" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
         <div class="ai-badge">AI-genererad planering</div>
         <div class="card-title">Planerade zoner · <span data-offer-method>DHI</span>-metoden</div>
         <div class="scalp-wrap" role="img" aria-label="Skalp-karta med planerade zoner">
@@ -4463,7 +4594,11 @@
         </div>
       </div>
 
-      <div class="card" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
+      <div
+        class="card ton-orange"
+        data-unlock="1"
+        data-tease-label="🔒 Låses upp när offert skickas"
+      >
         <div class="card-title">Prisspecifikation</div>
         <div class="price-row">
           <span class="price-label"
@@ -4484,7 +4619,7 @@
           <span class="price-label" style="font-weight: 700">Resterande på operationsdagen</span
           ><span class="price-val total" data-offer-total-amount>54 000 kr</span>
         </div>
-        <div class="klarna-chip">
+        <div class="finans-chip">
           <svg
             width="14"
             height="14"
@@ -4497,8 +4632,20 @@
             <rect x="2" y="5" width="20" height="14" rx="2" />
             <line x1="2" y1="10" x2="22" y2="10" />
           </svg>
-          Finansiering tillgänglig via&nbsp;<span class="klarna-chip-k">Klarna</span>&nbsp;· från 1
-          800 kr/mån
+          <!-- BETALSÄTTEN KOMMER UR AVTALET, inte ur marknadsföring.
+               steg7-offert-tp-final-demo.html rad 612–618, Betalningsvillkor:
+               "Betalning ska erläggas via faktura, betalkort eller finansiering
+               via Medical Finance (ingen kontantbetalning) och vara
+               Tjänsteutövaren tillhanda innan behandlingen påbörjas."
+               Här stod tidigare "Finansiering tillgänglig via Klarna · från
+               1 800 kr/mån". Klarna är inte ett av de betalsätt avtalet
+               tillåter, och månadsbeloppet hade ingen källa någonstans.
+               Räntefritt upp till 24 månader kommer ur klinikfakta rad 46–48,
+               som också slår fast att längre planer ALDRIG erbjuds. -->
+          Faktura, betalkort eller räntefri delbetalning upp till 24 månader via&nbsp;<span
+            class="finans-chip-k"
+            >Medical Finance</span
+          >
         </div>
       </div>
 
@@ -4594,7 +4741,224 @@
         </div>
       </div>
 
-      <div class="section-heading" data-unlock="1" data-tease-label="">AI-analys</div>
+      <div class="timeline-card" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
+        <div class="tl-title">Förväntad hårväxt · Månad 1–12</div>
+        <div class="tl-months" aria-hidden="true">
+          <!-- heights in % of 3.5rem container; colors: danger=shock, warning=vila, cal=start, success=full -->
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 95%; background: rgba(var(--danger-rgb), 0.25)"
+            ></div>
+            <div class="tl-num">1</div>
+          </div>
+          <div class="tl-col">
+            <div class="tl-bar" style="height: 85%; background: rgba(var(--danger-rgb), 0.2)"></div>
+            <div class="tl-num">2</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 30%; background: rgba(var(--warning-rgb), 0.22)"
+            ></div>
+            <div class="tl-num">3</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 38%; background: rgba(var(--warning-rgb), 0.35)"
+            ></div>
+            <div class="tl-num">4</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 48%; background: rgba(var(--warning-rgb), 0.45)"
+            ></div>
+            <div class="tl-num">5</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 58%; background: rgba(var(--warning-rgb), 0.55)"
+            ></div>
+            <div class="tl-num">6</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 70%; background: rgba(var(--success-rgb), 0.45)"
+            ></div>
+            <div class="tl-num">7</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 78%; background: rgba(var(--success-rgb), 0.55)"
+            ></div>
+            <div class="tl-num">8</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 84%; background: rgba(var(--success-rgb), 0.65)"
+            ></div>
+            <div class="tl-num">9</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 90%; background: rgba(var(--success-rgb), 0.75)"
+            ></div>
+            <div class="tl-num">10</div>
+          </div>
+          <div class="tl-col">
+            <div
+              class="tl-bar"
+              style="height: 95%; background: rgba(var(--success-rgb), 0.85)"
+            ></div>
+            <div class="tl-num">11</div>
+          </div>
+          <div class="tl-col">
+            <div class="tl-bar" style="height: 100%; background: var(--success)"></div>
+            <div class="tl-num">12</div>
+          </div>
+        </div>
+        <div class="tl-phases">
+          <span class="tl-phase"
+            ><span class="tl-phase-dot" style="background: rgba(var(--danger-rgb), 0.5)"></span
+            >Chockfall (mån 1–2)</span
+          >
+          <span class="tl-phase"
+            ><span class="tl-phase-dot" style="background: rgba(var(--warning-rgb), 0.6)"></span
+            >Vilofas (mån 3–5)</span
+          >
+          <span class="tl-phase"
+            ><span class="tl-phase-dot" style="background: var(--success)"></span>Tydlig skillnad
+            (mån 6)</span
+          >
+        </div>
+        <div class="tl-note">
+          Chockfallet i månad 1–2 är normalt och förväntat — hårstråna faller men hårsäckarna är
+          intakta och börjar producera nytt hår. Tydlig skillnad syns vid 6 månader, och
+          slutresultatet efter 10–12 månader.
+        </div>
+      </div>
+
+      <div
+        class="sign-card"
+        id="mainSignCard"
+        data-unlock="1"
+        data-tease-label="🔒 Offert skickas snart"
+      >
+        <div class="status-chip" data-portal-status-chip>
+          <span class="dot"></span>Väntar på din signatur
+        </div>
+        <h3 data-portal-sign-title>Godkänn din behandlingsplan</h3>
+        <p data-portal-sign-copy>
+          Läs igenom offerten nedan och bekräfta nedanstående — sedan signerar du med Mobilt BankID.
+          Juridiskt bindande och säkert.
+        </p>
+        <div class="portal-status-panel" aria-live="polite">
+          <div class="portal-status-row">
+            <span>Offert</span>
+            <strong data-portal-quote-status>Väntar</strong>
+          </div>
+          <div class="portal-status-row">
+            <span>Signering</span>
+            <strong data-portal-esign-status>Ej signerad</strong>
+          </div>
+          <div class="portal-status-row">
+            <span>Betänketid</span>
+            <strong data-portal-cooling-status>Kontrolleras</strong>
+          </div>
+          <div class="portal-status-next" data-portal-next-step>
+            Läs igenom offerten och signera när allt stämmer.
+          </div>
+        </div>
+
+        <div class="medical-warn">
+          <div class="medical-warn-icon">⚠️</div>
+          <div class="medical-warn-text">
+            <strong>Medicinsk information</strong>
+            Informera kliniken om du tar blodförtunnande läkemedel, Minoxidil eller annan
+            hårvårdsbehandling innan du signerar.
+          </div>
+        </div>
+
+        <div class="consent-list">
+          <label class="consent-item">
+            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
+            <span class="consent-label"
+              >Jag har läst och förstår behandlingsplanen och prisspecifikationen</span
+            >
+          </label>
+          <label class="consent-item">
+            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
+            <span class="consent-label"
+              >Jag bekräftar att min uppgivna medicinska historik är korrekt och fullständig</span
+            >
+          </label>
+          <label class="consent-item">
+            <input type="checkbox" class="consent-check" onchange="updateSignBtn()" />
+            <span class="consent-label"
+              >Jag förstår att det slutliga resultatet varierar individuellt och utvärderas vid 12
+              månader</span
+            >
+          </label>
+        </div>
+
+        <button id="bankidBtn" class="btn-bankid" type="button" onclick="startBankID()">
+          <svg width="22" height="22" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+            <rect width="44" height="44" rx="8" fill="rgba(255,255,255,.15)" />
+            <rect x="7" y="11" width="30" height="6" rx="3" fill="white" />
+            <rect x="7" y="20" width="19" height="6" rx="3" fill="white" />
+            <rect x="7" y="29" width="24" height="6" rx="3" fill="white" />
+          </svg>
+          Signera med Mobilt BankID
+        </button>
+
+        <div class="bankid-signed" id="bankidSigned">
+          <div class="bankid-signed-check">✓</div>
+          <div class="bankid-signed-title">Signering slutförd</div>
+          <div class="bankid-signed-meta">
+            Signerad av <span data-offer-customer-name>Adam Karlsson</span> ·
+            <span id="signedTime"></span><br />Bekräftelse skickas till din e-post
+          </div>
+        </div>
+
+        <!-- NEDRÄKNING (visas efter signering) -->
+        <div class="countdown-card" id="countdownCard">
+          <div class="countdown-days" id="countdownDays">78</div>
+          <div class="countdown-label">dagar till operation</div>
+          <div class="countdown-date">15 september 2026 · kl 08:00 · Hair TP Clinic Göteborg</div>
+          <div class="countdown-msg">
+            🌱 Din resa har börjat. Förberedelseguiden är nu upplåst — läs igenom den lugnt under
+            nästa vecka.
+          </div>
+        </div>
+
+        <button class="btn-pdf" type="button" onclick="window.print()" data-offer-document-pdf>
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Spara offert som PDF
+        </button>
+        <a class="btn-pdf" href="#" target="_blank" rel="noopener" data-offer-document-link hidden>
+          Öppna offertunderlag
+        </a>
+      </div>
+
+      <div class="section-heading ton-lila" data-unlock="1" data-tease-label="">AI-analys</div>
       <div class="card ai-card" data-unlock="1" data-tease-label="🔒 Låses upp när offert skickas">
         <div class="ai-badge">Hair TP AI · personlig analys</div>
         <div class="insight-row">
@@ -4635,7 +4999,7 @@
         </div>
       </div>
 
-      <div class="section-heading" data-unlock="2" data-tease-label="">Kommande steg</div>
+      <div class="section-heading ton-bla" data-unlock="2" data-tease-label="">Kommande steg</div>
       <div class="locked-card" data-unlock="2" data-tease-label="🔒 Låses upp vid signering">
         <div class="locked-icon">📋</div>
         <div>
@@ -4664,7 +5028,7 @@
         <span class="locked-badge">🔒 Låst</span>
       </div>
 
-      <div class="section-heading" data-unlock="2" data-tease-label="">Vanliga frågor</div>
+      <div class="section-heading ton-bla" data-unlock="2" data-tease-label="">Vanliga frågor</div>
       <div
         class="faq-card"
         id="faqCard"
@@ -4691,8 +5055,8 @@
             </svg>
           </summary>
           <div class="faq-a">
-            Operationen tar normalt 6–8 timmar beroende på antalet hårsäckar. Du är vaken under hela
-            ingreppet och får pauser. Ta gärna med öronsnäckor och en film att titta på.
+            Mellan 4 och 8 timmar beroende på antal grafter. Du går hem samma dag. Du är vaken under
+            hela ingreppet och får pauser — ta gärna med öronsnäckor och en film att titta på.
           </div>
         </details>
         <details class="faq-item">
@@ -4748,8 +5112,8 @@
             </svg>
           </summary>
           <div class="faq-a">
-            De flesta patienter ser tydlig tillväxt runt månad 4–5. Vid månad 7–8 är skillnaden
-            markant. Fullresultatet utvärderas vid 12 månader.
+            Tydlig skillnad vid 6 månader. Slutresultat efter 10–12 månader, eftersom
+            kollagenbildning och hårtillväxt behöver tid.
           </div>
         </details>
         <details class="faq-item">
@@ -4768,12 +5132,15 @@
           </summary>
           <div class="faq-a">
             Du når kliniken direkt via din portal. Hårspecialist Fazli Krasniqi svarar normalt inom
-            4 timmar på vardagar. Vid medicinska akutsituationer hänvisar vi till 1177.
+            4 timmar på vardagar. Vid akut vård: ring 1177 för rådgivning, eller 112 vid livshotande
+            symtom.
           </div>
         </details>
       </div>
 
-      <div class="section-heading" data-unlock="2" data-tease-label="">Dina bokningar</div>
+      <div class="section-heading ton-orange" data-unlock="2" data-tease-label="">
+        Dina bokningar
+      </div>
 
       <div
         class="booking-card booking-op"
@@ -4947,7 +5314,7 @@
         </button>
       </div>
 
-      <div class="section-heading" data-unlock="3" data-tease-label="">Dina bilder</div>
+      <div class="section-heading ton-gron" data-unlock="3" data-tease-label="">Dina bilder</div>
       <div
         class="card"
         data-unlock="3"
@@ -4979,7 +5346,7 @@
         </div>
       </div>
 
-      <div class="section-heading">Din kontakt</div>
+      <div class="section-heading ton-cerise">Din kontakt</div>
       <div class="contact-card">
         <div class="contact-avatar">👨‍⚕️</div>
         <div>
