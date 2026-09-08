@@ -1,0 +1,103 @@
+[
+  {
+    "origin": "A331",
+    "date": "2026-07-10",
+    "description": "RATTELSE A331 · Meta ref VN57KU5L42 · Amex 1008",
+    "rows": [
+      { "Account": 2893, "Credit": 7096.0, "TransactionInformation": "Meta VN57KU5L42" },
+      { "Account": 1930, "Debit": 7096.0, "TransactionInformation": "aterfor felaktig betalning" },
+      { "Account": 5911, "Debit": 7096.0 },
+      { "Account": 5900, "Credit": 7096.0, "TransactionInformation": "aterfor gruppkonto" }
+    ]
+  },
+  {
+    "origin": "A332",
+    "date": "2026-07-07",
+    "description": "RATTELSE A332 · Meta ref XYTK3TDL42 · Amex 1008",
+    "rows": [
+      { "Account": 2893, "Credit": 7096.0, "TransactionInformation": "Meta XYTK3TDL42" },
+      { "Account": 1930, "Debit": 7096.0 },
+      { "Account": 5911, "Debit": 7096.0 },
+      { "Account": 5900, "Credit": 7096.0 }
+    ]
+  },
+  {
+    "origin": "A333",
+    "date": "2026-07-01",
+    "description": "RATTELSE A333 · Meta ref 9MH3MSVK42 · FBADS-066-106218592 · Amex 1008",
+    "rows": [
+      { "Account": 2893, "Credit": 7096.0, "TransactionInformation": "Meta 9MH3MSVK42" },
+      { "Account": 1930, "Debit": 7096.0 },
+      { "Account": 5911, "Debit": 7096.0 },
+      { "Account": 5900, "Credit": 7096.0 }
+    ]
+  },
+  {
+    "origin": "A334",
+    "date": "2026-07-03",
+    "description": "RATTELSE A334 · Meta ref BQREPSMK42 · Amex 1008",
+    "rows": [
+      { "Account": 2893, "Credit": 7096.0, "TransactionInformation": "Meta BQREPSMK42" },
+      { "Account": 1930, "Debit": 7096.0 },
+      { "Account": 5911, "Debit": 7096.0 },
+      { "Account": 5900, "Credit": 7096.0 }
+    ]
+  },
+  {
+    "origin": "A348",
+    "date": "2026-07-14",
+    "description": "RATTELSE A348 · Meta ref YA64TTDL42 · Mastercard 3888 HB-kort",
+    "rows": [
+      { "Account": 2412, "Credit": 7474.82, "TransactionInformation": "Meta YA64TTDL42" },
+      { "Account": 1930, "Debit": 7474.82 },
+      { "Account": 5911, "Debit": 7474.82 },
+      { "Account": 5900, "Credit": 7474.82 }
+    ]
+  },
+  {
+    "origin": "A350",
+    "date": "2026-07-15",
+    "description": "RATTELSE A350 · Meta ref ZLTFXTRK42 · Amex 1008",
+    "rows": [
+      { "Account": 2893, "Credit": 1285.83, "TransactionInformation": "Meta ZLTFXTRK42" },
+      { "Account": 1930, "Debit": 1285.83 },
+      { "Account": 5911, "Debit": 1285.83 },
+      { "Account": 5900, "Credit": 1285.83 }
+    ]
+  },
+  {
+    "origin": "A352",
+    "date": "2026-07-16",
+    "description": "RATTELSE A352 · Meta ref S3TH9VML42 · Amex 6005",
+    "rows": [
+      { "Account": 2893, "Credit": 5322.0, "TransactionInformation": "Meta S3TH9VML42" },
+      { "Account": 1930, "Debit": 5322.0 },
+      { "Account": 5911, "Debit": 5322.0 },
+      { "Account": 5900, "Credit": 5322.0 }
+    ]
+  },
+  {
+    "origin": "A2226",
+    "date": "2026-07-25",
+    "description": "RATTELSE A2226 · Meta ref K3NQYUDL42 · Amex 6005 · lagger till omvand moms",
+    "rows": [
+      { "Account": 2893, "Credit": 6710.02, "TransactionInformation": "Meta K3NQYUDL42" },
+      { "Account": 1930, "Debit": 6710.02 },
+      { "Account": 5911, "Debit": 6710.02 },
+      { "Account": 5900, "Credit": 6710.02 },
+      { "Account": 2614, "Credit": 1677.51 },
+      { "Account": 2645, "Debit": 1677.51 }
+    ]
+  },
+  {
+    "origin": null,
+    "date": "2026-07-19",
+    "description": "Meta annonser · ref QTRMKV5L42 · Amex 6005 · ej tidigare bokford",
+    "rows": [
+      { "Account": 2893, "Credit": 7096.0, "TransactionInformation": "Meta QTRMKV5L42" },
+      { "Account": 5911, "Debit": 7096.0 },
+      { "Account": 2614, "Credit": 1774.0 },
+      { "Account": 2645, "Debit": 1774.0 }
+    ]
+  }
+]
