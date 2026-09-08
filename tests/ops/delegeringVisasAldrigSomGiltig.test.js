@@ -335,20 +335,132 @@ test('en tills vidare-delegering som ännu inte börjat gälla är inte giltig',
   assert.notEqual(status, STATUS.TILLS_VIDARE);
 });
 
+test('samma fall bedöms lika oavsett vilken tidpunkt som pinnas', async () => {
+  // Beviset att förra buggen är borta, inte bara passerad.
+  //
+  // Det räcker inte att sviten är grön idag — den var grön i fem dagar
+  // förra gången också. Om tiden verkligen är en indata måste EXAKT samma
+  // fall ge exakt samma svar vare sig det utspelar sig 2019 eller 2099.
+  // Gör det inte det läcker väggklockan in någonstans.
+  const tidpunkter = [
+    new Date('2019-03-14T08:00:00.000Z'),
+    new Date('2026-09-03T10:00:00.000Z'),
+    new Date('2099-11-30T23:59:00.000Z'),
+  ];
+
+  const svar = [];
+  for (const nu of tidpunkter) {
+    // ÄVEN startdatumet måste vara relativt. Första versionen av det här
+    // testet ärvde bas.issuedAt = 2026-01-15, alltså ett ABSOLUT datum, och
+    // föll på 2019 — helt riktigt, för en delegering utfärdad 2026 HAR inte
+    // börjat gälla 2019. Det var testet som blandade en pinnad klocka med
+    // en fast kalender, inte butiken som läckte.
+    const utfardad = new Date(nu.getTime() - 30 * 86400000).toISOString();
+    await medStore(async (store) => {
+      const om5 = await store.issueDelegation({
+        ...bas,
+        nu,
+        issuedAt: utfardad,
+        holderUserId: 'u-snart',
+        validUntil: new Date(nu.getTime() + 5 * 86400000).toISOString(),
+      });
+      const igar = await store.issueDelegation({
+        ...bas,
+        nu,
+        issuedAt: utfardad,
+        holderUserId: 'u-utgangen',
+        validUntil: new Date(nu.getTime() - 86400000).toISOString(),
+      });
+      const tillsVidare = await store.issueDelegation({
+        ...bas,
+        nu,
+        issuedAt: utfardad,
+        holderUserId: 'u-oppen',
+        validUntil: null,
+      });
+      svar.push([om5.status, igar.status, tillsVidare.status].join('/'));
+    });
+  }
+
+  assert.deepEqual(
+    [...new Set(svar)],
+    ['giltig/utgangen/tills_vidare'],
+    `Samma fall gav olika svar vid olika pinnade tidpunkter: ${svar.join(' | ')}. ` +
+      'Då läser någon väggklockan i stället för den tid som skickats in.'
+  );
+});
+
+test('utan eget startdatum stämplas posten vid den pinnade tidpunkten', async () => {
+  // Täcker fallbacken, inte bara den uttryckliga vägen.
+  //
+  // Testet ovan skickar alltid med issuedAt, så `|| nu.toISOString()` kördes
+  // aldrig. Sabotagekörningen avslöjade det: när stämpeln medvetet lades
+  // tillbaka på väggklockan föll INGET test. En rättelse som inget test når
+  // är en rättelse man tror att man har.
+  const nu = new Date('2031-06-01T12:00:00.000Z');
+  await medStore(async (store) => {
+    const utan = await store.issueDelegation({
+      ...bas,
+      nu,
+      issuedAt: undefined,
+      holderUserId: 'u-utan-startdatum',
+      validUntil: new Date(nu.getTime() + 10 * 86400000).toISOString(),
+    });
+    assert.equal(
+      utan.issuedAt,
+      nu.toISOString(),
+      'Stämpeln följde inte den tid som skickades in — då läcker väggklockan ' +
+        'in i posten, och samma fall får olika historik beroende på när det körs.'
+    );
+    assert.equal(utan.status, STATUS.GILTIG);
+
+    // Samma sak åt andra hållet. Sabotagekörningen visade att revokedAt
+    // kunde läggas tillbaka på väggklockan utan att ett enda test föll —
+    // återkallandet är den mest juridiskt laddade tidsstämpeln i hela
+    // modulen, och den var otäckt.
+    const aterkallad = await store.revokeDelegation({
+      id: utan.id,
+      revokedByUserId: 'u-lakare',
+      nu,
+    });
+    assert.equal(
+      aterkallad.revokedAt,
+      nu.toISOString(),
+      'Återkallandet stämplades med väggklockan i stället för den tid som ' +
+        'skickades in. En delegering är ett juridiskt dokument — när den ' +
+        'upphörde får inte bero på när koden råkade köras.'
+    );
+    assert.equal(aterkallad.status, STATUS.ATERKALLAD);
+  });
+});
+
 test('sammanfattningen räknar rätt kategorier', async () => {
   await medStore(async (store) => {
-    await store.issueDelegation({ ...bas, validUntil: '2030-01-01T00:00:00Z' });
+    // TIDEN ÄR EN INDATA, INTE EN FÖRUTSÄTTNING.
+    //
+    // Testet pinnade NU för läsningen (store.summary nedan) men lät
+    // skrivningen få väggklockan, eftersom issueDelegation saknade `nu`.
+    // Fixturen "NU + 5 dagar" var alltså giltig ända tills den riktiga
+    // tiden hann ikapp den — och det gjorde den 2026-09-08, fem dagar
+    // efter NU. Ett test som går sönder av att kalendern rör sig mäter
+    // inte det det påstår.
+    //
+    // Butiken tar nu emot `nu` i BÅDA riktningarna, så hela fallet
+    // bedöms mot en och samma tidpunkt.
+    await store.issueDelegation({ ...bas, nu: NU, validUntil: '2030-01-01T00:00:00Z' });
     const snart = await store.issueDelegation({
       ...bas,
+      nu: NU,
       holderUserId: 'u-b',
       validUntil: new Date(NU.getTime() + 5 * 86400000).toISOString(),
     });
     const attAterkalla = await store.issueDelegation({
       ...bas,
+      nu: NU,
       holderUserId: 'u-c',
       validUntil: '2030-01-01T00:00:00Z',
     });
-    await store.revokeDelegation({ id: attAterkalla.id, revokedByUserId: 'u-lakare' });
+    await store.revokeDelegation({ id: attAterkalla.id, revokedByUserId: 'u-lakare', nu: NU });
 
     const s = store.summary({ tenantId: bas.tenantId, nu: NU });
     assert.equal(s.total, 3);

@@ -275,7 +275,24 @@ async function createCcoDelegationStore({ filePath, auditLog = null } = {}) {
   }
 
   /** Utfärda en delegering. Endast läkare/ägare — RBAC sitter i routern. */
+  /**
+   * @param {object} input
+   * @param {Date} [input.nu] Tidpunkt statusen ska bedömas mot.
+   *
+   * NU SOM INDATA, INTE FÖRUTSÄTTNING. Alla LÄSVÄGAR (listForHolder,
+   * listIssuedBy, listForTenant, summary) har alltid tagit emot `nu`.
+   * Skrivvägarna gjorde det inte — de anropade tillVy(delegation) och
+   * fick väggklockan. Butiken hade alltså TVÅ klockor, och ett test som
+   * pinnade tiden fick sin skrivning bedömd mot en annan tid än sin
+   * läsning.
+   *
+   * Det syntes inte förrän 2026-09-08, när en fixtur skriven som "NU + 5
+   * dagar" hann passera den riktiga tiden och en post som skulle vara
+   * giltig lästes som utgången. Ett test som går sönder av att kalendern
+   * rör sig mäter inte det det påstår.
+   */
   async function issueDelegation(input = {}) {
+    const nu = input.nu instanceof Date ? input.nu : new Date();
     const tenantId = normalizeText(input.tenantId);
     const holderUserId = normalizeText(input.holderUserId);
     const medicationId = normalizeText(input.medicationId);
@@ -337,7 +354,12 @@ async function createCcoDelegationStore({ filePath, auditLog = null } = {}) {
       medicationAtc: lakemedel.atc,
       issuedByUserId,
       issuedByName: normalizeText(input.issuedByName) || null,
-      issuedAt: normalizeText(input.issuedAt) || nowIso(),
+      // Stampeln foljer samma klocka som bedomningen. Stod nowIso() har,
+      // alltsa vaggklockan: skickade man in ett nu i det forflutna blev
+      // posten utfardad i FRAMTIDEN relativt den tiden, och lastes som
+      // ej_borjat. Klockan var da bara halvt injicerad — bedomningen tog
+      // emot den, stampeln inte.
+      issuedAt: normalizeText(input.issuedAt) || nu.toISOString(),
       validUntil: validUntil || null,
       revokedAt: null,
       revokedReason: null,
@@ -355,22 +377,23 @@ async function createCcoDelegationStore({ filePath, auditLog = null } = {}) {
       treatmentArea,
       validUntil,
     });
-    return tillVy(delegation);
+    return tillVy(delegation, nu);
   }
 
   /**
    * Återkalla. Terminalt — en återkallad delegering går aldrig tillbaka.
    * Posten raderas inte: att den funnits är en händelse som inträffat.
    */
-  async function revokeDelegation({ id, revokedByUserId, reason } = {}) {
+  async function revokeDelegation({ id, revokedByUserId, reason, nu } = {}) {
+    const bedomsVid = nu instanceof Date ? nu : new Date();
     const delegationId = normalizeText(id);
     if (!delegationId) throw badRequest('id krävs.');
 
     const delegation = state.delegations.find((d) => d.id === delegationId);
     if (!delegation) return null;
-    if (delegation.revokedAt) return tillVy(delegation);
+    if (delegation.revokedAt) return tillVy(delegation, bedomsVid);
 
-    delegation.revokedAt = nowIso();
+    delegation.revokedAt = bedomsVid.toISOString();
     delegation.revokedReason = normalizeText(reason) || null;
     delegation.revokedByUserId = normalizeText(revokedByUserId) || null;
     await save();
@@ -381,7 +404,7 @@ async function createCcoDelegationStore({ filePath, auditLog = null } = {}) {
       revokedByUserId: delegation.revokedByUserId,
       reason: delegation.revokedReason,
     });
-    return tillVy(delegation);
+    return tillVy(delegation, bedomsVid);
   }
 
   function filtrera({ tenantId = null, holderUserId = null, issuedByUserId = null } = {}) {
