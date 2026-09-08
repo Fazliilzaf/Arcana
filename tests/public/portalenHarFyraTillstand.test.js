@@ -96,7 +96,41 @@ test('T-201: avstängda kontroller har en egen, platt form', () => {
 });
 
 test('T-202: hover luras inte tillbaka liv i något avstängt', () => {
-  assert.ok(KOD.includes('.btn:disabled:hover'), 'en avstängd knapp reagerar fortfarande på hover');
+  // Testet letade tidigare efter den exakta strängen '.btn:disabled:hover'.
+  // Det höll bara så länge selektorn såg ut på precis ett sätt. När
+  // spökknappen och primärknappen fick var sin avstängd behandling
+  // — .btn:disabled:not(.primary) respektive .btn.primary:disabled —
+  // försvann strängen medan avsikten var oförändrad, och testet föll på
+  // sin egen formulering i stället för på ett fel.
+  //
+  // Nu kontrolleras SAKEN: varje avstängd variant måste ha en hover-regel
+  // som dödar både skugga och filter. Det är starkare än förut, eftersom
+  // det nu täcker båda varianterna i stället för en.
+  const hoverRegler = [...KOD.matchAll(/([^{}]*:disabled[^{}]*:hover[^{}]*)\{([^}]*)\}/g)];
+  assert.ok(hoverRegler.length >= 1, 'ingen hover-regel alls för avstängda kontroller');
+
+  for (const [, selektor, dek] of hoverRegler) {
+    assert.match(
+      dek,
+      /box-shadow:\s*none/,
+      `${selektor.trim().slice(0, 60)} låter skuggan leva vid hover`
+    );
+    assert.match(
+      dek,
+      /filter:\s*none/,
+      `${selektor.trim().slice(0, 60)} låter filtret leva vid hover`
+    );
+  }
+
+  const alla = hoverRegler.map((m) => m[1]).join(' ');
+  assert.ok(
+    /\.btn[^,{]*:disabled|\.btn[^,{]*\[disabled\]/.test(alla),
+    'spökknappens avstängda läge saknar hover-neutralisering'
+  );
+  assert.ok(
+    /\.btn\.primary[^,{]*(:disabled|\[disabled\])/.test(alla),
+    'primärknappens avstängda läge saknar hover-neutralisering'
+  );
 });
 
 test('T-203: den avstängda texten går fortfarande att LÄSA', () => {
