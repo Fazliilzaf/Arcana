@@ -3336,11 +3336,35 @@
         border-bottom: 1px solid rgba(var(--line-strong-rgb), 0.3);
         backdrop-filter: blur(12px);
         padding: 0.35rem var(--pad-x);
-        display: flex;
+        /* DOLD FÖR PATIENTEN ────────────────────────────────────────
+           Raden är märkt i markupen som stegväljare för prototyp-
+           granskning, men den saknade grind och låg synlig i drift för
+           alla som öppnade sin offert.
+
+           applyStage() är visserligen helt klientsidig — den togglar
+           .active, sätter stage-teased/stage-future på [data-unlock],
+           visar nedräkningen och döljer FAQ-overlayen. Servern rörs
+           inte, ingenting signeras, ingen post ändras. Det är alltså
+           ingen säkerhetslucka.
+
+           Men patienten kunde klicka "2 · Signerad" och därmed låsa upp
+           det suddade innehållet under Efter operation och Uppföljning,
+           så att portalen såg ut som om hen kommit längre än hen har.
+           På en sida som bär ett bindande BankID-flöde och en ångerfrist
+           på fjorton dagar är det ett sanningsproblem även utan att
+           något faktiskt ändras.
+
+           Grinden är densamma som personalbannern redan använder:
+           renderStaffPreviewBanner() sätter data-staff-preview på
+           <html>, och raden visas bara när den är sann. */
+        display: none;
         align-items: center;
         gap: 0.5rem;
         overflow-x: auto;
         scrollbar-width: none;
+      }
+      html[data-staff-preview='true'] .stage-bar {
+        display: flex;
       }
       .stage-bar::-webkit-scrollbar {
         display: none;
