@@ -1693,11 +1693,16 @@
         color: var(--danger);
         border-color: rgba(var(--danger-rgb), 0.3);
       }
-      .btn[disabled],
-      .btn:disabled,
+      /* SPÖKKNAPPEN plattas ut — den har ingen kulör att bevara.
+         .btn har background: none och förekommer 61 gånger (ORD-243).
+         Enbart nedtonad opacitet på något som redan är tyst syns knappt
+         som ett tillståndsbyte, så den får i stället en tydligt sänkt,
+         färglös yta. Den avsikten står kvar. */
+      .btn[disabled]:not(.primary),
+      .btn:disabled:not(.primary),
       .role-btn:disabled,
       .ordination-mode-btn:disabled,
-      button:disabled {
+      button:disabled:not(.primary) {
         opacity: 1;
         box-shadow: none;
         background: rgba(var(--brand-rgb), 0.045);
@@ -1706,12 +1711,35 @@
         cursor: not-allowed;
         filter: none;
       }
-      .btn[disabled]:hover,
-      .btn:disabled:hover,
+      .btn[disabled]:not(.primary):hover,
+      .btn:disabled:not(.primary):hover,
       .role-btn:disabled:hover,
       .ordination-mode-btn:disabled:hover,
-      button:disabled:hover {
+      button:disabled:not(.primary):hover {
         background: rgba(var(--brand-rgb), 0.045);
+        box-shadow: none;
+        filter: none;
+      }
+      /* PRIMÄRKNAPPEN behåller sin salvia och tonas ned i stället.
+         Den plattades tidigare ut tillsammans med spökknapparna, och då
+         försvann det enda stället på sidan som bär varumärkets gröna.
+         Hair AI Doctor har en enda regel för det här — disabled:opacity-50
+         på .btn — och knappen behåller sin kulör.
+
+         Ingen background skrivs om här, så gradienten från .btn.primary
+         står kvar. Det slipper duplicera #2e5a47, som inte är en token.
+
+         WCAG 1.4.3 undantar inaktiva komponenter, så nedtoningen binder
+         inte mot kontrastkravet. */
+      .btn.primary[disabled],
+      .btn.primary:disabled {
+        opacity: 0.45;
+        box-shadow: none;
+        cursor: not-allowed;
+        filter: none;
+      }
+      .btn.primary[disabled]:hover,
+      .btn.primary:disabled:hover {
         box-shadow: none;
         filter: none;
       }

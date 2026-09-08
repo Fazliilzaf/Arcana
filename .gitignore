@@ -95,3 +95,6 @@ tmp/
 # Säkerhetskopior av .env — innehåller hemligheter, får aldrig committas (ORD-156)
 .env.bak-*
 .env.backup*
+
+# Redigerarens arbetsyta — personlig per maskin, inte projektets.
+*.code-workspace
