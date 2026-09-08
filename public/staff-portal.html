@@ -997,8 +997,15 @@
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(253, 238, 244, 0.52));
         box-shadow: var(--djup-liten);
       }
+      /* BUGG, hittad av portalFargsprak-testet: har stod var(--rose) och
+         var(--text). Ingen av dem har nagonsin definierats i filen — CSS
+         foll darfor tillbaka pa inherit, och de fyra elementen tog
+         foralderns farg i stallet for sin egen. Inget kraschar, inget
+         varnar, och raden ser helt riktig ut i granskning.
+         --accent ar portalens rosa (#bb4779), --brand dess black (#2b251f,
+         med 35 andra avlasningar). */
       .next-action-kicker {
-        color: var(--rose);
+        color: var(--accent);
         font-size: var(--txt-etikett);
         font-weight: 900;
         letter-spacing: 0.08em;
@@ -1006,7 +1013,7 @@
       }
       .next-action-title {
         margin-top: 3px;
-        color: var(--text);
+        color: var(--brand);
         font-size: 13px;
         font-weight: 850;
       }
@@ -1049,7 +1056,7 @@
         text-transform: uppercase;
       }
       .case-detail-value {
-        color: var(--text);
+        color: var(--brand);
         font-size: 12px;
         font-weight: 750;
         overflow-wrap: anywhere;
@@ -1079,7 +1086,7 @@
         background: rgba(var(--sage-rgb), 0.08);
       }
       .checklist-progress-label {
-        color: var(--text);
+        color: var(--brand);
         font-size: var(--txt-liten);
         font-weight: 800;
         overflow-wrap: anywhere;

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#b0356e" />
+    <meta name="theme-color" content="var(--accent)" />
     <!-- Brandmärke ARCANA → Hair TP Clinic-logga (avsiktlig visuell ändring) -->
     <meta name="visual-regression" content="intentional-change" />
     <title>Din plan · Hair TP Clinic</title>
@@ -23,10 +23,66 @@
         --bg-rail: #fbf7f2;
 
         /* ARCANA brand */
+        /* SAMMA FÄRGER SOM TRIPLETT ─────────────────────────────────
+           Ingen av de sju semantiska färgerna fanns som rgb-triplett, och
+           en hex går inte att använda i rgba(). Därför skrevs varje skugga
+           som bar en kulör för hand — 27 stycken vid mätning. Filen bevisar
+           behovet själv: --accent-border nedan är redan tripletten inskriven.
+
+           Med tripletterna kan skuggan läsa samma källa som ytan. Det är
+           inte kosmetik: .step-dot.done hade ytan i var(--success) men
+           skuggan i rgba(42, 110, 82) — nästan, men inte, samma gröna.
+           Sådant syns aldrig i granskning och alltid i efterhand. */
+        --accent-rgb: 176, 53, 110;
+        --violet-rgb: 107, 49, 201;
+        --gold-rgb: 138, 95, 30;
+        --success-rgb: 47, 111, 84;
+        --warning-rgb: 154, 100, 16;
+        --danger-rgb: 168, 56, 56;
+        --info-rgb: 47, 101, 149;
+
+        /* DE NAMNLÖSA SOM ANVÄNDS MEST ──────────────────────────────
+           Räknat i filen, utanför :root. Ingen av dem hade ett namn, och
+           flera används oftare än de färger som har det:
+             #cabaae      29 ggr · dämpad linje och inaktiv yta
+             167,145,125  29 ggr · hårlinje och avdelare
+             223,212,203  12 ggr · den ljusa kanten runt kort
+             250,246,242  10 ggr · är EXAKT --bg-page, skrivet för hand
+             180,165,150   6 ggr · kortkanten, redan i --card-border
+             101,75,152    5 ggr · dämpad violett i atmosfärsgradienterna
+             255,252,248   5 ggr · varm nästan-vit yta
+             #8c2455       4 ggr · accentens mörka ände
+             #1b4f3a       4 ggr · den grönas mörka ände
+           En färg som används 29 gånger utan namn är inte ett undantag,
+           den är en del av paletten som ingen skrivit ner. */
+        --muted-rgb: 167, 145, 125;
+        --line-rgb: 223, 212, 203;
+        --line-strong-rgb: 180, 165, 150;
+        --bg-page-rgb: 250, 246, 242;
+        --bg-warm-rgb: 255, 252, 248;
+        --violet-mist-rgb: 101, 75, 152;
+        --muted-solid: #cabaae;
+        --accent-deep: #8c2455;
+        --success-deep: #1b4f3a;
+
+        /* Den ljusa änden i graftdiagrammets tre gradienter. Låg som nakna
+           hex i markupen: #c85080, #8a52dc, #b07c30. De är DESIGNADE värden,
+           inte slumpade — mättade lyft, inte utblandning mot vitt, vilket
+           color-mix mot white hade gett (mätt: #c1618e i stället för
+           #c85080). Därför namn i stället för härledning. */
+        --accent-lift: #c85080;
+        --violet-lift: #8a52dc;
+        --gold-lift: #b07c30;
+
+        /* BankID:s egen märkesblå. Ligger MEDVETET utanför paletten —
+           knappen ska se ut som BankID, inte som portalen. Namngiven för
+           att den användes på fyra ställen som en naken triplett. */
+        --bankid-rgb: 24, 62, 79;
+
         --accent: #b0356e;
         --accent-weak: #fdeef4;
         --accent-weak-bg: #fdeef4;
-        --accent-border: rgba(176, 53, 110, 0.2);
+        --accent-border: rgba(var(--accent-rgb), 0.2);
         --violet: #6b31c9;
         --violet-bg: rgba(107, 49, 201, 0.12);
         --gold: #8a5f1e;
@@ -44,12 +100,34 @@
         --text-primary: #221c15;
         --text-secondary: #574d40;
         --text-tertiary: #6d6354;
+        --text-tertiary-rgb: 109, 99, 84;
+
+        /* BUGG, hittad vid tokenpasset: --text-muted LÄSES på fyra ställen
+           (.portal-photo-intro, .portal-photo-card small, .plan-evidence-copy,
+           .plan-evidence-zone small) men har ALDRIG definierats i filen —
+           git -S på definitionen ger noll träffar genom hela historiken.
+           Fyra textstycken har alltså ärvt förälderns färg i stället för att
+           dämpas, och sett mörkare ut än avsett. Alla fyra är småtext av
+           samma slag som --text-tertiary redan beskriver, så det blir ett
+           alias och inte en ny kulör.
+           OBS: detta ÄR en synlig ändring — den enda avsiktliga i passet
+           utöver skuggbläcket. */
+        --text-muted: var(--text-tertiary);
 
         /* Shadows — CCO v3 exakta värden */
-        --sh-sm: 0 1px 2px rgba(56, 40, 28, 0.06);
-        --sh-md: 0 3px 10px rgba(56, 40, 28, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
-        --sh-lg: 0 8px 22px rgba(56, 40, 28, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
-        --sh-xl: 0 24px 56px rgba(93, 74, 60, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+        /* ETT skuggbläck, inte tre.
+           Mätt i filen: sh-sm/md/lg låg på 56,40,28, sh-xl på 93,74,60, och
+           .portal-file-link + .portal-photo-card på en tredje, 60,45,35.
+           Tre nyanser av samma neutrala djup i ett och samma dokument är
+           drift, inte design — ingen av dem var vald mot de andra.
+           56,40,28 vinner för att tre av fyra skuggtokens redan bar den.
+           Priset är ärligt: sh-xl blir en aning varmare och mörkare, och de
+           två korten likaså. Alla tre ligger under 0,4 alfa. */
+        --sh-rgb: 56, 40, 28;
+        --sh-sm: 0 1px 2px rgba(var(--sh-rgb), 0.06);
+        --sh-md: 0 3px 10px rgba(var(--sh-rgb), 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+        --sh-lg: 0 8px 22px rgba(var(--sh-rgb), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+        --sh-xl: 0 24px 56px rgba(var(--sh-rgb), 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 
         /* Card recipe — CCO v3 stil (vit bas + varm shadow) */
         --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 241, 236, 0.86));
@@ -152,8 +230,8 @@
         padding: calc(0.65rem + env(safe-area-inset-top, 0px)) var(--pad-x) 0.65rem;
         background: linear-gradient(
           180deg,
-          rgba(250, 246, 242, 0.97),
-          rgba(250, 246, 242, 0.82) 80%,
+          rgba(var(--bg-page-rgb), 0.97),
+          rgba(var(--bg-page-rgb), 0.82) 80%,
           transparent
         );
         backdrop-filter: blur(18px);
@@ -179,8 +257,8 @@
         border: var(--card-border);
         border-radius: var(--r-lg);
         box-shadow:
-          0 10px 24px rgba(56, 40, 28, 0.18),
-          0 3px 8px rgba(56, 40, 28, 0.12),
+          0 10px 24px rgba(var(--sh-rgb), 0.18),
+          0 3px 8px rgba(var(--sh-rgb), 0.12),
           inset 0 1px 0 rgba(255, 255, 255, 0.92);
       }
       .brand-logo {
@@ -188,7 +266,7 @@
         width: auto;
         display: block;
         flex-shrink: 0;
-        filter: drop-shadow(0 4px 9px rgba(56, 40, 28, 0.38));
+        filter: drop-shadow(0 4px 9px rgba(var(--sh-rgb), 0.38));
       }
       .brand-name {
         font-family: 'Cormorant Garamond', Georgia, serif;
@@ -240,7 +318,7 @@
         width: 2.25rem;
         height: 2.25rem;
         border-radius: 50%;
-        background: linear-gradient(180deg, var(--accent), #8c2455);
+        background: linear-gradient(180deg, var(--accent), var(--accent-deep));
         color: #fff;
         font-weight: 800;
         font-size: 0.78rem;
@@ -248,7 +326,7 @@
         align-items: center;
         justify-content: center;
         box-shadow:
-          0 4px 12px rgba(176, 53, 110, 0.32),
+          0 4px 12px rgba(var(--accent-rgb), 0.32),
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
         border: 1.5px solid rgba(255, 255, 255, 0.5);
         cursor: pointer;
@@ -297,36 +375,36 @@
         flex-shrink: 0;
       }
       .step-dot.done {
-        background: linear-gradient(180deg, var(--success), #1b4f3a);
+        background: linear-gradient(180deg, var(--success), var(--success-deep));
         color: #fff;
         box-shadow:
-          0 4px 12px rgba(42, 110, 82, 0.28),
+          0 4px 12px rgba(var(--success-rgb), 0.28),
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
       .step-dot.active {
-        background: linear-gradient(180deg, var(--accent), #8c2455);
+        background: linear-gradient(180deg, var(--accent), var(--accent-deep));
         color: #fff;
         box-shadow:
-          0 4px 14px rgba(176, 53, 110, 0.42),
+          0 4px 14px rgba(var(--accent-rgb), 0.42),
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
         animation: pulse-step 2.4s ease-in-out infinite;
       }
       .step-dot.locked {
-        background: rgba(167, 145, 125, 0.1);
+        background: rgba(var(--muted-rgb), 0.1);
         color: var(--text-tertiary);
-        border: 1.5px dashed rgba(167, 145, 125, 0.32);
+        border: 1.5px dashed rgba(var(--muted-rgb), 0.32);
       }
       @keyframes pulse-step {
         0%,
         100% {
           box-shadow:
-            0 4px 14px rgba(176, 53, 110, 0.42),
+            0 4px 14px rgba(var(--accent-rgb), 0.42),
             inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
         50% {
           box-shadow:
-            0 4px 22px rgba(176, 53, 110, 0.62),
-            0 0 0 6px rgba(176, 53, 110, 0.08),
+            0 4px 22px rgba(var(--accent-rgb), 0.62),
+            0 0 0 6px rgba(var(--accent-rgb), 0.08),
             inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
       }
@@ -350,11 +428,11 @@
         min-width: 10px;
         margin-top: 1rem;
         margin-bottom: 1.45rem;
-        background: rgba(167, 145, 125, 0.18);
+        background: rgba(var(--muted-rgb), 0.18);
         border-radius: 1px;
       }
       .step-connector.done {
-        background: linear-gradient(90deg, var(--success), rgba(47, 111, 84, 0.2));
+        background: linear-gradient(90deg, var(--success), rgba(var(--success-rgb), 0.2));
       }
 
       /* HERO */
@@ -419,7 +497,7 @@
         content: '';
         flex: 1;
         height: 1px;
-        background: rgba(167, 145, 125, 0.2);
+        background: rgba(var(--muted-rgb), 0.2);
       }
 
       /* CARD */
@@ -445,15 +523,15 @@
         padding: 1.5rem 1.4rem;
         border-radius: var(--panel-radius);
         background:
-          linear-gradient(180deg, rgba(215, 130, 90, 0.02) 0%, rgba(176, 53, 110, 0.06) 100%),
+          linear-gradient(180deg, rgba(215, 130, 90, 0.02) 0%, rgba(var(--accent-rgb), 0.06) 100%),
           #ffffff;
-        border: 1px solid rgba(176, 53, 110, 0.18);
+        border: 1px solid rgba(var(--accent-rgb), 0.18);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.8),
-          inset 0 -1px 0 rgba(176, 53, 110, 0.12),
-          0 1px 2px rgba(176, 53, 110, 0.06),
-          0 10px 28px -4px rgba(176, 53, 110, 0.12),
-          0 24px 52px -12px rgba(176, 53, 110, 0.1);
+          inset 0 -1px 0 rgba(var(--accent-rgb), 0.12),
+          0 1px 2px rgba(var(--accent-rgb), 0.06),
+          0 10px 28px -4px rgba(var(--accent-rgb), 0.12),
+          0 24px 52px -12px rgba(var(--accent-rgb), 0.1);
         margin-bottom: var(--gap);
         text-align: center;
       }
@@ -463,8 +541,8 @@
         gap: 0.38rem;
         padding: 0.26rem 0.7rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.08);
-        border: 1px solid rgba(176, 53, 110, 0.18);
+        background: rgba(var(--accent-rgb), 0.08);
+        border: 1px solid rgba(var(--accent-rgb), 0.18);
         font-size: 0.6rem;
         font-weight: 700;
         letter-spacing: 0.09em;
@@ -500,7 +578,7 @@
         padding: 0.85rem;
         border-radius: var(--card-radius);
         background: rgba(255, 250, 246, 0.82);
-        border: 1px solid rgba(223, 212, 203, 0.7);
+        border: 1px solid rgba(var(--line-rgb), 0.7);
         text-align: left;
       }
       html[data-customer-offer-context='live'] .portal-status-panel {
@@ -513,8 +591,8 @@
         padding: 1rem;
         border-radius: var(--panel-radius);
         background:
-          radial-gradient(circle at 12% 0%, rgba(176, 53, 110, 0.15), transparent 42%),
-          radial-gradient(circle at 88% 18%, rgba(101, 75, 152, 0.13), transparent 44%),
+          radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.15), transparent 42%),
+          radial-gradient(circle at 88% 18%, rgba(var(--violet-mist-rgb), 0.13), transparent 44%),
           var(--card-bg);
         border: var(--card-border);
         box-shadow: var(--card-shadow);
@@ -529,7 +607,7 @@
         gap: 0.36rem;
         padding: 0.24rem 0.6rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.09);
+        background: rgba(var(--accent-rgb), 0.09);
         color: var(--accent);
         font-size: 0.6rem;
         font-weight: 850;
@@ -560,7 +638,7 @@
         padding: 0.55rem 0.62rem;
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(223, 212, 203, 0.64);
+        border: 1px solid rgba(var(--line-rgb), 0.64);
       }
       .portal-next-action__meta-item span {
         display: block;
@@ -583,7 +661,7 @@
         border-radius: var(--r-pill);
         background: linear-gradient(135deg, var(--accent), var(--violet));
         color: #fff;
-        box-shadow: 0 15px 34px -20px rgba(176, 53, 110, 0.75);
+        box-shadow: 0 15px 34px -20px rgba(var(--accent-rgb), 0.75);
         font-size: 0.82rem;
         font-weight: 900;
         cursor: pointer;
@@ -591,7 +669,11 @@
       .portal-next-action__button:disabled {
         cursor: not-allowed;
         opacity: 0.72;
-        background: linear-gradient(135deg, rgba(167, 145, 125, 0.5), rgba(109, 99, 84, 0.5));
+        background: linear-gradient(
+          135deg,
+          rgba(var(--muted-rgb), 0.5),
+          rgba(var(--text-tertiary-rgb), 0.5)
+        );
         box-shadow: none;
       }
       .portal-next-action__hint {
@@ -608,8 +690,8 @@
         border-radius: var(--panel-radius);
         background:
           radial-gradient(circle at 4% 10%, rgba(211, 156, 52, 0.12), transparent 38%),
-          radial-gradient(circle at 96% 12%, rgba(176, 53, 110, 0.13), transparent 42%),
-          rgba(255, 252, 248, 0.94);
+          radial-gradient(circle at 96% 12%, rgba(var(--accent-rgb), 0.13), transparent 42%),
+          rgba(var(--bg-warm-rgb), 0.94);
         border: var(--card-border);
         box-shadow: var(--card-shadow);
       }
@@ -640,7 +722,7 @@
         flex: 0 0 auto;
         padding: 0.25rem 0.62rem;
         border-radius: var(--r-pill);
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
         font-size: 0.58rem;
         font-weight: 850;
@@ -659,14 +741,14 @@
         padding: 0.7rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.82);
-        border: 1px solid rgba(223, 212, 203, 0.68);
+        border: 1px solid rgba(var(--line-rgb), 0.68);
       }
       .portal-journey-step[data-state='done'] {
-        border-color: rgba(47, 111, 84, 0.28);
+        border-color: rgba(var(--success-rgb), 0.28);
         background: rgba(237, 248, 241, 0.72);
       }
       .portal-journey-step[data-state='active'] {
-        border-color: rgba(176, 53, 110, 0.28);
+        border-color: rgba(var(--accent-rgb), 0.28);
         background: rgba(255, 244, 249, 0.76);
       }
       .portal-journey-step[data-state='locked'] {
@@ -678,19 +760,19 @@
         height: 2rem;
         place-items: center;
         border-radius: 50%;
-        background: rgba(167, 145, 125, 0.14);
+        background: rgba(var(--muted-rgb), 0.14);
         color: var(--text-tertiary);
         font-size: 0.82rem;
         font-weight: 900;
       }
       .portal-journey-step[data-state='done'] .portal-journey-step__dot {
-        background: rgba(47, 111, 84, 0.14);
+        background: rgba(var(--success-rgb), 0.14);
         color: var(--success);
       }
       .portal-journey-step[data-state='active'] .portal-journey-step__dot {
         background: linear-gradient(135deg, var(--accent), var(--violet));
         color: #fff;
-        box-shadow: 0 12px 30px -18px rgba(176, 53, 110, 0.72);
+        box-shadow: 0 12px 30px -18px rgba(var(--accent-rgb), 0.72);
       }
       .portal-journey-step__body strong {
         display: block;
@@ -708,7 +790,7 @@
       .portal-journey-step__status {
         padding: 0.18rem 0.52rem;
         border-radius: var(--r-pill);
-        background: rgba(109, 99, 84, 0.09);
+        background: rgba(var(--text-tertiary-rgb), 0.09);
         color: var(--text-secondary);
         font-size: 0.56rem;
         font-weight: 850;
@@ -717,11 +799,11 @@
         white-space: nowrap;
       }
       .portal-journey-step[data-state='done'] .portal-journey-step__status {
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
       }
       .portal-journey-step[data-state='active'] .portal-journey-step__status {
-        background: rgba(176, 53, 110, 0.1);
+        background: rgba(var(--accent-rgb), 0.1);
         color: var(--accent);
       }
       .portal-journey-gates__note {
@@ -746,10 +828,10 @@
         padding: 0.72rem 0.85rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.84);
-        border: 1px solid rgba(223, 212, 203, 0.64);
+        border: 1px solid rgba(var(--line-rgb), 0.64);
         color: var(--text-primary);
         text-decoration: none;
-        box-shadow: 0 10px 24px -18px rgba(60, 45, 35, 0.3);
+        box-shadow: 0 10px 24px -18px rgba(var(--sh-rgb), 0.3);
       }
       .portal-file-link span:first-child {
         font-size: 0.78rem;
@@ -758,7 +840,7 @@
       .portal-file-link span:last-child {
         padding: 0.18rem 0.52rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.08);
+        background: rgba(var(--accent-rgb), 0.08);
         color: var(--accent);
         font-size: 0.62rem;
         font-weight: 800;
@@ -790,12 +872,12 @@
         padding: 0.52rem;
         border-radius: 22px;
         background:
-          radial-gradient(circle at 12% 10%, rgba(176, 53, 110, 0.14), transparent 42%),
+          radial-gradient(circle at 12% 10%, rgba(var(--accent-rgb), 0.14), transparent 42%),
           rgba(255, 255, 255, 0.9);
-        border: 1px solid rgba(223, 212, 203, 0.7);
+        border: 1px solid rgba(var(--line-rgb), 0.7);
         color: var(--text-primary);
         text-decoration: none;
-        box-shadow: 0 18px 36px -26px rgba(60, 45, 35, 0.38);
+        box-shadow: 0 18px 36px -26px rgba(var(--sh-rgb), 0.38);
       }
       .portal-photo-card img {
         width: 100%;
@@ -803,7 +885,11 @@
         object-fit: cover;
         border-radius: 17px;
         border: 1px solid rgba(255, 255, 255, 0.76);
-        background: linear-gradient(135deg, rgba(176, 53, 110, 0.09), rgba(101, 75, 152, 0.1));
+        background: linear-gradient(
+          135deg,
+          rgba(var(--accent-rgb), 0.09),
+          rgba(var(--violet-mist-rgb), 0.1)
+        );
       }
       .portal-photo-card strong {
         font-size: 0.78rem;
@@ -818,7 +904,7 @@
         justify-self: start;
         padding: 0.2rem 0.55rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.1);
+        background: rgba(var(--accent-rgb), 0.1);
         color: var(--accent);
         font-size: 0.62rem;
         font-weight: 850;
@@ -849,7 +935,11 @@
         flex-shrink: 0;
         padding: 0.34rem 0.62rem;
         border-radius: var(--r-pill);
-        background: linear-gradient(135deg, rgba(176, 53, 110, 0.12), rgba(101, 75, 152, 0.12));
+        background: linear-gradient(
+          135deg,
+          rgba(var(--accent-rgb), 0.12),
+          rgba(var(--violet-mist-rgb), 0.12)
+        );
         color: var(--accent);
         font-size: 0.66rem;
         font-weight: 850;
@@ -865,7 +955,7 @@
         padding: 0.62rem 0.7rem;
         border-radius: 18px;
         background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(223, 212, 203, 0.7);
+        border: 1px solid rgba(var(--line-rgb), 0.7);
       }
       .plan-evidence-metric span {
         display: block;
@@ -912,13 +1002,13 @@
         height: 4px;
         overflow: hidden;
         border-radius: 999px;
-        background: rgba(167, 145, 125, 0.13);
+        background: rgba(var(--muted-rgb), 0.13);
       }
       .plan-evidence-zone-bar span {
         display: block;
         height: 100%;
         border-radius: inherit;
-        background: linear-gradient(90deg, var(--accent), rgba(101, 75, 152, 0.75));
+        background: linear-gradient(90deg, var(--accent), rgba(var(--violet-mist-rgb), 0.75));
       }
       .portal-status-row {
         display: flex;
@@ -993,11 +1083,15 @@
           box-shadow 0.15s;
       }
       .consent-item:has(input:checked) {
-        border-color: rgba(47, 111, 84, 0.28);
-        background: linear-gradient(180deg, rgba(47, 111, 84, 0.04), rgba(47, 111, 84, 0.08));
+        border-color: rgba(var(--success-rgb), 0.28);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--success-rgb), 0.04),
+          rgba(var(--success-rgb), 0.08)
+        );
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.7),
-          0 2px 6px rgba(47, 111, 84, 0.08);
+          0 2px 6px rgba(var(--success-rgb), 0.08);
       }
       .consent-check {
         width: 1.15rem;
@@ -1029,9 +1123,9 @@
         color: #fff;
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.12),
-          0 1px 2px rgba(24, 62, 79, 0.2),
-          0 4px 12px rgba(24, 62, 79, 0.18),
-          0 12px 28px -4px rgba(24, 62, 79, 0.22);
+          0 1px 2px rgba(var(--bankid-rgb), 0.2),
+          0 4px 12px rgba(var(--bankid-rgb), 0.18),
+          0 12px 28px -4px rgba(var(--bankid-rgb), 0.22);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1052,9 +1146,9 @@
         transform: translateY(-2px);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.14),
-          0 2px 4px rgba(24, 62, 79, 0.2),
-          0 8px 20px rgba(24, 62, 79, 0.22),
-          0 20px 40px -8px rgba(24, 62, 79, 0.26);
+          0 2px 4px rgba(var(--bankid-rgb), 0.2),
+          0 8px 20px rgba(var(--bankid-rgb), 0.22),
+          0 20px 40px -8px rgba(var(--bankid-rgb), 0.26);
       }
       .btn-bankid.enabled:active {
         transform: translateY(0);
@@ -1070,11 +1164,15 @@
         gap: 0.6rem;
         padding: 1.1rem;
         border-radius: var(--card-radius);
-        background: linear-gradient(180deg, rgba(47, 111, 84, 0.06), rgba(47, 111, 84, 0.12));
-        border: 1px solid rgba(47, 111, 84, 0.24);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--success-rgb), 0.06),
+          rgba(var(--success-rgb), 0.12)
+        );
+        border: 1px solid rgba(var(--success-rgb), 0.24);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.7),
-          0 4px 14px rgba(47, 111, 84, 0.12);
+          0 4px 14px rgba(var(--success-rgb), 0.12);
       }
       .bankid-signed.visible {
         display: flex;
@@ -1083,14 +1181,14 @@
         width: 2.5rem;
         height: 2.5rem;
         border-radius: 50%;
-        background: linear-gradient(180deg, var(--success), #1b4f3a);
+        background: linear-gradient(180deg, var(--success), var(--success-deep));
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1.1rem;
         color: #fff;
         box-shadow:
-          0 4px 14px rgba(47, 111, 84, 0.3),
+          0 4px 14px rgba(var(--success-rgb), 0.3),
           inset 0 1px 0 rgba(255, 255, 255, 0.2);
       }
       .bankid-signed-title {
@@ -1127,7 +1225,7 @@
         display: none !important;
       }
       .btn-pdf:hover {
-        border-color: rgba(167, 145, 125, 0.38);
+        border-color: rgba(var(--muted-rgb), 0.38);
         color: var(--text-secondary);
       }
 
@@ -1138,8 +1236,12 @@
         gap: 0.35rem;
         padding: 0.2rem 0.58rem;
         border-radius: var(--r-pill);
-        background: linear-gradient(180deg, rgba(107, 49, 201, 0.08), rgba(107, 49, 201, 0.14));
-        border: 1px solid rgba(107, 49, 201, 0.18);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--violet-rgb), 0.08),
+          rgba(var(--violet-rgb), 0.14)
+        );
+        border: 1px solid rgba(var(--violet-rgb), 0.18);
         font-size: 0.6rem;
         font-weight: 700;
         letter-spacing: 0.08em;
@@ -1161,6 +1263,12 @@
         border: var(--card-border);
         margin-bottom: 0.85rem;
         padding: 0.75rem;
+        /* MEDVETET utanför paletten: en ljus, varm linje längst ner under
+           hårbottensillustrationen. Alla tokens som ligger nära i familjen
+           (--gold 138,95,30, --sh-rgb 56,40,28) är MÖRKA — de vänder linjen
+           från ett varmt återsken till en skarv. Intentionen är ljus värme,
+           inte djup, och då är literalen rätt svar.
+           Enda kvarvarande handskrivna tripletten i filens skuggor. */
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.7),
           inset 0 -1px 0 rgba(215, 130, 90, 0.1);
@@ -1268,7 +1376,7 @@
         color: var(--accent);
       }
       .z-hairline .zone-bar {
-        background: linear-gradient(90deg, var(--accent), rgba(176, 53, 110, 0.15));
+        background: linear-gradient(90deg, var(--accent), rgba(var(--accent-rgb), 0.15));
       }
       .z-mid .zone-dot {
         background: var(--violet);
@@ -1277,7 +1385,7 @@
         color: var(--violet);
       }
       .z-mid .zone-bar {
-        background: linear-gradient(90deg, var(--violet), rgba(107, 49, 201, 0.15));
+        background: linear-gradient(90deg, var(--violet), rgba(var(--violet-rgb), 0.15));
       }
       .z-crown .zone-dot {
         background: var(--gold);
@@ -1286,7 +1394,7 @@
         color: var(--gold);
       }
       .z-crown .zone-bar {
-        background: linear-gradient(90deg, var(--gold), rgba(138, 95, 30, 0.15));
+        background: linear-gradient(90deg, var(--gold), rgba(var(--gold-rgb), 0.15));
       }
       .z-total .zone-dot {
         background: var(--success);
@@ -1295,7 +1403,7 @@
         color: var(--success);
       }
       .z-total .zone-bar {
-        background: linear-gradient(90deg, var(--success), rgba(47, 111, 84, 0.15));
+        background: linear-gradient(90deg, var(--success), rgba(var(--success-rgb), 0.15));
       }
 
       /* PRICE */
@@ -1304,7 +1412,7 @@
         justify-content: space-between;
         align-items: baseline;
         padding: 0.55rem 0;
-        border-bottom: 1px solid rgba(167, 145, 125, 0.12);
+        border-bottom: 1px solid rgba(var(--muted-rgb), 0.12);
       }
       .price-row:last-child {
         border-bottom: 0;
@@ -1335,7 +1443,7 @@
       }
       .divider {
         height: 1px;
-        background: rgba(167, 145, 125, 0.14);
+        background: rgba(var(--muted-rgb), 0.14);
         margin: 0.3rem 0;
       }
 
@@ -1344,12 +1452,12 @@
         padding: 1rem 1.1rem;
         border-radius: var(--card-radius);
         background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(47, 101, 149, 0.05)), #ffffff;
-        border: 1px solid rgba(47, 101, 149, 0.16);
+          linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(var(--info-rgb), 0.05)), #ffffff;
+        border: 1px solid rgba(var(--info-rgb), 0.16);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.8),
-          0 4px 12px rgba(47, 101, 149, 0.08),
-          0 1px 2px rgba(47, 101, 149, 0.04);
+          0 4px 12px rgba(var(--info-rgb), 0.08),
+          0 1px 2px rgba(var(--info-rgb), 0.04);
         margin-bottom: var(--gap);
       }
       .betatid-top {
@@ -1362,7 +1470,7 @@
         height: 2.25rem;
         flex-shrink: 0;
         border-radius: 50%;
-        background: rgba(47, 101, 149, 0.1);
+        background: rgba(var(--info-rgb), 0.1);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1376,12 +1484,12 @@
       }
       .betatid-desc {
         font-size: 0.7rem;
-        color: rgba(47, 101, 149, 0.7);
+        color: rgba(var(--info-rgb), 0.7);
         line-height: 1.4;
       }
       .betatid-expire {
         font-size: 0.67rem;
-        color: rgba(47, 101, 149, 0.55);
+        color: rgba(var(--info-rgb), 0.55);
         margin-top: 0.2rem;
         font-style: italic;
       }
@@ -1391,8 +1499,8 @@
         text-align: center;
         padding: 0.38rem 0.75rem;
         border-radius: var(--r-md);
-        background: rgba(47, 101, 149, 0.08);
-        border: 1px solid rgba(47, 101, 149, 0.12);
+        background: rgba(var(--info-rgb), 0.08);
+        border: 1px solid rgba(var(--info-rgb), 0.12);
       }
       .betatid-days .num {
         font-size: 1.45rem;
@@ -1406,7 +1514,7 @@
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: rgba(47, 101, 149, 0.55);
+        color: rgba(var(--info-rgb), 0.55);
       }
       .reminder-row {
         display: flex;
@@ -1414,7 +1522,7 @@
         gap: 0.65rem;
         margin-top: 0.8rem;
         padding-top: 0.75rem;
-        border-top: 1px solid rgba(47, 101, 149, 0.1);
+        border-top: 1px solid rgba(var(--info-rgb), 0.1);
       }
       .reminder-toggle {
         position: relative;
@@ -1432,7 +1540,7 @@
         position: absolute;
         inset: 0;
         border-radius: var(--r-pill);
-        background: rgba(167, 145, 125, 0.24);
+        background: rgba(var(--muted-rgb), 0.24);
         transition: background 0.2s;
         cursor: pointer;
       }
@@ -1465,10 +1573,10 @@
         margin-top: 0.5rem;
         padding: 0.5rem 0.7rem;
         border-radius: var(--r-md);
-        background: rgba(47, 101, 149, 0.06);
-        border: 1px solid rgba(47, 101, 149, 0.12);
+        background: rgba(var(--info-rgb), 0.06);
+        border: 1px solid rgba(var(--info-rgb), 0.12);
         font-size: 0.68rem;
-        color: rgba(47, 101, 149, 0.8);
+        color: rgba(var(--info-rgb), 0.8);
         display: none;
       }
       .reminder-confirm.visible {
@@ -1478,15 +1586,19 @@
       /* AI CARD */
       .ai-card {
         background:
-          linear-gradient(180deg, rgba(107, 49, 201, 0.03) 0%, rgba(107, 49, 201, 0.08) 100%),
+          linear-gradient(
+            180deg,
+            rgba(var(--violet-rgb), 0.03) 0%,
+            rgba(var(--violet-rgb), 0.08) 100%
+          ),
           #ffffff;
-        border-color: rgba(107, 49, 201, 0.14);
+        border-color: rgba(var(--violet-rgb), 0.14);
       }
       .insight-row {
         display: flex;
         gap: 0.7rem;
         padding: 0.7rem 0;
-        border-bottom: 1px solid rgba(107, 49, 201, 0.07);
+        border-bottom: 1px solid rgba(var(--violet-rgb), 0.07);
       }
       .insight-row:last-child {
         border-bottom: 0;
@@ -1497,7 +1609,7 @@
         height: 1.85rem;
         flex-shrink: 0;
         border-radius: var(--r-sm);
-        background: rgba(107, 49, 201, 0.08);
+        background: rgba(var(--violet-rgb), 0.08);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1520,8 +1632,12 @@
         align-items: center;
         padding: 0.14rem 0.44rem;
         border-radius: var(--r-pill);
-        background: linear-gradient(180deg, rgba(107, 49, 201, 0.08), rgba(107, 49, 201, 0.14));
-        border: 1px solid rgba(107, 49, 201, 0.16);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--violet-rgb), 0.08),
+          rgba(var(--violet-rgb), 0.14)
+        );
+        border: 1px solid rgba(var(--violet-rgb), 0.16);
         font-size: 0.62rem;
         font-weight: 700;
         color: var(--violet);
@@ -1534,8 +1650,8 @@
       .locked-card {
         padding: 1rem 1.1rem;
         border-radius: var(--card-radius);
-        background: rgba(167, 145, 125, 0.04);
-        border: 1.5px dashed rgba(167, 145, 125, 0.24);
+        background: rgba(var(--muted-rgb), 0.04);
+        border: 1.5px dashed rgba(var(--muted-rgb), 0.24);
         margin-bottom: var(--gap);
         display: flex;
         align-items: center;
@@ -1547,7 +1663,7 @@
         height: 2.1rem;
         flex-shrink: 0;
         border-radius: 50%;
-        background: rgba(167, 145, 125, 0.1);
+        background: rgba(var(--muted-rgb), 0.1);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1575,7 +1691,7 @@
         flex-shrink: 0;
         padding: 0.2rem 0.52rem;
         border-radius: var(--r-pill);
-        background: rgba(167, 145, 125, 0.1);
+        background: rgba(var(--muted-rgb), 0.1);
         font-size: 0.58rem;
         font-weight: 700;
         letter-spacing: 0.07em;
@@ -1591,8 +1707,8 @@
         gap: 0.8rem;
         padding: 0.9rem 1rem;
         border-radius: var(--r-md);
-        background: rgba(167, 145, 125, 0.05);
-        border: 1.5px dashed rgba(167, 145, 125, 0.22);
+        background: rgba(var(--muted-rgb), 0.05);
+        border: 1.5px dashed rgba(var(--muted-rgb), 0.22);
       }
       .photos-locked-icon {
         font-size: 1.25rem;
@@ -1616,8 +1732,13 @@
       }
       .booking-card.booking-op {
         background:
-          linear-gradient(180deg, rgba(47, 111, 84, 0.03) 0%, rgba(47, 111, 84, 0.08) 100%), #ffffff;
-        border-color: rgba(47, 111, 84, 0.16);
+          linear-gradient(
+            180deg,
+            rgba(var(--success-rgb), 0.03) 0%,
+            rgba(var(--success-rgb), 0.08) 100%
+          ),
+          #ffffff;
+        border-color: rgba(var(--success-rgb), 0.16);
       }
       .booking-header {
         display: flex;
@@ -1630,7 +1751,7 @@
         height: 2.1rem;
         flex-shrink: 0;
         border-radius: 50%;
-        background: rgba(167, 145, 125, 0.1);
+        background: rgba(var(--muted-rgb), 0.1);
         border: var(--card-border);
         display: flex;
         align-items: center;
@@ -1639,8 +1760,8 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
       }
       .booking-op .booking-icon {
-        background: rgba(47, 111, 84, 0.1);
-        border-color: rgba(47, 111, 84, 0.16);
+        background: rgba(var(--success-rgb), 0.1);
+        border-color: rgba(var(--success-rgb), 0.16);
       }
       .booking-info {
         flex: 1;
@@ -1660,9 +1781,9 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
       }
       .booking-tag.confirmed {
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
-        border: 1px solid rgba(47, 111, 84, 0.18);
+        border: 1px solid rgba(var(--success-rgb), 0.18);
       }
       .booking-tag.confirmed::before {
         content: '';
@@ -1672,7 +1793,7 @@
         background: var(--success);
       }
       .booking-tag.pending {
-        background: rgba(167, 145, 125, 0.08);
+        background: rgba(var(--muted-rgb), 0.08);
         color: var(--text-tertiary);
         border: var(--card-border);
       }
@@ -1705,16 +1826,16 @@
         gap: 0.5rem;
         padding: 0.52rem 0.68rem;
         border-radius: var(--r-md);
-        background: rgba(167, 145, 125, 0.05);
+        background: rgba(var(--muted-rgb), 0.05);
         border: var(--card-border);
         font-size: 0.7rem;
         color: var(--text-tertiary);
         line-height: 1.4;
       }
       .booking-op .booking-note {
-        background: rgba(47, 111, 84, 0.05);
-        border-color: rgba(47, 111, 84, 0.14);
-        color: rgba(47, 111, 84, 0.75);
+        background: rgba(var(--success-rgb), 0.05);
+        border-color: rgba(var(--success-rgb), 0.14);
+        color: rgba(var(--success-rgb), 0.75);
       }
       .booking-note svg {
         flex-shrink: 0;
@@ -1728,10 +1849,10 @@
         padding: 1rem;
         border-radius: var(--panel-radius);
         background:
-          radial-gradient(circle at 8% 0%, rgba(47, 111, 84, 0.14), transparent 42%),
+          radial-gradient(circle at 8% 0%, rgba(var(--success-rgb), 0.14), transparent 42%),
           radial-gradient(circle at 94% 18%, rgba(211, 156, 52, 0.15), transparent 42%),
-          rgba(255, 252, 248, 0.96);
-        border: 1px solid rgba(47, 111, 84, 0.16);
+          rgba(var(--bg-warm-rgb), 0.96);
+        border: 1px solid rgba(var(--success-rgb), 0.16);
         box-shadow: var(--card-shadow);
       }
       html[data-customer-offer-context='live'] .operation-day-panel.is-visible {
@@ -1748,7 +1869,7 @@
         width: max-content;
         padding: 0.22rem 0.58rem;
         border-radius: var(--r-pill);
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
         font-size: 0.56rem;
         font-weight: 850;
@@ -1769,7 +1890,7 @@
         padding: 0.52rem 0.62rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(223, 212, 203, 0.68);
+        border: 1px solid rgba(var(--line-rgb), 0.68);
         color: var(--text-secondary);
         font-size: 0.66rem;
         font-weight: 750;
@@ -1794,14 +1915,14 @@
         padding: 0.68rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.84);
-        border: 1px solid rgba(223, 212, 203, 0.68);
+        border: 1px solid rgba(var(--line-rgb), 0.68);
       }
       .operation-day-check[data-state='done'] {
-        border-color: rgba(47, 111, 84, 0.25);
+        border-color: rgba(var(--success-rgb), 0.25);
         background: rgba(237, 248, 241, 0.72);
       }
       .operation-day-check[data-state='active'] {
-        border-color: rgba(176, 53, 110, 0.25);
+        border-color: rgba(var(--accent-rgb), 0.25);
         background: rgba(255, 244, 249, 0.74);
       }
       .operation-day-check__icon {
@@ -1810,13 +1931,13 @@
         height: 1.92rem;
         place-items: center;
         border-radius: 50%;
-        background: rgba(167, 145, 125, 0.12);
+        background: rgba(var(--muted-rgb), 0.12);
         color: var(--text-tertiary);
         font-size: 0.8rem;
         font-weight: 900;
       }
       .operation-day-check[data-state='done'] .operation-day-check__icon {
-        background: rgba(47, 111, 84, 0.13);
+        background: rgba(var(--success-rgb), 0.13);
         color: var(--success);
       }
       .operation-day-check[data-state='active'] .operation-day-check__icon {
@@ -1839,7 +1960,7 @@
       .operation-day-check__status {
         padding: 0.16rem 0.48rem;
         border-radius: var(--r-pill);
-        background: rgba(109, 99, 84, 0.09);
+        background: rgba(var(--text-tertiary-rgb), 0.09);
         color: var(--text-secondary);
         font-size: 0.55rem;
         font-weight: 850;
@@ -1848,11 +1969,11 @@
         white-space: nowrap;
       }
       .operation-day-check[data-state='done'] .operation-day-check__status {
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
       }
       .operation-day-check[data-state='active'] .operation-day-check__status {
-        background: rgba(176, 53, 110, 0.1);
+        background: rgba(var(--accent-rgb), 0.1);
         color: var(--accent);
       }
       .operation-day-panel__hint {
@@ -1868,10 +1989,10 @@
         padding: 1rem;
         border-radius: var(--panel-radius);
         background:
-          radial-gradient(circle at 10% 12%, rgba(176, 53, 110, 0.11), transparent 42%),
+          radial-gradient(circle at 10% 12%, rgba(var(--accent-rgb), 0.11), transparent 42%),
           radial-gradient(circle at 92% 4%, rgba(107, 83, 171, 0.13), transparent 44%),
-          rgba(255, 252, 248, 0.97);
-        border: 1px solid rgba(176, 53, 110, 0.14);
+          rgba(var(--bg-warm-rgb), 0.97);
+        border: 1px solid rgba(var(--accent-rgb), 0.14);
         box-shadow: var(--card-shadow);
       }
       html[data-customer-offer-context='live'] .aftercare-panel.is-visible {
@@ -1888,7 +2009,7 @@
         width: max-content;
         padding: 0.22rem 0.58rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.1);
+        background: rgba(var(--accent-rgb), 0.1);
         color: var(--accent);
         font-size: 0.56rem;
         font-weight: 850;
@@ -1909,7 +2030,7 @@
         padding: 0.52rem 0.62rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(223, 212, 203, 0.68);
+        border: 1px solid rgba(var(--line-rgb), 0.68);
         color: var(--text-secondary);
         font-size: 0.66rem;
         font-weight: 750;
@@ -1934,10 +2055,10 @@
         padding: 0.68rem;
         border-radius: var(--card-radius);
         background: rgba(255, 255, 255, 0.84);
-        border: 1px solid rgba(223, 212, 203, 0.68);
+        border: 1px solid rgba(var(--line-rgb), 0.68);
       }
       .aftercare-step[data-state='done'] {
-        border-color: rgba(47, 111, 84, 0.25);
+        border-color: rgba(var(--success-rgb), 0.25);
         background: rgba(237, 248, 241, 0.72);
       }
       .aftercare-step[data-state='active'] {
@@ -1950,13 +2071,13 @@
         height: 1.92rem;
         place-items: center;
         border-radius: 50%;
-        background: rgba(167, 145, 125, 0.12);
+        background: rgba(var(--muted-rgb), 0.12);
         color: var(--text-tertiary);
         font-size: 0.8rem;
         font-weight: 900;
       }
       .aftercare-step[data-state='done'] .aftercare-step__icon {
-        background: rgba(47, 111, 84, 0.13);
+        background: rgba(var(--success-rgb), 0.13);
         color: var(--success);
       }
       .aftercare-step[data-state='active'] .aftercare-step__icon {
@@ -1979,7 +2100,7 @@
       .aftercare-step__status {
         padding: 0.16rem 0.48rem;
         border-radius: var(--r-pill);
-        background: rgba(109, 99, 84, 0.09);
+        background: rgba(var(--text-tertiary-rgb), 0.09);
         color: var(--text-secondary);
         font-size: 0.55rem;
         font-weight: 850;
@@ -1988,7 +2109,7 @@
         white-space: nowrap;
       }
       .aftercare-step[data-state='done'] .aftercare-step__status {
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
       }
       .aftercare-step[data-state='active'] .aftercare-step__status {
@@ -2018,7 +2139,7 @@
       .mode-toggle-group {
         display: flex;
         gap: 2px;
-        background: rgba(167, 145, 125, 0.1);
+        background: rgba(var(--muted-rgb), 0.1);
         border-radius: var(--r-pill);
         padding: 2px;
         border: var(--card-border);
@@ -2039,7 +2160,7 @@
         color: var(--text-primary);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.8),
-          0 1px 4px rgba(56, 40, 28, 0.08);
+          0 1px 4px rgba(var(--sh-rgb), 0.08);
       }
       .mode-btn:disabled {
         opacity: 0.34;
@@ -2051,10 +2172,10 @@
         gap: 0.4rem;
         padding: 0.5rem 0.65rem;
         border-radius: var(--r-md);
-        background: rgba(47, 101, 149, 0.05);
-        border: 1px solid rgba(47, 101, 149, 0.13);
+        background: rgba(var(--info-rgb), 0.05);
+        border: 1px solid rgba(var(--info-rgb), 0.13);
         font-size: 0.68rem;
-        color: rgba(47, 101, 149, 0.8);
+        color: rgba(var(--info-rgb), 0.8);
         line-height: 1.4;
         margin-bottom: 0.72rem;
       }
@@ -2075,7 +2196,7 @@
         color: var(--text-secondary);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.8),
-          0 1px 3px rgba(56, 40, 28, 0.06);
+          0 1px 3px rgba(var(--sh-rgb), 0.06);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2083,26 +2204,30 @@
         transition: all 0.15s;
       }
       .btn-book:hover {
-        border-color: rgba(176, 53, 110, 0.24);
+        border-color: rgba(var(--accent-rgb), 0.24);
         color: var(--accent);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(253, 240, 248, 0.8));
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.9),
-          0 3px 8px rgba(176, 53, 110, 0.1);
+          0 3px 8px rgba(var(--accent-rgb), 0.1);
       }
       .btn-video {
         width: 100%;
         padding: 0.72rem 1rem;
         border-radius: var(--r-md);
-        border: 1.5px solid rgba(47, 101, 149, 0.24);
+        border: 1.5px solid rgba(var(--info-rgb), 0.24);
         cursor: pointer;
         font: 600 0.8rem/1 inherit;
         letter-spacing: 0.03em;
-        background: linear-gradient(180deg, rgba(47, 101, 149, 0.08), rgba(47, 101, 149, 0.04));
+        background: linear-gradient(
+          180deg,
+          rgba(var(--info-rgb), 0.08),
+          rgba(var(--info-rgb), 0.04)
+        );
         color: var(--info);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.7),
-          0 2px 6px rgba(47, 101, 149, 0.08);
+          0 2px 6px rgba(var(--info-rgb), 0.08);
         display: none;
         align-items: center;
         justify-content: center;
@@ -2114,12 +2239,16 @@
         display: flex;
       }
       .btn-video:hover {
-        background: linear-gradient(180deg, rgba(47, 101, 149, 0.14), rgba(47, 101, 149, 0.08));
-        border-color: rgba(47, 101, 149, 0.4);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--info-rgb), 0.14),
+          rgba(var(--info-rgb), 0.08)
+        );
+        border-color: rgba(var(--info-rgb), 0.4);
       }
       .video-sub {
         font-size: 0.62rem;
-        color: rgba(47, 101, 149, 0.6);
+        color: rgba(var(--info-rgb), 0.6);
         font-weight: 500;
         display: none;
         margin-top: 0.28rem;
@@ -2144,7 +2273,11 @@
         width: 2.25rem;
         height: 2.25rem;
         border-radius: 50%;
-        background: linear-gradient(180deg, rgba(138, 95, 30, 0.15), rgba(138, 95, 30, 0.28));
+        background: linear-gradient(
+          180deg,
+          rgba(var(--gold-rgb), 0.15),
+          rgba(var(--gold-rgb), 0.28)
+        );
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2182,7 +2315,7 @@
         transition: all 0.15s;
       }
       .contact-btn:hover {
-        border-color: rgba(176, 53, 110, 0.22);
+        border-color: rgba(var(--accent-rgb), 0.22);
         color: var(--accent);
       }
       .contact-via {
@@ -2199,9 +2332,9 @@
         padding: 0.88rem;
         border-radius: var(--card-radius);
         background:
-          radial-gradient(circle at 12% 0%, rgba(176, 53, 110, 0.11), transparent 42%),
-          rgba(255, 252, 248, 0.96);
-        border: 1px solid rgba(176, 53, 110, 0.13);
+          radial-gradient(circle at 12% 0%, rgba(var(--accent-rgb), 0.11), transparent 42%),
+          rgba(var(--bg-warm-rgb), 0.96);
+        border: 1px solid rgba(var(--accent-rgb), 0.13);
         box-shadow: var(--card-shadow);
       }
       html[data-customer-offer-context='live'] .secure-contact-panel.is-visible {
@@ -2218,7 +2351,7 @@
         width: max-content;
         padding: 0.2rem 0.54rem;
         border-radius: var(--r-pill);
-        background: rgba(176, 53, 110, 0.1);
+        background: rgba(var(--accent-rgb), 0.1);
         color: var(--accent);
         font-size: 0.55rem;
         font-weight: 850;
@@ -2236,7 +2369,7 @@
       .secure-contact-panel__status {
         padding: 0.18rem 0.5rem;
         border-radius: var(--r-pill);
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
         font-size: 0.55rem;
         font-weight: 850;
@@ -2259,7 +2392,7 @@
         padding: 0.55rem;
         border-radius: var(--r-md);
         background: rgba(255, 255, 255, 0.74);
-        border: 1px solid rgba(223, 212, 203, 0.62);
+        border: 1px solid rgba(var(--line-rgb), 0.62);
       }
       .secure-contact-panel__meta-item span {
         display: block;
@@ -2289,9 +2422,9 @@
         padding: 0.88rem;
         border-radius: var(--card-radius);
         background:
-          radial-gradient(circle at 88% 0%, rgba(47, 111, 84, 0.12), transparent 42%),
-          rgba(255, 252, 248, 0.96);
-        border: 1px solid rgba(47, 111, 84, 0.14);
+          radial-gradient(circle at 88% 0%, rgba(var(--success-rgb), 0.12), transparent 42%),
+          rgba(var(--bg-warm-rgb), 0.96);
+        border: 1px solid rgba(var(--success-rgb), 0.14);
         box-shadow: var(--card-shadow);
       }
       html[data-customer-offer-context='live'] .portal-trust-log.is-visible {
@@ -2308,7 +2441,7 @@
         width: max-content;
         padding: 0.2rem 0.54rem;
         border-radius: var(--r-pill);
-        background: rgba(47, 111, 84, 0.1);
+        background: rgba(var(--success-rgb), 0.1);
         color: var(--success);
         font-size: 0.55rem;
         font-weight: 850;
@@ -2326,7 +2459,7 @@
       .portal-trust-log__badge {
         padding: 0.18rem 0.5rem;
         border-radius: var(--r-pill);
-        background: rgba(101, 75, 152, 0.1);
+        background: rgba(var(--violet-mist-rgb), 0.1);
         color: var(--violet);
         font-size: 0.55rem;
         font-weight: 850;
@@ -2349,7 +2482,7 @@
         padding: 0.55rem;
         border-radius: var(--r-md);
         background: rgba(255, 255, 255, 0.74);
-        border: 1px solid rgba(223, 212, 203, 0.62);
+        border: 1px solid rgba(var(--line-rgb), 0.62);
       }
       .portal-trust-log__item span {
         display: block;
@@ -2397,12 +2530,12 @@
         align-items: center;
         gap: 0.75rem;
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(253, 232, 243, 0.92));
-        border: 1px solid rgba(176, 53, 110, 0.2);
+        border: 1px solid rgba(var(--accent-rgb), 0.2);
         border-radius: var(--panel-radius);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.9),
-          0 4px 16px rgba(176, 53, 110, 0.14),
-          0 12px 32px -4px rgba(176, 53, 110, 0.12);
+          0 4px 16px rgba(var(--accent-rgb), 0.14),
+          0 12px 32px -4px rgba(var(--accent-rgb), 0.12);
         padding: 0.75rem 1rem;
       }
       .sticky-label {
@@ -2427,7 +2560,7 @@
         background: #183e4f;
         color: #fff;
         box-shadow:
-          0 2px 8px rgba(24, 62, 79, 0.2),
+          0 2px 8px rgba(var(--bankid-rgb), 0.2),
           inset 0 1px 0 rgba(255, 255, 255, 0.1);
         white-space: nowrap;
         flex-shrink: 0;
@@ -2435,7 +2568,7 @@
       }
       .btn-sign-sm:hover {
         box-shadow:
-          0 4px 14px rgba(24, 62, 79, 0.28),
+          0 4px 14px rgba(var(--bankid-rgb), 0.28),
           inset 0 1px 0 rgba(255, 255, 255, 0.12);
       }
 
@@ -2553,7 +2686,7 @@
         padding: 0.42rem 0.6rem;
         border-radius: var(--r-sm);
         background: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(180, 165, 150, 0.18);
+        border: 1px solid rgba(var(--line-strong-rgb), 0.18);
         font-size: 0.75rem;
         font-weight: 600;
         color: var(--text-secondary);
@@ -2563,7 +2696,7 @@
         height: 1.15rem;
         border-radius: 50%;
         flex-shrink: 0;
-        background: linear-gradient(180deg, var(--success), #1b4f3a);
+        background: linear-gradient(180deg, var(--success), var(--success-deep));
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2576,7 +2709,7 @@
         align-items: center;
         margin-top: 0.65rem;
         padding-top: 0.55rem;
-        border-top: 1px solid rgba(167, 145, 125, 0.14);
+        border-top: 1px solid rgba(var(--muted-rgb), 0.14);
       }
       .value-total-label {
         font-size: 0.72rem;
@@ -2598,7 +2731,7 @@
         padding: 1.1rem 1.2rem;
         border-radius: var(--card-radius);
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(253, 232, 243, 0.6));
-        border: 1px solid rgba(176, 53, 110, 0.14);
+        border: 1px solid rgba(var(--accent-rgb), 0.14);
         box-shadow: var(--card-shadow);
         margin-bottom: var(--gap);
       }
@@ -2621,12 +2754,16 @@
         height: 2.5rem;
         border-radius: 50%;
         flex-shrink: 0;
-        background: linear-gradient(180deg, rgba(176, 53, 110, 0.15), rgba(176, 53, 110, 0.3));
+        background: linear-gradient(
+          180deg,
+          rgba(var(--accent-rgb), 0.15),
+          rgba(var(--accent-rgb), 0.3)
+        );
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1rem;
-        border: 1.5px solid rgba(176, 53, 110, 0.18);
+        border: 1.5px solid rgba(var(--accent-rgb), 0.18);
       }
       .testimonial-text {
         font-size: 0.8rem;
@@ -2653,7 +2790,7 @@
         overflow: hidden;
         position: relative;
         background: linear-gradient(180deg, rgba(244, 238, 232, 0.8), rgba(232, 222, 210, 0.6));
-        border: 1px solid rgba(180, 165, 150, 0.2);
+        border: 1px solid rgba(var(--line-strong-rgb), 0.2);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -2688,7 +2825,7 @@
         position: absolute;
         inset: 0;
         border-radius: var(--card-radius);
-        background: rgba(250, 246, 242, 0.82);
+        background: rgba(var(--bg-page-rgb), 0.82);
         backdrop-filter: blur(4px);
         display: flex;
         flex-direction: column;
@@ -2713,7 +2850,7 @@
         font-weight: 600;
       }
       .faq-item {
-        border-bottom: 1px solid rgba(167, 145, 125, 0.12);
+        border-bottom: 1px solid rgba(var(--muted-rgb), 0.12);
         padding: 0.55rem 0;
       }
       .faq-item:last-child {
@@ -2744,7 +2881,7 @@
         line-height: 1.5;
         margin-top: 0.35rem;
         padding-top: 0.35rem;
-        border-top: 1px solid rgba(167, 145, 125, 0.08);
+        border-top: 1px solid rgba(var(--muted-rgb), 0.08);
       }
 
       /* NEDRÄKNING (post-signing) */
@@ -2752,8 +2889,12 @@
         display: none;
         padding: 1.25rem 1.4rem;
         border-radius: var(--panel-radius);
-        background: linear-gradient(180deg, rgba(47, 111, 84, 0.04), rgba(47, 111, 84, 0.1));
-        border: 1px solid rgba(47, 111, 84, 0.22);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--success-rgb), 0.04),
+          rgba(var(--success-rgb), 0.1)
+        );
+        border: 1px solid rgba(var(--success-rgb), 0.22);
         box-shadow: var(--card-shadow);
         margin-bottom: var(--gap);
         text-align: center;
@@ -2766,7 +2907,7 @@
         font-weight: 800;
         letter-spacing: -0.05em;
         font-variant-numeric: tabular-nums;
-        background: linear-gradient(180deg, var(--success), #1b4f3a);
+        background: linear-gradient(180deg, var(--success), var(--success-deep));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
@@ -2802,10 +2943,10 @@
         left: 0;
         right: 0;
         z-index: 100;
-        background: rgba(250, 246, 242, 0.95);
+        background: rgba(var(--bg-page-rgb), 0.95);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
-        border-top: 1px solid rgba(167, 145, 125, 0.22);
+        border-top: 1px solid rgba(var(--muted-rgb), 0.22);
         padding: 0.5rem var(--pad-x) calc(0.5rem + env(safe-area-inset-bottom, 0px));
         display: flex;
         justify-content: space-around;
@@ -2834,7 +2975,11 @@
       }
       .nav-item.active {
         color: var(--accent);
-        background: linear-gradient(180deg, rgba(176, 53, 110, 0.08), rgba(176, 53, 110, 0.04));
+        background: linear-gradient(
+          180deg,
+          rgba(var(--accent-rgb), 0.08),
+          rgba(var(--accent-rgb), 0.04)
+        );
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
       }
       .nav-dot {
@@ -2845,7 +2990,7 @@
         height: 6px;
         border-radius: 50%;
         background: var(--accent);
-        border: 2px solid rgba(250, 246, 242, 0.95);
+        border: 2px solid rgba(var(--bg-page-rgb), 0.95);
       }
 
       /* ===== PROGRESSIVT STEG-SYSTEM ===== */
@@ -2868,9 +3013,9 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(250, 246, 242, 0.92);
+        background: rgba(var(--bg-page-rgb), 0.92);
         backdrop-filter: blur(8px);
-        border: 1px solid rgba(180, 165, 150, 0.3);
+        border: 1px solid rgba(var(--line-strong-rgb), 0.3);
         border-radius: var(--r-pill);
         padding: 0.32rem 0.8rem;
         font-size: 0.65rem;
@@ -2900,9 +3045,9 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(250, 246, 242, 0.88);
+        background: rgba(var(--bg-page-rgb), 0.88);
         backdrop-filter: blur(8px);
-        border: 1px solid rgba(180, 165, 150, 0.25);
+        border: 1px solid rgba(var(--line-strong-rgb), 0.25);
         border-radius: var(--r-pill);
         padding: 0.28rem 0.7rem;
         font-size: 0.62rem;
@@ -2944,16 +3089,16 @@
            Låg tidigare på rgba(176,53,110) → rgba(140,40,85): mörk, full
            mättnad, och sidans ENDA mörka helbreddsyta. Det var därför den
            stack ut — inte nyansen utan att den var mörk alls.
-           Nu byggd av portalens egna ytor: --bg-page #faf6f2 → --bg-sunken
+           Nu byggd av portalens egna ytor: --bg-page var(--bg-page) → --bg-sunken
            #f3ece3 som botten, en rosa dimma ur --accent (176,53,110) och en
            varm guldglöd ur --gold-bg-familjen (138,95,30) från vänster.
            Inga nya hex. Bandet ligger i samma sandfamilj som resten av
            sidan, och pillren poppar mot sanden i stället för mot mörkret. */
         background:
-          radial-gradient(130% 200% at 3% 0%, rgba(138, 95, 30, 0.22), transparent 55%),
-          linear-gradient(180deg, rgba(176, 53, 110, 0.07), rgba(176, 53, 110, 0.13)),
-          linear-gradient(180deg, #faf6f2, #f3ece3);
-        border-bottom: 1px solid rgba(180, 165, 150, 0.3);
+          radial-gradient(130% 200% at 3% 0%, rgba(var(--gold-rgb), 0.22), transparent 55%),
+          linear-gradient(180deg, rgba(var(--accent-rgb), 0.07), rgba(var(--accent-rgb), 0.13)),
+          linear-gradient(180deg, var(--bg-page), #f3ece3);
+        border-bottom: 1px solid rgba(var(--line-strong-rgb), 0.3);
         backdrop-filter: blur(12px);
         padding: 0.35rem var(--pad-x);
         display: flex;
@@ -2978,7 +3123,7 @@
         flex-shrink: 0;
         padding: 0.25rem 0.6rem;
         border-radius: var(--r-pill);
-        border: 1px solid rgba(180, 165, 150, 0.42);
+        border: 1px solid rgba(var(--line-strong-rgb), 0.42);
         /* Bubblor 2026-09-07 — samma form och mått, men samma lyft som
            pillren i staff-portalen: ljusare topp, mörkare botten, en
            inre ljuslinje överst och en skugga under. Platt yta → knapp.
@@ -2986,7 +3131,7 @@
         background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 241, 236, 0.86));
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.92),
-          0 1px 2px rgba(56, 40, 28, 0.08);
+          0 1px 2px rgba(var(--sh-rgb), 0.08);
         color: var(--text-secondary);
         font-size: 0.62rem;
         font-weight: 700;
@@ -2995,22 +3140,22 @@
         white-space: nowrap;
       }
       .stage-btn:hover {
-        background: linear-gradient(180deg, #ffffff, rgba(250, 246, 242, 0.92));
+        background: linear-gradient(180deg, #ffffff, rgba(var(--bg-page-rgb), 0.92));
         color: var(--text-primary);
         transform: translateY(-1px);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.95),
-          0 3px 7px rgba(56, 40, 28, 0.12);
+          0 3px 7px rgba(var(--sh-rgb), 0.12);
       }
       .stage-btn.active {
         /* Aktivt steg poppar tydligast: vit topp mot --accent-weak
-           #fdeef4, kant och text i accentens mörka ände #8c2455. */
+           #fdeef4, kant och text i accentens mörka ände var(--accent-deep). */
         background: linear-gradient(180deg, #ffffff, var(--accent-weak));
-        color: #8c2455;
+        color: var(--accent-deep);
         border-color: rgba(140, 36, 85, 0.35);
         box-shadow:
           inset 0 1px 0 rgba(255, 255, 255, 0.92),
-          0 3px 8px rgba(56, 40, 28, 0.16);
+          0 3px 8px rgba(var(--sh-rgb), 0.16);
       }
 
       .staff-preview-banner {
@@ -3021,8 +3166,8 @@
         border-radius: var(--r-lg);
         background:
           linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 241, 236, 0.9)),
-          radial-gradient(circle at 0% 0%, rgba(176, 53, 110, 0.16), transparent 42%);
-        border: 1px solid rgba(176, 53, 110, 0.18);
+          radial-gradient(circle at 0% 0%, rgba(var(--accent-rgb), 0.16), transparent 42%);
+        border: 1px solid rgba(var(--accent-rgb), 0.18);
         box-shadow: var(--sh-md);
         color: var(--text-secondary);
         font-size: 0.74rem;
@@ -3123,7 +3268,7 @@
           bottom: 1rem;
           transform: translateX(-50%);
           width: min(620px, calc(100vw - 2rem));
-          border: 1px solid rgba(167, 145, 125, 0.22);
+          border: 1px solid rgba(var(--muted-rgb), 0.22);
           border-radius: var(--panel-radius);
           box-shadow: var(--sh-lg);
           padding: 0.55rem 0.7rem;
@@ -3216,119 +3361,119 @@
           />
           <path
             d="M89.3871 105.095L95.165 100.117H69.2715L75.0494 105.095V157.649L69.2715 162.628H95.165L89.3871 157.649V105.095Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M104.672 100.117L110.45 105.096V116.295L124.787 120.695V105.096L130.565 100.118L104.672 100.117Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M131.723 140.233V126.778L93.7666 115.134V128.514L110.468 133.671V157.65L104.69 162.628H130.583L124.805 157.65V138.097L131.723 140.233Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M25.3678 103.909C25.3403 105.074 25.512 105.291 26.8327 105.382L35.8417 106.006C37.1624 106.099 37.3622 105.891 37.4951 104.751L37.8591 104.77C37.7825 105.362 37.6928 106.406 37.6147 107.524C37.5419 108.58 37.4808 109.708 37.4704 110.386L37.1064 110.36C37.1338 109.196 36.9621 108.979 35.6414 108.886L31.2793 108.586L30.9454 113.398L35.3075 113.699C36.6282 113.793 36.8294 113.591 36.9621 112.443L37.3261 112.466C37.2441 113.119 37.152 114.201 37.0816 115.211C37.0012 116.373 36.9439 117.465 36.9362 118.08L36.5742 118.056C36.6002 116.899 36.4288 116.685 35.1081 116.591L26.0997 115.967C24.7778 115.875 24.5777 116.077 24.4451 117.217L24.0811 117.191C24.1592 116.58 24.2528 115.491 24.3333 114.329C24.4033 113.315 24.4606 112.234 24.4698 111.578L24.8338 111.602C24.8064 112.767 24.9793 112.985 26.3 113.075L30.5816 113.372L30.9155 108.559L26.6339 108.262C25.312 108.172 25.112 108.37 24.9793 109.519L24.6153 109.489C24.6973 108.819 24.7942 107.693 24.866 106.638C24.9441 105.52 24.9987 104.474 25.0037 103.881L25.3678 103.909Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M41.6698 88.2433C42.6045 88.2356 43.0254 87.9014 43.1658 87.583L43.5063 87.7023C43.2177 88.3638 42.8289 89.3386 42.4757 90.2705C42.0753 91.3273 41.7232 92.306 41.541 92.8894L41.1997 92.76C41.4752 91.9333 41.496 91.5032 41.0307 91.3291C40.7456 91.2415 40.4472 91.2054 40.1494 91.2226L36.9687 91.1851L35.5652 94.8811L36.5725 95.7855C37.068 96.2772 37.6466 96.6772 38.2817 96.9669C39.1799 97.3074 39.6322 96.8137 40.0108 95.892L40.3527 96.0193C40.0266 96.7809 39.7666 97.4138 39.4989 98.1209C39.309 98.62 39.1492 99.0919 39.0517 99.4466L38.7113 99.3167C38.8087 98.7836 38.558 98.1171 37.4857 97.1592L29.002 89.5052C29.0878 89.3284 29.171 89.1323 29.2503 88.9242C29.3257 88.7254 29.3958 88.5149 29.4491 88.328L41.6698 88.2433ZM31.3616 91.1273L35.2736 94.6277L36.5824 91.177L31.3616 91.1273Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M39.0537 71.4545C38.4506 72.4501 38.4924 72.7229 39.5903 73.4587L47.0879 78.4756C48.1873 79.2113 48.4592 79.1386 49.1467 78.2091L49.4481 78.4156C49.0543 78.9406 48.4369 79.8311 47.8728 80.6706C47.2268 81.6361 46.6341 82.5537 46.3226 83.0817L46.0209 82.879C46.6171 81.8898 46.5772 81.6171 45.4777 80.8798L37.9817 75.8629C36.8822 75.1287 36.6103 75.2014 35.9267 76.1229L35.625 75.9213C35.9956 75.4327 36.6169 74.5357 37.2647 73.569C37.8275 72.7295 38.4151 71.8208 38.7517 71.2502L39.0537 71.4545Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M61.9183 64.3219C61.947 64.7798 61.8659 65.2379 61.6819 65.6581C61.4978 66.0783 61.2162 66.4486 60.8603 66.7381C59.9009 67.6244 58.9484 67.8885 57.7148 66.9605L56.2489 65.845C55.0218 64.9104 54.0833 64.3246 53.2489 65.0976L52.3808 65.8995L55.2207 68.9722C56.1189 69.9443 56.401 69.9377 57.2861 69.1931L57.5329 69.4614C57.0261 69.8811 56.2176 70.6037 55.4741 71.2915C54.6188 72.0803 53.8284 72.8357 53.4021 73.2775L53.1553 73.0092C53.9677 72.1864 53.99 71.9109 53.093 70.9388L46.9683 64.3088C46.0701 63.3367 45.7868 63.3444 44.9095 64.084L44.6611 63.8157C45.1354 63.4258 45.9765 62.6734 46.7265 61.9791C47.6012 61.1706 48.4643 60.3257 48.8036 60.0115C51.2899 57.7137 53.293 57.4478 54.6501 58.916C55.6509 59.9987 56.1318 61.8404 54.0365 64.2721L54.0431 64.2671C55.7874 62.9089 56.9754 62.7673 58.235 63.6589L59.8076 64.7584C60.6149 65.3316 60.9945 65.4407 61.3281 65.1328C61.4332 65.0295 61.5116 64.9021 61.5564 64.7617C61.6012 64.6213 61.6112 64.4721 61.5853 64.327L61.9183 64.3219ZM49.096 62.3448L52.1348 65.6318L52.7081 65.1015C54.2882 63.6431 53.7038 62.3434 52.5704 61.1166C51.2732 59.7155 50.0775 59.3086 48.8635 60.431C48.1784 61.0621 48.2446 61.4246 49.096 62.3448Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M79.2773 45.817C79.4711 46.3238 79.6699 46.788 79.8246 47.0908L79.4347 47.2417C77.7616 44.6004 76.5086 44.017 74.9247 44.6267L74.5517 44.7697L78.2842 54.4616C78.8173 55.8473 79.2007 55.9266 80.716 55.3637L80.8472 55.7018C80.1168 55.9567 78.8456 56.4155 77.5953 56.8975C76.3449 57.3795 75.1751 57.8592 74.5136 58.1412L74.3824 57.802C75.8849 57.2057 76.1151 56.8871 75.582 55.5026L71.8489 45.8119L71.476 45.955C69.8759 46.5724 69.3521 47.8305 69.876 50.9228L69.486 51.0718C69.3966 50.7439 69.2326 50.2669 69.0388 49.7601C68.8218 49.1961 68.3382 48.0406 67.8105 46.9203C69.3638 46.3784 71.5604 45.5323 73.0772 44.9474C74.5941 44.3625 76.7739 43.523 78.2893 42.8833C78.6429 44.0716 79.0603 45.2527 79.2773 45.817Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M93.0653 51.0955C93.2019 52.511 93.5477 52.6734 95.1605 52.5369L95.1981 52.9346C94.4528 52.9802 93.1849 53.075 91.8928 53.1996C90.8494 53.301 89.808 53.4271 89.0242 53.5296L88.9891 53.1671C90.133 53.0034 90.3187 52.798 90.1926 51.4801L89.325 42.4926C89.1977 41.1759 88.9673 41.011 87.8213 41.0683L87.7861 40.7043C88.3997 40.681 89.5254 40.5898 90.5429 40.4923C91.7282 40.3778 92.9279 40.2273 93.3867 40.1829C96.7585 39.8579 98.5442 41.1666 98.747 43.2722C98.916 45.0242 97.9969 47.4326 93.7245 47.8446L92.76 47.9382L93.0653 51.0955ZM92.2094 42.2145L92.7255 47.5754L93.5042 47.5012C95.645 47.2958 95.9374 45.6061 95.7592 43.7578C95.5397 41.4749 94.8272 40.391 93.1816 40.5507C92.2535 40.6405 92.0884 40.9681 92.2094 42.2145Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M125.452 44.948C125.52 45.0628 125.624 45.1519 125.748 45.2014C125.995 45.2741 126.225 44.9894 126.505 44.2942L126.905 44.4111C126.592 45.2923 126.223 46.4892 125.598 48.621L125.188 48.5018C125.47 46.8434 125.496 45.9347 124.802 44.9542C124.371 44.216 123.669 43.6747 122.846 43.4452C120.339 42.7095 118.509 45.3507 117.605 48.4389C116.688 51.5672 116.905 54.7153 119.403 55.4471C120.207 55.6916 121.075 55.6176 121.826 55.2406C122.934 54.805 123.432 53.8967 124.094 52.2368L124.503 52.3575C123.853 54.5749 123.504 55.8329 123.281 56.7779L122.881 56.6611C123.022 55.9241 123.004 55.5771 122.756 55.5044C122.619 55.4787 122.478 55.4912 122.347 55.5408C121.317 55.897 120.292 56.1713 118.791 55.7318C115.09 54.6452 113.308 51.595 114.481 47.5955C115.624 43.6902 118.944 41.8103 122.577 42.8749C123.754 43.1966 124.775 43.9328 125.452 44.948Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M140.926 52.0145C139.851 51.4075 139.549 51.4388 138.848 52.5603L133.958 60.3988C133.356 61.3632 133.431 61.5984 134.244 62.1055L134.998 62.5748C136.423 63.4637 138.372 62.7536 139.958 60.8851L140.312 61.106C140.061 61.4398 139.749 61.9067 139.42 62.4343C139.12 62.9167 138.514 63.9213 138.003 64.9415C136.983 64.2436 135.536 63.3403 134.496 62.6916C133.464 62.0483 131.151 60.6048 129.441 59.602L129.634 59.2926C130.642 59.859 130.914 59.8086 131.614 58.6856L136.39 51.0289C137.09 49.9047 137.008 49.6343 136.064 48.9833L136.256 48.6792C136.758 49.0354 137.675 49.6281 138.663 50.2428C139.56 50.8029 140.527 51.384 141.119 51.7062L140.926 52.0145Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M155.607 64.1191C154.744 63.338 154.467 63.3276 153.537 64.2681L147.19 70.6748C146.259 71.6145 146.279 71.8971 147.061 72.7467L146.805 73.0055C146.363 72.5181 145.607 71.7436 144.888 71.0311C144.061 70.2122 143.273 69.4559 142.813 69.0516L143.068 68.7929C143.926 69.5662 144.203 69.5778 145.134 68.6381L151.481 62.2305C152.412 61.2909 152.392 61.0083 151.616 60.1652L151.872 59.9053C152.281 60.3614 153.046 61.1427 153.871 61.9622C154.591 62.6744 155.372 63.423 155.865 63.8612L155.607 64.1191Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M168.034 81.5233C167.291 80.6135 166.775 80.6901 165.275 81.6092L156.616 86.9224C156.554 86.8032 156.475 86.6741 156.395 86.5456C156.312 86.4091 156.229 86.2725 156.129 86.1181L160.538 74.1639L154.584 77.8127C152.879 78.8576 152.568 79.2347 153.272 80.6889L152.962 80.8827C152.746 80.4629 152.319 79.7338 151.978 79.1721C151.68 78.6859 151.336 78.1571 151.105 77.8491L151.417 77.6592C152.161 78.5679 152.677 78.4924 154.177 77.5734L161.162 73.2946C162.291 72.6018 162.339 72.3224 161.78 71.3097L162.092 71.1213C162.26 71.4645 162.576 72.013 162.872 72.4977C163.174 72.9902 163.486 73.466 163.739 73.8094L160.013 84.3438L164.869 81.3686C166.574 80.3252 166.885 79.9481 166.18 78.4936L166.491 78.3091C166.707 78.7288 167.133 79.4595 167.475 80.0197C167.773 80.5059 168.117 81.0347 168.347 81.3313L168.034 81.5233Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M173.29 95.5822C172.886 94.4879 172.645 94.3501 171.384 94.7517L162.779 97.4943C161.517 97.8959 161.404 98.1546 161.704 99.2737L161.357 99.3882C161.191 98.7515 160.88 97.7116 160.571 96.7458C160.217 95.6344 159.869 94.5973 159.649 94.0228L159.996 93.9122C160.398 94.9976 160.639 95.1345 161.899 94.7335L170.504 91.9909C171.766 91.5893 171.879 91.3294 171.583 90.2207L171.93 90.1101C172.082 90.7063 172.397 91.7542 172.75 92.8644C173.057 93.8299 173.403 94.8581 173.636 95.4704L173.29 95.5822Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M175.52 114.612C175.437 114.716 175.39 114.845 175.386 114.978C175.405 115.234 175.752 115.353 176.502 115.371L176.532 115.788C175.597 115.803 174.345 115.873 172.129 116.031L172.099 115.606C173.753 115.292 174.613 114.998 175.292 114.006C175.832 113.344 176.093 112.497 176.022 111.646C175.835 109.04 172.722 108.245 169.513 108.476C166.259 108.71 163.386 110.012 163.572 112.609C163.623 113.447 163.995 114.234 164.611 114.805C165.406 115.694 166.432 115.842 168.217 115.884L168.247 116.309C165.942 116.474 164.641 116.586 163.678 116.708L163.648 116.291C164.388 116.166 164.707 116.027 164.689 115.769C164.665 115.632 164.603 115.504 164.51 115.399C163.817 114.558 163.203 113.694 163.091 112.133C162.816 108.286 165.053 105.551 169.211 105.252C173.272 104.963 176.192 107.416 176.463 111.195C176.572 112.41 176.237 113.624 175.52 114.612Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M168.353 135.824C167.747 135.823 167.156 135.642 166.653 135.304C166.15 134.966 165.758 134.488 165.528 133.928C165.297 133.368 165.237 132.752 165.355 132.158C165.474 131.564 165.766 131.019 166.194 130.591C166.622 130.163 167.168 129.871 167.762 129.753C168.356 129.634 168.971 129.694 169.531 129.925C170.091 130.156 170.57 130.548 170.907 131.051C171.245 131.554 171.426 132.145 171.427 132.751C171.429 133.155 171.35 133.556 171.197 133.929C171.043 134.303 170.816 134.643 170.53 134.928C170.245 135.214 169.905 135.44 169.531 135.594C169.158 135.748 168.757 135.826 168.353 135.824Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M174.589 163.009C174.678 161.847 174.519 161.621 173.203 161.459L164.236 160.35C162.922 160.188 162.708 160.385 162.515 161.517L162.153 161.466C162.261 160.879 162.407 159.841 162.544 158.729C162.674 157.679 162.795 156.558 162.843 155.886L163.204 155.931C163.114 157.094 163.274 157.319 164.59 157.482L168.932 158.018L169.525 153.227L165.182 152.691C163.867 152.528 163.655 152.718 163.461 153.858L163.099 153.811C163.214 153.162 163.365 152.089 163.49 151.083C163.633 149.927 163.749 148.841 163.788 148.227L164.15 148.271C164.061 149.426 164.221 149.652 165.536 149.814L174.503 150.922C175.819 151.084 176.029 150.896 176.223 149.765L176.586 149.809C176.475 150.413 176.323 151.496 176.18 152.65C176.055 153.658 175.942 154.735 175.894 155.395L175.533 155.35C175.622 154.187 175.463 153.962 174.149 153.8L169.885 153.273L169.295 158.063L173.558 158.591C174.872 158.754 175.084 158.565 175.279 157.423L175.64 157.464C175.521 158.131 175.366 159.248 175.237 160.298C175.099 161.41 174.987 162.452 174.949 163.055L174.589 163.009Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M157.409 177.751C156.477 177.705 156.038 178.015 155.881 178.324L155.548 178.175C155.873 177.533 156.315 176.582 156.719 175.673C157.178 174.643 157.583 173.687 157.796 173.122L158.129 173.269C157.808 174.08 157.762 174.507 158.218 174.709C158.498 174.811 158.794 174.863 159.092 174.863L162.262 175.079L163.867 171.47L162.913 170.511C162.446 169.993 161.891 169.561 161.274 169.237C160.397 168.847 159.918 169.314 159.489 170.212L159.156 170.063C159.524 169.322 159.819 168.706 160.126 168.016C160.342 167.528 160.527 167.068 160.643 166.721L160.976 166.87C160.848 167.397 161.063 168.074 162.079 169.09L170.114 177.194C170.018 177.366 169.923 177.555 169.833 177.761C169.746 177.954 169.664 178.161 169.602 178.347L157.409 177.751ZM167.851 175.447L164.147 171.739L162.648 175.105L167.851 175.447Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M159.097 194.695C159.756 193.734 159.73 193.458 158.672 192.659L151.461 187.219C150.403 186.421 150.125 186.48 149.387 187.37L149.096 187.146C149.519 186.643 150.187 185.787 150.798 184.979C151.499 184.05 152.144 183.167 152.485 182.656L152.777 182.876C152.123 183.83 152.149 184.107 153.207 184.905L160.421 190.346C161.479 191.143 161.756 191.085 162.49 190.201L162.782 190.421C162.383 190.888 161.711 191.75 161.009 192.679C160.398 193.487 159.759 194.365 159.392 194.915L159.097 194.695Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M135.82 200.527C135.818 200.067 135.924 199.614 136.132 199.204C136.34 198.795 136.643 198.441 137.015 198.172C138.024 197.341 138.991 197.131 140.171 198.129L141.572 199.324C142.745 200.329 143.649 200.966 144.528 200.242L145.44 199.491L142.777 196.258C141.936 195.237 141.653 195.228 140.726 195.922L140.495 195.64C141.025 195.25 141.874 194.574 142.656 193.929C143.555 193.19 144.388 192.48 144.839 192.062L145.07 192.344C144.212 193.119 144.173 193.394 145.015 194.417L150.758 201.389C151.6 202.41 151.884 202.419 152.802 201.732L153.035 202.012C152.539 202.375 151.656 203.08 150.867 203.729C149.947 204.487 149.036 205.282 148.679 205.578C146.064 207.731 144.048 207.883 142.776 206.34C141.837 205.2 141.462 203.333 143.694 201.022L143.688 201.028C141.867 202.286 140.672 202.359 139.465 201.396L137.956 200.208C137.182 199.59 136.809 199.46 136.46 199.75C136.348 199.846 136.262 199.969 136.209 200.107C136.156 200.245 136.138 200.393 136.155 200.54L135.82 200.527ZM148.52 203.231L145.671 199.773L145.068 200.271C143.407 201.64 143.917 202.971 144.979 204.26C146.194 205.737 147.368 206.21 148.644 205.158C149.363 204.565 149.316 204.2 148.519 203.231H148.52Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M120.976 217.085C120.785 216.578 120.59 216.111 120.44 215.809L120.831 215.662C122.485 218.312 123.733 218.904 125.32 218.305L125.695 218.164L122.03 208.451C121.508 207.063 121.124 206.979 119.606 207.533L119.478 207.193C120.211 206.946 121.483 206.493 122.738 206.02C123.992 205.547 125.163 205.077 125.827 204.798L125.955 205.138C124.449 205.724 124.217 206.04 124.741 207.428L128.403 217.141L128.778 217.001C130.382 216.397 130.915 215.142 130.412 212.048L130.801 211.899C130.887 212.226 131.05 212.707 131.241 213.215C131.454 213.779 131.93 214.939 132.448 216.05C130.891 216.58 128.689 217.411 127.17 217.984C125.65 218.557 123.463 219.381 121.945 220.024C121.599 218.836 121.189 217.652 120.976 217.085Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M107.243 211.74C107.112 210.324 106.766 210.16 105.156 210.291L105.12 209.892C105.865 209.85 107.132 209.762 108.424 209.642C109.468 209.547 110.509 209.424 111.294 209.325L111.328 209.687C110.183 209.846 109.996 210.05 110.117 211.368L110.943 220.356C111.064 221.674 111.294 221.84 112.441 221.787L112.473 222.149C111.86 222.17 110.735 222.256 109.718 222.348C108.532 222.457 107.333 222.603 106.872 222.646C103.502 222.957 101.721 221.639 101.529 219.533C101.367 217.784 102.297 215.378 106.569 214.985L107.534 214.896L107.243 211.74ZM108.058 220.621L107.567 215.259L106.787 215.332C104.646 215.528 104.347 217.215 104.516 219.063C104.727 221.346 105.433 222.432 107.078 222.279C108.007 222.195 108.173 221.867 108.057 220.62L108.058 220.621Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M78.7836 219.006C78.7094 218.895 78.6007 218.811 78.4742 218.767C78.2235 218.708 78.0061 219.004 77.7644 219.713L77.3574 219.616C77.6257 218.722 77.9346 217.507 78.4506 215.344L78.8653 215.442C78.6677 217.114 78.6885 218.024 79.4318 218.969C79.9007 219.684 80.6293 220.188 81.4635 220.376C84.0059 220.982 85.6968 218.251 86.4457 215.121C87.2021 211.947 86.8252 208.815 84.2921 208.211C83.4763 208.007 82.6133 208.125 81.8823 208.541C80.7969 209.031 80.3461 209.965 79.7689 211.656L79.3543 211.557C79.8909 209.308 80.1756 208.034 80.3485 207.077L80.7554 207.175C80.6514 207.918 80.6878 208.264 80.9388 208.324C81.0773 208.343 81.2185 208.322 81.3457 208.264C82.357 207.857 83.367 207.532 84.8877 207.895C88.6414 208.789 90.5768 211.746 89.61 215.801C88.665 219.761 85.4443 221.808 81.7607 220.929C80.5688 220.668 79.5114 219.985 78.7836 219.006Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M62.9439 212.709C64.0499 213.264 64.3516 213.215 64.995 212.059L69.4925 203.975C70.0461 202.979 69.9605 202.748 69.1207 202.281L68.3435 201.848C66.8735 201.031 64.9589 201.839 63.4668 203.789L63.1016 203.586C63.3356 203.236 63.6242 202.755 63.9271 202.212C64.2041 201.714 64.7589 200.678 65.2192 199.632C66.2745 200.281 67.7667 201.11 68.839 201.707C69.9048 202.298 72.2913 203.626 74.0511 204.544L73.8722 204.862C72.8363 204.348 72.5659 204.41 71.9225 205.57L67.5293 213.469C66.886 214.629 66.982 214.895 67.9583 215.5L67.7816 215.826C67.2616 215.496 66.3142 214.948 65.2964 214.382C64.3722 213.867 63.3753 213.334 62.7656 213.029L62.9439 212.709Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M47.7052 201.303C48.6073 202.041 48.884 202.04 49.7706 201.056L55.8159 194.346C56.7023 193.362 56.6686 193.081 55.8458 192.269L56.0902 191.997C56.5556 192.464 57.3498 193.202 58.1023 193.882C58.9668 194.66 59.792 195.379 60.2717 195.764L60.0272 196.034C59.1329 195.301 58.8562 195.302 57.9702 196.285L51.923 202.996C51.0367 203.98 51.0704 204.261 51.8867 205.068L51.6422 205.346C51.2108 204.91 50.4101 204.165 49.5443 203.385C48.7918 202.708 47.9741 201.995 47.4619 201.573L47.7052 201.303Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M34.4386 184.504C35.225 185.376 35.7372 185.275 37.1891 184.286L45.5777 178.581C45.6466 178.697 45.7309 178.822 45.8162 178.946C45.9056 179.078 45.9969 179.21 46.1036 179.343L42.2778 191.486L48.045 187.56C49.6969 186.434 49.9881 186.043 49.216 184.624L49.5162 184.424C49.7514 184.832 50.2117 185.537 50.582 186.081C50.9019 186.549 51.271 187.06 51.5151 187.355L51.2149 187.56C50.4273 186.689 49.9163 186.789 48.4632 187.78L41.6979 192.386C40.6047 193.131 40.5698 193.413 41.1753 194.395L40.8751 194.602C40.6894 194.266 40.3486 193.737 40.029 193.267C39.7041 192.79 39.3702 192.331 39.1009 191.997L42.3114 181.301L37.6076 184.505C35.9569 185.63 35.6657 186.022 36.4378 187.44L36.1376 187.652C35.9012 187.243 35.4409 186.537 35.0718 185.995C34.7519 185.526 34.3828 185.016 34.1387 184.71L34.4386 184.504Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M28.492 170.685C28.947 171.758 29.1938 171.883 30.434 171.423L38.8969 168.28C40.1383 167.818 40.2384 167.554 39.8872 166.452L40.2292 166.327C40.4242 166.954 40.7855 167.976 41.1379 168.926C41.5433 170.018 41.941 171.036 42.1882 171.597L41.8462 171.725C41.394 170.661 41.1468 170.534 39.9084 170.994L31.4438 174.138C30.2012 174.6 30.1022 174.863 30.4495 175.957L30.1091 176.084C29.9284 175.495 29.5644 174.464 29.1589 173.375C28.8066 172.425 28.4136 171.415 28.1504 170.81L28.492 170.685Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M25.3333 151.793C25.4108 151.685 25.4517 151.555 25.4502 151.422C25.4203 151.167 25.0668 151.065 24.3173 151.082L24.2666 150.668C25.1997 150.61 26.4465 150.479 28.6535 150.217L28.7042 150.64C27.0678 151.031 26.2202 151.366 25.5912 152.39C25.0828 153.077 24.8606 153.934 24.9711 154.781C25.2805 157.375 28.4293 158.021 31.6234 157.641C34.8625 157.254 37.6714 155.82 37.3632 153.233C37.272 152.398 36.8635 151.63 36.222 151.087C35.3872 150.238 34.3542 150.137 32.5697 150.18L32.519 149.756C34.8145 149.483 36.109 149.309 37.0645 149.143L37.114 149.557C36.3809 149.716 36.069 149.871 36.0988 150.127C36.1295 150.263 36.197 150.388 36.2938 150.488C37.0257 151.295 37.6807 152.131 37.8652 153.684C38.3214 157.514 36.2157 160.352 32.076 160.846C28.0337 161.326 25.0012 159.012 24.554 155.251C24.3873 154.042 24.6642 152.814 25.3333 151.793Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
           <path
             d="M32.3523 129.829C32.9577 129.831 33.5491 130.012 34.0518 130.349C34.5544 130.687 34.9459 131.166 35.1768 131.725C35.4076 132.285 35.4676 132.9 35.349 133.494C35.2305 134.088 34.9388 134.633 34.5106 135.061C34.0825 135.489 33.5372 135.781 32.9435 135.9C32.3498 136.018 31.7343 135.958 31.1746 135.727C30.6149 135.496 30.1361 135.105 29.7986 134.602C29.4612 134.1 29.2801 133.508 29.2784 132.903C29.2765 132.499 29.3547 132.098 29.5086 131.724C29.6624 131.351 29.8887 131.011 30.1746 130.725C30.4604 130.439 30.8 130.213 31.1738 130.059C31.5476 129.906 31.9481 129.827 32.3523 129.829Z"
-            fill="#CABAAE"
+            fill="var(--muted-solid)"
           />
         </svg>
         <span class="brand-name">Hair TP Clinic</span>
@@ -3515,47 +3660,77 @@
         <div class="tl-months" aria-hidden="true">
           <!-- heights in % of 3.5rem container; colors: danger=shock, warning=vila, cal=start, success=full -->
           <div class="tl-col">
-            <div class="tl-bar" style="height: 95%; background: rgba(168, 56, 56, 0.25)"></div>
+            <div
+              class="tl-bar"
+              style="height: 95%; background: rgba(var(--danger-rgb), 0.25)"
+            ></div>
             <div class="tl-num">1</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 85%; background: rgba(168, 56, 56, 0.2)"></div>
+            <div class="tl-bar" style="height: 85%; background: rgba(var(--danger-rgb), 0.2)"></div>
             <div class="tl-num">2</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 30%; background: rgba(154, 100, 16, 0.22)"></div>
+            <div
+              class="tl-bar"
+              style="height: 30%; background: rgba(var(--warning-rgb), 0.22)"
+            ></div>
             <div class="tl-num">3</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 38%; background: rgba(154, 100, 16, 0.35)"></div>
+            <div
+              class="tl-bar"
+              style="height: 38%; background: rgba(var(--warning-rgb), 0.35)"
+            ></div>
             <div class="tl-num">4</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 48%; background: rgba(154, 100, 16, 0.45)"></div>
+            <div
+              class="tl-bar"
+              style="height: 48%; background: rgba(var(--warning-rgb), 0.45)"
+            ></div>
             <div class="tl-num">5</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 58%; background: rgba(154, 100, 16, 0.55)"></div>
+            <div
+              class="tl-bar"
+              style="height: 58%; background: rgba(var(--warning-rgb), 0.55)"
+            ></div>
             <div class="tl-num">6</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 70%; background: rgba(47, 111, 84, 0.45)"></div>
+            <div
+              class="tl-bar"
+              style="height: 70%; background: rgba(var(--success-rgb), 0.45)"
+            ></div>
             <div class="tl-num">7</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 78%; background: rgba(47, 111, 84, 0.55)"></div>
+            <div
+              class="tl-bar"
+              style="height: 78%; background: rgba(var(--success-rgb), 0.55)"
+            ></div>
             <div class="tl-num">8</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 84%; background: rgba(47, 111, 84, 0.65)"></div>
+            <div
+              class="tl-bar"
+              style="height: 84%; background: rgba(var(--success-rgb), 0.65)"
+            ></div>
             <div class="tl-num">9</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 90%; background: rgba(47, 111, 84, 0.75)"></div>
+            <div
+              class="tl-bar"
+              style="height: 90%; background: rgba(var(--success-rgb), 0.75)"
+            ></div>
             <div class="tl-num">10</div>
           </div>
           <div class="tl-col">
-            <div class="tl-bar" style="height: 95%; background: rgba(47, 111, 84, 0.85)"></div>
+            <div
+              class="tl-bar"
+              style="height: 95%; background: rgba(var(--success-rgb), 0.85)"
+            ></div>
             <div class="tl-num">11</div>
           </div>
           <div class="tl-col">
@@ -3565,12 +3740,12 @@
         </div>
         <div class="tl-phases">
           <span class="tl-phase"
-            ><span class="tl-phase-dot" style="background: rgba(168, 56, 56, 0.5)"></span>Chockfall
-            (mån 1–2)</span
+            ><span class="tl-phase-dot" style="background: rgba(var(--danger-rgb), 0.5)"></span
+            >Chockfall (mån 1–2)</span
           >
           <span class="tl-phase"
-            ><span class="tl-phase-dot" style="background: rgba(154, 100, 16, 0.6)"></span>Vilofas
-            (mån 3–6)</span
+            ><span class="tl-phase-dot" style="background: rgba(var(--warning-rgb), 0.6)"></span
+            >Vilofas (mån 3–6)</span
           >
           <span class="tl-phase"
             ><span class="tl-phase-dot" style="background: var(--success)"></span>Synlig tillväxt
@@ -3763,8 +3938,8 @@
               cy="55"
               rx="60"
               ry="20"
-              fill="rgba(176,53,110,.16)"
-              stroke="rgba(176,53,110,.32)"
+              fill="rgba(var(--accent-rgb),.16)"
+              stroke="rgba(var(--accent-rgb),.32)"
               stroke-width="1.2"
             />
             <ellipse
@@ -3772,8 +3947,8 @@
               cy="92"
               rx="54"
               ry="26"
-              fill="rgba(107,49,201,.13)"
-              stroke="rgba(107,49,201,.28)"
+              fill="rgba(var(--violet-rgb),.13)"
+              stroke="rgba(var(--violet-rgb),.28)"
               stroke-width="1.2"
             />
             <ellipse
@@ -3781,8 +3956,8 @@
               cy="138"
               rx="45"
               ry="30"
-              fill="rgba(138,95,30,.13)"
-              stroke="rgba(138,95,30,.28)"
+              fill="rgba(var(--gold-rgb),.13)"
+              stroke="rgba(var(--gold-rgb),.28)"
               stroke-width="1.2"
             />
             <text
@@ -3791,7 +3966,7 @@
               text-anchor="middle"
               font-size="9"
               font-weight="700"
-              fill="rgba(176,53,110,.85)"
+              fill="rgba(var(--accent-rgb),.85)"
               font-family="system-ui,sans-serif"
             >
               Hårlinje
@@ -3802,7 +3977,7 @@
               text-anchor="middle"
               font-size="9"
               font-weight="700"
-              fill="rgba(107,49,201,.85)"
+              fill="rgba(var(--violet-rgb),.85)"
               font-family="system-ui,sans-serif"
             >
               Mittparti
@@ -3813,7 +3988,7 @@
               text-anchor="middle"
               font-size="9"
               font-weight="700"
-              fill="rgba(138,95,30,.85)"
+              fill="rgba(var(--gold-rgb),.85)"
               font-family="system-ui,sans-serif"
             >
               Krona
@@ -3822,7 +3997,7 @@
               cx="86"
               cy="47"
               r="5"
-              fill="rgba(176,53,110,.9)"
+              fill="rgba(var(--accent-rgb),.9)"
               stroke="white"
               stroke-width="2"
             />
@@ -3830,15 +4005,15 @@
               cx="86"
               cy="47"
               r="9"
-              fill="rgba(176,53,110,.1)"
-              stroke="rgba(176,53,110,.28)"
+              fill="rgba(var(--accent-rgb),.1)"
+              stroke="rgba(var(--accent-rgb),.28)"
               stroke-width="1"
             />
             <circle
               cx="134"
               cy="58"
               r="5"
-              fill="rgba(176,53,110,.9)"
+              fill="rgba(var(--accent-rgb),.9)"
               stroke="white"
               stroke-width="2"
             />
@@ -3846,15 +4021,15 @@
               cx="134"
               cy="58"
               r="9"
-              fill="rgba(176,53,110,.1)"
-              stroke="rgba(176,53,110,.28)"
+              fill="rgba(var(--accent-rgb),.1)"
+              stroke="rgba(var(--accent-rgb),.28)"
               stroke-width="1"
             />
             <circle
               cx="92"
               cy="93"
               r="5"
-              fill="rgba(107,49,201,.9)"
+              fill="rgba(var(--violet-rgb),.9)"
               stroke="white"
               stroke-width="2"
             />
@@ -3862,15 +4037,15 @@
               cx="92"
               cy="93"
               r="9"
-              fill="rgba(107,49,201,.08)"
-              stroke="rgba(107,49,201,.25)"
+              fill="rgba(var(--violet-rgb),.08)"
+              stroke="rgba(var(--violet-rgb),.25)"
               stroke-width="1"
             />
             <circle
               cx="128"
               cy="100"
               r="5"
-              fill="rgba(107,49,201,.9)"
+              fill="rgba(var(--violet-rgb),.9)"
               stroke="white"
               stroke-width="2"
             />
@@ -3878,7 +4053,7 @@
               cx="110"
               cy="138"
               r="5"
-              fill="rgba(138,95,30,.9)"
+              fill="rgba(var(--gold-rgb),.9)"
               stroke="white"
               stroke-width="2"
             />
@@ -3886,8 +4061,8 @@
               cx="110"
               cy="138"
               r="9"
-              fill="rgba(138,95,30,.08)"
-              stroke="rgba(138,95,30,.25)"
+              fill="rgba(var(--gold-rgb),.08)"
+              stroke="rgba(var(--gold-rgb),.25)"
               stroke-width="1"
             />
           </svg>
@@ -3906,15 +4081,18 @@
         <div class="graft-bar" aria-hidden="true" data-offer-graft-bar>
           <div
             class="graft-seg"
-            style="flex: 800; background: linear-gradient(90deg, #b0356e, #c85080)"
+            style="flex: 800; background: linear-gradient(90deg, var(--accent), var(--accent-lift))"
           ></div>
           <div
             class="graft-seg"
-            style="flex: 1200; background: linear-gradient(90deg, #6b31c9, #8a52dc)"
+            style="
+              flex: 1200;
+              background: linear-gradient(90deg, var(--violet), var(--violet-lift));
+            "
           ></div>
           <div
             class="graft-seg"
-            style="flex: 500; background: linear-gradient(90deg, #8a5f1e, #b07c30)"
+            style="flex: 500; background: linear-gradient(90deg, var(--gold), var(--gold-lift))"
           ></div>
         </div>
         <div class="zone-visual" data-offer-zones>
@@ -4443,7 +4621,7 @@
               margin-left: auto;
               padding: 0.18rem 0.5rem;
               border-radius: var(--r-pill);
-              background: rgba(167, 145, 125, 0.1);
+              background: rgba(var(--muted-rgb), 0.1);
               font-size: 0.58rem;
               font-weight: 700;
               letter-spacing: 0.07em;
@@ -5790,8 +5968,8 @@
           signed.classList.add('visible');
           var chip = document.querySelector('.status-chip');
           if (chip) {
-            chip.style.background = 'rgba(47,111,84,.10)';
-            chip.style.borderColor = 'rgba(47,111,84,.18)';
+            chip.style.background = 'rgba(var(--success-rgb),.10)';
+            chip.style.borderColor = 'rgba(var(--success-rgb),.18)';
             chip.style.color = 'var(--success)';
             chip.innerHTML =
               '<span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;margin-right:.4rem"></span>Signerad';
