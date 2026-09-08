@@ -152,3 +152,34 @@ test('offertportalen: ett enda neutralt skuggbläck', () => {
       'djup är drift, inte design, eftersom ingen valdes mot de andra.'
   );
 });
+
+test('avstängda knappar tonas ned — de avfärgas inte', () => {
+  // Hair AI Doctor har en enda regel för det här: disabled:opacity-50 på
+  // .btn. Knappen behåller sin varma orange och ser ändå otillgänglig ut.
+  //
+  // Offertportalen bytte i stället UT gradienten på sitt huvudsakliga
+  // anrop mot rgba(--muted-rgb) → rgba(--text-tertiary-rgb), alltså
+  // brungrått. Sidans största element blev färglöst medan resten bar
+  // accent och violett.
+  //
+  // Målet från ORD-244 §2 står kvar — en avstängd knapp SKA se avstängd
+  // ut. Men opaciteten och den borttagna skuggan klarar det på egen hand.
+  // Färgbytet var ett andra signalsystem som kostade kulören.
+  const css = utanKommentarer(las(FILER[0]));
+  const m = css.match(/\.portal-next-action__button:disabled\s*\{([^}]*)\}/);
+  assert.ok(m, '.portal-next-action__button:disabled hittades inte');
+  const dek = m[1];
+
+  assert.match(dek, /opacity\s*:/, 'Nedtoningen är det som ska bära signalen.');
+  assert.doesNotMatch(
+    dek,
+    /(^|;)\s*background(-color)?\s*:/,
+    'Avstängt läge får inte byta yta. Knappen ska behålla sin kulör och ' +
+      'bara tonas ned, som Hair AI Doctors .btn gör.'
+  );
+  assert.doesNotMatch(
+    dek,
+    /(^|;)\s*color\s*:/,
+    'Avstängt läge får inte byta textfärg heller — opaciteten tar den med sig.'
+  );
+});

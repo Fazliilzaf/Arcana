@@ -825,13 +825,25 @@
         cursor: pointer;
       }
       .portal-next-action__button:disabled {
+        /* Avstängd betyder nedtonad, inte avfärgad.
+           Hair AI Doctor har en enda regel för det här — disabled:opacity-50
+           på .btn — och knappen behåller sin varma orange. Den ser
+           otillgänglig ut men fortsätter höra till varumärket.
+
+           Portalen bytte i stället UT gradienten mot rgba(--muted-rgb) →
+           rgba(--text-tertiary-rgb), alltså brungrått. Sidans huvudsakliga
+           anrop blev då färglöst medan resten av sidan bär accent och
+           violett, och blicken fick ingenstans att ta vägen.
+
+           Målet från ORD-244 §2 står kvar: en avstängd knapp ska SE
+           avstängd ut. Det klarar opaciteten och den borttagna skuggan på
+           egen hand — färgbytet var ett andra signalsystem som kostade
+           kulören utan att tillföra något.
+
+           Kontrastkravet gäller inte här: WCAG 1.4.3 undantar
+           inaktiva komponenter. */
         cursor: not-allowed;
-        opacity: 0.72;
-        background: linear-gradient(
-          135deg,
-          rgba(var(--muted-rgb), 0.5),
-          rgba(var(--text-tertiary-rgb), 0.5)
-        );
+        opacity: 0.5;
         box-shadow: none;
       }
       .portal-next-action__hint {
