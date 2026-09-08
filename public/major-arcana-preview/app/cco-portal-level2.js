@@ -133,7 +133,9 @@
         var statusLabel = esc(DOCUMENT_STATUS_LABELS[status] || 'Väntar');
         var openUrl = doc && doc.openUrl ? esc(doc.openUrl) : '';
         var action = openUrl
-          ? '<a class="l2-document-open" href="' + openUrl + '" target="_blank" rel="noopener">Öppna</a>'
+          ? '<a class="l2-document-open" href="' +
+            openUrl +
+            '" target="_blank" rel="noopener">Öppna</a>'
           : '<span class="l2-document-unavailable">Hos kliniken</span>';
         return (
           '<li class="l2-document"><div><strong>' +
@@ -229,31 +231,56 @@
   }
 
   var STYLE_ID = 'cco-portal-level2-styles';
+
+  /**
+   * Nivå 2 läser portalens tokens i stället för egna hexvärden.
+   *
+   * Modulen skrevs fristående och hade en helt egen palett: kritvit yta,
+   * grå kant, 14px radie, grund skugga. Renderad bredvid portalens övriga
+   * kort stack den ut som en främmande komponent — hård och platt där allt
+   * annat är mjukt och lyft. Den syntes direkt på skärmen och gick inte att
+   * hitta i portalens CSS, eftersom den ligger här.
+   *
+   * Stilarna injiceras i samma dokument, så var(--card-bg) och de andra
+   * löser mot :root i portalen. Faller den in i ett dokument utan tokens
+   * finns reservvärden efter kommatecknet.
+   */
   var CSS =
     '.l2-panel{display:flex;flex-direction:column;gap:12px}' +
-    '.l2-card{background:#fff;border:1px solid rgba(43,37,31,.1);border-radius:14px;' +
-    'padding:14px 16px;box-shadow:0 4px 16px rgba(43,37,31,.06)}' +
-    '.l2-muted{color:rgba(70,60,50,.62)}' +
+    '.l2-card{background:var(--card-bg,#fff);' +
+    'border:var(--card-border,1px solid rgba(255,255,255,.75));' +
+    'border-radius:var(--card-radius,20px);padding:14px 16px;' +
+    'box-shadow:var(--card-shadow,0 4px 16px rgba(60,42,30,.1))}' +
+    '.l2-muted{color:var(--text-tertiary,#6f6456)}' +
     '.l2-kicker{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;' +
-    'color:#8a8174;margin-bottom:4px}' +
-    '.l2-title{font-size:16px;font-weight:800;letter-spacing:-.01em}' +
-    '.l2-row{font-size:13px;margin-top:6px}' +
+    'color:var(--text-tertiary,#6f6456);margin-bottom:4px}' +
+    '.l2-title{font-size:16px;font-weight:800;letter-spacing:-.01em;color:var(--text-primary,#2b241d)}' +
+    '.l2-row{font-size:13px;margin-top:6px;color:var(--text-secondary,#574c40)}' +
     '.l2-status{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;' +
-    'font-size:11px;font-weight:800;background:rgba(74,130,104,.12);color:#4a8268}' +
-    '.l2-status--cooling_off{background:rgba(200,130,30,.14);color:#c8821e}' +
-    '.l2-status--preparing{background:rgba(43,37,31,.07);color:rgba(70,60,50,.62)}' +
-    '.l2-btn{display:inline-block;margin-top:10px;padding:9px 16px;border-radius:999px;border:none;' +
-    'background:linear-gradient(135deg,#4a8268,#2e5a47);color:#fff;font-size:13px;font-weight:700;' +
-    'text-decoration:none;cursor:pointer}' +
+    'font-size:11px;font-weight:800;background:rgba(var(--success-rgb,74,130,104),.12);' +
+    'color:var(--success,#2f6f54)}' +
+    '.l2-status--cooling_off{background:rgba(var(--warning-rgb,200,124,46),.14);color:var(--gold,#8a5f1e)}' +
+    '.l2-status--preparing{background:rgba(var(--ink-rgb,43,37,31),.07);color:var(--text-tertiary,#6f6456)}' +
+    // Knappen tar samma varma pillerform som Hair AI Doctors primärknapp.
+    '.l2-btn{display:inline-block;margin-top:10px;padding:0 20px;height:44px;line-height:44px;' +
+    'border-radius:999px;border:none;background:var(--btn-warm,linear-gradient(135deg,#ffb08a,#f0964a));' +
+    'color:#fff;font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;' +
+    'box-shadow:var(--shadow-btn-brand,0 6px 16px rgba(240,150,74,.34))}' +
     '.l2-bookings{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}' +
     '.l2-booking{display:flex;justify-content:space-between;gap:10px;font-size:12px;' +
-    'padding:7px 0;border-bottom:1px solid rgba(43,37,31,.08)}' +
+    'padding:7px 0;border-bottom:1px solid rgba(var(--ink-rgb,43,37,31),.08)}' +
     '.l2-booking:last-child{border-bottom:none}' +
     '.l2-documents{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}' +
-    '.l2-document{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid rgba(43,37,31,.08)}' +
-    '.l2-document:last-child{border-bottom:none}.l2-document strong,.l2-document small{display:block}.l2-document small{margin-top:3px;color:rgba(70,60,50,.62);font-size:11px}' +
-    '.l2-document-meta{display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap}.l2-document-status{padding:3px 7px;border-radius:999px;background:rgba(74,130,104,.12);color:#2e5a47;font-weight:800}' +
-    '.l2-document-status--väntar{background:rgba(200,130,30,.14);color:#a86d19}.l2-document-open{color:#2e5a47;font-weight:800;text-decoration:none}.l2-document-unavailable{color:rgba(70,60,50,.62)}';
+    '.l2-document{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;' +
+    'border-bottom:1px solid rgba(var(--ink-rgb,43,37,31),.08)}' +
+    '.l2-document:last-child{border-bottom:none}.l2-document strong,.l2-document small{display:block}' +
+    '.l2-document small{margin-top:3px;color:var(--text-tertiary,#6f6456);font-size:11px}' +
+    '.l2-document-meta{display:flex;align-items:center;gap:8px;font-size:11px;white-space:nowrap}' +
+    '.l2-document-status{padding:3px 7px;border-radius:999px;' +
+    'background:rgba(var(--success-rgb,74,130,104),.12);color:var(--success-deep,#1b4f3a);font-weight:800}' +
+    '.l2-document-status--väntar{background:rgba(var(--warning-rgb,200,124,46),.14);color:var(--gold,#8a5f1e)}' +
+    '.l2-document-open{color:var(--success-deep,#1b4f3a);font-weight:800;text-decoration:none}' +
+    '.l2-document-unavailable{color:var(--text-tertiary,#6f6456)}';
 
   function ensureStyles() {
     if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return;

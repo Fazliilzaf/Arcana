@@ -146,13 +146,57 @@
         --sh-lg: 0 8px 22px rgba(var(--sh-rgb), 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.92);
         --sh-xl: 0 24px 56px rgba(var(--sh-rgb), 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 
-        /* Card recipe — CCO v3 stil (vit bas + varm shadow) */
-        --card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 241, 236, 0.86));
-        --card-border: 1px solid rgba(180, 165, 150, 0.25);
-        --card-radius: 14px;
+        /* KORTRECEPTET — identiskt med Hair AI Doctors .card ───────────
+           Uppmätt i renderad AID (inte gissat ur källan): radie 20px,
+           kant rgba(255,255,255,0.75), yta 165° i tre stopp, och en
+           femlagers skugga.
+
+           Kanten är det som ändrar mest. Portalen ritade en GRÅ linje
+           runt varje kort; AID lägger en VIT rand. Grå linje läser som
+           en kontur — något är utritat. Vit rand läser som ljus över en
+           kant — något ligger där. Det är hela skillnaden mellan skarp
+           och mjuk, och det syns på varje kort på sidan samtidigt.
+
+           Kant och skugga MÅSTE bytas ihop. Tar man bort den grå linjen
+           utan att fördjupa skuggan tappar kortet sin avgränsning mot
+           den krämiga bakgrunden och flyter ut. AID:s skugga bär den
+           avgränsningen i stället: tre spridningar utåt plus en ljuslinje
+           upptill och en varm skuggkant nedtill. */
+        --card-bg: linear-gradient(
+          165deg,
+          rgba(255, 255, 255, 0.96),
+          rgba(252, 247, 242, 0.88) 55%,
+          rgba(246, 239, 232, 0.82)
+        );
+        --card-border: 1px solid rgba(255, 255, 255, 0.75);
+        --card-radius: 20px;
         --panel-radius: 20px;
-        --card-shadow: var(--sh-md);
-        --card-shadow-hover: var(--sh-lg);
+        --card-shadow:
+          0 2px 4px rgba(var(--sh-rgb), 0.05), 0 12px 28px rgba(var(--sh-rgb), 0.1),
+          0 28px 56px rgba(var(--sh-rgb), 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          inset 0 -1px 0 rgba(187, 159, 122, 0.12);
+        --card-shadow-hover:
+          0 4px 8px rgba(var(--sh-rgb), 0.06), 0 20px 40px rgba(var(--sh-rgb), 0.13),
+          0 40px 80px rgba(var(--sh-rgb), 0.09), inset 0 1px 0 rgba(255, 255, 255, 1),
+          inset 0 -1px 0 rgba(187, 159, 122, 0.16);
+
+        /* PRIMÄRKNAPPEN — Hair AI Doctors varma piller ────────────────
+           AID:s huvudknapp är en helt rundad orange gradient, 44 px hög,
+           med en skugga i sin EGEN kulör. Den lyser; den ser ut att vilja
+           bli tryckt på. Portalen hade ingen motsvarighet — dess anrop låg
+           som rektanglar i neutral grå.
+
+           --ton-varm är AID:s tonvariabel för just den orangen, och behövs
+           här för att skuggan ska kunna läsa samma källa som ytan i stället
+           för att skrivas för hand. */
+        --ton-varm: 240, 150, 74;
+        --btn-warm: linear-gradient(135deg, #ffb08a, #f0964a);
+        --shadow-btn-brand:
+          0 6px 16px rgba(var(--ton-varm), 0.34), 0 2px 4px rgba(var(--ton-varm), 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        --shadow-btn-brand-hover:
+          0 10px 24px rgba(var(--ton-varm), 0.4), 0 3px 6px rgba(var(--ton-varm), 0.18),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
 
         /* Panel fill */
         --fill-panel: linear-gradient(
@@ -177,7 +221,9 @@
 
         /* Layout */
         --r-sm: 10px;
-        --r-md: 14px;
+        /* 16px, inte 14 — det är radien på Hair AI Doctors fält, uppmätt.
+           Ett steg mjukare på varje inre element, konsekvent genom hela sidan. */
+        --r-md: 16px;
         --r-lg: var(--card-radius);
         --r-xl: var(--panel-radius);
         --r-pill: 999px;
@@ -301,7 +347,10 @@
         position: relative;
         width: var(--tap);
         height: var(--tap);
-        border-radius: var(--r-md);
+        /* Piller på en kvadrat blir en cirkel. AID:s ikonytor och avatar
+           är runda; en rundad fyrkant bredvid dem läser som ett annat
+           system. */
+        border-radius: var(--r-pill);
         border: var(--card-border);
         background: var(--fill-control);
         box-shadow: var(--card-shadow);
@@ -1053,8 +1102,18 @@
         gap: 0.6rem;
         padding: 0.65rem 0.8rem;
         border-radius: var(--r-md);
-        background: linear-gradient(180deg, rgba(200, 130, 30, 0.07), rgba(200, 130, 30, 0.03));
-        border: 1px solid rgba(200, 130, 30, 0.22);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--warning-rgb), 0.07),
+          rgba(var(--warning-rgb), 0.03)
+        );
+        border: 1px solid rgba(var(--warning-rgb), 0.22);
+        /* Låg helt utan djup — en färgad ruta på samma nivå som texten
+           omkring. Medicinsk information ska LIGGA PÅ innehållet, inte i
+           det, så den lyfts med sin egen ton i skuggan enligt regel 1. */
+        box-shadow:
+          0 2px 6px rgba(var(--warning-rgb), 0.14),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
         margin-bottom: 0.9rem;
         text-align: left;
       }
@@ -1130,7 +1189,10 @@
       .btn-bankid {
         width: 100%;
         padding: 1rem 1.5rem;
-        border-radius: var(--card-radius);
+        /* BankID-blå är medvetet utanför paletten — men FORMEN hör till
+           portalen. Alla anrop i Hair AI Doctor är piller; en rektangel
+           här läser som en knapp från ett annat program. */
+        border-radius: var(--r-pill);
         border: none;
         font:
           700 0.9rem/1 'Jost',
@@ -1228,10 +1290,15 @@
         gap: 0.4rem;
         width: 100%;
         margin-top: 0.65rem;
-        padding: 0.55rem 1rem;
-        border-radius: var(--r-md);
+        padding: 0.62rem 1rem;
+        border-radius: var(--r-pill);
         border: var(--card-border);
-        background: transparent;
+        background: var(--fill-control);
+        /* Låg helt platt och genomskinlig — en text med en kant runt.
+           Sekundär betyder tystare, inte formlös. */
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.8),
+          0 1px 3px rgba(var(--sh-rgb), 0.06);
         font: 600 0.72rem/1 inherit;
         color: var(--text-tertiary);
         cursor: pointer;
@@ -1354,7 +1421,11 @@
         border-radius: var(--r-md);
         background: var(--fill-control);
         border: var(--card-border);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        /* Bar bara ljuslinjen och ingen skugga utåt — alltså en vit rand
+           utan något att rama in. Zonerna är innehåll och ska lyfta. */
+        box-shadow:
+          0 2px 6px rgba(var(--sh-rgb), 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.8);
       }
       .zone-item.full {
         grid-column: 1/-1;
@@ -2233,7 +2304,7 @@
       .btn-book {
         width: 100%;
         padding: 0.72rem 1rem;
-        border-radius: var(--r-md);
+        border-radius: var(--r-pill);
         border: var(--card-border);
         cursor: pointer;
         font: 600 0.8rem/1 inherit;
@@ -2856,7 +2927,15 @@
         overflow: hidden;
         position: relative;
         background: linear-gradient(180deg, rgba(244, 238, 232, 0.8), rgba(232, 222, 210, 0.6));
-        border: 1px solid rgba(var(--line-strong-rgb), 0.2);
+        /* En bildram är ett SPÅR något ligger i, inte en upphöjd yta.
+           Den hade varken djup eller ljuslinje och läste som en tom
+           rektangel bland lyfta kort. Nu sjunker den, så bilden vilar i
+           den — samma regel som mätarrännorna i Hair AI Doctor. */
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        box-shadow:
+          inset 0 2px 4px rgba(var(--sh-rgb), 0.12),
+          inset 0 0 0 1px rgba(var(--sh-rgb), 0.05),
+          0 1px 0 rgba(255, 255, 255, 0.9);
         display: flex;
         align-items: center;
         justify-content: center;
