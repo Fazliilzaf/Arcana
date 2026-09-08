@@ -2940,7 +2940,20 @@
         position: sticky;
         top: 4.2rem;
         z-index: 80;
-        background: linear-gradient(180deg, rgba(176, 53, 110, 0.92), rgba(140, 40, 85, 0.9));
+        /* Sand med rosa värme, 2026-09-07 — kulören, inte formen.
+           Låg tidigare på rgba(176,53,110) → rgba(140,40,85): mörk, full
+           mättnad, och sidans ENDA mörka helbreddsyta. Det var därför den
+           stack ut — inte nyansen utan att den var mörk alls.
+           Nu byggd av portalens egna ytor: --bg-page #faf6f2 → --bg-sunken
+           #f3ece3 som botten, en rosa dimma ur --accent (176,53,110) och en
+           varm guldglöd ur --gold-bg-familjen (138,95,30) från vänster.
+           Inga nya hex. Bandet ligger i samma sandfamilj som resten av
+           sidan, och pillren poppar mot sanden i stället för mot mörkret. */
+        background:
+          radial-gradient(130% 200% at 3% 0%, rgba(138, 95, 30, 0.22), transparent 55%),
+          linear-gradient(180deg, rgba(176, 53, 110, 0.07), rgba(176, 53, 110, 0.13)),
+          linear-gradient(180deg, #faf6f2, #f3ece3);
+        border-bottom: 1px solid rgba(180, 165, 150, 0.3);
         backdrop-filter: blur(12px);
         padding: 0.35rem var(--pad-x);
         display: flex;
@@ -2957,26 +2970,47 @@
         font-weight: 800;
         letter-spacing: 0.1em;
         text-transform: uppercase;
-        color: rgba(255, 255, 255, 0.6);
+        /* Ljust band → etiketten måste vändas till mörk text. */
+        color: var(--text-tertiary);
         flex-shrink: 0;
       }
       .stage-btn {
         flex-shrink: 0;
         padding: 0.25rem 0.6rem;
         border-radius: var(--r-pill);
-        border: 1px solid rgba(255, 255, 255, 0.25);
-        background: transparent;
-        color: rgba(255, 255, 255, 0.65);
+        border: 1px solid rgba(180, 165, 150, 0.42);
+        /* Bubblor 2026-09-07 — samma form och mått, men samma lyft som
+           pillren i staff-portalen: ljusare topp, mörkare botten, en
+           inre ljuslinje överst och en skugga under. Platt yta → knapp.
+           På det ljusa bandet är basen --bubble-bg-receptet. */
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 241, 236, 0.86));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.92),
+          0 1px 2px rgba(56, 40, 28, 0.08);
+        color: var(--text-secondary);
         font-size: 0.62rem;
         font-weight: 700;
         cursor: pointer;
         transition: all 0.15s;
         white-space: nowrap;
       }
+      .stage-btn:hover {
+        background: linear-gradient(180deg, #ffffff, rgba(250, 246, 242, 0.92));
+        color: var(--text-primary);
+        transform: translateY(-1px);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          0 3px 7px rgba(56, 40, 28, 0.12);
+      }
       .stage-btn.active {
-        background: rgba(255, 255, 255, 0.22);
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.5);
+        /* Aktivt steg poppar tydligast: vit topp mot --accent-weak
+           #fdeef4, kant och text i accentens mörka ände #8c2455. */
+        background: linear-gradient(180deg, #ffffff, var(--accent-weak));
+        color: #8c2455;
+        border-color: rgba(140, 36, 85, 0.35);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.92),
+          0 3px 8px rgba(56, 40, 28, 0.16);
       }
 
       .staff-preview-banner {
