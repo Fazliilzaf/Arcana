@@ -7,16 +7,25 @@
     <!-- Brandmärke ARCANA → Hair TP Clinic-logga (avsiktlig visuell ändring) -->
     <meta name="visual-regression" content="intentional-change" />
     <title>Din plan · Hair TP Clinic</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800;900&family=Cormorant+Garamond:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- Inga webbtypsnitt. Portalen använder samma stackar som Hair AI
+         Doctor, och de finns redan på enheten. Två vinster utöver
+         släktskapet: sidan slutar bero på ett externt anrop för att kunna
+         rendera text, och det finns ingen font-swap som flyttar layouten
+         en bit in i laddningen. -->
     <style>
       /* === CCO v3 foundation — spliced from cco-notiser-v3 / cco-kalender-v8 === */
       :root {
         /* Surfaces (CCO v3 light foundation) */
+        /* TYPOGRAFIN — Hair AI Doctors två stackar, ordagrant.
+           --font-serif är AID:s --serif; --font-sans är dess body-stack.
+           Portalen körde Jost och Cormorant Garamond, som är vackra men
+           läser som ett annat varumärke: geometrisk sans mot AID:s
+           humanistiska, högkontrast-display mot AID:s old style. */
+        --font-sans:
+          -apple-system, 'system-ui', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        --font-serif:
+          'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+
         --bg-page: #faf6f2;
         --bg-surface: #ffffff;
         --bg-sunken: #f3ece3;
@@ -260,15 +269,10 @@
           radial-gradient(ellipse at 88% 4%, rgba(255, 210, 225, 0.3), transparent 42%),
           var(--bg-page);
         color: var(--text-primary);
-        font-family:
-          'Jost',
-          -apple-system,
-          'SF Pro Display',
-          Inter,
-          system-ui,
-          sans-serif;
+        font-family: var(--font-sans);
         font-size: var(--fs-body);
-        line-height: 1.5;
+        /* 1.55 — AID:s uppmätta radhöjd (21.7px på 14px). */
+        line-height: 1.55;
         min-height: 100vh;
         padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
       }
@@ -332,7 +336,7 @@
         filter: drop-shadow(0 4px 9px rgba(var(--sh-rgb), 0.38));
       }
       .brand-name {
-        font-family: 'Cormorant Garamond', Georgia, serif;
+        font-family: var(--font-serif);
         font-weight: 700;
         font-size: 1.15rem;
         line-height: 1;
@@ -519,7 +523,7 @@
         margin-bottom: 0.25rem;
       }
       .hero-name {
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: clamp(1.6rem, 1.2rem + 2.5vw, 2.4rem);
         font-weight: 600;
         letter-spacing: -0.01em;
@@ -624,7 +628,7 @@
         animation: blink 1.5s ease-in-out infinite;
       }
       .sign-card h3 {
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.25rem;
         font-weight: 600;
         letter-spacing: -0.01em;
@@ -683,7 +687,7 @@
       .portal-next-action__title {
         margin: 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.28rem;
         font-weight: 650;
         letter-spacing: -0.01em;
@@ -773,7 +777,7 @@
       .portal-journey-gates__head h2 {
         margin: 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.24rem;
         font-weight: 650;
         letter-spacing: -0.01em;
@@ -1194,9 +1198,7 @@
            här läser som en knapp från ett annat program. */
         border-radius: var(--r-pill);
         border: none;
-        font:
-          700 0.9rem/1 'Jost',
-          inherit;
+        font: 700 0.9rem/1 var(--font-sans);
         letter-spacing: 0.06em;
         background: #183e4f;
         color: #fff;
@@ -1996,7 +1998,7 @@
       .operation-day-panel h2 {
         margin: 0.38rem 0 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.32rem;
         font-weight: 650;
         letter-spacing: -0.01em;
@@ -2136,7 +2138,7 @@
       .aftercare-panel h2 {
         margin: 0.38rem 0 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.32rem;
         font-weight: 650;
         letter-spacing: -0.01em;
@@ -2478,7 +2480,7 @@
       .secure-contact-panel h3 {
         margin: 0.34rem 0 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.12rem;
         font-weight: 650;
         line-height: 1.08;
@@ -2568,7 +2570,7 @@
       .portal-trust-log h3 {
         margin: 0.34rem 0 0;
         color: var(--text-primary);
-        font-family: 'Cormorant Garamond', 'Georgia', serif;
+        font-family: var(--font-serif);
         font-size: 1.12rem;
         font-weight: 650;
         line-height: 1.08;
