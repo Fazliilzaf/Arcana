@@ -1312,7 +1312,16 @@
           inset 0 1px 2px rgba(0, 0, 0, 0.1),
           inset 0 -1px 0 rgba(255, 255, 255, 0.3);
       }
+      /* Graftsegmenten lag helt utan form: ingen radie, ingen ljuslinje,
+         ingen skugga — tre farger som motte varandra med rak kant. Nu samma
+         ljuslinje som allt annat upphojt.
+         Sjalva rannan (.graft-bar) rors INTE: den ar redan en nedsankt
+         gropa med inset 0 1px 2px, alltsa precis vad den ska vara — ett
+         spar som segmenten ligger i. Jag lade forst till en upphojd skugga
+         dar och vande den at fel hall; matningen visade att originalet
+         redan foljde regeln. */
       .graft-seg {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
         transition: flex 0.4s;
       }
 
@@ -1647,16 +1656,36 @@
       }
 
       /* LOCKED */
+      /* DET SOM ÄNNU INTE ÖPPNATS SJUNKER — det svävar inte.
+         Mätt i sidan: av 21 kortytor bar 18 djup, och de tre som saknade
+         det var just dessa. En låst etapp låg som en streckad ruta utan
+         skugga, alltså på SAMMA nivå som de kort man faktiskt kan använda,
+         bara blekare. Ett dämpat kort läser som ett kort med dålig
+         kontrast; en fördjupning läser som "inte öppen än", vilket är sant.
+
+         Samma regel som allt annat på sidan: innehåll lyfter, frånvaro
+         sjunker. Byggd av filens egna ytor — --bg-sunken som botten och
+         --muted-rgb som bläck. Den streckade ramen får gå: när fördjupningen
+         bär betydelsen blir strecken bara brus. Opaciteten sänks från 0,72
+         till 0,82 eftersom djupet nu gör jobbet som blekningen gjorde. */
       .locked-card {
         padding: 1rem 1.1rem;
         border-radius: var(--card-radius);
-        background: rgba(var(--muted-rgb), 0.04);
-        border: 1.5px dashed rgba(var(--muted-rgb), 0.24);
+        background: linear-gradient(
+          180deg,
+          rgba(var(--muted-rgb), 0.13),
+          rgba(var(--muted-rgb), 0.05)
+        );
+        border: 1px solid rgba(var(--muted-rgb), 0.14);
+        box-shadow:
+          inset 0 2px 4px rgba(var(--muted-rgb), 0.22),
+          inset 0 1px 1px rgba(var(--muted-rgb), 0.18),
+          0 1px 0 rgba(255, 255, 255, 0.9);
         margin-bottom: var(--gap);
         display: flex;
         align-items: center;
         gap: 0.8rem;
-        opacity: 0.72;
+        opacity: 0.82;
       }
       .locked-icon {
         width: 2.1rem;
@@ -2594,15 +2623,35 @@
         align-items: end;
         height: 3.5rem;
       }
+      /* BUGG SEDAN B6011B06: staplarna har aldrig synts.
+         .tl-months är ett grid med align-items: end, vilket gör att varje
+         .tl-col krymper till sitt INNEHÅLL i stället för att fylla radens
+         3,5rem. Stapelns height: 95% räknades då mot en förälder utan
+         bestämd höjd — uppmätt i webbläsaren: kolumnen 11px, stapeln 0px.
+         Diagrammet "Förväntad hårväxt · Månad 1–12" har alltså visat en tom
+         yta med bara siffror och en teckenförklaring, på patientens egen
+         sida. Kolumnen fyller nu raden och stapeln växer nedifrån. */
       .tl-col {
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: flex-end;
+        height: 100%;
         gap: 1px;
       }
+      /* Stapeln ar ett OBJEKT, inte en fargklick.
+         Samma tva rader som resten av sidan foljer: en ljuslinje langst upp
+         sa ytan far en kant mot ljuset, och en liten skugga i STAPELNS EGEN
+         kulor — inte i ett neutralt black. color-mix haller den kopplad till
+         det inline satta vardet utan att kraeva en triplett per stapel.
+         Radien upp fran 3px till 5px: vid 28px bredd las 3px som en
+         tillfallighet snarare an en form. */
       .tl-bar {
         width: 100%;
-        border-radius: 3px 3px 0 0;
+        border-radius: 5px 5px 0 0;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.55),
+          0 2px 4px rgba(var(--sh-rgb), 0.1);
         transition: height 0.3s;
       }
       .tl-num {
