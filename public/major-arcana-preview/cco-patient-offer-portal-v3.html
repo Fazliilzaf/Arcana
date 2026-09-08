@@ -585,7 +585,34 @@
         color: var(--text-primary);
       }
       .hero-name span {
+        /* Gradientens högra ände neutraliserad 45 % mot bläcket.
+           Den låg tidigare på ren var(--violet), och det violetta drog
+           blicken till slutet av meningen i stället för till namnet.
+           Nu läser den som mörk plommon: kulören finns kvar som underton,
+           men patientens namn kommer först och färgen sen.
+
+           Blandningen görs HÄR och inte i --violet, eftersom den tokenen
+           också bär AI-kortet, .ai-badge, zonsiffran och datapillren.
+           Att neutralisera den globalt hade dämpat fyra komponenter som
+           ingen bett om.
+
+           color-mix och inte en hexkod: värdet följer med om paletten
+           justeras, i stället för att frysa fast dagens violett.
+
+           RESERVEN OVANFÖR ÄR INTE KOSMETIK. color-mix kräver Safari 16.2
+           och Chrome 111. På en äldre telefon blir hela background-
+           deklarationen ogiltig och kastas — och eftersom
+           -webkit-text-fill-color: transparent ligger i en EGEN
+           deklaration som fortfarande gäller, blir patientens namn då
+           osynligt. Inte fel färg: borta. Den första gradienten fångar
+           det fallet med ren violett, och nyare webbläsare skriver över
+           den med den neutraliserade. */
         background: linear-gradient(135deg, var(--accent) 0%, var(--violet) 100%);
+        background: linear-gradient(
+          135deg,
+          var(--accent) 0%,
+          color-mix(in srgb, var(--violet) 55%, var(--text-primary)) 100%
+        );
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
