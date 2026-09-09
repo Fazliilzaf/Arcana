@@ -234,19 +234,60 @@ async function resolveCustomerDeclarationStatuses(commercialCase = {}, journalSt
   return out;
 }
 
+const CUSTOMER_OFFER_PORTAL_PATH = path.join(
+  __dirname,
+  '..',
+  '..',
+  'public',
+  'major-arcana-preview',
+  'cco-patient-offer-portal-v3.html'
+);
+
+/**
+ * Cachen invalideras på filens mtime.
+ *
+ * FÖRE: `if (cachedCustomerOfferPortalHtml) return cached...` — filen
+ * lästes en gång per process och cachen tömdes aldrig. I drift märks det
+ * inte, för Render startar om processen vid varje deploy. Lokalt blev det
+ * en fälla: den som redigerar portalen ser sina ändringar först efter en
+ * omstart av servern, och ingenting säger till. Uppmätt 2026-09-08 —
+ * portalen byggdes om, dev-servern fortsatte servera den gamla filen, och
+ * felsökningen gick åt fel håll innan orsaken hittades här.
+ *
+ * EFTER: en stat() per anrop, och filen läses om bara när mtime ändrats.
+ * Kostnaden i drift är en stat mot en fil som aldrig ändras mellan
+ * omstarter. Det är billigare än den halvtimme det kostar att leta efter
+ * en ändring som redan är gjord.
+ *
+ * Går stat() fel — filen borttagen mitt i drift, rättighetsfel — behålls
+ * den cachade kopian hellre än att kundens portal går sönder. Först när
+ * det INTE finns något cachat får felet gå vidare.
+ */
 let cachedCustomerOfferPortalHtml = null;
+let cachedCustomerOfferPortalMtimeMs = 0;
 
 async function loadCustomerOfferPortalHtml() {
-  if (cachedCustomerOfferPortalHtml) return cachedCustomerOfferPortalHtml;
-  const filePath = path.join(
-    __dirname,
-    '..',
-    '..',
-    'public',
-    'major-arcana-preview',
-    'cco-patient-offer-portal-v3.html'
-  );
-  cachedCustomerOfferPortalHtml = await fs.readFile(filePath, 'utf8');
+  let mtimeMs = 0;
+  try {
+    mtimeMs = (await fs.stat(CUSTOMER_OFFER_PORTAL_PATH)).mtimeMs;
+  } catch (err) {
+    if (cachedCustomerOfferPortalHtml) {
+      console.warn(
+        '[cco-commercial/customer-offer-portal] kunde inte läsa filens mtime, ' +
+          'behåller cachad kopia',
+        err
+      );
+      return cachedCustomerOfferPortalHtml;
+    }
+    throw err;
+  }
+
+  if (cachedCustomerOfferPortalHtml && mtimeMs === cachedCustomerOfferPortalMtimeMs) {
+    return cachedCustomerOfferPortalHtml;
+  }
+
+  cachedCustomerOfferPortalHtml = await fs.readFile(CUSTOMER_OFFER_PORTAL_PATH, 'utf8');
+  cachedCustomerOfferPortalMtimeMs = mtimeMs;
   return cachedCustomerOfferPortalHtml;
 }
 
@@ -483,7 +524,9 @@ function createCcoCommercialRouter({
       patientMasterStore &&
       typeof patientMasterStore.getPatient === 'function'
     ) {
-      const patient = await patientMasterStore.getPatient({ tenantId, patientId }).catch(() => null);
+      const patient = await patientMasterStore
+        .getPatient({ tenantId, patientId })
+        .catch(() => null);
       signerName = normalizeText(patient?.displayName || patient?.name);
     }
     return { patientId, signerName: signerName || patientId || '' };
@@ -952,7 +995,9 @@ function createCcoCommercialRouter({
           // skälet "superseded", så kunden på en gammal länk får ett begripligt
           // nej (inte invalid_token) i det scenario som inträffar oftast.
           esignRevocations: [
-            ...(Array.isArray(commercialCase.esignRevocations) ? commercialCase.esignRevocations : []),
+            ...(Array.isArray(commercialCase.esignRevocations)
+              ? commercialCase.esignRevocations
+              : []),
             supersededEsignToken
               ? {
                   token: supersededEsignToken,
