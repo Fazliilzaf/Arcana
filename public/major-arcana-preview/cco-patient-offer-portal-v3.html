@@ -2055,6 +2055,84 @@
         display: none !important;
       }
 
+      /* ── Videosamtal — uppföljning online (WebRTC via src/video/signalingServer.js) ── */
+      .mode-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        width: 100%;
+        margin-top: 0.2rem;
+      }
+      .mode-row-label {
+        font-size: 10.5px;
+        font-weight: 800;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        flex-shrink: 0;
+      }
+      .mode-toggle-group {
+        display: flex;
+        gap: 2px;
+        background: rgba(var(--muted-rgb), 0.12);
+        border-radius: var(--r-pill);
+        padding: 2px;
+        border: var(--aid-kort-kant);
+      }
+      .mode-btn {
+        padding: 0.3rem 0.78rem;
+        border-radius: var(--r-pill);
+        border: 0;
+        font: 700 11px/1 var(--font-sans);
+        cursor: pointer;
+        background: transparent;
+        color: var(--text-tertiary);
+        transition: all 0.15s;
+        letter-spacing: 0.02em;
+      }
+      .mode-btn.active {
+        background: var(--aid-kort-yta);
+        color: rgb(var(--ton));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.9),
+          0 2px 6px rgba(var(--ton), 0.18);
+      }
+      .btn-video {
+        width: 100%;
+        padding: 0.72rem 1rem;
+        border-radius: 14px;
+        border: 1.5px solid rgba(var(--ton-bla), 0.28);
+        cursor: pointer;
+        font: 600 0.8rem/1 var(--font-sans);
+        letter-spacing: 0.03em;
+        background: linear-gradient(180deg, rgba(var(--ton-bla), 0.1), rgba(var(--ton-bla), 0.05));
+        color: rgb(var(--ton-bla));
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.7),
+          0 2px 6px rgba(var(--ton-bla), 0.1);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+        transition: all 0.15s;
+      }
+      .btn-video.visible {
+        display: flex;
+      }
+      .video-sub {
+        font-size: 11px;
+        color: rgba(var(--ton-bla), 0.65);
+        font-weight: 500;
+        display: none;
+        margin-top: 0.28rem;
+        text-align: center;
+        width: 100%;
+      }
+      .video-sub.visible {
+        display: block;
+      }
+
       @media print {
         .topbar,
         .sticky-sign,
@@ -3659,13 +3737,24 @@
             </span>
           </div>
         </div>
-        <div class="bok ton-gron">
+        <div class="bok ton-gron booking-card">
           <div class="bok-dag"><b>4</b><em>mån</em></div>
           <div class="bok-txt">
             <b>Uppföljning · månad 4</b
-            ><span>Fysiskt besök · Vasaplatsen 2, Göteborg · välj datum</span>
+            ><span>Vasaplatsen 2, Göteborg · välj datum</span>
           </div>
           <span class="chip"><span class="prick"></span>Ej bokad</span>
+          <div class="mode-row">
+            <span class="mode-row-label">Typ</span>
+            <div
+              class="mode-toggle-group"
+              role="radiogroup"
+              aria-label="Typ av uppföljning månad 4"
+            >
+              <button class="mode-btn active" type="button" onclick="setMode(this)">Fysisk</button>
+              <button class="mode-btn" type="button" onclick="setMode(this)">Online</button>
+            </div>
+          </div>
           <div class="bok-verktyg">
             <button class="knapp-liten ton-gron">
               <svg
@@ -3682,14 +3771,40 @@
               Välj datum
             </button>
           </div>
+          <button class="btn-video" type="button">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            Gå med i videomötet
+          </button>
+          <span class="video-sub">Öppnar videolänk · länk skickas via e-post</span>
         </div>
-        <div class="bok ton-gron">
+        <div class="bok ton-gron booking-card">
           <div class="bok-dag"><b>8</b><em>mån</em></div>
           <div class="bok-txt">
             <b>Uppföljning · månad 8</b
-            ><span>Fysiskt besök · Vasaplatsen 2, Göteborg · välj datum</span>
+            ><span>Vasaplatsen 2, Göteborg · välj datum</span>
           </div>
           <span class="chip"><span class="prick"></span>Ej bokad</span>
+          <div class="mode-row">
+            <span class="mode-row-label">Typ</span>
+            <div
+              class="mode-toggle-group"
+              role="radiogroup"
+              aria-label="Typ av uppföljning månad 8"
+            >
+              <button class="mode-btn active" type="button" onclick="setMode(this)">Fysisk</button>
+              <button class="mode-btn" type="button" onclick="setMode(this)">Online</button>
+            </div>
+          </div>
           <div class="bok-verktyg">
             <button class="knapp-liten ton-gron">
               <svg
@@ -3706,6 +3821,21 @@
               Välj datum
             </button>
           </div>
+          <button class="btn-video" type="button">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            Gå med i videomötet
+          </button>
+          <span class="video-sub">Öppnar videolänk · länk skickas via e-post</span>
         </div>
         <div class="bok ton-gron">
           <div class="bok-dag"><b>12</b><em>mån</em></div>
