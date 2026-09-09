@@ -77,6 +77,22 @@ function createVideoRouter({ authStore, signalingService, transcriptionService }
     return res.json({ ok: true, iceServers: signalingService.resolveIceServers() });
   });
 
+  // --- Hälsokontroll (ingen auth) — svarar om signaleringstjänsten är uppe ---
+  router.get('/video/healthz', (req, res) => {
+    let activeRooms = 0;
+    try {
+      activeRooms = signalingService.listActiveRooms().length;
+    } catch {
+      activeRooms = -1;
+    }
+    return res.json({
+      ok: true,
+      signalingUp: true,
+      activeRooms,
+      transport: 'ws://…/api/v1/video/signal',
+    });
+  });
+
   // --- Patient join (token-based, no auth) ---
 
   router.get('/video/join/:token', (req, res) => {
