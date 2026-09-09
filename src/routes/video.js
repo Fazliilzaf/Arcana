@@ -85,11 +85,13 @@ function createVideoRouter({ authStore, signalingService, transcriptionService }
     } catch {
       activeRooms = -1;
     }
+    const proto = req.secure ? 'wss' : 'ws';
+    const host = normalizeText(req.get('host')) || 'localhost';
     return res.json({
       ok: true,
       signalingUp: true,
       activeRooms,
-      transport: 'ws://…/api/v1/video/signal',
+      transport: `${proto}://${host}/api/v1/video/signal`,
     });
   });
 
