@@ -2313,16 +2313,6 @@
       </span>
     </aside>
 
-    <!-- Stegväljare för prototypgranskning -->
-    <div class="stage-bar" role="group" aria-label="Välj steg i portalen">
-      <span class="stage-bar-label">Visa steg →</span>
-      <button class="stage-btn" onclick="applyStage(0)">0 · Konsultation</button>
-      <button class="stage-btn active" onclick="applyStage(1)">1 · Offert mottagen</button>
-      <button class="stage-btn" onclick="applyStage(2)">2 · Signerad</button>
-      <button class="stage-btn" onclick="applyStage(3)">3 · Efter operation</button>
-      <button class="stage-btn" onclick="applyStage(4)">4 · Uppföljning</button>
-    </div>
-
     <div class="wrap">
       <!-- 0 · Kundresan -->
       <div class="rail">
@@ -2901,53 +2891,6 @@
               fristen. Behöver du mer tid, säg till.
             </p>
           </div>
-        </div>
-      </div>
-
-      <!-- Betänketid (bevarad funktion med påminnelse) -->
-      <div
-        class="betatid-card ton-bla"
-        data-unlock="1"
-        data-tease-label="Låses upp när offert skickas"
-      >
-        <div class="betatid-top">
-          <span class="parla">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z" />
-              <polyline points="12 7 12 12 15.5 14" />
-            </svg>
-          </span>
-          <div style="min-width: 0; flex: 1">
-            <div class="betatid-title">Betänketid · Distansavtalslagen</div>
-            <div class="betatid-desc">
-              14 dagars ångerrätt från att du mottog denna plan. Signeringen bekräftar att du väljer
-              att starta inom ångerfristen.
-            </div>
-            <div class="betatid-expire">
-              Offerten upphör 8 juli 2026 — kontakta oss om du behöver mer tid.
-            </div>
-          </div>
-          <div class="betatid-days">
-            <div class="num">10</div>
-            <div class="lbl">dagar<br />kvar</div>
-          </div>
-        </div>
-        <div class="reminder-row">
-          <label class="reminder-toggle" aria-label="Påminnelse 3 dagar innan">
-            <input type="checkbox" id="reminderToggle" onchange="handleReminder(this)" />
-            <div class="toggle-track"><div class="toggle-thumb"></div></div>
-          </label>
-          <span class="reminder-label">Påminn mig 3 dagar innan betänketiden löper ut</span>
-        </div>
-        <div class="reminder-confirm" id="reminderConfirm">
-          ✓ Du får ett SMS till ditt registrerade nummer dagen före deadline.
         </div>
       </div>
 
@@ -4106,16 +4049,6 @@
         Din behandlingsplan är framtagen av läkare på Hair TP Clinic och signeras digitalt med
         BankID.
       </p>
-    </div>
-
-    <div class="sticky-sign" id="stickySign">
-      <div class="sticky-inner">
-        <div class="sticky-label">
-          <strong data-sticky-sign-title>Redo att signera?</strong>
-          <span data-sticky-sign-copy>Offerten är klar — signera digitalt nu.</span>
-        </div>
-        <button class="btn-sign-sm" type="button">Signera →</button>
-      </div>
     </div>
 
     <nav class="botten" aria-label="Portalmeny">
@@ -5324,39 +5257,6 @@
       renderOfferPlanToPortal(window.ARCANA_CUSTOMER_OFFER_PLAN || DEMO_OFFER_PLAN);
       applyCustomerOfferContext(window.ARCANA_CUSTOMER_OFFER_CONTEXT || {});
 
-      // ===== STEG-SYSTEM =====
-      var STAGE = 1; // standard: offert mottagen
-      function applyStage(n) {
-        STAGE = n;
-        document.querySelectorAll('.stage-btn').forEach(function (b, i) {
-          b.classList.toggle('active', i === n);
-        });
-        document.querySelectorAll('[data-unlock]').forEach(function (el) {
-          var unlock = parseInt(el.getAttribute('data-unlock'), 10);
-          var diff = unlock - n;
-          el.classList.remove('stage-teased', 'stage-future');
-          if (diff === 1) el.classList.add('stage-teased');
-          else if (diff >= 2) el.classList.add('stage-future');
-        });
-        // Visa/dölj nedräkning beroende på steg
-        var cd = document.getElementById('countdownCard');
-        if (cd) cd.classList.toggle('visible', n >= 2);
-        // Lås upp FAQ beroende på steg
-        var faqOverlay = document.getElementById('faqOverlay');
-        if (faqOverlay) faqOverlay.style.display = n >= 2 ? 'none' : '';
-      }
-      applyStage(1); // starta i steg 1
-
-      var mainCard = document.getElementById('mainSignCard');
-      var stickySign = document.getElementById('stickySign');
-      if (mainCard && stickySign) {
-        new IntersectionObserver(
-          function (e) {
-            stickySign.classList.toggle('is-visible', !e[0].isIntersecting);
-          },
-          { threshold: 0.2 }
-        ).observe(mainCard);
-      }
       function updateSignBtn() {
         var all = Array.from(document.querySelectorAll('.consent-check')).every(function (c) {
           return c.checked;
@@ -5391,7 +5291,6 @@
             chip.innerHTML =
               '<span style="width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;margin-right:.4rem"></span>Signerad';
           }
-          if (stickySign) stickySign.classList.remove('is-visible');
           // Visa nedräkning
           var cd = document.getElementById('countdownCard');
           if (cd) cd.classList.add('visible');
@@ -5401,7 +5300,8 @@
         }, 1800);
       }
       function handleReminder(input) {
-        document.getElementById('reminderConfirm').classList.toggle('visible', input.checked);
+        var confirm = document.getElementById('reminderConfirm');
+        if (confirm) confirm.classList.toggle('visible', input.checked);
       }
       function setMode(btn) {
         var group = btn.closest('.mode-toggle-group');
