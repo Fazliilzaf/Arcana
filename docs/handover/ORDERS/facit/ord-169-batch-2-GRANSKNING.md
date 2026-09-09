@@ -2,6 +2,176 @@
 
 Datum: 2026-09-08 · Granskare: Claude · Underlag: `ord-169-batch-2-hair-tp.md` + direktläsning i Fortnox (Hair TP Clinic gbg AB)
 
+---
+
+## TILLÄGG 2026-09-08 — A1995 ska INTE flyttas till Curatiio
+
+Förslaget att nolla A1995 + A2001 i Hair TP och bokföra dem i Curatiio bygger på annonskontots namn. Kvittona säger något annat. Båda lästa i sin helhet:
+
+**Curatiio-kvittot** (`meta_all_transactions/curatiio/2026-01-11T18-24 Transaktion #25642958705391872-...pdf`)
+Konto-id 479410056348442 · ref 6WWAYBVBK2 · Faktura-nr FBADS-443-105363078 · Amex 6005 · 7 500,00 kr · Betald
+Fakturamottagare: **Fazli Hair OP AB**, Kungsgatan 17, 503 33 Borås — **VAT: SE559034268801**
+
+**Hair TP-kvittot** (`meta_all_transactions/hairtp/2026-01-20T08-12 Transaktion #25455113680839268-...pdf`)
+Konto-id 1112651725849665 · ref B2J8U9VK42 · Faktura-nr FBADS-066-105432113 · Amex 1008 · 7 096,00 kr · Betald
+Fakturamottagare: **Hair TP Clinic gbg AB**, Vasaplasten 2, 411 34 Göteborg — **VAT: SE559034268801**
+
+Olika bolagsnamn och olika adresser — men **identiskt momsregistreringsnummer**. SE559034268801 motsvarar org.nr 559034-2688, vilket är det organisationsnummer som Fortnox-företaget "Hair TP Clinic" är registrerat på.
+
+Ett svenskt momsnummer är unikt per juridisk person. Två skilda bolag kan inte dela ett. Vid omvänd skattskyldighet enligt art. 196 är det den momsregistrerade mottagaren som ska redovisa skatten — och den är densamma för båda annonskontona.
+
+**Slutsats: kostnaden är rätt bokförd där den ligger. A1995 och A2001 rörs inte.**
+
+### A1995:s betalkonto är nu bevisat, inte antaget
+
+Min tidigare anmärkning faller. Kvittot anger **American Express ···· 6005**. Amex är privat på Fazli, alltså **2893** — precis som bokfört. A1995 är därmed fullt verifierad: belopp, referensnummer, fakturanummer, betalstatus och betalkonto.
+
+---
+
+## TILLÄGG 2 — egen verifiering mot primärkällorna
+
+Kortutdragen finns lokalt (`tmp/platinum-61008.csv` = Amex 1008, `tmp/sas-elite-86005.csv` = Amex 6005). Nedanstående är läst där och i kvittomapparna, inte hämtat ur rapporten.
+
+### Bekräftat
+
+| Påstående                       | Kontroll                                                              | Utfall            |
+| ------------------------------- | --------------------------------------------------------------------- | ----------------- |
+| A2224: 01-20 7 096 unikt        | 1008 = B2J8U9VK42 7 096 · 6005 = UU7YNC5BK2 1 391,73                  | Unikt ✓           |
+| A2225: 02-25 2 817,88 unikt     | 6005 = X7Y4TCDL42 2 817,88 · endast andra beloppet 5 315,88 samma dag | Unikt ✓           |
+| A2223: 04-09 376,63 unikt       | 6005 = YNF54J5L42 376,63 · 1008 = 7 500,00 samma dag                  | Unikt ✓           |
+| A2220: 06-25 692,33 unikt       | 6005 = WGTRTRRK42 692,33 · endast 7 246,94 samma dag                  | Unikt ✓           |
+| A2227: 08-11 7 096 unikt        | 6005 = LBJE4XVK42 7 096 · inget på 1008                               | Unikt ✓           |
+| A1209/A1210: verklig debitering | 1008, 07-14, G5LKWWMBK2 **135,45**                                    | Finns ✓           |
+| A962: verklig debitering        | 6005, 07-25, A98FJZRBK2 **1 154,60**                                  | Finns ✓           |
+| 06-24 saknar bokföring          | 6005, 06-24, 3Q5EQRDL42 **7 096,00**                                  | Finns, obokförd ✓ |
+
+### A1065 och A1067 — bekräftat att debitering saknas, men de är inte dubbletter
+
+Amex 1008 har i intervallet 07-01–07-08 exakt tre Meta-debiteringar: 07-01, 07-03 och 07-07. Amex 6005 har ingen alls i samma intervall. I `~/Downloads` finns kvitton bara för 07-01, 07-03 och 07-07 (två per datum — en betald, en misslyckad).
+
+Ingen debitering och inget kvitto existerar alltså för 07-02 eller 07-06. Att nolla dem är därför rätt utfall — beloppen har aldrig belastat något kort.
+
+Men beskrivningen `Makulerad dubblett av A2235` respektive `av A2233` påstår ett dubblettförhållande som inte är bevisat. De är inte dubbletter av något; de saknar underliggande transaktion helt. Formuleringen valdes med motiveringen "närmast", vilket är just den sortens bedömning regeln finns för att stoppa.
+
+**Förslag:** ändra beskrivningen på dessa två till något som stämmer med vad som faktiskt konstaterats. Kräver din GO för ny formulering — jag ändrar ingenting utan den.
+
+### Mastercard-posterna — verifierade (rättelse av tidigare påstående)
+
+Jag skrev först att 05-19 och 07-14 inte gick att verifiera eftersom inget utdrag för Mastercard 3888 finns i `tmp/`. Det var fel källa. **Meta-kvittot anger betalningsmetoden självt** — inget kortutdrag behövs. Båda lästa i sin helhet:
+
+| Datum            | Ref        | Belopp   | Betalningsmetod          | Faktura-nr          | Konto                    |
+| ---------------- | ---------- | -------- | ------------------------ | ------------------- | ------------------------ |
+| 2026-05-19 20:17 | FXZQ8MZK42 | 5 322,00 | **Mastercard ···· 3888** | FBADS-066-106004904 | Hair TP 1112651725849665 |
+| 2026-07-14 14:38 | YA64TTDL42 | 7 474,82 | **Mastercard ···· 3888** | FBADS-066-106284095 | Hair TP 1112651725849665 |
+
+Båda märkta **Betald**. Det bekräftar:
+
+- **A1303** → 2412 HB Kort är rätt betalkonto.
+- **A2236** → 2412 HB Kort är rätt betalkonto.
+- **A1302:s nyckel** — rapporten angav "Faktura FBADS-066-106284095 (= YA64TTDL42)". Fakturanumret stämmer exakt mot kvittot.
+
+**Lärdom för framtida kontroller:** betalkortet ska läsas ur Meta-kvittot, inte sökas i ett kortutdrag. Kvittot är primärkällan och finns för varje debitering.
+
+---
+
+## TILLÄGG 3 — cm-record-kedjan läst
+
+CM-lagret nås via `cfo.hairtpclinic.com` (inte `arcana.`), inloggad som owner@hairtpclinic.se. Endpoints: `/api/v1/cm/receipts`, `/api/v1/cm/expense-records/:id`, `/api/v1/cm/raw-items/:id?full=1`.
+
+### A1062 / A1218 — min misstanke var fel, och det är nu bevisat
+
+cm-record `a92f8222-c82f-49ef-a040-7db9e90b3340` → rawItem `23da82d6-e013-4c96-8c54-a08e00eef7f4`. Råmailet innehåller:
+
+```
+Referensnummer   BQREPSMK42
+Transaktions-id  27424227413927882-27495274520156505
+```
+
+Det transaktions-id:t är exakt filnamnet på kvittot i `~/Downloads`:
+`2026-07-03T14-09 Transaktion #27424227413927882-27495274520156505.pdf`
+
+**A1062 och A1218 hör alltså till 07-03-debiteringen (BQREPSMK42), inte till 06-24.** Nollningen står. Min invändning i granskningen är därmed avfärdad med primärkälla.
+
+### A1065 / A1067 — grunden för nollningen håller inte
+
+cm-record `523c35ef` (07-02) och `efe67fb8` (07-06). Deras råmail ser ut så här i sin helhet:
+
+```
+Det här är ingen faktura Transaktion för Hair TP Clinic annonskonto ([telefon])
+Transaktions-id [telefon] Betalningssammanfattning Fakturerat belopp
+7 096,00 kr (SEK) Datumintervall 2 jul 2026 00:00
+```
+
+Tre saker framgår:
+
+1. **Transaktions-id är maskerat till `[telefon]`.** En PII-tvätt har tolkat det långa siffertalet som ett telefonnummer och skrivit över det. Transaktionsnyckeln är förstörd i den lagrade kopian.
+2. **Texten är avkortad** precis efter `Datumintervall` — före det ställe där Referensnummer står i ett komplett mail (jämför a92f8222 ovan, 1 720 tecken mot 460).
+3. **Datumet 07-02 kommer från `Datumintervall`**, alltså periodens början — inte från ett debiteringsdatum.
+
+Slutsatsen "ingen debitering existerar 07-02" är därför korrekt men irrelevant. Källan har aldrig påstått att 07-02 var ett debiteringsdatum — det är en periodstart.
+
+### Löst via kvitto@-brevlådan
+
+Originalmailen finns omaskerade i `kvitto@hairtpclinic.com`. Sökning på avsändaren `business-updates.facebook.com` ger för Hair TP-kontot:
+
+| Mail mottaget    | Transaktions-id                     | Belopp   | Datumintervall (start) |
+| ---------------- | ----------------------------------- | -------- | ---------------------- |
+| 2026-07-01 04:42 | 27336936719323613-27300527182964571 | 7 096,00 | 26 jun                 |
+| 2026-07-03 12:09 | 27424227413927882-27495274520156505 | 7 096,00 | **30 jun**             |
+| 2026-07-07 04:30 | 27408746742142610-27401561106194512 | 7 096,00 | **2 jul**              |
+| 2026-07-10 00:54 | 27433810176302938-27440900005593950 | 7 096,00 | **6 jul**              |
+
+Periodstarterna matchar cm-posternas datum exakt:
+
+- `a92f8222` (cm-datum **06-30**) → mailet 07-03 → **BQREPSMK42**, 07-03-debiteringen
+- `523c35ef` (cm-datum **07-02**) → mailet 07-07 → **XYTK3TDL42**, 07-07-debiteringen
+- `efe67fb8` (cm-datum **07-06**) → mailet 07-10 → **VN57KU5L42**, 07-10-debiteringen
+
+**A1065 och A1067 är alltså verkliga dubbletter.** Nollningen står. Men de är dubbletter av andra verifikationer än de märkts som:
+
+| Vernr | Märkt som dubblett av | Verklig motpart               |
+| ----- | --------------------- | ----------------------------- |
+| A1065 | A2235 (07-03)         | **A2233** (07-07, XYTK3TDL42) |
+| A1067 | A2233 (07-07)         | **A2232** (07-10, VN57KU5L42) |
+
+Utfallet är rätt, attributionen fel i båda — och omkastad sinsemellan. Två beskrivningar att rätta, inget mer.
+
+### Generell konsekvens: cm-datumet är inte ett debiteringsdatum
+
+`a92f8222` har `date: 2026-06-30` men avser debiteringen 07-03. `523c35ef` har `date: 2026-07-02` från en periodstart. Fältet fylls från `Datumintervall` när transaktions-id saknas.
+
+Det förklarar hela mönstret av verifikationer med "fel datum" som återkommit genom hela genomgången. **Datum i cm-records får aldrig användas som debiteringsdatum, och aldrig som grund för ett dubblettbeslut.**
+
+### Kvarstår
+
+- **A1065 / A1067:** nollningen står, men beskrivningarna pekar på fel motpart. Rättas till A2233 respektive A2232. Kräver Fazlis GO.
+- **A2221 / A2231** vilar på att 7 474,82 förekommer exakt en gång. Beloppet är bekräftat för 07-14 via kvittot; att det inte förekommer någon annan gång är inte uttömmande kontrollerat.
+
+### Metod som fungerade — använd den framåt
+
+`kvitto@hairtpclinic.com` innehåller varje Meta-kvitto i original, omaskerat. Sök på avsändare `business-updates.facebook.com` och matcha på **Transaktions-id** eller **Datumintervall**. Det är den snabbaste och säkraste vägen till transaktionsnyckeln — snabbare än cm-lagret, som både maskerar id:t och avkortar texten.
+
+### Nytt fynd: referensserierna skiljer annonskontona åt
+
+Meta-referenserna delar sig i två serier:
+
+- `*K42` / `*L42` → **Hair TP-kontot** (1112651725849665)
+- `*BK2` → **Curatiio-kontot** (479410056348442)
+
+Verifierat genom datummatchning: samtliga `*BK2`-debiteringar på båda Amex-korten (06-28, 06-25, 06-13, 06-11, 06-09, 06-07, 05-31, 05-25, 05-21 ×2, 05-18, 05-16, 05-14, 05-09, 04-25, 04-24, 04-09, 03-25, 03-16, 02-25, 02-16, 02-05, 02-03, 01-25, 01-11) har ett motsvarande kvitto i `meta_all_transactions/curatiio/`. Ingen `*K42`/`*L42` gör det.
+
+Det ger en tillförlitlig regel för att skilja kontona åt direkt ur kortutdraget, utan att öppna varje PDF.
+
+**Konsekvens:** `meta_all_transactions/curatiio/` slutar 2026-06-28. Juli och augusti är aldrig nedladdade. Det är därför kvittona saknas för A1209/A1210 (G5LKWWMBK2, 07-14) och A962 (A98FJZRBK2, 07-25) — båda är `*BK2`. De ska hämtas från Curatiio-kontot, inte letas efter i Hair TP-mappen.
+
+### Samtliga 20 obokförda tillhör Hair TP-kontot
+
+Alla tjugo referenser i listan är `*K42`/`*L42`. Ingen är Curatiio.
+
+Netto **131 979,34 kr**, moms 25 % **32 994,84 kr**. Det är den enskilt största kvarvarande posten i hela genomgången — större än allt som hittills rättats.
+
+---
+
 ## Utfall
 
 **Godkänt:** de 11 facit-rättelserna.

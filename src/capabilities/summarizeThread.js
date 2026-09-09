@@ -75,6 +75,36 @@ function describeRelativeTime(iso) {
   return new Date(ts).toLocaleDateString('sv-SE');
 }
 
+/**
+ * Vem talar? Utgående = kliniken (med avsändarnamnet om det finns),
+ * inkommande = kunden. Faller tillbaka på meddelandets `from` när det
+ * finns, annars "Kunden"/"Kliniken".
+ */
+function resolveSpeaker(message, customerName) {
+  const dir = normalizeText(message?.direction).toLowerCase();
+  const from = capText(message?.from, 60);
+  if (dir === 'outbound') return from || 'Kliniken';
+  const customer = capText(customerName, 60);
+  return customer || from || 'Kunden';
+}
+
+/**
+ * "Vem sa vad" — en ordnad rad per meddelande (senaste först begränsat
+ * till de sista 12) med avsändare, tidpunkt och ett kort utdrag.
+ */
+function buildTurns(messages, customerName) {
+  return asArray(messages)
+    .slice()
+    .sort(compareByTime)
+    .slice(-12)
+    .map((m) => ({
+      who: resolveSpeaker(m, customerName),
+      when: toIsoOrEmpty(m?.sentAt || m?.recordedAt),
+      said: capText(m?.body || m?.bodyPreview || m?.text, 220),
+    }))
+    .filter((t) => t.said);
+}
+
 function detectKeyTokens(messages) {
   // Regex-baserad extraktion av faktiska tokens som inte får hallucineras
   const out = {
@@ -136,6 +166,7 @@ function buildHeuristicSummary({ messages, customerName, subject, lastVisitedAt 
       whatChangedSinceLastVisit: '',
       newMessagesSinceLastVisit: 0,
       tokens: detectKeyTokens([]),
+      turns: [],
     };
   }
 
@@ -152,17 +183,14 @@ function buildHeuristicSummary({ messages, customerName, subject, lastVisitedAt 
   const headline = headlineParts.join(' ');
 
   const bullets = [];
-  // 1) Senaste händelse
-  const lastSenderLabel =
-    normalizeText(last?.direction).toLowerCase() === 'outbound'
-      ? 'Du svarade'
-      : `${customerLabel} skrev`;
+  // 1) Senaste händelse — med avsändare, inte bara "kund/klinik"
+  const lastSpeaker = resolveSpeaker(last, customerName);
   const lastWhen = describeRelativeTime(toIsoOrEmpty(last?.sentAt || last?.recordedAt));
   const lastBody = capText(last?.body || last?.bodyPreview || last?.text, 180);
   if (lastBody) {
-    bullets.push(`Senast: ${lastSenderLabel} ${lastWhen}: "${lastBody}"`);
+    bullets.push(`Senast: ${lastSpeaker} ${lastWhen}: "${lastBody}"`);
   } else {
-    bullets.push(`Senast: ${lastSenderLabel} ${lastWhen}.`);
+    bullets.push(`Senast: ${lastSpeaker} ${lastWhen}.`);
   }
 
   // 2) Volym-balans
@@ -233,6 +261,7 @@ function buildHeuristicSummary({ messages, customerName, subject, lastVisitedAt 
     whatChangedSinceLastVisit: whatChanged,
     newMessagesSinceLastVisit: newSince,
     tokens,
+    turns: buildTurns(sorted, customerName),
   };
 }
 
@@ -243,7 +272,7 @@ async function maybeRunOpenAiSummary({ openai, model, messages, customerName, su
     const transcript = messages
       .slice(-30) // hardcap för att undvika token-explosion
       .map((m, idx) => {
-        const who = normalizeText(m?.direction).toLowerCase() === 'outbound' ? 'KLINIK' : 'KUND';
+        const who = resolveSpeaker(m, customerName);
         const when = toIsoOrEmpty(m?.sentAt || m?.recordedAt) || `(${idx + 1})`;
         const body = capText(m?.body || m?.bodyPreview || m?.text, 800);
         return `[${when}] ${who}: ${body}`;
@@ -251,8 +280,10 @@ async function maybeRunOpenAiSummary({ openai, model, messages, customerName, su
       .join('\n');
 
     const systemPrompt =
-      'Du sammanfattar en e-postkonversation mellan en klinik och en kund. ' +
+      'Du sammanfattar en konversation mellan en klinik och en kund. ' +
       'Skriv KORT, max 5 punkter på svenska. ' +
+      'När du kan, ange VEM som sa vad i varje punkt — använd avsändarnamnen ur transkriptet, ' +
+      'inte bara "kunden"/"kliniken". ' +
       'STRIKT REGEL: hitta aldrig på fakta. Använd endast information som finns i transkriptet. ' +
       'Ange aldrig priser, datum eller medicinska detaljer som inte står ordagrant. ' +
       'Returnera JSON enligt schemat: { "headline": string, "bullets": string[] (3-5 st) }.';
@@ -372,6 +403,20 @@ class SummarizeThreadCapability extends BaseCapability {
           newMessagesSinceLastVisit: { type: 'integer', minimum: 0, maximum: 1000 },
           source: { type: 'string', enum: ['heuristic', 'openai', 'hybrid'] },
           generatedAt: { type: 'string', minLength: 1, maxLength: 64 },
+          turns: {
+            type: 'array',
+            maxItems: 12,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['who', 'when', 'said'],
+              properties: {
+                who: { type: 'string', maxLength: 60 },
+                when: { type: 'string', maxLength: 64 },
+                said: { type: 'string', maxLength: 240 },
+              },
+            },
+          },
           detectedLanguage: {
             type: 'object',
             additionalProperties: false,
@@ -727,6 +772,7 @@ class SummarizeThreadCapability extends BaseCapability {
         intent,
         nextBestAction,
         anomalies,
+        turns: asArray(heuristic.turns),
       },
       metadata: {
         capability: SummarizeThreadCapability.name,

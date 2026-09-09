@@ -79,3 +79,65 @@ Dessa bokförs INTE av mig — de kan finnas bokförda under annan beskrivning. 
 - **A340/A960 bokföringsdatum** avviker från debiteringsdatum (06-30 vs 06-28; 07-23 vs 08-01). Datum ändras inte av strykmetoden; flaggat här.
 - **A1062/A1218 nollade som dubbletter av A340:** debiteringarna 06-24 (3Q5EQRDL42) och 06-28 (W6JYBT5L42) är båda 7 096,00. Om någon av A1062/A1218 i själva verket var 06-24-debiteringen ska den återställas och 06-24 bokförs separat. Bedömt som osannolikt (samma datum 06-30 som A340).
 - Momsbelopp räknade om enligt konventionen 25 % av netto, halvt öre uppåt, där originalet saknade 2614/2645 (2641-raderna var felaktiga svenska momsberäkningar).
+
+---
+
+# Omprövning 2026-09-08 (efter granskning)
+
+Granskningen underkände de 26 nollningarna: dubblettnyckeln var belopp + datum, inte transaktionsnyckel. Samtliga 26 + de 12 lämnade har därför prövats om mot **transaktionsnyckeln** — nyckelkedjan: Meta-kvittots `Referensnummer`/`Faktura-nr` ↔ kortutdragets `FACEBK *<ref>` (tmp/platinum-61008.csv, tmp/sas-elite-86005.csv) ↔ Arcanas expense ↔ CM-record ↔ råmail.
+
+## Bevis per verifikation (källa: råmailets Referensnummer om inget annat anges)
+
+| Vernr | Transaktionsnyckel                                                            | Debitering       | Slutsats                                                       | Åtgärd                                            |
+| ----- | ----------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| A1061 | 9MH3MSVK42                                                                    | 07-01, Amex 1008 | Dubblett av A2234                                              | Nollad, korrekt                                   |
+| A1217 | 9MH3MSVK42 (samma cm-record som A1061)                                        | 07-01            | Dubblett av A2234                                              | Nollad, korrekt                                   |
+| A1063 | BQREPSMK42                                                                    | 07-03, Amex 1008 | Dubblett av A2235                                              | Nollad, korrekt                                   |
+| A1219 | BQREPSMK42 (samma cm-record som A1063)                                        | 07-03            | Dubblett av A2235                                              | Nollad, korrekt                                   |
+| A1062 | BQREPSMK42 (cm a92f8222, period 30 jun–3 jul)                                 | 07-03            | Dubblett av **A2235** — ej A340, ej 06-24-debiteringen         | Nollad; **beskrivning rättad** av A340 → av A2235 |
+| A1218 | BQREPSMK42 (samma cm-record som A1062)                                        | 07-03            | Dubblett av A2235                                              | Nollad; **beskrivning rättad** av A340 → av A2235 |
+| A1066 | XYTK3TDL42                                                                    | 07-07, Amex 1008 | Dubblett av A2233                                              | Nollad, korrekt                                   |
+| A1140 | XYTK3TDL42 (samma cm-record som A1066)                                        | 07-07            | Dubblett av A2233                                              | Nollad, korrekt                                   |
+| A1064 | VN57KU5L42                                                                    | 07-10, Amex 1008 | Dubblett av A2232                                              | Nollad, korrekt                                   |
+| A1139 | VN57KU5L42 (samma cm-record som A1064)                                        | 07-10            | Dubblett av A2232                                              | Nollad, korrekt                                   |
+| A1211 | YA64TTDL42                                                                    | 07-14, MC 3888   | Dubblett av A2236                                              | **Nollad vid omprövning**                         |
+| A1212 | YA64TTDL42                                                                    | 07-14            | Dubblett av A2236                                              | Nollad, korrekt                                   |
+| A1302 | Faktura FBADS-066-106284095 (= YA64TTDL42)                                    | 07-14            | Dubblett av A2236                                              | Nollad, korrekt                                   |
+| A2221 | 07-14 7 474,82 — beloppet finns exakt en gång (kortutdrag+kvitton)            | 07-14            | Dubblett av A2236                                              | Nollad, korrekt                                   |
+| A2231 | 07-14 7 474,82 — som ovan                                                     | 07-14            | Dubblett av A2236                                              | Nollad, korrekt                                   |
+| A1213 | ZLTFXTRK42                                                                    | 07-15, Amex 1008 | Dubblett av A2237                                              | **Nollad vid omprövning**                         |
+| A1214 | ZLTFXTRK42                                                                    | 07-15            | Dubblett av A2237                                              | Nollad, korrekt                                   |
+| A1215 | S3TH9VML42                                                                    | 07-16, Amex 6005 | Dubblett av A2238                                              | **Nollad vid omprövning**                         |
+| A1216 | S3TH9VML42                                                                    | 07-16            | Dubblett av A2238                                              | Nollad, korrekt                                   |
+| A961  | K3NQYUDL42                                                                    | 07-25, Amex 6005 | Dubblett av A2239                                              | **Nollad vid omprövning**                         |
+| A1308 | Faktura FBADS-066-106336699 (= K3NQYUDL42)                                    | 07-25            | Dubblett av A2239                                              | Nollad, korrekt                                   |
+| A963  | QTRMKV5L42                                                                    | 07-19, Amex 6005 | Dubblett av A2240                                              | Nollad, korrekt                                   |
+| A964  | QTRMKV5L42                                                                    | 07-19            | Dubblett av A2240                                              | **Nollad vid omprövning**                         |
+| A959  | LBJE4XVK42                                                                    | 08-11, Amex 6005 | Dubblett av A958                                               | **Nollad vid omprövning**                         |
+| A2224 | 01-20 7 096 — enda debiteringen det datumet (B2J8U9VK42)                      | 01-20            | Dubblett av A1305                                              | Nollad, korrekt                                   |
+| A2225 | 02-25 2 817,88 — enda med beloppet (X7Y4TCDL42)                               | 02-25            | Dubblett av A1307                                              | Nollad, korrekt                                   |
+| A2223 | 04-09 376,63 — enda med beloppet (YNF54J5L42)                                 | 04-09            | Dubblett av A1304                                              | Nollad, korrekt                                   |
+| A2222 | 05-19 5 322 — datumet pekar på FXZQ8MZK42                                     | 05-19            | Dubblett av A1303                                              | Nollad, korrekt                                   |
+| A2229 | 05-19 5 322 — som ovan                                                        | 05-19            | Dubblett av A1303                                              | Nollad, korrekt                                   |
+| A2220 | 06-25 692,33 — enda med beloppet (WGTRTRRK42)                                 | 06-25            | Dubblett av A1301                                              | Nollad, korrekt                                   |
+| A2227 | 08-11 7 096 — enda debiteringen det datumet (LBJE4XVK42)                      | 08-11            | Dubblett av A958                                               | Nollad, korrekt                                   |
+| A1065 | Ingen debitering existerar 07-02 på något kort (båda Amex-utdragen kompletta) | —                | Kan inte vara verklig kostnad; dubblett i 07-01–07-07-klustret | **Nollad vid omprövning** (av A2235, närmast)     |
+| A1067 | Ingen debitering existerar 07-06 på något kort                                | —                | Som ovan                                                       | **Nollad vid omprövning** (av A2233, närmast)     |
+| A2001 | Samma CF-id som A1995                                                         | 01-11            | Dubblett av A1995                                              | Nollad, korrekt — men se A1995 nedan              |
+
+Granskarens misstanke om A1062/A1218 är alltså bemött med motsatsbevis: båda bar 07-03-debiteringen (BQREPSMK42), och 06-24-debiteringen (3Q5EQRDL42) fanns aldrig bland dessa verifikationer. Den står kvar som saknad bokföring.
+
+## Kvar till Fazli — med nya bevis (5 poster)
+
+1. **A1995 + A2001 (7 500 kr, 01-11) — FEL BOLAG.** Referensnummer 6WWAYBVBK2 finns som kvitto i `~/Downloads/meta_all_transactions/curatiio/`: **Curatiio annonskonto 479410056348442**, Amex 6005, Faktura-nr FBADS-443-105363078. Kostnaden är Curatiios, bokförd i Hair TP via kvitto@hairtpclinic.com. Mitt facit på A1995 gjorde formen rätt men i fel bolag. **Förslag: nolla båda i Hair TP (ej som dubblett — ny beskrivningstyp behövs, t.ex. "Makulerad - Curatiio-kostnad bokförd i fel bolag") och bokför i Curatiio-passet.** Inväntar GO + godkänd beskrivning.
+2. **A1209 + A1210 (135,45, 07-13/07-14).** Verklig debitering: FACEBK \*G5LKWWMBK2, Amex 1008, 07-14 (kortutdraget). Kvitto-PDF saknas i båda bolagens mappar; A1210:s cm-record pekar på Curatiio-kontot. Oklart bolag → ingen åtgärd.
+3. **A962 (1 154,60, 07-13).** Verklig debitering: FACEBK \*A98FJZRBK2, Amex 6005, 07-25 (kortutdraget). Kvitto saknas, bolag oklart → ingen åtgärd.
+4. **A1306 (1,48, 06-17).** Betald med Annonseringskredit — ingen kortbetalning → ingen åtgärd.
+
+## Uppdaterad summering
+
+- Facit-rättelser: **11** (netto 57 091,06 kr, moms 14 272,77 kr) — alla godkända av granskningen, däribland A1995 som nu visat sig höra till Curatiio (se punkt 1).
+- Nollade dubbletter: **34** (26 + 8 vid omprövning), samtliga med transaktionsnyckel dokumenterad ovan.
+- Beskrivningsrättningar: **2** (A1062, A1218).
+- Kvar till Fazli: **5 poster** (A1995+A2001 som ett beslut, A1209+A1210 som ett, A962, A1306).
+- Orörda enligt order: A335, A336, A345, A346, A347, A349, A351.

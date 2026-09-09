@@ -76,8 +76,8 @@ function createSignalingService() {
       roomId,
       patientToken,
       hostToken,
-      patientUrl: `/video/join/${patientToken}`,
-      hostUrl: `/video/join/${hostToken}`,
+      patientUrl: `/video-call.html?token=${patientToken}`,
+      hostUrl: `/video-call.html?token=${hostToken}`,
       iceServers: resolveIceServers(),
     };
   }

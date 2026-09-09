@@ -6032,6 +6032,7 @@
           : `<button class="btn followup-action" data-action="followup_contacted" data-case-id="${escapeHtml(item.caseId || '')}">Kontaktad</button>
               <button class="btn followup-action" data-action="followup_needs_doctor" data-case-id="${escapeHtml(item.caseId || '')}">Behöver läkare</button>
               <button class="btn followup-action" data-action="followup_journal_draft" data-case-id="${escapeHtml(item.caseId || '')}">Journalutkast</button>
+              <button class="btn followup-video-action" data-case-id="${escapeHtml(item.caseId || '')}" data-patient-name="${escapeHtml(item.customerName || '')}" data-service-label="${escapeHtml(item.serviceLabel || item.action?.label || 'Uppföljning')}">Starta videosamtal</button>
               <button class="btn followup-upload-token-action" data-case-id="${escapeHtml(item.caseId || '')}" data-upload-url="${escapeHtml(uploadToken?.uploadUrl || uploadToken?.uploadPath || '')}">${uploadToken?.active ? 'Visa bildlänk' : 'Skapa bildlänk'}</button>
               <button class="btn primary followup-action" data-action="followup_completed" data-case-id="${escapeHtml(item.caseId || '')}">Markera klar</button>`;
         const uploadTokenHtml = uploadToken?.active
@@ -6791,6 +6792,51 @@
           ]);
         } catch (err) {
           setFeedback(err.message || 'Kunde inte spara uppföljningsåtgärd.', 'error');
+          button.disabled = false;
+        }
+      }
+
+      async function startFollowupVideoCall(button) {
+        const caseId = button?.dataset?.caseId || '';
+        const patientName = button?.dataset?.patientName || '';
+        const serviceLabel = button?.dataset?.serviceLabel || 'Uppföljning';
+        if (!caseId) return;
+
+        const card = button.closest('.item-card');
+        const escapedId =
+          window.CSS && typeof CSS.escape === 'function'
+            ? CSS.escape(caseId)
+            : String(caseId).replace(/["\\]/g, '\\$&');
+        const feedback = card?.querySelector(`[data-followup-feedback-for="${escapedId}"]`);
+        const setFeedback = (message, type) => {
+          if (!feedback) return;
+          feedback.textContent = message;
+          feedback.className = `queue-feedback ${type || ''}`.trim();
+        };
+
+        try {
+          button.disabled = true;
+          setFeedback('Skapar videorum...', '');
+          const room = await staffPost('/api/v1/video/rooms', {
+            encounterId: caseId,
+            patientName,
+            serviceLabel,
+          });
+          const base = window.location.origin;
+          const patientLink = room?.patientUrl ? `${base}${room.patientUrl}` : '';
+          const hostLink = room?.hostUrl ? `${base}${room.hostUrl}` : '';
+          const lines = [];
+          if (patientLink) lines.push(`Kundlänk: ${patientLink}`);
+          if (hostLink) lines.push(`Personal: ${hostLink}`);
+          setFeedback(
+            lines.length ? lines.join(' · ') : 'Videorum skapat.',
+            'ok'
+          );
+          if (patientLink && navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(patientLink).catch(() => {});
+          }
+        } catch (err) {
+          setFeedback(err.message || 'Kunde inte skapa videorum.', 'error');
           button.disabled = false;
         }
       }
@@ -9453,6 +9499,11 @@
         if (followupButton) {
           event.preventDefault();
           submitFollowupAction(followupButton);
+        }
+        const followupVideoButton = event.target.closest?.('.followup-video-action');
+        if (followupVideoButton) {
+          event.preventDefault();
+          startFollowupVideoCall(followupVideoButton);
         }
         const followupUploadTokenButton = event.target.closest?.('.followup-upload-token-action');
         if (followupUploadTokenButton) {

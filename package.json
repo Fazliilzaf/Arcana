@@ -479,7 +479,8 @@
     "playwright": "1.58.2",
     "redis": "^4.7.1",
     "sharp": "^0.35.3",
-    "stripe": "^22.1.1"
+    "stripe": "^22.1.1",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.0",

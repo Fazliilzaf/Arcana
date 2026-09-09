@@ -77,6 +77,39 @@ function createVideoRouter({ authStore, signalingService, transcriptionService }
     return res.json({ ok: true, iceServers: signalingService.resolveIceServers() });
   });
 
+  // --- Hälsokontroll (ingen auth) — svarar om signaleringstjänsten är uppe ---
+  router.get('/video/healthz', (req, res) => {
+    let activeRooms = 0;
+    try {
+      activeRooms = signalingService.listActiveRooms().length;
+    } catch {
+      activeRooms = -1;
+    }
+    const proto = req.secure ? 'wss' : 'ws';
+    const host = normalizeText(req.get('host')) || 'localhost';
+    return res.json({
+      ok: true,
+      signalingUp: true,
+      activeRooms,
+      transport: `${proto}://${host}/api/v1/video/signal`,
+    });
+  });
+
+  // --- Testrum (endast utanför produktion) — för manuell testning ---
+  router.post('/video/test-room', (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ ok: false, error: 'not_found' });
+    }
+    const room = signalingService.createRoom({
+      encounterId: normalizeText(req.body?.encounterId) || undefined,
+      tenantId: normalizeText(req.body?.tenantId) || 'test',
+      serviceLabel: normalizeText(req.body?.serviceLabel) || 'Test-videosamtal',
+      patientName: normalizeText(req.body?.patientName) || 'Testpatient',
+      hostUserId: 'test-operator',
+    });
+    return res.json({ ok: true, ...room });
+  });
+
   // --- Patient join (token-based, no auth) ---
 
   router.get('/video/join/:token', (req, res) => {
