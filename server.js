@@ -10131,6 +10131,7 @@ const { createPatientIdentityRouter } = require('./src/routes/patientIdentity');
 const { createPatientIdentityStore } = require('./src/ops/patientIdentityVerification');
 const { createVideoRouter } = require('./src/routes/video');
 const { createSignalingService } = require('./src/video/signalingServer');
+const { createSignalingTransport } = require('./src/video/signalingTransport');
 const { createMeetingTranscriptionService } = require('./src/video/meetingTranscription');
 const { createQmsRouter } = require('./src/routes/qms');
 const { createQmsStore } = require('./src/qms/qmsStore');
@@ -13732,6 +13733,13 @@ process.once('SIGTERM', () => {
       transcriptionService,
     })
   );
+
+  // WebRTC-signalering (WebSocket) — realtidstransporten för videorummen.
+  createSignalingTransport({
+    httpServer: server,
+    signalingService,
+    logger: typeof logger === 'object' ? logger : console,
+  });
 
   app.use(
     '/api/v1',

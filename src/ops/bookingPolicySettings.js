@@ -98,7 +98,10 @@ function resolveServicePolicyFields(service = {}, settings = {}) {
   const serviceId = normalizeText(service.id);
   const override = asObject(normalized.serviceOverrides[serviceId]);
   const global = normalized.globalDefaults;
-  const meetingMode = normalizeText(override.meetingMode || service.meetingMode).toLowerCase();
+  // Kundens explicita val (service.meetingMode, satt per bokning) vinner över
+  // migrations-defaultet (override.meetingMode). Det låter en videouppföljning
+  // bokas online även när tjänstens default är fysisk.
+  const meetingMode = normalizeText(service.meetingMode || override.meetingMode).toLowerCase();
   const defaultNotice =
     meetingMode === 'online' ? global.minNoticeOnlineMinutes : global.minNoticePhysicalMinutes;
 
