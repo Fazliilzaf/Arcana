@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#183e4f" />
+    <title>Videosamtal · Hair TP Clinic</title>
+    <style>
+      :root {
+        --bg: #0f1f27;
+        --panel: #16313d;
+        --ink: #eaf3f7;
+        --muted: #9db6c0;
+        --accent: #5ca3e0;
+        --danger: #e06565;
+        --ok: #5fb98a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, 'system-ui', 'Segoe UI', Roboto, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+      }
+      header {
+        width: 100%;
+        max-width: 760px;
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.6rem 0 1rem;
+      }
+      header .brand {
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      header .spacer { flex: 1; }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        background: var(--panel);
+        padding: 0.4rem 0.8rem;
+        border-radius: 999px;
+      }
+      .status .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+      }
+      .status.live .dot { background: var(--ok); }
+      .status.connecting .dot { background: #e0a94e; }
+      .status.error .dot { background: var(--danger); }
+      .videos {
+        width: 100%;
+        max-width: 760px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.8rem;
+      }
+      @media (max-width: 560px) {
+        .videos { grid-template-columns: 1fr; }
+      }
+      .tile {
+        position: relative;
+        aspect-ratio: 4 / 3;
+        background: #0a161c;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .tile video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .tile .tag {
+        position: absolute;
+        bottom: 0.6rem;
+        left: 0.6rem;
+        font-size: 0.72rem;
+        color: var(--muted);
+        background: rgba(10, 22, 28, 0.7);
+        padding: 0.2rem 0.55rem;
+        border-radius: 6px;
+      }
+      .tile .placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .controls {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .btn {
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: var(--panel);
+        color: var(--ink);
+        padding: 0.7rem 1.1rem;
+        border-radius: 999px;
+        font: 600 0.9rem/1 inherit;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        transition: all 0.15s;
+      }
+      .btn:hover { border-color: rgba(255, 255, 255, 0.35); }
+      .btn.danger { background: var(--danger); border-color: var(--danger); }
+      .btn.off { opacity: 0.55; }
+      .error-box {
+        margin-top: 1rem;
+        max-width: 760px;
+        width: 100%;
+        text-align: center;
+        color: var(--danger);
+        font-size: 0.9rem;
+        background: rgba(224, 101, 101, 0.12);
+        border: 1px solid rgba(224, 101, 101, 0.3);
+        border-radius: 12px;
+        padding: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="brand">Hair TP Clinic · Videosamtal</span>
+      <span class="spacer"></span>
+      <span class="status" id="status"><span class="dot"></span><span id="statusText">Ansluter…</span></span>
+    </header>
+
+    <div class="videos">
+      <div class="tile">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <span class="tag">Du</span>
+      </div>
+      <div class="tile">
+        <video id="remoteVideo" autoplay playsinline></video>
+        <span class="tag" id="remoteTag">Motpart</span>
+        <div class="placeholder" id="remotePlaceholder">Väntar på motpart…</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="micBtn" type="button">🎙️ Mikrofon av</button>
+      <button class="btn" id="camBtn" type="button">📷 Kamera av</button>
+      <button class="btn danger" id="leaveBtn" type="button">Lämna samtalet</button>
+    </div>
+
+    <div class="error-box" id="errorBox" hidden></div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        var params = new URLSearchParams(window.location.search);
+        var token = (params.get('token') || '').trim();
+
+        var els = {
+          status: document.getElementById('status'),
+          statusText: document.getElementById('statusText'),
+          localVideo: document.getElementById('localVideo'),
+          remoteVideo: document.getElementById('remoteVideo'),
+          remotePlaceholder: document.getElementById('remotePlaceholder'),
+          remoteTag: document.getElementById('remoteTag'),
+          micBtn: document.getElementById('micBtn'),
+          camBtn: document.getElementById('camBtn'),
+          leaveBtn: document.getElementById('leaveBtn'),
+          errorBox: document.getElementById('errorBox'),
+        };
+
+        var pc = null;
+        var ws = null;
+        var localStream = null;
+        var roomInfo = null;
+        var micOn = true;
+        var camOn = true;
+
+        function setStatus(kind, text) {
+          els.status.className = 'status ' + kind;
+          els.statusText.textContent = text;
+        }
+
+        function showError(text) {
+          els.errorBox.hidden = false;
+          els.errorBox.textContent = text;
+        }
+
+        function remoteConnected() {
+          els.remotePlaceholder.hidden = true;
+          setStatus('live', 'Samtal pågår');
+        }
+
+        function setTrackEnabled(kind, on) {
+          if (!localStream) return;
+          localStream.getTracks().forEach(function (t) {
+            if (t.kind === kind) t.enabled = on;
+          });
+        }
+
+        function toggleMic() {
+          micOn = !micOn;
+          setTrackEnabled('audio', micOn);
+          els.micBtn.textContent = micOn ? '🎙️ Mikrofon av' : '🔇 Mikrofon på';
+          els.micBtn.classList.toggle('off', !micOn);
+        }
+
+        function toggleCam() {
+          camOn = !camOn;
+          setTrackEnabled('video', camOn);
+          els.camBtn.textContent = camOn ? '📷 Kamera av' : '🚫 Kamera på';
+          els.camBtn.classList.toggle('off', !camOn);
+        }
+
+        function send(type, payload) {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: type, payload: payload }));
+          }
+        }
+
+        function setupPeerConnection(iceServers) {
+          pc = new RTCPeerConnection({ iceServers: iceServers && iceServers.length ? iceServers : [] });
+
+          pc.onicecandidate = function (e) {
+            if (e.candidate) {
+              send('ice-candidate', {
+                candidate: e.candidate.candidate,
+                sdpMid: e.candidate.sdpMid,
+                sdpMLineIndex: e.candidate.sdpMLineIndex,
+              });
+            }
+          };
+
+          pc.ontrack = function (e) {
+            if (els.remoteVideo.srcObject !== e.streams[0]) {
+              els.remoteVideo.srcObject = e.streams[0];
+            }
+            remoteConnected();
+          };
+
+          if (localStream) {
+            localStream.getTracks().forEach(function (track) {
+              pc.addTrack(track, localStream);
+            });
+          }
+        }
+
+        async function initiate() {
+          var offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          send('offer', { sdp: pc.localDescription.sdp });
+        }
+
+        async function handleSignal(msg) {
+          try {
+            if (msg.type === 'offer') {
+              await pc.setRemoteDescription({ type: 'offer', sdp: msg.payload.sdp });
+              var answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              send('answer', { sdp: pc.localDescription.sdp });
+            } else if (msg.type === 'answer') {
+              await pc.setRemoteDescription({ type: 'answer', sdp: msg.payload.sdp });
+            } else if (msg.type === 'ice-candidate') {
+              var init = msg.payload;
+              if (init && init.candidate) {
+                await pc.addIceCandidate(init);
+              }
+            } else if (msg.type === 'peer-joined') {
+              setStatus('connecting', 'Motpart ansluten — kopplar…');
+            } else if (msg.type === 'peer-left') {
+              setStatus('error', 'Motparten lämnade samtalet');
+              els.remotePlaceholder.hidden = false;
+            }
+          } catch (err) {
+            showError('Signalfel: ' + (err && err.message));
+          }
+        }
+
+        function cleanup() {
+          if (ws) { try { ws.close(); } catch (e) {} }
+          if (pc) { try { pc.close(); } catch (e) {} }
+          if (localStream) {
+            localStream.getTracks().forEach(function (t) { t.stop(); });
+          }
+          pc = null;
+          ws = null;
+          localStream = null;
+        }
+
+        async function start() {
+          if (!token) {
+            setStatus('error', 'Saknar token');
+            showError('Ingen samtalslänk. Be personalen skicka en ny länk.');
+            return;
+          }
+
+          var info;
+          try {
+            var res = await fetch('/api/v1/video/join/' + encodeURIComponent(token));
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            info = await res.json();
+            if (!info.ok) throw new Error(info.error || 'Rummet är inte tillgängligt');
+          } catch (err) {
+            setStatus('error', 'Rummet är inte tillgängligt');
+            showError('Rummet finns inte eller har avslutats. Be personalen skapa ett nytt samtal.');
+            return;
+          }
+          roomInfo = info;
+          els.remoteTag.textContent = info.patientName ? 'Motpart · ' + info.patientName : 'Motpart';
+
+          ws = new WebSocket(
+            (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+              location.host +
+              '/api/v1/video/signal?token=' +
+              encodeURIComponent(token)
+          );
+
+          ws.onopen = async function () {
+            setStatus('connecting', 'Startar kamera…');
+            try {
+              localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              els.localVideo.srcObject = localStream;
+              setupPeerConnection(info.iceServers);
+              // Patienten (gästen) initierar; personalen väntar på erbjudandet.
+              if (info.role === 'patient') {
+                await initiate();
+              } else {
+                setStatus('connecting', 'Väntar på motpart…');
+              }
+            } catch (err) {
+              setStatus('error', 'Kunde inte starta kamera');
+              showError('Kameran/mikrofonen är inte tillgänglig: ' + (err && err.message));
+            }
+          };
+
+          ws.onmessage = function (e) {
+            var msg;
+            try { msg = JSON.parse(e.data); } catch (err) { return; }
+            handleSignal(msg);
+          };
+
+          ws.onclose = function () {
+            setStatus('error', 'Samtalet avslutades');
+            els.remotePlaceholder.hidden = false;
+            cleanup();
+          };
+
+          ws.onerror = function () {
+            setStatus('error', 'Anslutningsfel');
+            showError('Kunde inte ansluta till signaleringen.');
+          };
+        }
+
+        els.micBtn.addEventListener('click', toggleMic);
+        els.camBtn.addEventListener('click', toggleCam);
+        els.leaveBtn.addEventListener('click', function () {
+          cleanup();
+          setStatus('error', 'Du lämnade samtalet');
+          els.remotePlaceholder.hidden = false;
+        });
+        window.addEventListener('beforeunload', cleanup);
+
+        start();
+      })();
+    </script>
+  </body>
+</html>
