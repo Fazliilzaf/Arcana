@@ -3714,7 +3714,7 @@
               Välj datum
             </button>
           </div>
-          <button class="btn-video" type="button">
+          <button class="btn-video" type="button" onclick="joinVideoCall(this)">
             <svg
               width="14"
               height="14"
@@ -3764,7 +3764,7 @@
               Välj datum
             </button>
           </div>
-          <button class="btn-video" type="button">
+          <button class="btn-video" type="button" onclick="joinVideoCall(this)">
             <svg
               width="14"
               height="14"
@@ -5315,6 +5315,24 @@
         var videoSub = card.querySelector('.video-sub');
         if (videoBtn) videoBtn.classList.toggle('visible', isOnline);
         if (videoSub) videoSub.classList.toggle('visible', isOnline);
+      }
+
+      // "Gå med i videomötet" — öppnar videolänken om den finns i kontexten,
+      // annars förklarar den att länken kommer via e-post.
+      function joinVideoCall(button) {
+        var ctx = window.ARCANA_CUSTOMER_OFFER_CONTEXT || {};
+        var url = typeof ctx.videoRoomUrl === 'string' ? ctx.videoRoomUrl.trim() : '';
+        if (url) {
+          window.open(url, '_blank', 'noopener');
+          return;
+        }
+        var card = button.closest('.booking-card');
+        var sub = card ? card.querySelector('.video-sub') : null;
+        if (sub) {
+          sub.textContent =
+            'Videolänken skickas till din e-post när kliniken startar samtalet. Håll utkik i din inkorg.';
+          sub.classList.add('visible');
+        }
       }
     </script>
     <script src="/major-arcana-preview/app/cco-portal-level2.js"></script>
