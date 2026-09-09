@@ -4,6 +4,75 @@
 (() => {
   'use strict';
 
+  function injectStyles() {
+    if (document.getElementById('thread-ai-summary-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'thread-ai-summary-styles';
+    style.textContent = `
+      .thread-ai-summary-panel {
+        margin: 0;
+        padding: 14px 16px;
+        border-radius: var(--r-md, 14px);
+        background: var(--press, linear-gradient(180deg, #fff, #f4eee8));
+        border: 1px solid var(--panel-border, rgba(120, 105, 90, 0.16));
+        box-shadow: var(--sh-sm, 0 1px 2px rgba(56, 40, 28, 0.06));
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .thread-ai-summary-head { display: flex; flex-direction: column; gap: 2px; }
+      .thread-ai-summary-kicker {
+        margin: 0;
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--accent-studio, #bb4779);
+      }
+      .thread-ai-summary-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        line-height: 1.25;
+        color: var(--ink, #1d1e24);
+      }
+      .thread-ai-summary-bullets,
+      .thread-ai-summary-turns-list {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .thread-ai-summary-bullets li,
+      .thread-ai-summary-turns-list li {
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--body, #2a2b32);
+      }
+      .thread-ai-summary-turns-list strong {
+        color: var(--ink, #1d1e24);
+        font-weight: 700;
+      }
+      .thread-ai-summary-turns { display: flex; flex-direction: column; gap: 5px; }
+      .thread-ai-summary-next,
+      .thread-ai-summary-risk {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--body, #2a2b32);
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.6);
+      }
+      .thread-ai-summary-next strong,
+      .thread-ai-summary-risk strong { color: var(--ink, #1d1e24); }
+      .thread-ai-summary-risk { background: rgba(168, 56, 56, 0.06); }
+    `;
+    document.head.appendChild(style);
+  }
+  injectStyles();
+
   const SUMMARY_DEBOUNCE_MS = 450;
   const cache = new Map();
   const inflight = new Map();
