@@ -1869,6 +1869,7 @@ function createCcoConversationRouter({
           secondaryActions: Array.isArray(nba.secondaryActions) ? nba.secondaryActions : [],
           source: normalizeText(data.source) || 'heuristic',
           generatedAt: normalizeText(data.generatedAt),
+          turns: Array.isArray(data.turns) ? data.turns : [],
         };
         if (
           ccoConversationStateStore &&

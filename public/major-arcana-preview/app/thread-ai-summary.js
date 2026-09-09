@@ -152,6 +152,9 @@
     }
     const headline = normalizeText(summary.headline) || 'AI-sammanfattning';
     const bullets = Array.isArray(summary.bullets) ? summary.bullets.filter(Boolean).slice(0, 5) : [];
+    const turns = Array.isArray(summary.turns)
+      ? summary.turns.filter((t) => t && normalizeText(t.said)).slice(0, 12)
+      : [];
     const nextStep = normalizeText(summary.nextStep);
     const risk = normalizeText(summary.risk);
     host.hidden = false;
@@ -166,6 +169,21 @@
             ? `<ul class="thread-ai-summary-bullets">${bullets
                 .map((item) => `<li>${escapeHtml(item)}</li>`)
                 .join('')}</ul>`
+            : ''
+        }
+        ${
+          turns.length
+            ? `<div class="thread-ai-summary-turns">
+                <p class="thread-ai-summary-kicker">Vem sa vad</p>
+                <ol class="thread-ai-summary-turns-list">${turns
+                  .map(
+                    (t) =>
+                      `<li><strong>${escapeHtml(normalizeText(t.who) || '?')}</strong> — ${escapeHtml(
+                        t.said
+                      )}</li>`
+                  )
+                  .join('')}</ol>
+              </div>`
             : ''
         }
         ${nextStep ? `<p class="thread-ai-summary-next"><strong>Nästa:</strong> ${escapeHtml(nextStep)}</p>` : ''}
