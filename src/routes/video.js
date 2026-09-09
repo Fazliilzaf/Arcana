@@ -95,6 +95,21 @@ function createVideoRouter({ authStore, signalingService, transcriptionService }
     });
   });
 
+  // --- Testrum (endast utanför produktion) — för manuell testning ---
+  router.post('/video/test-room', (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ ok: false, error: 'not_found' });
+    }
+    const room = signalingService.createRoom({
+      encounterId: normalizeText(req.body?.encounterId) || undefined,
+      tenantId: normalizeText(req.body?.tenantId) || 'test',
+      serviceLabel: normalizeText(req.body?.serviceLabel) || 'Test-videosamtal',
+      patientName: normalizeText(req.body?.patientName) || 'Testpatient',
+      hostUserId: 'test-operator',
+    });
+    return res.json({ ok: true, ...room });
+  });
+
   // --- Patient join (token-based, no auth) ---
 
   router.get('/video/join/:token', (req, res) => {
